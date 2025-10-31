@@ -1,12 +1,30 @@
-'use client'
+ 'use client'
 
+import { Suspense, useEffect } from 'react';
 import { LoginPage } from '../../components/LoginPage';
 import { useUserProfile } from '../../contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+function LoadingState({ label }: { label: string }) {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-2 text-sm text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Login() {
+  return (
+    <Suspense fallback={<LoadingState label="Ładowanie strony logowania..." />}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const { user, isLoading } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -21,14 +39,7 @@ export default function Login() {
 
   // Show loading while checking auth
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Sprawdzanie...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Sprawdzanie..." />;
   }
 
   // Don't render login page if user is authenticated (will redirect)
