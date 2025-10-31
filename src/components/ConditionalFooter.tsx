@@ -1,0 +1,34 @@
+'use client';
+
+import { createContext, useContext, useState, ReactNode } from 'react';
+import { Footer } from './Footer';
+
+interface LayoutContextType {
+  isMapExpanded: boolean;
+  setIsMapExpanded: (expanded: boolean) => void;
+}
+
+const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
+
+export function useLayoutContext() {
+  const context = useContext(LayoutContext);
+  if (!context) {
+    throw new Error('useLayoutContext must be used within a LayoutProvider');
+  }
+  return context;
+}
+
+interface LayoutProviderProps {
+  children: ReactNode;
+}
+
+export function LayoutProvider({ children }: LayoutProviderProps) {
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+
+  return (
+    <LayoutContext.Provider value={{ isMapExpanded, setIsMapExpanded }}>
+      {children}
+      {!isMapExpanded && <Footer />}
+    </LayoutContext.Provider>
+  );
+}

@@ -1,0 +1,388 @@
+import { createClient } from '../supabase/client';
+import { ManagerProfile } from '../../types/manager';
+
+// Re-export ManagerProfile for convenience
+export type { ManagerProfile };
+
+// Interface for browse page manager data
+export interface BrowseManager {
+  id: string;
+  name: string;
+  short_name?: string;
+  city: string;
+  avatar_url?: string;
+  plan_type: 'basic' | 'pro' | 'premium';
+  last_active: string;
+  is_verified: boolean;
+  verification_level: string;
+  founded_year?: number;
+  employee_count?: string;
+  buildings_count: number;
+  units_count: number;
+  total_area: number;
+  organization_type: string;
+  primary_needs: string[];
+  frequent_services: string[];
+  managed_property_types: string[];
+  years_active: number;
+  published_jobs: number;
+  completed_projects: number;
+  active_contractors: number;
+  average_response_time: string;
+  payment_punctuality: number;
+  project_completion_rate: number;
+  contractor_retention_rate: number;
+  rating: number;
+  review_count: number;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+}
+
+export interface ManagerFilters {
+  city?: string;
+  organizationType?: string;
+  searchQuery?: string;
+  sortBy?: 'rating' | 'buildings' | 'units' | 'experience' | 'name';
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Fetch managers for the browse page with optional filtering
+ */
+export async function fetchManagers(filters: ManagerFilters = {}): Promise<BrowseManager[]> {
+  const supabase = createClient();
+  
+  const {
+    city,
+    organizationType,
+    searchQuery,
+    sortBy = 'rating',
+    limit = 50,
+    offset = 0
+  } = filters;
+
+  try {
+    let query = supabase
+      .from('companies')
+      .select('*')
+      .in('type', ['property_management', 'housing_association', 'cooperative', 'condo_management', 'spółdzielnia', 'wspólnota']);
+
+    // Apply filters
+    if (city) {
+      query = query.eq('city', city);
+    }
+
+    if (organizationType) {
+      // Filter by organization_type in manager_data JSONB
+      query = query.eq('manager_data->>organization_type', organizationType);
+    }
+
+    if (searchQuery) {
+      query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching managers:', error);
+      throw new Error('Failed to fetch managers');
+    }
+
+    // Fetch ratings for all managers
+    const managerIds = (data || []).map(company => company.id);
+    let ratingsMap: { [key: string]: any } = {};
+    
+    if (managerIds.length > 0) {
+      const { data: ratingsData } = await (supabase as any)
+        .from('company_ratings')
+        .select('company_id, average_rating, total_reviews')
+        .in('company_id', managerIds);
+      
+      if (ratingsData) {
+        ratingsMap = ratingsData.reduce((acc: any, rating: any) => {
+          acc[rating.company_id] = rating;
+          return acc;
+        }, {});
+      }
+    }
+
+    // Transform data to BrowseManager format
+    let managers: BrowseManager[] = (data || []).map((company: any) => {
+      const ratings = ratingsMap[company.id];
+      const managerData = company.manager_data || {};
+      const experienceData = company.experience_data || {};
+      const statsData = company.stats_data || {};
+      
+      return {
+        id: company.id,
+        name: company.name,
+        short_name: company.short_name,
+        city: company.city || '',
+        avatar_url: company.avatar_url,
+        plan_type: company.plan_type || 'basic',
+        last_active: company.last_active || company.updated_at || new Date().toISOString(),
+        is_verified: company.is_verified,
+        verification_level: company.verification_level || 'none',
+        founded_year: company.founded_year,
+        employee_count: company.employee_count,
+        buildings_count: managerData.buildings_count || 0,
+        units_count: managerData.units_count || 0,
+        total_area: managerData.total_area || 0,
+        organization_type: managerData.organization_type || company.type,
+        primary_needs: managerData.primary_needs || [],
+        frequent_services: managerData.frequent_services || [],
+        managed_property_types: managerData.managed_property_types || [],
+        years_active: experienceData.years_active || 0,
+        published_jobs: experienceData.published_jobs || 0,
+        completed_projects: experienceData.completed_projects || 0,
+        active_contractors: experienceData.active_contractors || 0,
+        average_response_time: statsData.average_response_time || '',
+        payment_punctuality: statsData.payment_punctuality || 0,
+        project_completion_rate: statsData.project_completion_rate || 0,
+        contractor_retention_rate: statsData.contractor_retention_rate || 0,
+        rating: ratings?.average_rating || 0,
+        review_count: ratings?.total_reviews || 0,
+        phone: company.phone,
+        email: company.email,
+        website: company.website,
+        address: company.address
+      };
+    });
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'rating':
+        managers = managers.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        break;
+      case 'name':
+        managers = managers.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'buildings':
+        managers = managers.sort((a, b) => (b.buildings_count || 0) - (a.buildings_count || 0));
+        break;
+      case 'units':
+        managers = managers.sort((a, b) => (b.units_count || 0) - (a.units_count || 0));
+        break;
+      case 'experience':
+        managers = managers.sort((a, b) => (b.years_active || 0) - (a.years_active || 0));
+        break;
+      default:
+        managers = managers.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+    }
+
+    return managers;
+  } catch (error) {
+    console.error('Error in fetchManagers:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch a single manager by ID with full profile data
+ */
+export async function fetchManagerById(id: string): Promise<ManagerProfile | null> {
+  const supabase = createClient();
+
+  try {
+    // Fetch company data
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', id)
+      .in('type', ['property_management', 'housing_association', 'cooperative', 'condo_management', 'spółdzielnia', 'wspólnota'])
+      .single();
+
+    if (companyError || !company) {
+      console.error('Error fetching manager:', companyError);
+      return null;
+    }
+
+    // Fetch real ratings data
+    const { data: ratingsData } = await (supabase as any)
+      .from('company_ratings')
+      .select('average_rating, total_reviews, rating_breakdown, category_ratings')
+      .eq('company_id', id)
+      .single();
+
+    // Fetch reviews
+    const { data: reviewsData } = await (supabase as any)
+      .from('company_reviews')
+      .select(`
+        id,
+        rating,
+        title,
+        comment,
+        categories,
+        created_at,
+        user_profiles!company_reviews_reviewer_id_fkey (
+          first_name,
+          last_name,
+          user_type
+        )
+      `)
+      .eq('company_id', id)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const managerData = (company as any).manager_data || {};
+    const experienceData = (company as any).experience_data || {};
+    const statsData = (company as any).stats_data || {};
+
+    // Transform to ManagerProfile format with real data
+    const manager: ManagerProfile = {
+      id: company.id,
+      name: company.name,
+      organizationType: managerData.organization_type || company.type as any,
+      avatar: (company as any).avatar_url,
+      coverImage: (company as any).cover_image_url,
+      location: {
+        city: company.city || 'Warszawa',
+        district: company.city || 'Warszawa',
+        coordinates: { lat: 52.2297, lng: 21.0122 }
+      },
+      contactInfo: {
+        phone: company.phone || '',
+        email: company.email || '',
+        website: company.website,
+        address: company.address || '',
+        contactPerson: '',
+        position: ''
+      },
+      businessInfo: {
+        nip: company.nip || '',
+        regon: company.regon || '',
+        krs: company.krs,
+        yearEstablished: company.founded_year || 2020,
+        legalForm: managerData.organization_type || 'Wspólnota Mieszkaniowa'
+      },
+      rating: {
+        overall: ratingsData?.average_rating || 0,
+        reviewsCount: ratingsData?.total_reviews || 0,
+        categories: {
+          paymentTimeliness: ratingsData?.category_ratings?.payment_timeliness || 0,
+          communication: ratingsData?.category_ratings?.communication || 0,
+          projectClarity: ratingsData?.category_ratings?.project_clarity || 0,
+          professionalism: ratingsData?.category_ratings?.professionalism || 0
+        }
+      },
+      verification: {
+        status: company.is_verified ? 'verified' : 'unverified',
+        badges: [],
+        documents: [],
+        lastVerified: company.updated_at
+      },
+      managedProperties: {
+        buildingsCount: managerData.buildings_count || 0,
+        unitsCount: managerData.units_count || 0,
+        totalArea: managerData.total_area || 0,
+        propertyTypes: managerData.managed_property_types || [],
+        constructionYears: managerData.construction_years || { min: 2000, max: 2024 },
+        averageUnitSize: managerData.average_unit_size || 70
+      },
+      services: {
+        primaryNeeds: managerData.primary_needs || [],
+        frequentServices: managerData.frequent_services || [],
+        specialRequirements: managerData.special_requirements || []
+      },
+      experience: {
+        yearsActive: experienceData.years_active || 0,
+        publishedJobs: experienceData.published_jobs || 0,
+        completedProjects: experienceData.completed_projects || 0,
+        activeContractors: experienceData.active_contractors || 0,
+        budgetRange: experienceData.budget_range || { min: 0, max: 0 }
+      },
+      portfolio: {
+        images: (company as any).portfolio_data?.images || [],
+        managedBuildings: (company as any).portfolio_data?.managedBuildings || []
+      },
+      financials: {
+        averageProjectBudget: managerData.average_project_budget || '0 zł',
+        paymentTerms: managerData.payment_terms || [],
+        budgetPreferences: '',
+        fundingSources: []
+      },
+      requirements: {
+        requiredCertificates: managerData.required_certificates || [],
+        insuranceRequirements: managerData.insurance_requirements || '',
+        preferredPaymentMethods: managerData.preferred_payment_methods || [],
+        workingHours: managerData.working_hours || '',
+        specialRequests: managerData.special_requests || []
+      },
+      reviews: (reviewsData || []).map((review: any) => ({
+        id: review.id,
+        author: review.user_profiles ? 
+          `${review.user_profiles.first_name} ${review.user_profiles.last_name}` : 
+          'Anonimowy użytkownik',
+        authorCompany: review.user_profiles?.user_type === 'manager' ? 'Wspólnota mieszkaniowa' : 'Firma wykonawcza',
+        rating: review.rating,
+        date: review.created_at,
+        project: review.job_id ? 'Projekt remontowy' : 'Współpraca',
+        comment: review.comment || '',
+        response: undefined,
+        helpful: 0
+      })),
+      stats: {
+        averageResponseTime: statsData.average_response_time || '',
+        paymentPunctuality: statsData.payment_punctuality || 0,
+        projectCompletionRate: statsData.project_completion_rate || 0,
+        contractorRetentionRate: statsData.contractor_retention_rate || 0,
+        averageProjectDuration: statsData.average_project_duration || ''
+      },
+      preferences: {
+        preferredContractorSize: managerData.preferred_contractor_size || [],
+        workSchedulePreference: managerData.work_schedule_preference || '',
+        communicationStyle: managerData.communication_style || '',
+        budgetFlexibility: managerData.budget_flexibility || ''
+      },
+      recentActivity: {
+        lastJobPosted: '',
+        totalJobsThisYear: 0,
+        averageJobsPerMonth: 0,
+        seasonalActivity: {}
+      },
+      joinedDate: company.created_at,
+      lastActive: company.updated_at
+    };
+
+    return manager;
+  } catch (error) {
+    console.error('Error in fetchManagerById:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get top rated managers
+ */
+export async function getTopRatedManagers(limit: number = 5): Promise<BrowseManager[]> {
+  return fetchManagers({ sortBy: 'rating', limit });
+}
+
+/**
+ * Get managers by city
+ */
+export async function getManagersByCity(city: string): Promise<BrowseManager[]> {
+  return fetchManagers({ city, limit: 50 });
+}
+
+/**
+ * Get managers by organization type
+ */
+export async function getManagersByType(organizationType: string): Promise<BrowseManager[]> {
+  return fetchManagers({ organizationType, limit: 50 });
+}
+
+/**
+ * Search managers by query
+ */
+export async function searchManagers(query: string): Promise<BrowseManager[]> {
+  return fetchManagers({ searchQuery: query, limit: 50 });
+}
