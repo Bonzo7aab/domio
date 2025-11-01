@@ -2,7 +2,7 @@
   "name": "Domio - Platforma zleceń budowlanych",
   "short_name": "Domio",
   "description": "Mobilna aplikacja łącząca zarządców nieruchomości z wykonawcami budowlanymi",
-  "start_url": "/mobile.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1e40af",
@@ -89,7 +89,7 @@
       "name": "Znajdź zlecenia",
       "short_name": "Zlecenia",
       "description": "Przeglądaj dostępne zlecenia budowlane",
-      "url": "/mobile.html?view=home",
+      "url": "/jobs",
       "icons": [
         {
           "src": "/icon-96x96.png",
@@ -98,10 +98,10 @@
       ]
     },
     {
-      "name": "Mapa zleceń",
-      "short_name": "Mapa", 
-      "description": "Zobacz zlecenia na mapie",
-      "url": "/mobile.html?view=map",
+      "name": "Panel zarządcy",
+      "short_name": "Zarządca",
+      "description": "Szybki dostęp do panelu zarządcy",
+      "url": "/manager-dashboard",
       "icons": [
         {
           "src": "/icon-96x96.png",
@@ -110,10 +110,10 @@
       ]
     },
     {
-      "name": "Mój profil",
-      "short_name": "Profil",
-      "description": "Zarządzaj swoim kontem",
-      "url": "/mobile.html?view=profile", 
+      "name": "Panel wykonawcy",
+      "short_name": "Wykonawca",
+      "description": "Szybki dostęp do panelu wykonawcy",
+      "url": "/contractor-dashboard", 
       "icons": [
         {
           "src": "/icon-96x96.png",

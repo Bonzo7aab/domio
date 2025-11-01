@@ -15,6 +15,7 @@ import {
   FileText,
   Download
 } from 'lucide-react';
+import { mockApplications as applicationMocks, jobListMockData } from '../mocks';
 
 interface MyApplication {
   id: string;
@@ -52,93 +53,51 @@ interface MyApplicationsProps {
   onStartConversation?: (applicationId: string) => void;
 }
 
-// Mock data for contractor's applications
-const mockApplications: MyApplication[] = [
-  {
-    id: 'app-1',
-    jobId: '1',
-    jobTitle: 'Kompleksowe sprzątanie klatek schodowych',
-    jobCompany: 'Wspólnota Mieszkaniowa "Słoneczna"',
-    jobLocation: 'Warszawa, Mokotów',
-    jobCategory: 'Utrzymanie Czystości i Zieleni',
-    proposedPrice: 2800,
-    proposedTimeline: '2 tygodnie',
-    status: 'accepted',
-    submittedAt: new Date('2024-01-15T10:30:00'),
-    lastUpdated: new Date('2024-01-18T14:20:00'),
-    coverLetter: 'Dzień dobry, jesteśmy firmą z 5-letnim doświadczeniem w sprzątaniu budynków mieszkalnych...',
-    experience: 'Realizowaliśmy podobne projekty dla Wspólnoty "Zielona" oraz SM "Centrum"...',
-    attachments: [
-      { id: 'att-1', name: 'portfolio.pdf', type: 'portfolio', url: '#' },
-      { id: 'att-2', name: 'referencje.pdf', type: 'reference', url: '#' }
-    ],
-    certificates: ['ISO 9001', 'Certyfikat DDD'],
-    reviewNotes: 'Bardzo dobre referencje i profesjonalne podejście. Zapraszamy do współpracy.',
-    contractDetails: {
-      startDate: new Date('2024-02-01'),
-      endDate: new Date('2025-01-31'),
-      totalValue: 33600,
-      paymentSchedule: 'Miesięcznie do 10. każdego miesiąca'
-    }
-  },
-  {
-    id: 'app-2',
-    jobId: '2',
-    jobTitle: 'Remont elewacji budynku - 4-piętrowy',
-    jobCompany: 'Wspólnota Mieszkaniowa ul. Parkowa 24',
-    jobLocation: 'Kraków, Podgórze',
-    jobCategory: 'Roboty Remontowo-Budowlane',
-    proposedPrice: 75000,
-    proposedTimeline: '4 tygodnie',
-    status: 'under_review',
-    submittedAt: new Date('2024-01-16T09:15:00'),
-    lastUpdated: new Date('2024-01-17T11:30:00'),
-    coverLetter: 'Oferujemy kompleksowy remont elewacji z wykorzystaniem najnowszych technologii...',
-    experience: 'Specjalizujemy się w remontach elewacji budynków mieszkalnych od 2018 roku...',
-    attachments: [
-      { id: 'att-3', name: 'kosztorys_elewacja.pdf', type: 'estimate', url: '#' },
-      { id: 'att-4', name: 'uprawnienia_budowlane.pdf', type: 'certificate', url: '#' }
-    ],
-    certificates: ['Certyfikat budowlany', 'Uprawnienia wysokościowe']
-  },
-  {
-    id: 'app-3',
-    jobId: '5',
-    jobTitle: 'Deratyzacja i dezynsekcja',
-    jobCompany: 'Wspólnota Mieszkaniowa "Osiedle Słoneczne"',
-    jobLocation: 'Poznań',
-    jobCategory: 'Specjalistyczne usługi',
-    proposedPrice: 1200,
-    proposedTimeline: '3 dni',
-    status: 'rejected',
-    submittedAt: new Date('2024-01-12T16:45:00'),
-    lastUpdated: new Date('2024-01-14T10:00:00'),
-    coverLetter: 'Posiadamy wszystkie wymagane certyfikaty DDD oraz wieloletnie doświadczenie...',
-    experience: 'Obsługujemy wspólnoty mieszkaniowe w Poznaniu i okolicach od 2020 roku...',
-    attachments: [
-      { id: 'att-5', name: 'certyfikaty_DDD.pdf', type: 'certificate', url: '#' }
-    ],
-    certificates: ['Certyfikat DDD', 'Pozwolenie na biocydy'],
-    reviewNotes: 'Dziękujemy za ofertę. Wybraliśmy firmę z większym doświadczeniem w tej lokalizacji.'
-  },
-  {
-    id: 'app-4',
-    jobId: '7',
-    jobTitle: 'Naprawa instalacji hydraulicznej',
-    jobCompany: 'Wspólnota Mieszkaniowa "Centrum"',
-    jobLocation: 'Łódź',
-    jobCategory: 'Instalacje i systemy',
-    proposedPrice: 1800,
-    proposedTimeline: '1 dzień',
-    status: 'submitted',
-    submittedAt: new Date('2024-01-18T08:30:00'),
-    lastUpdated: new Date('2024-01-18T08:30:00'),
-    coverLetter: 'Jesteśmy dostępni na interwencje 24/7. Posiadamy pełne wyposażenie do napraw hydraulicznych...',
-    experience: 'Specjalizujemy się w naprawach awaryjnych instalacji w budynkach mieszkalnych...',
-    attachments: [],
-    certificates: ['Uprawnienia hydrauliczne', 'Certyfikat instalatorski']
-  }
-];
+// Derive mock data for contractor's applications using centralized mocks
+const derivedMockApplications: MyApplication[] = applicationMocks.map((application, index) => {
+  const job = jobListMockData.find(jobEntry => jobEntry.id === application.jobId);
+
+  return {
+    id: application.id,
+    jobId: application.jobId,
+    jobTitle: job?.title || `Zlecenie ${application.jobId}`,
+    jobCompany: job?.company || application.contractorCompany,
+    jobLocation: job?.location || application.contractorLocation,
+    jobCategory: job?.category || 'Inne usługi',
+    proposedPrice: application.proposedPrice,
+    proposedTimeline: application.proposedTimeline,
+    status: application.status,
+    submittedAt: application.submittedAt,
+    lastUpdated: application.lastUpdated,
+    coverLetter: application.coverLetter,
+    experience: application.experience,
+    attachments: application.attachments.map(attachment => ({
+      id: attachment.id,
+      name: attachment.name,
+      type: attachment.type,
+      url: attachment.url
+    })),
+    certificates: application.certificates,
+    reviewNotes: application.reviewNotes,
+    interviewDate: undefined,
+    contractDetails: undefined,
+    // Ensure diversity in sample data for UI states
+    ...(index === 0
+      ? {
+          status: 'accepted' as const,
+          contractDetails: {
+            startDate: new Date('2024-02-01'),
+            endDate: new Date('2025-01-31'),
+            totalValue: application.proposedPrice * 12,
+            paymentSchedule: 'Miesięcznie do 10. każdego miesiąca'
+          }
+        }
+      : {}),
+    ...(index === 1 ? { status: 'under_review' as const } : {}),
+    ...(index === 2 ? { status: 'rejected' as const } : {}),
+    ...(index === 3 ? { status: 'submitted' as const } : {})
+  };
+});
 
 export const MyApplications: React.FC<MyApplicationsProps> = ({
   onJobView,
@@ -147,7 +106,7 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
   const [selectedTab, setSelectedTab] = useState('all');
 
   // Filter applications by status
-  const filteredApplications = mockApplications.filter(app => {
+  const filteredApplications = derivedMockApplications.filter(app => {
     switch (selectedTab) {
       case 'pending':
         return app.status === 'submitted';
@@ -164,11 +123,11 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
 
   // Statistics
   const stats = {
-    total: mockApplications.length,
-    pending: mockApplications.filter(app => app.status === 'submitted').length,
-    review: mockApplications.filter(app => app.status === 'under_review').length,
-    accepted: mockApplications.filter(app => app.status === 'accepted').length,
-    rejected: mockApplications.filter(app => app.status === 'rejected').length
+    total: derivedMockApplications.length,
+    pending: derivedMockApplications.filter(app => app.status === 'submitted').length,
+    review: derivedMockApplications.filter(app => app.status === 'under_review').length,
+    accepted: derivedMockApplications.filter(app => app.status === 'accepted').length,
+    rejected: derivedMockApplications.filter(app => app.status === 'rejected').length
   };
 
   const formatPrice = (price: number) => {

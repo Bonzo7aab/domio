@@ -49,6 +49,7 @@ import { Separator } from './ui/separator';
 import { Switch } from './ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Textarea } from './ui/textarea';
+import { getTenderById } from '../mocks';
 
 interface ContractorPageProps {
   onBack: () => void;
@@ -199,28 +200,22 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   };
 
   const handleBidSubmit = (tenderId: string) => {
-    // Mock tender data for the form
-    const mockTender = {
-      id: tenderId,
-      title: 'Kompleksowy remont elewacji budynku mieszkalnego',
-      deadline: new Date('2024-02-15T23:59:59'),
-      value: '450000',
-      currency: 'PLN',
-      evaluationCriteria: [
-        { id: 'price', name: 'Cena oferty', description: 'Łączna cena realizacji', weight: 40, type: 'price' as const },
-        { id: 'quality', name: 'Jakość wykonania', description: 'Doświadczenie i referencje', weight: 30, type: 'quality' as const },
-        { id: 'time', name: 'Termin realizacji', description: 'Czas wykonania prac', weight: 20, type: 'time' as const },
-        { id: 'warranty', name: 'Gwarancja', description: 'Okres gwarancji i serwis', weight: 10, type: 'quality' as const }
-      ],
-      requirements: [
-        'Doświadczenie min. 3 lata w remontach elewacji',
-        'Certyfikat ISO 9001',
-        'Ubezpieczenie OC min. 500,000 zł',
-        'Referencje z podobnych projektów'
-      ]
-    };
-    
-    setSelectedTender(mockTender);
+    const tender = getTenderById(tenderId) || getTenderById('tender-1');
+
+    if (!tender) {
+      console.warn('Tender not found for bid submission');
+      return;
+    }
+
+    setSelectedTender({
+      id: tender.id,
+      title: tender.title,
+      deadline: tender.submissionDeadline || new Date(),
+      value: tender.estimatedValue || '0',
+      currency: tender.currency || 'PLN',
+      evaluationCriteria: tender.evaluationCriteria || [],
+      requirements: tender.requirements || []
+    });
     setShowBidSubmission(true);
   };
 
