@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import * as RechartsPrimitive from "recharts";
+// Recharts is imported but not used in this file - it's only used when charts are actually rendered
+// This allows tree-shaking to work properly with optimizePackageImports in next.config.js
 
 import { cn } from "./utils";
 

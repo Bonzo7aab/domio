@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { MapPin, Clock, BookmarkIcon, Eye, Gavel, Wrench, Users } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -52,7 +52,7 @@ interface JobCardProps {
   onApplyClick?: (jobId: string, jobData?: any) => void;
 }
 
-export default function JobCard({ 
+const JobCard = React.memo(function JobCard({ 
   job, 
   onClick, 
   onBookmark, 
@@ -62,35 +62,37 @@ export default function JobCard({
   isHighlighted = false,
   onApplyClick
 }: JobCardProps) {
-  const handleBookmarkClick = (e: React.MouseEvent) => {
+  const handleBookmarkClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onBookmark?.(job.id);
-  };
+  }, [job.id, onBookmark]);
 
-
-  const handleApplyClick = (e: React.MouseEvent) => {
+  const handleApplyClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (onApplyClick) {
       onApplyClick(job.id, job);
     }
-  };
+  }, [job.id, job, onApplyClick]);
 
-  const isTender = job.postType === 'tender';
+  const isTender = useMemo(() => job.postType === 'tender', [job.postType]);
   
   // Helper function to get days remaining for tenders
-  const getDaysRemaining = (deadline: string) => {
+  const getDaysRemaining = useCallback((deadline: string) => {
     const now = new Date();
     const deadlineDate = new Date(deadline);
     const diffTime = deadlineDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return Math.max(0, diffDays);
-  };
+  }, []);
 
   // Render tender card with new design
-  if (isTender) {
-    const daysRemaining = job.tenderInfo?.submissionDeadline 
+  const daysRemaining = useMemo(() => {
+    return isTender && job.tenderInfo?.submissionDeadline 
       ? getDaysRemaining(job.tenderInfo.submissionDeadline)
       : 0;
+  }, [isTender, job.tenderInfo?.submissionDeadline, getDaysRemaining]);
+
+  if (isTender) {
 
     return (
       <Card 
@@ -318,4 +320,6 @@ export default function JobCard({
       </CardContent>
     </Card>
   );
-}
+});
+
+export default JobCard;
