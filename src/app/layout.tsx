@@ -5,13 +5,31 @@ import { Toaster } from '../components/ui/sonner'
 import AuthProvider from '../contexts/AuthContext'
 import { HeaderWrapper } from '../components/HeaderWrapper'
 import { LayoutProvider } from '../components/ConditionalFooter'
-import { GlobalCommandPalette } from '../components/GlobalCommandPalette'
+import { GlobalCommandPaletteClient } from '../components/GlobalCommandPaletteClient'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap',
+  preload: true,
+  variable: '--font-inter',
+})
 
 export const metadata: Metadata = {
   title: 'Domio - Platforma dla Zarządców i Wykonawców',
   description: 'Platforma łącząca zarządców nieruchomości z wykwalifikowanymi wykonawcami',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  openGraph: {
+    type: 'website',
+    locale: 'pl_PL',
+    url: '/',
+    siteName: 'Domio',
+    title: 'Domio - Platforma dla Zarządców i Wykonawców',
+    description: 'Platforma łącząca zarządców nieruchomości z wykwalifikowanymi wykonawcami',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 }
 
 // Note: Next.js 15 enables React.StrictMode by default in development
@@ -32,7 +50,7 @@ export default function RootLayout({
               {children}
             </main>
             <Toaster />
-            <GlobalCommandPalette />
+            <GlobalCommandPaletteClient />
           </LayoutProvider>
         </AuthProvider>
       </body>

@@ -1,16 +1,41 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import JobFilters, { FilterState } from '../components/JobFilters';
 import { EnhancedJobList } from '../components/EnhancedJobList';
-import { EnhancedMapViewGoogleMaps as EnhancedMapView } from '../components/EnhancedMapViewGoogleMaps';
 import { JobApplicationModal } from '../components/JobApplicationModal';
-import { MessagingSystem } from '../components/MessagingSystem';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getJobsAndTenders, type DBJobFilters } from '../lib/data';
 import { useLayoutContext } from '../components/ConditionalFooter';
+
+// Dynamically import heavy components to reduce initial bundle size
+const EnhancedMapViewGoogleMaps = dynamic(
+  () => import('../components/EnhancedMapViewGoogleMaps').then(mod => ({ default: mod.EnhancedMapViewGoogleMaps })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full bg-muted">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">Ładowanie mapy...</p>
+        </div>
+      </div>
+    )
+  }
+);
+
+const MessagingSystem = dynamic(
+  () => import('../components/MessagingSystem').then(mod => ({ default: mod.MessagingSystem })),
+  { 
+    ssr: false,
+    loading: () => null
+  }
+);
+
+const EnhancedMapView = EnhancedMapViewGoogleMaps;
 
 export default function HomePage() {
   const { user } = useUserProfile();

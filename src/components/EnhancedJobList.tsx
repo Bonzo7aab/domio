@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { addBookmark, getBookmarkedJobs, removeBookmark } from '../utils/bookmarkStorage';
 import { getStoredJobs, Job } from '../utils/jobStorage';
 import JobCard from './JobCard';
@@ -255,6 +255,48 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     }
   }, [primaryLocation, onPrimaryLocationChange]);
 
+  const handleJobSelect = useCallback((jobId: string) => {
+    onJobSelect?.(jobId);
+  }, [onJobSelect]);
+
+  const handleJobHover = useCallback((jobId: string | null) => {
+    onJobHover?.(jobId);
+  }, [onJobHover]);
+
+  const handleBookmark = useCallback((jobId: string, job: any) => {
+    const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
+    
+    if (isCurrentlyBookmarked) {
+      // Remove bookmark
+      removeBookmark(jobId);
+      setBookmarkedJobs(prev => prev.filter(id => id !== jobId));
+    } else {
+      // Add bookmark
+      const bookmarkData = {
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        postType: (job.postType || 'job') as 'job' | 'tender',
+        budget: job.budget || job.salary,
+        deadline: job.deadline
+      };
+      addBookmark(bookmarkData);
+      setBookmarkedJobs(prev => [...prev, jobId]);
+    }
+  }, [bookmarkedJobs]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    if (onClearSearch) {
+      onClearSearch();
+    }
+  }, [onClearSearch]);
+
+  const handleLoadMore = useCallback(() => {
+    setLoadedCount(prev => prev + 10);
+  }, []);
+
   return (
     <div className="flex-1 overflow-hidden">
       <div className="flex flex-col h-full">
@@ -315,33 +357,12 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
                 <JobCard
                   key={job.id || `fallback-${index}`}
                   job={job}
-                  onClick={() => onJobSelect?.(job.id)}
-                  onMouseEnter={() => onJobHover?.(job.id)}
-                  onMouseLeave={() => onJobHover?.(null)}
+                  onClick={() => handleJobSelect(job.id)}
+                  onMouseEnter={() => handleJobHover(job.id)}
+                  onMouseLeave={() => handleJobHover(null)}
                   isHighlighted={hoveredJobId === job.id}
                   isBookmarked={bookmarkedJobs.includes(job.id)}
-                  onBookmark={(jobId) => {
-                    const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
-                    
-                    if (isCurrentlyBookmarked) {
-                      // Remove bookmark
-                      removeBookmark(jobId);
-                      setBookmarkedJobs(prev => prev.filter(id => id !== jobId));
-                    } else {
-                      // Add bookmark
-                      const bookmarkData = {
-                        id: job.id,
-                        title: job.title,
-                        company: job.company,
-                        location: job.location,
-                        postType: (job.postType || 'job') as 'job' | 'tender',
-                        budget: job.budget || job.salary,
-                        deadline: job.deadline
-                      };
-                      addBookmark(bookmarkData);
-                      setBookmarkedJobs(prev => [...prev, jobId]);
-                    }
-                  }}
+                  onBookmark={() => handleBookmark(job.id, job)}
                   onApplyClick={onApplyClick}
                 />
               ))
@@ -352,7 +373,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
               <div className="text-center pt-4">
                 <Button 
                   variant="outline" 
-                  onClick={() => setLoadedCount(prev => prev + 10)}
+                  onClick={handleLoadMore}
                 >
                   Załaduj więcej ogłoszeń
                 </Button>
