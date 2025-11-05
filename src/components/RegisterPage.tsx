@@ -93,15 +93,9 @@ export function RegisterPage({ searchParams }: RegisterPageProps) {
                         htmlFor="manager"
                         className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg cursor-pointer transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300"
                       >
-                        <div className="w-6 h-6 rounded-full border-2 border-slate-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 flex items-center justify-center">
-                          {selectedUserType === 'manager' && (
-                            <div className="w-2 h-2 bg-white rounded-full"></div>
-                          )}
-                        </div>
                         <Building className="h-5 w-5 text-slate-600" />
                         <div>
                           <h3 className="font-medium text-slate-900">Zarządca</h3>
-                          <p className="text-xs text-slate-600">Zarządzanie nieruchomościami</p>
                         </div>
                       </Label>
                     </div>
@@ -120,15 +114,9 @@ export function RegisterPage({ searchParams }: RegisterPageProps) {
                         htmlFor="contractor"
                         className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg cursor-pointer transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300"
                       >
-                        <div className="w-6 h-6 rounded-full border-2 border-slate-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 flex items-center justify-center">
-                          {selectedUserType === 'contractor' && (
-                            <div className="w-2 h-2 bg-white rounded-full"></div>
-                          )}
-                        </div>
                         <User className="h-5 w-5 text-slate-600" />
                         <div>
                           <h3 className="font-medium text-slate-900">Wykonawca</h3>
-                          <p className="text-xs text-slate-600">Świadczenie usług</p>
                         </div>
                       </Label>
                     </div>

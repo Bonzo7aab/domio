@@ -8,6 +8,8 @@ interface TrustIndicatorsProps {
   hasInsurance?: boolean;
   certificates?: string[];
   rating?: number;
+  visits_count?: number;
+  bookmarks_count?: number;
   completedJobs?: number;
   clientType?: string;
   urgent?: boolean;
@@ -22,6 +24,8 @@ export default function TrustIndicators({
   hasInsurance = false,
   certificates = [],
   rating,
+  visits_count,
+  bookmarks_count,
   completedJobs,
   clientType,
   urgent = false,
@@ -61,18 +65,36 @@ export default function TrustIndicators({
         </Badge>
       )}
       
-      {/* Rating and experience in one line */}
-      {rating && (
+      {/* Rating (for contractors) or visits/bookmarks (for jobs) */}
+      {isContractorView && rating && (
         <div className="flex items-center space-x-2">
           <TrustBadge type="rating" value={rating} />
           {completedJobs && showAll && (
             <TrustBadge 
               type="experience" 
               value={completedJobs}
-              tooltip={isContractorView ? `Firma wykonała ${completedJobs} zleceń na platformie Urbi.eu` : `Wspólnota/spółdzielnia opublikowała ${completedJobs} zleceń na platformie Urbi.eu`}
+              tooltip={`Firma wykonała ${completedJobs} zleceń na platformie Urbi.eu`}
             />
           )}
         </div>
+      )}
+      {/* Visits and bookmarks for jobs */}
+      {!isContractorView && (visits_count !== undefined || bookmarks_count !== undefined) && (
+        <div className="flex items-center space-x-2 text-xs text-gray-600">
+          {visits_count !== undefined && visits_count > 0 && (
+            <span>{visits_count} wyświetleń</span>
+          )}
+          {bookmarks_count !== undefined && bookmarks_count > 0 && (
+            <span>{bookmarks_count} zapisów</span>
+          )}
+        </div>
+      )}
+      {!isContractorView && completedJobs && showAll && (
+        <TrustBadge 
+          type="experience" 
+          value={completedJobs}
+          tooltip={`Wspólnota/spółdzielnia opublikowała ${completedJobs} zleceń na platformie Urbi.eu`}
+        />
       )}
       
       {/* Insurance and certificates - tylko dla wykonawców */}

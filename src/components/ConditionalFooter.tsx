@@ -28,7 +28,11 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   return (
     <LayoutContext.Provider value={{ isMapExpanded, setIsMapExpanded }}>
       {children}
-      {!isMapExpanded && <Footer />}
+      {!isMapExpanded && (
+        <div className="hidden md:block">
+          <Footer />
+        </div>
+      )}
     </LayoutContext.Provider>
   );
 }

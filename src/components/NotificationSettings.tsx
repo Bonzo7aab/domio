@@ -1,17 +1,40 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Switch } from './ui/switch';
 import { Alert, AlertDescription } from './ui/alert';
-import { Edit2, X, Check, Bell } from 'lucide-react';
+import { Edit2, X, Check, Bell, AlertCircle } from 'lucide-react';
+import { useUserProfile } from '../contexts/AuthContext';
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  mapPreferencesToComponent,
+  savePushSubscription,
+  deletePushSubscription,
+  getPushSubscriptions
+} from '../lib/database/notifications';
+import {
+  isPushNotificationSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  getServiceWorkerRegistration,
+  subscribeToPushNotifications,
+  unsubscribeFromPushNotifications,
+  getUserAgent
+} from '../lib/push-notifications/client';
 
 export function NotificationSettings() {
+  const { user, isAuthenticated } = useUserProfile();
   const [isEditing, setIsEditing] = useState(false);
   const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
+  const [pushPermissionStatus, setPushPermissionStatus] = useState<'default' | 'granted' | 'denied'>('default');
+  const [isPushSupported, setIsPushSupported] = useState(false);
   
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
@@ -29,7 +52,136 @@ export function NotificationSettings() {
     messageNotifications: true,
   });
 
-  const handleNotificationChange = (setting: string, value: boolean) => {
+  // Load preferences from database on mount
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setIsLoadingPreferences(false);
+      return;
+    }
+
+    const loadPreferences = async () => {
+      try {
+        setIsLoadingPreferences(true);
+        const dbPreferences = await getNotificationPreferences(user.id);
+        const componentPreferences = mapPreferencesToComponent(dbPreferences);
+        
+        setNotificationSettings({
+          emailNotifications: componentPreferences.emailNotifications,
+          pushNotifications: componentPreferences.pushNotifications,
+          marketingEmails: componentPreferences.marketingEmails,
+          jobUpdates: componentPreferences.jobUpdates,
+          messageNotifications: componentPreferences.messageNotifications,
+        });
+        setOriginalSettings({
+          emailNotifications: componentPreferences.emailNotifications,
+          pushNotifications: componentPreferences.pushNotifications,
+          marketingEmails: componentPreferences.marketingEmails,
+          jobUpdates: componentPreferences.jobUpdates,
+          messageNotifications: componentPreferences.messageNotifications,
+        });
+      } catch (err) {
+        console.error('Error loading notification preferences:', err);
+        setError('Nie udało się załadować ustawień powiadomień');
+      } finally {
+        setIsLoadingPreferences(false);
+      }
+    };
+
+    loadPreferences();
+  }, [user, isAuthenticated]);
+
+  // Check push notification support and permission status
+  useEffect(() => {
+    const checkPushSupport = () => {
+      const supported = isPushNotificationSupported();
+      setIsPushSupported(supported);
+      
+      if (supported) {
+        const permission = getNotificationPermission();
+        setPushPermissionStatus(permission);
+      }
+    };
+
+    checkPushSupport();
+  }, []);
+
+  const handleNotificationChange = async (setting: string, value: boolean) => {
+    // Special handling for push notifications
+    if (setting === 'pushNotifications' && value === true) {
+      // User wants to enable push notifications
+      if (!isPushSupported) {
+        setError('Powiadomienia push nie są obsługiwane w tej przeglądarce');
+        return;
+      }
+
+      const permission = getNotificationPermission();
+      
+      if (permission === 'denied') {
+        setError('Powiadomienia push zostały zablokowane. Odblokuj je w ustawieniach przeglądarki.');
+        return;
+      }
+
+      if (permission === 'default') {
+        // Request permission
+        try {
+          const newPermission = await requestNotificationPermission();
+          setPushPermissionStatus(newPermission);
+          
+          if (newPermission !== 'granted') {
+            setError('Powiadomienia push wymagają zgody użytkownika');
+            return;
+          }
+        } catch (err) {
+          console.error('Error requesting notification permission:', err);
+          setError('Nie udało się uzyskać zgody na powiadomienia push');
+          return;
+        }
+      }
+
+      // Subscribe to push notifications
+      try {
+        const registration = await getServiceWorkerRegistration();
+        if (!registration) {
+          setError('Rejestracja service workera nie jest dostępna');
+          return;
+        }
+
+        const subscription = await subscribeToPushNotifications(registration);
+        if (subscription && user?.id) {
+          await savePushSubscription(user.id, {
+            endpoint: subscription.endpoint,
+            p256dh: subscription.keys.p256dh,
+            auth: subscription.keys.auth,
+            userAgent: getUserAgent()
+          });
+        }
+      } catch (err) {
+        console.error('Error subscribing to push notifications:', err);
+        setError('Nie udało się zasubskrybować powiadomień push');
+        return;
+      }
+    } else if (setting === 'pushNotifications' && value === false) {
+      // User wants to disable push notifications - unsubscribe
+      try {
+        const registration = await getServiceWorkerRegistration();
+        if (registration) {
+          await unsubscribeFromPushNotifications(registration);
+          
+          // Delete subscription from database
+          if (user?.id) {
+            const subscriptions = await getPushSubscriptions(user.id);
+            for (const sub of subscriptions) {
+              await deletePushSubscription(user.id, sub.endpoint);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error unsubscribing from push notifications:', err);
+        // Continue anyway - user wants to disable
+      }
+    }
+
+    // Update local state
     setNotificationSettings(prev => ({
       ...prev,
       [setting]: value
@@ -37,17 +189,32 @@ export function NotificationSettings() {
   };
 
   const handleSaveSettings = async () => {
+    if (!isAuthenticated || !user?.id) {
+      setError('Musisz być zalogowany, aby zapisać ustawienia');
+      return;
+    }
+
     setIsLoading(true);
+    setError('');
+    setSuccess('');
+    
     try {
-      // TODO: Implement saving notification settings
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log('Saving notification settings:', notificationSettings);
+      // Save notification preferences to database
+      await saveNotificationPreferences(user.id, {
+        emailNotifications: notificationSettings.emailNotifications,
+        pushNotifications: notificationSettings.pushNotifications,
+        marketingNotifications: notificationSettings.marketingEmails,
+        messageNotifications: notificationSettings.messageNotifications,
+        newJobNotifications: notificationSettings.jobUpdates,
+      });
+
       setOriginalSettings(notificationSettings);
       setSuccess('Ustawienia powiadomień zostały zapisane');
       setIsEditing(false);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error('Error saving settings:', err);
+      setError('Nie udało się zapisać ustawień powiadomień');
     } finally {
       setIsLoading(false);
     }
@@ -56,13 +223,35 @@ export function NotificationSettings() {
   const handleCancel = () => {
     setNotificationSettings(originalSettings);
     setIsEditing(false);
+    setError('');
   };
+
+  // Determine if push notifications can be enabled
+  const canEnablePush = isPushSupported && pushPermissionStatus !== 'denied';
+  const isPushDisabled = !isPushSupported || pushPermissionStatus === 'denied';
+
+  if (isLoadingPreferences) {
+    return (
+      <div className="space-y-4">
+        <div className="border rounded-lg p-4 bg-card">
+          <p className="text-sm text-muted-foreground">Ładowanie ustawień...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       {success && (
         <Alert>
           <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      )}
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
@@ -78,6 +267,7 @@ export function NotificationSettings() {
               variant="outline" 
               size="sm"
               onClick={() => setIsEditing(true)}
+              disabled={!isAuthenticated}
             >
               <Edit2 className="h-4 w-4 mr-2" />
               Edytuj
@@ -125,13 +315,21 @@ export function NotificationSettings() {
             <div className="space-y-1">
               <Label>Powiadomienia push</Label>
               <p className="text-sm text-muted-foreground">
-                Otrzymuj powiadomienia w przeglądarce
+                {isPushDisabled 
+                  ? 'Powiadomienia push nie są dostępne (zablokowane lub nieobsługiwane)'
+                  : 'Otrzymuj powiadomienia w przeglądarce'
+                }
               </p>
+              {pushPermissionStatus === 'denied' && (
+                <p className="text-xs text-destructive mt-1">
+                  Powiadomienia zostały zablokowane. Odblokuj je w ustawieniach przeglądarki.
+                </p>
+              )}
             </div>
             <Switch
-              checked={notificationSettings.pushNotifications}
+              checked={notificationSettings.pushNotifications && canEnablePush}
               onCheckedChange={(value) => handleNotificationChange('pushNotifications', value)}
-              disabled={!isEditing}
+              disabled={!isEditing || isPushDisabled}
             />
           </div>
 

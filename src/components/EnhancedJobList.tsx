@@ -173,11 +173,6 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
         return false;
       }
       
-      // Filter by rating
-      if (filters.rating > 0 && (job.rating || 0) < filters.rating) {
-        return false;
-      }
-      
       return true;
     });
   }, [searchFilteredJobs, filters]);
@@ -210,8 +205,6 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
         return sorted.sort((a, b) => (b.budgetTotal || 0) - (a.budgetTotal || 0));
       case 'applications':
         return sorted.sort((a, b) => a.applications - b.applications);
-      case 'rating':
-        return sorted.sort((a, b) => b.rating - a.rating);
       default:
         return sorted;
     }

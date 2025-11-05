@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react';
-import { Search, Bell, User, Menu, MessageCircle, GraduationCap, Play, Bookmark, LogOut } from 'lucide-react';
+import { Search, Bell, User, MessageCircle, GraduationCap, Play, Bookmark, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { UnifiedNotifications } from './UnifiedNotifications';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -64,6 +64,10 @@ export function Header({ initialUser }: HeaderProps) {
     router.push('/user-type-selection')
   }
 
+  const handleRegisterClick = () => {
+    router.push('/register')
+  }
+
   const handleAccountClick = () => {
     router.push('/account')
   }
@@ -99,7 +103,7 @@ export function Header({ initialUser }: HeaderProps) {
   }
 
   return (
-    <header className="domio-header sticky top-0 z-50" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+    <header className="domio-header sticky top-0 z-50 w-full" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* 1. Logo Section - Left */}
@@ -107,23 +111,25 @@ export function Header({ initialUser }: HeaderProps) {
             <h1 className="text-2xl font-bold cursor-pointer" style={{ color: '#1e40af' }} onClick={handleHomeClick}>Domio</h1>
           </div>
 
-          {/* 2. Center Content - Navigation and Search Bar */}
-          <div className="flex items-center space-x-4">
+          {/* 2. Center Content - Navigation and Search Bar (Hidden on mobile) */}
+          <div className="hidden md:flex items-center space-x-4 flex-1 justify-center">
             {/* Navigation buttons */}
-            <div className="hidden md:flex items-center space-x-3">
+            <div className="flex items-center space-x-3">
               <Button variant="ghost" size="sm" onClick={handleContractorPageClick} className="text-sm hover:bg-gray-200">
                 Wykonawcy
               </Button>
               <Button variant="ghost" size="sm" onClick={handleManagerPageClick} className="text-sm hover:bg-gray-200">
                 Zarządcy Nieruchomości
               </Button>
-              <Button variant="ghost" size="sm" onClick={handlePricingClick} className="text-sm hover:bg-gray-200">
-                Cennik
-              </Button>
+              {false && (
+                <Button variant="ghost" size="sm" onClick={handlePricingClick} className="text-sm hover:bg-gray-200">
+                  Cennik
+                </Button>
+              )}
             </div>
             
             {/* Fixed Width Search Bar */}
-            <div className="hidden sm:block">
+            <div className="hidden lg:block">
               <Button
                 variant="outline"
                 className="flex items-center justify-between h-10 w-64 text-muted-foreground hover:text-foreground"
@@ -151,21 +157,32 @@ export function Header({ initialUser }: HeaderProps) {
             </div>
           </div>
 
-          {/* 3. Right Side Actions - Notifications and User Dropdown */}
-          <div className="flex items-center space-x-3">
-            {/* Unified Notifications - visible for all users */}
-            <UnifiedNotifications 
-              onJobSelect={handleJobSelect}
-              onSearchSelect={(query) => {
-                console.log('Search query:', query);
-              }}
-              onApplicationSelect={(applicationId) => {
-                console.log('Navigate to application:', applicationId);
-              }}
-              onTenderSelect={(tenderId) => {
-                console.log('Navigate to tender:', tenderId);
-              }}
-            />
+            {/* Add Job button - only visible on desktop for managers and unauthenticated users */}
+            <div className="hidden md:block mr-4">
+              {(!userIsAuthenticated || currentUser?.userType !== 'contractor') && (
+                <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
+                  Dodaj Ogłoszenie
+                </Button>
+              )}
+            </div>
+
+          {/* 3. Right Side Actions - Notifications and User Dropdown (Always visible) */}
+          <div className="flex items-center space-x-3 flex-shrink-0">
+            {/* Unified Notifications - only visible for authenticated users */}
+            {userIsAuthenticated && (
+              <UnifiedNotifications 
+                onJobSelect={handleJobSelect}
+                onSearchSelect={(query) => {
+                  console.log('Search query:', query);
+                }}
+                onApplicationSelect={(applicationId) => {
+                  console.log('Navigate to application:', applicationId);
+                }}
+                onTenderSelect={(tenderId) => {
+                  console.log('Navigate to tender:', tenderId);
+                }}
+              />
+            )}
             
             {/* User Actions */}
             {isLoading ? (
@@ -265,33 +282,30 @@ export function Header({ initialUser }: HeaderProps) {
                 </DropdownMenu>
               </>
             ) : (
-              <Button variant="ghost" size="sm" onClick={handleLoginClick} className="text-sm bg-gray-200 hover:bg-gray-300">
-                <User className="h-4 w-4 mr-2" />
-                Zaloguj się
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
+                    <User className="h-4 w-4 mr-2" />
+                    Zaloguj się / Zarejestruj
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  className="w-48 border border-gray-200 shadow-lg" 
+                  align="end"
+                  style={{ backgroundColor: '#f8fafc' }}
+                >
+                  <DropdownMenuItem onClick={handleLoginClick}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Zaloguj się</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleRegisterClick}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Zarejestruj się</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             
-            {/* Mobile Search Button */}
-            <div className="sm:hidden">
-              <Button variant="ghost" size="icon" className="bg-gray-200 hover:bg-gray-300">
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            {/* Mobile Menu Button */}
-            <div className="md:hidden">
-              <Button variant="ghost" size="icon" className="bg-gray-200 hover:bg-gray-300">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </div>
-            
-            {/* Add Job button - only visible for managers and unauthenticated users */}
-            {(!userIsAuthenticated || currentUser?.userType !== 'contractor') && (
-              <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 ml-2 bg-blue-800 hover:bg-blue-900">
-                <span className="hidden sm:inline">Dodaj Ogłoszenie</span>
-                <span className="sm:hidden">Dodaj</span>
-              </Button>
-            )}
           </div>
         </div>
       </div>

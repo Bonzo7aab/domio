@@ -9,6 +9,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { PasswordForm } from './PasswordForm';
 import { ProfileForm } from './ProfileForm';
 import { CompanyManagementForm } from './CompanyManagementForm';
+import { DeleteAccountSection } from './DeleteAccountSection';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader } from './ui/card';
@@ -21,26 +22,36 @@ export function UserAccountPageClient({
   onManagerDashboardClick, 
   onContractorDashboardClick 
 }: UserAccountPageProps) {
-  const { user, isLoading } = useUserProfile();
+  const { user, isLoading, session } = useUserProfile();
   const router = useRouter();
+  const hasCheckedAuth = React.useRef(false);
 
-  // Redirect to login if not authenticated
+  // Wait for auth check to complete before redirecting
   React.useEffect(() => {
-    if (!isLoading && !user) {
+    // Mark that we've checked auth once we have a definitive answer
+    if (!isLoading) {
+      hasCheckedAuth.current = true;
+    }
+  }, [isLoading]);
+
+  // Redirect to login only after we've confirmed no user and no session
+  React.useEffect(() => {
+    // Don't redirect if still loading or if we haven't checked auth yet
+    if (isLoading || !hasCheckedAuth.current) {
+      return;
+    }
+
+    // If we have a session but no user, it means user profile is being loaded
+    // Don't redirect in this case - wait for user to load
+    if (session && !user) {
+      return;
+    }
+
+    // Only redirect if we're sure there's no user and no session
+    if (!user && !session) {
       router.push('/login');
     }
-  }, [user, isLoading, router]);
-
-  // Add timeout redirect to prevent infinite isLoading
-  React.useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (isLoading && !user) {
-        router.push('/login');
-      }
-    }, 5000) // 5 second timeout
-
-    return () => clearTimeout(timeout)
-  }, [isLoading, user, router]);
+  }, [user, session, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -177,6 +188,7 @@ export function UserAccountPageClient({
 
                 <TabsContent value="security" className="space-y-6">
                   <PasswordForm />
+                  <DeleteAccountSection />
                 </TabsContent>
 
                 <TabsContent value="notifications" className="space-y-6">

@@ -19,7 +19,8 @@ interface JobCardProps {
     skills?: string[];
     postedTime: string;
     applications: number;
-    rating: number;
+    visits_count?: number;
+    bookmarks_count?: number;
     verified: boolean;
     urgent: boolean;
     companyLogo?: string;
@@ -96,85 +97,88 @@ const JobCard = React.memo(function JobCard({
 
     return (
       <Card 
-        className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
+        className="cursor-pointer hover:shadow-lg transition-shadow bg-white w-full max-w-full"
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Gavel className="w-4 h-4 text-warning" />
-                    <h3 className="font-semibold text-lg">{job.title}</h3>
+        <CardContent className="p-4 md:p-6">
+          <div className="flex items-start justify-between mb-3 md:mb-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start md:items-center justify-between mb-2 gap-2">
+                <div className="flex items-start md:items-center gap-2 md:gap-3 flex-wrap min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+                    <Gavel className="w-4 h-4 text-warning flex-shrink-0" />
+                    <h3 className="font-semibold text-base md:text-lg truncate">{job.title}</h3>
                   </div>
-                  {/* Map current phase to valid tender status */}
-                  <TenderStatusBadge status={
-                    job.tenderInfo?.currentPhase?.toLowerCase().includes('ocena') || 
-                    job.tenderInfo?.currentPhase?.toLowerCase().includes('evaluation') ? 'evaluation' :
-                    job.tenderInfo?.currentPhase?.toLowerCase().includes('rozstrzyg') ||
-                    job.tenderInfo?.currentPhase?.toLowerCase().includes('awarded') ? 'awarded' :
-                    job.tenderInfo?.currentPhase?.toLowerCase().includes('anulo') ||
-                    job.tenderInfo?.currentPhase?.toLowerCase().includes('cancel') ? 'cancelled' :
-                    'active'
-                  } />
-                  {job.urgent && (
-                    <Badge variant="destructive" className="text-xs">
-                      Pilne
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-1.5 md:gap-3 flex-wrap">
+                    {/* Map current phase to valid tender status */}
+                    <TenderStatusBadge status={
+                      job.tenderInfo?.currentPhase?.toLowerCase().includes('ocena') || 
+                      job.tenderInfo?.currentPhase?.toLowerCase().includes('evaluation') ? 'evaluation' :
+                      job.tenderInfo?.currentPhase?.toLowerCase().includes('rozstrzyg') ||
+                      job.tenderInfo?.currentPhase?.toLowerCase().includes('awarded') ? 'awarded' :
+                      job.tenderInfo?.currentPhase?.toLowerCase().includes('anulo') ||
+                      job.tenderInfo?.currentPhase?.toLowerCase().includes('cancel') ? 'cancelled' :
+                      'active'
+                    } />
+                    {job.urgent && (
+                      <Badge variant="destructive" className="text-xs">
+                        Pilne
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Action buttons in top right block */}
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
-                    onClick={handleBookmarkClick}
-                  >
-                    <BookmarkIcon className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
-                  </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={`text-muted-foreground hover:text-foreground flex-shrink-0 ${isBookmarked ? 'text-primary' : ''}`}
+                  onClick={handleBookmarkClick}
+                >
+                  <BookmarkIcon className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                </Button>
               </div>
               
-              <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-3">
                 <span className="font-medium">{job.company}</span>
                 <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  <span>{job.location}</span>
+                  <MapPin className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">{job.location}</span>
                 </div>
-                <Badge variant="outline">{job.category || job.type}</Badge>
+                <Badge variant="outline" className="w-fit">{job.category || job.type}</Badge>
               </div>
               
-              <p className="text-gray-700 text-sm mb-4 line-clamp-2">
+              <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-4 line-clamp-2">
                 {job.description}
               </p>
 
-              <div className="flex items-center gap-6 text-sm justify-between">
-                <div className='flex gap-4'>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-600 font-medium">💰</span>
-                  <span>Wartość: {job.salary}</span>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-gray-500" />
-                  <span>{job.applications} ofert</span>
-                </div>
-                
-                {daysRemaining > 0 && (
-                  <div className="flex items-center gap-2 text-orange-600">
-                    <Clock className="h-4 w-4" />
-                    <span>{daysRemaining} {daysRemaining === 1 ? 'dzień' : 'dni'} do końca</span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm sm:justify-between">
+                <div className='flex flex-wrap gap-3 sm:gap-4'>
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-600 font-medium">💰</span>
+                    <span>Wartość: {job.salary}</span>
                   </div>
-                )}
+                  
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                    <span>{job.applications} ofert</span>
+                  </div>
+                  
+                  {daysRemaining > 0 && (
+                    <div className="flex items-center gap-2 text-orange-600">
+                      <Clock className="h-4 w-4 flex-shrink-0" />
+                      <span>{daysRemaining} {daysRemaining === 1 ? 'dzień' : 'dni'} do końca</span>
+                    </div>
+                  )}
                 </div>
                 <Button 
-                    onClick={handleApplyClick}
-                  >
-                    Złóż ofertę
-                  </Button>
+                  onClick={handleApplyClick}
+                  className="w-full sm:w-auto"
+                >
+                  Złóż ofertę
+                </Button>
               </div>
             </div>
           </div>
@@ -186,34 +190,57 @@ const JobCard = React.memo(function JobCard({
   // Updated job card design for regular jobs with action buttons
   return (
     <Card 
-      className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
+      className="cursor-pointer hover:shadow-lg transition-shadow bg-white w-full max-w-full"
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Wrench className="w-4 h-4 text-primary" />
-                  <h3 className="font-semibold text-lg">{job.title}</h3>
+      <CardContent className="p-4 md:p-6">
+        <div className="flex items-start justify-between mb-3 md:mb-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start md:items-center justify-between mb-2 gap-2">
+              <div className="flex items-start md:items-center gap-2 md:gap-3 flex-wrap min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+                  <Wrench className="w-4 h-4 text-primary flex-shrink-0" />
+                  <h3 className="font-semibold text-base md:text-lg truncate">{job.title}</h3>
                 </div>
                 {job.urgent && (
                   <Badge variant="destructive" className="text-xs">
                     Pilne
                   </Badge>
                 )}
-                
               </div>
               
               {/* Action buttons in top right block */}
-              <div className="flex gap-2">
-                {job.rating && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-yellow-500">★</span>
-                    <span className="text-xs">{job.rating.toFixed(1)}</span>
+              <div className="flex gap-1.5 md:gap-2 flex-shrink-0">
+                {(job.visits_count !== undefined || job.bookmarks_count !== undefined) && (
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    {job.visits_count !== undefined && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 cursor-default">
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{job.visits_count}</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Odwiedzone</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {job.bookmarks_count !== undefined && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 cursor-default">
+                            <BookmarkIcon className="w-3.5 h-3.5" />
+                            <span>{job.bookmarks_count}</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Zapisane</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 )}
                 <Button 
@@ -227,26 +254,24 @@ const JobCard = React.memo(function JobCard({
               </div>
             </div>
             
-            <div className="flex justify-between items-center gap-4 text-xs text-gray-600 mb-3">
-              <div className='flex gap-4 items-center'>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4 text-xs text-gray-600 mb-3">
+              <div className='flex flex-wrap gap-2 sm:gap-4 items-center'>
                 <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  <span>{job.location}</span>
+                  <MapPin className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">{job.location}</span>
                 </div>
-                <span className="h-4 border-gray-300 border-r-2" />
+                <span className="hidden sm:inline h-4 border-gray-300 border-r-2" />
                 <span className="font-normal text-gray-500">{job.company}</span>
               </div>
-              <Badge variant="secondary">{job.category || job.type}</Badge>
+              <Badge variant="secondary" className="w-fit">{job.category || job.type}</Badge>
             </div>
             
-            <p className="text-gray-700 text-sm mb-4 line-clamp-2">
+            <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-4 line-clamp-2">
               {job.description}
             </p>
 
-
-
-            <div className='flex justify-between'>
-              <div className="space-y-3 mt-4">
+            <div className='flex flex-col md:flex-row md:justify-between gap-4 md:gap-6'>
+              <div className="space-y-3 mt-0 md:mt-4 flex-1">
                 {/* Skills/Tags */}
                 {job.skills && job.skills.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -277,19 +302,19 @@ const JobCard = React.memo(function JobCard({
                 )}
 
                 {/* Job details */}
-                <div className="flex items-center gap-6 text-sm">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
                     <span className="text-green-600 font-medium">💰</span>
                     <span>Stawka: {job.salary}</span>
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-gray-500" />
+                    <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
                     <span>{job.applications} ofert</span>
                   </div>
                   
                   <div className="flex items-center gap-2 text-gray-500">
-                    <Clock className="h-4 w-4" />
+                    <Clock className="h-4 w-4 flex-shrink-0" />
                     <span>{job.postedTime}</span>
                   </div>
 
@@ -304,17 +329,15 @@ const JobCard = React.memo(function JobCard({
               </div>
 
               {/* Apply button at bottom */}
-              <div className="flex flex-wrap content-end">
+              <div className="flex md:flex-wrap md:content-end">
                 <Button
-                  className="bg-blue-800 hover:bg-blue-900 text-white"
+                  className="bg-blue-800 hover:bg-blue-900 text-white w-full md:w-auto"
                   onClick={handleApplyClick}
                 >
                   Złóż ofertę
                 </Button>
               </div>
             </div>
-
-
           </div>
         </div>
       </CardContent>

@@ -135,6 +135,8 @@ export async function sendQuoteRequestMessage(
 
 /**
  * Create a notification for a user
+ * Note: This function does NOT send push notifications. 
+ * Use createNotificationWithPush from notifications-server.ts if you need push notifications.
  */
 export async function createNotification(
   supabase: SupabaseClient<Database>,

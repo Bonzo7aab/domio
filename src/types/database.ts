@@ -331,6 +331,7 @@ export interface Database {
           images: string[]
           applications_count: number
           views_count: number
+          bookmarks_count: number
           created_at: string
           updated_at: string
           published_at: string | null
@@ -371,6 +372,7 @@ export interface Database {
           images?: string[]
           applications_count?: number
           views_count?: number
+          bookmarks_count?: number
           created_at?: string
           updated_at?: string
           published_at?: string | null
@@ -411,6 +413,7 @@ export interface Database {
           images?: string[]
           applications_count?: number
           views_count?: number
+          bookmarks_count?: number
           created_at?: string
           updated_at?: string
           published_at?: string | null
@@ -738,6 +741,142 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "file_uploads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      job_bookmarks: {
+        Row: {
+          id: string
+          job_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_bookmarks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_bookmarks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          id: string
+          user_id: string
+          email_notifications: boolean
+          push_notifications: boolean
+          sms_notifications: boolean
+          new_job_notifications: boolean
+          new_tender_notifications: boolean
+          message_notifications: boolean
+          status_update_notifications: boolean
+          reminder_notifications: boolean
+          marketing_notifications: boolean
+          system_notifications: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          email_notifications?: boolean
+          push_notifications?: boolean
+          sms_notifications?: boolean
+          new_job_notifications?: boolean
+          new_tender_notifications?: boolean
+          message_notifications?: boolean
+          status_update_notifications?: boolean
+          reminder_notifications?: boolean
+          marketing_notifications?: boolean
+          system_notifications?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          email_notifications?: boolean
+          push_notifications?: boolean
+          sms_notifications?: boolean
+          new_job_notifications?: boolean
+          new_tender_notifications?: boolean
+          message_notifications?: boolean
+          status_update_notifications?: boolean
+          reminder_notifications?: boolean
+          marketing_notifications?: boolean
+          system_notifications?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          user_agent?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"

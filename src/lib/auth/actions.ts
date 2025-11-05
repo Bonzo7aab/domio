@@ -180,3 +180,74 @@ export async function resetPasswordAction(email: string) {
   
   return { success: true }
 }
+
+/**
+ * Server Action for deleting user account
+ * This permanently deletes the user from auth.users, which cascades to delete
+ * user_profiles and all related data via database CASCADE constraints
+ */
+export async function deleteAccountAction() {
+  try {
+    const supabase = await createClient()
+    
+    // First, verify the user is authenticated
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      return { error: 'Not authenticated' }
+    }
+
+    const userId = user.id
+
+    // Use admin client to delete the user
+    // Import dynamically to avoid issues if service role key is not set
+    const { createAdminClient } = await import('../supabase/admin')
+    const adminClient = createAdminClient()
+    
+    // Delete the auth user - this will cascade delete user_profiles and related data
+    const { data: deleteData, error: deleteError } = await adminClient.auth.admin.deleteUser(userId)
+    
+    if (deleteError) {
+      console.error('Error deleting user account:', deleteError)
+      console.error('Delete error details:', JSON.stringify(deleteError, null, 2))
+      
+      // Provide more specific error messages
+      if (deleteError.message?.includes('not found') || deleteError.message?.includes('does not exist')) {
+        return { error: 'Użytkownik nie został znaleziony.' }
+      }
+      
+      if (deleteError.message?.includes('permission') || deleteError.message?.includes('unauthorized')) {
+        return { error: 'Brak uprawnień do usunięcia konta. Sprawdź konfigurację SUPABASE_SERVICE_ROLE_KEY.' }
+      }
+      
+      return { error: `Błąd bazy danych podczas usuwania użytkownika: ${deleteError.message || 'Nieznany błąd'}` }
+    }
+
+    // Revalidate all paths to clear any cached user data
+    revalidatePath('/', 'layout')
+    
+    // Sign out and redirect to homepage
+    // Note: User is already deleted, but we clear any remaining session
+    await supabase.auth.signOut()
+    
+    redirect('/')
+  } catch (error: any) {
+    console.error('Error in deleteAccountAction:', error)
+    
+    // Handle missing service role key gracefully
+    if (error.message?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
+      return { 
+        error: 'Usuwanie konta nie jest skonfigurowane. Dodaj zmienną środowiskową SUPABASE_SERVICE_ROLE_KEY do pliku .env.local. Klucz można znaleźć w ustawieniach projektu Supabase w sekcji API → service_role (secret) key.' 
+      }
+    }
+    
+    // Handle missing URL
+    if (error.message?.includes('NEXT_PUBLIC_SUPABASE_URL')) {
+      return { 
+        error: 'Brak konfiguracji Supabase URL. Sprawdź zmienne środowiskowe.' 
+      }
+    }
+    
+    return { error: error.message || 'Wystąpił błąd podczas usuwania konta' }
+  }
+}

@@ -12,7 +12,8 @@ export interface Job {
   searchKeywords: string[];
   postedTime: string;
   applications: number;
-  rating: number;
+  visits_count?: number;
+  bookmarks_count?: number;
   verified: boolean;
   urgent: boolean;
   premium: boolean;
@@ -131,7 +132,8 @@ export const createJobFromFormData = (formData: any): Job => {
     searchKeywords: keywords,
     postedTime: 'Właśnie teraz',
     applications: 0,
-    rating: 4.5, // Default rating for new jobs
+    visits_count: 0,
+    bookmarks_count: 0,
     verified: true,
     urgent: formData.urgency === 'high',
     premium: false,

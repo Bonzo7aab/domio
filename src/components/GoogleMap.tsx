@@ -12,6 +12,7 @@ interface GoogleMapProps {
   zoom?: number;
   onMapClick?: (event: google.maps.MapMouseEvent) => void;
   onMarkerClick?: (markerId: string) => void;
+  onBoundsChanged?: (bounds: { north: number; south: number; east: number; west: number }) => void;
   className?: string;
   style?: React.CSSProperties;
   isMapExpanded?: boolean;
@@ -24,9 +25,10 @@ const MapComponent: React.FC<{
   zoom: number;
   onMapClick?: (event: google.maps.MapMouseEvent) => void;
   onMarkerClick?: (markerId: string) => void;
+  onBoundsChanged?: (bounds: { north: number; south: number; east: number; west: number }) => void;
   isMapExpanded?: boolean;
   isSmallMap?: boolean;
-}> = ({ markers, center, zoom, onMapClick, onMarkerClick, isMapExpanded = false, isSmallMap = false }) => {
+}> = ({ markers, center, zoom, onMapClick, onMarkerClick, onBoundsChanged, isMapExpanded = false, isSmallMap = false }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map>();
   const [mapMarkers, setMapMarkers] = useState<google.maps.marker.AdvancedMarkerElement[]>([]);
@@ -34,6 +36,8 @@ const MapComponent: React.FC<{
   const mapMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const infoWindowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveringInfoWindowRef = useRef<boolean>(false);
+  const boundsDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
 
   useEffect(() => {
     if (mapRef.current && !map) {
@@ -93,8 +97,66 @@ const MapComponent: React.FC<{
           onMapClick(event);
         }
       });
+
+      // Add bounds_changed listener with debouncing
+      if (onBoundsChanged) {
+        newMap.addListener('bounds_changed', () => {
+          // Clear existing debounce timeout
+          if (boundsDebounceRef.current) {
+            clearTimeout(boundsDebounceRef.current);
+          }
+
+          // Debounce the bounds change callback (300ms)
+          boundsDebounceRef.current = setTimeout(() => {
+            const bounds = newMap.getBounds();
+            if (bounds) {
+              const northEast = bounds.getNorthEast();
+              const southWest = bounds.getSouthWest();
+              
+              const newBounds = {
+                north: northEast.lat(),
+                south: southWest.lat(),
+                east: northEast.lng(),
+                west: southWest.lng(),
+              };
+
+              // Only trigger callback if bounds changed significantly (>1% difference)
+              const hasSignificantChange = !lastBoundsRef.current || 
+                Math.abs(newBounds.north - lastBoundsRef.current.north) > (newBounds.north - newBounds.south) * 0.01 ||
+                Math.abs(newBounds.south - lastBoundsRef.current.south) > (newBounds.north - newBounds.south) * 0.01 ||
+                Math.abs(newBounds.east - lastBoundsRef.current.east) > (newBounds.east - newBounds.west) * 0.01 ||
+                Math.abs(newBounds.west - lastBoundsRef.current.west) > (newBounds.east - newBounds.west) * 0.01;
+
+              if (hasSignificantChange) {
+                lastBoundsRef.current = newBounds;
+                onBoundsChanged(newBounds);
+              }
+            }
+          }, 300);
+        });
+
+        // Trigger initial bounds callback after map is ready
+        const idleListener = newMap.addListener('idle', () => {
+          const bounds = newMap.getBounds();
+          if (bounds && onBoundsChanged) {
+            const northEast = bounds.getNorthEast();
+            const southWest = bounds.getSouthWest();
+            
+            const initialBounds = {
+              north: northEast.lat(),
+              south: southWest.lat(),
+              east: northEast.lng(),
+              west: southWest.lng(),
+            };
+            
+            lastBoundsRef.current = initialBounds;
+            onBoundsChanged(initialBounds);
+            google.maps.event.removeListener(idleListener);
+          }
+        });
+      }
     }
-  }, [mapRef, map, center, zoom, onMapClick]);
+  }, [mapRef, map, center, zoom, onMapClick, onBoundsChanged]);
 
   // Update map center and zoom when props change
   useEffect(() => {
@@ -321,11 +383,14 @@ const MapComponent: React.FC<{
     }
   }, [map, infoWindow, markers, isMapExpanded, isSmallMap]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (infoWindowTimeoutRef.current) {
         clearTimeout(infoWindowTimeoutRef.current);
+      }
+      if (boundsDebounceRef.current) {
+        clearTimeout(boundsDebounceRef.current);
       }
     };
   }, []);
@@ -373,6 +438,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   zoom = 12,
   onMapClick,
   onMarkerClick,
+  onBoundsChanged,
   className = '',
   style = { height: '100%' },
   isMapExpanded = false,
@@ -392,12 +458,13 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
             zoom={zoom}
             onMapClick={onMapClick}
             onMarkerClick={onMarkerClick}
+            onBoundsChanged={onBoundsChanged}
             isMapExpanded={isMapExpanded}
             isSmallMap={isSmallMap}
           />
         );
     }
-  }, [markers, center, zoom, onMapClick, onMarkerClick, isMapExpanded, isSmallMap]);
+  }, [markers, center, zoom, onMapClick, onMarkerClick, onBoundsChanged, isMapExpanded, isSmallMap]);
 
   if (!googleMapsConfig.apiKey || googleMapsConfig.apiKey === 'your_google_maps_api_key_here') {
     return (

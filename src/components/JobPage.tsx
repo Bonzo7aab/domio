@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Bookmark, HelpCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -18,6 +18,7 @@ import { addBookmark, removeBookmark, isJobBookmarked } from '../utils/bookmarkS
 import { toast } from 'sonner';
 import { createClient } from '../lib/supabase/client';
 import { getJobById, getTenderById } from '../lib/data';
+import { incrementJobViews, incrementTenderViews } from '../lib/database/jobs';
 
 interface JobPageProps {
   jobId: string;
@@ -51,7 +52,8 @@ const convertStoredJobToDetailedFormat = (storedJob: Job): any => {
     skills: storedJob.searchKeywords || [],
     postedTime: storedJob.postedTime,
     applications: storedJob.applications,
-    rating: storedJob.rating,
+    visits_count: storedJob.visits_count,
+    bookmarks_count: storedJob.bookmarks_count,
     verified: storedJob.verified,
     urgent: storedJob.urgent,
     category: storedJob.category,
@@ -114,7 +116,8 @@ const convertDatabaseJobToDetailedFormat = (job: any) => {
     skills: job.skills_required || [],
     postedTime: getTimeAgo(job.created_at),
     applications: job.applications_count || 0,
-    rating: 4.5,
+    visits_count: job.views_count || 0,
+    bookmarks_count: job.bookmarks_count || 0,
     verified: job.company?.is_verified || false,
     urgent: job.urgency === 'high',
     premium: job.type === 'premium',
@@ -153,7 +156,8 @@ const convertDatabaseTenderToDetailedFormat = (tender: any) => {
     description: tender.description,
     postedTime: getTimeAgo(tender.created_at),
     applications: tender.bids_count || 0,
-    rating: 4.5,
+    visits_count: tender.views_count || 0,
+    bookmarks_count: 0,
     verified: tender.company?.is_verified || false,
     urgent: false,
     premium: false,
@@ -210,7 +214,7 @@ const mapCompanyTypeToClientType = (companyType?: string): string => {
 };
 
 const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
-  const { user } = useUserProfile();
+  const { user, supabase } = useUserProfile();
   const [activeTab, setActiveTab] = useState('overview');
   const [showAskQuestionModal, setShowAskQuestionModal] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -224,9 +228,13 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
   const [jobData, setJobData] = useState<any>(null);
   const [isLoadingJob, setIsLoadingJob] = useState(true);
+  const hasIncrementedViews = useRef<string | null>(null);
 
   // Fetch job data from database
   useEffect(() => {
+    // Reset views increment flag when jobId changes
+    hasIncrementedViews.current = null;
+    
     async function loadJobData() {
       setIsLoadingJob(true);
       console.log('🔍 JobPage - Loading job data for ID:', jobId);
@@ -254,7 +262,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           skills: dbJob.skills_required || [],
           postedTime: new Date(dbJob.created_at).toLocaleDateString('pl-PL'),
           applications: dbJob.applications_count,
-          rating: 4.5,
+          visits_count: dbJob.views_count || 0,
+          bookmarks_count: dbJob.bookmarks_count || 0,
           verified: dbJob.company?.is_verified || false,
           urgent: dbJob.urgency === 'high',
           category: dbJob.category?.name || 'Inne',
@@ -290,6 +299,14 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         };
         setJobData(formattedJob);
         setIsLoadingJob(false);
+        
+        // Increment views count (only once per job)
+        if (hasIncrementedViews.current !== jobId && supabase) {
+          hasIncrementedViews.current = jobId;
+          incrementJobViews(supabase, jobId).catch(err => {
+            console.error('Failed to increment job views:', err);
+          });
+        }
         return;
       }
       
@@ -310,7 +327,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           skills: [],
           postedTime: new Date(dbTender.created_at).toLocaleDateString('pl-PL'),
           applications: dbTender.bids_count,
-          rating: 4.5,
+          visits_count: dbTender.views_count || 0,
+          bookmarks_count: 0,
           verified: dbTender.company?.is_verified || false,
           urgent: false,
           category: dbTender.category?.name || 'Inne',
@@ -350,6 +368,14 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         };
         setJobData(formattedTender);
         setIsLoadingJob(false);
+        
+        // Increment views count (only once per tender)
+        if (hasIncrementedViews.current !== jobId && supabase) {
+          hasIncrementedViews.current = jobId;
+          incrementTenderViews(supabase, jobId).catch(err => {
+            console.error('Failed to increment tender views:', err);
+          });
+        }
         return;
       }
       

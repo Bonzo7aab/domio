@@ -181,11 +181,15 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                     </div>
                   )}
                   
-                  {/* Rating */}
-                  {jobData?.rating && (
-                    <div className="flex items-center gap-2 text-yellow-600">
-                      <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                      <span className="font-medium">{jobData.rating.toFixed(1)}</span>
+                  {/* Visits and Bookmarks */}
+                  {(jobData?.visits_count || jobData?.bookmarks_count) && (
+                    <div className="flex items-center gap-3 text-xs text-gray-600">
+                      {jobData.visits_count !== undefined && jobData.visits_count > 0 && (
+                        <span>{jobData.visits_count} wyświetleń</span>
+                      )}
+                      {jobData.bookmarks_count !== undefined && jobData.bookmarks_count > 0 && (
+                        <span>{jobData.bookmarks_count} zapisów</span>
+                      )}
                     </div>
                   )}
                 </div>

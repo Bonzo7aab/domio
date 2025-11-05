@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronDown, ChevronUp, MapPin, Clock, Star, Gavel, Wrench, Check, PanelLeftClose, PanelLeftOpen, X, Edit3, ChevronDown as ArrowDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -26,37 +26,9 @@ interface JobFiltersProps {
   onFilterChange?: (filters: FilterState) => void;
   primaryLocation?: string;
   onLocationChange?: () => void;
+  forceExpanded?: boolean; // Force filters to stay expanded (useful in drawers)
+  jobs?: any[]; // Available jobs to calculate dynamic categories/subcategories
 }
-
-const categories = [
-  { 
-    name: 'Utrzymanie Czystości i Zieleni', 
-    count: 324, 
-    subcategories: ['Sprzątanie części wspólnych', 'Pielęgnacja terenów zielonych', 'Odśnieżanie i usuwanie lodu'] 
-  },
-  { 
-    name: 'Roboty Remontowo-Budowlane', 
-    count: 567, 
-    subcategories: ['Remonty dachów i elewacji', 'Remonty klatek schodowych', 'Wymiana stolarki', 'Termomodernizacja', 'Prace murarskie i tynkarskie', 'Malowanie i renowacja', 'Ogrodzenia i infrastruktura'] 
-  },
-  { 
-    name: 'Instalacje i systemy', 
-    count: 298, 
-    subcategories: ['Serwis instalacji elektrycznych', 'Instalacje wodno-kanalizacyjne', 'Przegląd wind', 'Domofony i wideodomofony', 'Systemy monitoringu'] 
-  },
-  { 
-    name: 'Utrzymanie techniczne i konserwacja', 
-    count: 189, 
-    subcategories: ['Przeglądy techniczne budynków', 'Serwis wentylacji', 'Bramy wjazdowe i szlabany', 'Drobne naprawy'] 
-  },
-  { 
-    name: 'Specjalistyczne usługi', 
-    count: 145, 
-    subcategories: ['Dezynsekcja i deratyzacja', 'Inspekcje kominiarskie', 'Oceny stanu technicznego', 'Projekty architektoniczne'] 
-  }
-];
-
-const locations = ['Warszawa', 'Kraków', 'Gdańsk', 'Wrocław', 'Poznań', 'Katowice'];
 
 // Custom Checkbox Component to match the image styling
 const CustomCheckbox: React.FC<{
@@ -88,8 +60,9 @@ const CustomCheckbox: React.FC<{
 };
 
 
-export default function JobFilters({ onFilterChange, primaryLocation, onLocationChange }: JobFiltersProps) {
+export default function JobFilters({ onFilterChange, primaryLocation, onLocationChange, forceExpanded = false, jobs = [] }: JobFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const effectiveIsExpanded = forceExpanded ? true : isExpanded;
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [expandedFilterSections, setExpandedFilterSections] = useState<string[]>(['post-type']);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -106,6 +79,58 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
   const [searchQuery, setSearchQuery] = useState('');
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate categories and subcategories dynamically from jobs
+  const categories = useMemo(() => {
+    if (!jobs || jobs.length === 0) {
+      return [];
+    }
+
+    // Group jobs by category
+    const categoryMap = new Map<string, { count: number; subcategories: Map<string, number> }>();
+
+    jobs.forEach(job => {
+      const categoryName = job.category || 'Inne';
+      const subcategoryName = job.subcategory;
+
+      if (!categoryMap.has(categoryName)) {
+        categoryMap.set(categoryName, { count: 0, subcategories: new Map<string, number>() });
+      }
+
+      const categoryData = categoryMap.get(categoryName)!;
+      categoryData.count += 1;
+
+      if (subcategoryName) {
+        const currentCount = categoryData.subcategories.get(subcategoryName) || 0;
+        categoryData.subcategories.set(subcategoryName, currentCount + 1);
+      }
+    });
+
+    // Convert to array format with sorted subcategories
+    return Array.from(categoryMap.entries())
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        subcategories: Array.from(data.subcategories.keys()).sort()
+      }))
+      .sort((a, b) => b.count - a.count); // Sort by count descending
+  }, [jobs]);
+
+  // Extract unique locations from jobs
+  const locations = useMemo(() => {
+    if (!jobs || jobs.length === 0) {
+      return [];
+    }
+
+    const locationSet = new Set<string>();
+    jobs.forEach(job => {
+      if (job.location) {
+        locationSet.add(job.location);
+      }
+    });
+
+    return Array.from(locationSet).sort();
+  }, [jobs]);
 
   // Emit filter changes to parent
   useEffect(() => {
@@ -318,11 +343,11 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
 
   return (
     <div 
-      className={`${isExpanded ? 'w-80' : 'w-16'} transition-all duration-300 ease-in-out overflow-hidden border-r border-gray-200 h-full`}
-      style={{ backgroundColor: '#ffffff' }}
+      className={`${effectiveIsExpanded ? (forceExpanded ? 'w-full' : 'w-80') : 'w-16'} transition-all duration-300 ease-in-out overflow-hidden ${forceExpanded ? '' : 'border-r border-gray-200'} h-full`}
+      style={{ backgroundColor: forceExpanded ? 'transparent' : '#ffffff' }}
     >
       {/* Collapsed state - show only toggle button */}
-      {!isExpanded && (
+      {!effectiveIsExpanded && (
         <div className="flex flex-col items-center py-6 px-2 h-full">
           <Button
             variant="ghost"
@@ -340,7 +365,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       )}
 
       {/* Expanded state - show all filters */}
-      {isExpanded && (
+      {effectiveIsExpanded && (
         <div className="flex flex-col h-full">
           {/* Fixed Header */}
           <div className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
@@ -348,7 +373,8 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
               <div className="flex items-center space-x-2">
                 <h3 className="text-lg font-bold text-gray-900">Filtry</h3>
               </div>
-              <Button
+              {!forceExpanded && (
+                <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsExpanded(false)}
@@ -357,6 +383,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                 >
                   <PanelLeftClose className="h-4 w-4 text-gray-600" />
                 </Button>
+              )}
             </div>
 
             {/* Current Location Display */}
@@ -536,46 +563,82 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 pl-2">
                 <div className="space-y-2">
-                {categories.map(category => (
-                  <div key={category.name}>
-                    <div 
-                      className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
-                      onClick={() => toggleCategory(category.name)}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-foreground">{category.name}</span>
-                        <span className="text-xs text-gray-500">({category.count})</span>
+                {categories.length > 0 ? (
+                  categories.map(category => (
+                    <div key={category.name}>
+                      <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                        <div className="flex items-center space-x-2 flex-1">
+                          <CustomCheckbox 
+                            id={`category-${category.name}`}
+                            checked={selectedCategories.includes(category.name)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedCategories(prev => [...prev, category.name]);
+                              } else {
+                                setSelectedCategories(prev => prev.filter(c => c !== category.name));
+                                // Also remove subcategories of this category
+                                const categorySubs = category.subcategories;
+                                setSelectedSubcategories(prev => 
+                                  prev.filter(sub => !categorySubs.includes(sub))
+                                );
+                              }
+                            }}
+                          />
+                          <span className="text-sm text-foreground">{category.name}</span>
+                          <span className="text-xs text-gray-500">({category.count})</span>
+                        </div>
+                        <div
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCategory(category.name);
+                          }}
+                        >
+                          {expandedCategories.includes(category.name) ? 
+                            <ChevronUp className="w-4 h-4 text-foreground" /> : 
+                            <ChevronDown className="w-4 h-4 text-gray-600" />
+                          }
+                        </div>
                       </div>
-                      {expandedCategories.includes(category.name) ? 
-                        <ChevronUp className="w-4 h-4 text-foreground" /> : 
-                        <ChevronDown className="w-4 h-4 text-gray-600" />
-                      }
+                      
+                      {expandedCategories.includes(category.name) && (
+                        <div className="ml-4 space-y-2 mt-2">
+                          {category.subcategories.length > 0 ? (
+                            category.subcategories.map(sub => {
+                              // Calculate count for this subcategory
+                              const subCount = jobs.filter(job => 
+                                job.category === category.name && job.subcategory === sub
+                              ).length;
+                              
+                              return (
+                                <div key={sub} className="flex items-center space-x-2">
+                                  <CustomCheckbox 
+                                    id={sub}
+                                    checked={selectedSubcategories.includes(sub)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedSubcategories(prev => [...prev, sub]);
+                                      } else {
+                                        setSelectedSubcategories(prev => prev.filter(c => c !== sub));
+                                      }
+                                    }}
+                                  />
+                                  <Label htmlFor={sub} className="text-sm text-gray-500 font-light cursor-pointer">
+                                    {sub} ({subCount})
+                                  </Label>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-xs text-gray-400 pl-6">(0)</div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    
-                    {expandedCategories.includes(category.name) && (
-                      <div className="ml-4 space-y-2 mt-2">
-                        {category.subcategories.map(sub => (
-                          <div key={sub} className="flex items-center space-x-2">
-                            <CustomCheckbox 
-                              id={sub}
-                              checked={selectedSubcategories.includes(sub)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedSubcategories(prev => [...prev, sub]);
-                                } else {
-                                  setSelectedSubcategories(prev => prev.filter(c => c !== sub));
-                                }
-                              }}
-                            />
-                            <Label htmlFor={sub} className="text-sm text-gray-500 font-light cursor-pointer">
-                              {sub}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <div className="text-xs text-gray-400 pl-2">(0)</div>
+                )}
               </div>
               </CollapsibleContent>
             </Collapsible>
@@ -597,25 +660,32 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 pl-2">
                 <div className="space-y-2">
-                {locations.map(location => (
-                  <div key={location} className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id={location}
-                      checked={selectedLocations.includes(location)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedLocations(prev => [...prev, location]);
-                        } else {
-                          setSelectedLocations(prev => prev.filter(l => l !== location));
-                        }
-                      }}
-                    />
-                    <Label htmlFor={location} className="text-sm cursor-pointer flex items-center text-gray-900 font-light">
-                      <MapPin className="w-3 h-3 mr-1 text-gray-600" />
-                      {location}
-                    </Label>
-                  </div>
-                ))}
+                {locations.length > 0 ? (
+                  locations.map(location => {
+                    const locationCount = jobs.filter(job => job.location === location).length;
+                    return (
+                      <div key={location} className="flex items-center space-x-2">
+                        <CustomCheckbox 
+                          id={location}
+                          checked={selectedLocations.includes(location)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedLocations(prev => [...prev, location]);
+                            } else {
+                              setSelectedLocations(prev => prev.filter(l => l !== location));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={location} className="text-sm cursor-pointer flex items-center text-gray-900 font-light">
+                          <MapPin className="w-3 h-3 mr-1 text-gray-600" />
+                          {location} ({locationCount})
+                        </Label>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-xs text-gray-400 pl-2">(0)</div>
+                )}
               </div>
               </CollapsibleContent>
             </Collapsible>

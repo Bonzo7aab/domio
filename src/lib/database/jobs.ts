@@ -13,6 +13,7 @@ export interface JobFilters {
   searchQuery?: string;
   limit?: number;
   offset?: number;
+  bounds?: { north: number; south: number; east: number; west: number };
 }
 
 export interface JobWithCompany {
@@ -41,6 +42,7 @@ export interface JobWithCompany {
   images: string[] | null;
   applications_count: number;
   views_count: number;
+  bookmarks_count: number;
   created_at: string;
   published_at: string | null;
   subcategory: string | null;
@@ -142,6 +144,15 @@ export async function fetchJobs(
       );
     }
 
+    // Apply bounds filtering (geographic bounds)
+    if (filters.bounds) {
+      query = query
+        .gte('latitude', filters.bounds.south)
+        .lte('latitude', filters.bounds.north)
+        .gte('longitude', filters.bounds.west)
+        .lte('longitude', filters.bounds.east);
+    }
+
     // Apply sorting
     switch (filters.sortBy) {
       case 'newest':
@@ -221,6 +232,15 @@ export async function fetchTenders(
       query = query.or(
         `title.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
       );
+    }
+
+    // Apply bounds filtering (geographic bounds)
+    if (filters.bounds) {
+      query = query
+        .gte('latitude' as any, filters.bounds.south)
+        .lte('latitude' as any, filters.bounds.north)
+        .gte('longitude' as any, filters.bounds.west)
+        .lte('longitude' as any, filters.bounds.east);
     }
 
     // Apply sorting
@@ -305,7 +325,8 @@ export async function fetchJobsAndTenders(
     requirements: job.requirements || [],
     responsibilities: job.responsibilities || [],
     skills: job.skills_required || [],
-    rating: 4.5, // Would need to calculate from reviews
+    visits_count: job.views_count || 0,
+    bookmarks_count: job.bookmarks_count || 0,
     hasInsurance: false, // Would need to check certificates
     completedJobs: 0, // Would need to query
     certificates: [], // Would need to query
@@ -333,7 +354,8 @@ export async function fetchJobsAndTenders(
     lat: ensureValidCoordinates(tender.latitude, tender.longitude, tender.location, tender.id)?.lat,
     lng: ensureValidCoordinates(tender.latitude, tender.longitude, tender.location, tender.id)?.lng,
     companyLogo: tender.company?.logo_url || undefined,
-    rating: 4.5,
+    visits_count: tender.views_count || 0,
+    bookmarks_count: 0, // Tenders don't have bookmarks_count yet
     clientType: mapCompanyTypeToClientType(undefined), // Company type not available in current query
     tenderInfo: {
       tenderType: 'Zamówienie publiczne',
@@ -428,6 +450,78 @@ export async function fetchTenderById(
   } catch (err) {
     console.error('Error fetching tender:', err);
     return { data: null, error: err };
+  }
+}
+
+/**
+ * Increment views_count for a job
+ */
+export async function incrementJobViews(
+  supabase: SupabaseClient<Database>,
+  jobId: string
+): Promise<{ error: any }> {
+  try {
+    // Fetch current views_count
+    const { data: currentJob, error: fetchError } = await supabase
+      .from('jobs')
+      .select('views_count')
+      .eq('id', jobId)
+      .single();
+
+    if (fetchError) {
+      return { error: fetchError };
+    }
+
+    if (!currentJob) {
+      return { error: new Error('Job not found') };
+    }
+
+    // Increment and update
+    const { error: updateError } = await supabase
+      .from('jobs')
+      .update({ views_count: (currentJob.views_count || 0) + 1 })
+      .eq('id', jobId);
+
+    return { error: updateError };
+  } catch (err) {
+    console.error('Error incrementing job views:', err);
+    return { error: err };
+  }
+}
+
+/**
+ * Increment views_count for a tender
+ */
+export async function incrementTenderViews(
+  supabase: SupabaseClient<Database>,
+  tenderId: string
+): Promise<{ error: any }> {
+  try {
+    // Fetch current views_count
+    const { data: currentTender, error: fetchError } = await (supabase as any)
+      .from('tenders')
+      .select('views_count')
+      .eq('id', tenderId)
+      .single();
+
+    if (fetchError) {
+      return { error: fetchError };
+    }
+
+    if (!currentTender) {
+      return { error: new Error('Tender not found') };
+    }
+
+    // Increment and update
+    const { error: updateError } = await (supabase as any)
+      .from('tenders')
+      .update({ views_count: (currentTender.views_count || 0) + 1 })
+      .eq('id', tenderId);
+
+    return { error: updateError };
+  } catch (err) {
+    console.error('Error incrementing tender views:', err);
+    return { error: err };
   }
 }
 

@@ -29,6 +29,7 @@ interface EnhancedMapViewProps {
   onFiltersChange?: (filters: FilterState) => void;
   showCitySelector?: boolean;
   onCitySelectorClose?: () => void;
+  onBoundsChanged?: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }
 
 // Real coordinates for Polish cities
@@ -61,13 +62,14 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   filters,
   onFiltersChange,
   showCitySelector: externalShowCitySelector = false,
-  onCitySelectorClose
+  onCitySelectorClose,
+  onBoundsChanged
 }) => {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showCitySelector, setShowCitySelector] = useState(false);
   const [showJobClusters] = useState(true); // Always show all jobs
   const [mapCenter, setMapCenter] = useState({ lat: 52.1394, lng: 21.0458 }); // Ursynów, Warsaw
-  const [mapZoom, setMapZoom] = useState(12); // District-level view
+  const [mapZoom, setMapZoom] = useState(13); // District-level view
   const [showMapFilters, setShowMapFilters] = useState(true);
   const [showMapLegend, setShowMapLegend] = useState(true);
   const [selectedCityName, setSelectedCityName] = useState<string | null>(null);
@@ -210,10 +212,6 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
         return false;
       }
       
-      // Filter by rating
-      if (filters.rating > 0 && (job.rating || 0) < filters.rating) {
-        return false;
-      }
       
       // Filter by search query
       if (filters.searchQuery && filters.searchQuery.trim()) {
@@ -279,6 +277,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
           zoom={mapZoom}
           onMapClick={handleMapClick}
           onMarkerClick={handleMarkerClick}
+          onBoundsChanged={onBoundsChanged}
           className="w-full h-full"
           isMapExpanded={isExpanded}
           isSmallMap={!isExpanded}
@@ -306,9 +305,9 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
           </div>
         )}
 
-        {/* Map Filters - Only visible when expanded */}
+        {/* Map Filters - Only visible when expanded and on desktop */}
         {isExpanded && showMapFilters && onFiltersChange && (
-          <div className="absolute top-20 left-4 z-[1001] w-80">
+          <div className="absolute top-20 left-4 z-[1001] w-80 hidden md:block">
             <JobFilters 
               onFilterChange={onFiltersChange}
               primaryLocation={selectedCityName || undefined}

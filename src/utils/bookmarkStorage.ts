@@ -1,4 +1,9 @@
 // Utility functions for managing bookmarked jobs in localStorage
+// Optionally syncs with database when user is authenticated
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../types/database';
+import { addJobBookmark as addJobBookmarkDb, removeJobBookmark as removeJobBookmarkDb } from '../lib/database/bookmarks';
 
 export interface BookmarkedJob {
   id: string;
@@ -23,8 +28,22 @@ export const getBookmarkedJobs = (): BookmarkedJob[] => {
   }
 };
 
-export const addBookmark = (job: Omit<BookmarkedJob, 'bookmarkedAt'>): void => {
+export const addBookmark = async (
+  job: Omit<BookmarkedJob, 'bookmarkedAt'>,
+  supabase?: SupabaseClient<Database>,
+  userId?: string
+): Promise<void> => {
   try {
+    // Sync with database if authenticated
+    if (supabase && userId) {
+      const { error } = await addJobBookmarkDb(supabase, job.id, userId);
+      if (error) {
+        console.warn('Failed to sync bookmark with database:', error);
+        // Continue with localStorage as fallback
+      }
+    }
+
+    // Always update localStorage for offline/unauthenticated users
     const bookmarks = getBookmarkedJobs();
     const newBookmark: BookmarkedJob = {
       ...job,
@@ -44,8 +63,22 @@ export const addBookmark = (job: Omit<BookmarkedJob, 'bookmarkedAt'>): void => {
   }
 };
 
-export const removeBookmark = (jobId: string): void => {
+export const removeBookmark = async (
+  jobId: string,
+  supabase?: SupabaseClient<Database>,
+  userId?: string
+): Promise<void> => {
   try {
+    // Sync with database if authenticated
+    if (supabase && userId) {
+      const { error } = await removeJobBookmarkDb(supabase, jobId, userId);
+      if (error) {
+        console.warn('Failed to sync bookmark removal with database:', error);
+        // Continue with localStorage as fallback
+      }
+    }
+
+    // Always update localStorage for offline/unauthenticated users
     const bookmarks = getBookmarkedJobs();
     const updatedBookmarks = bookmarks.filter(bookmark => bookmark.id !== jobId);
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));

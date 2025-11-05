@@ -4,12 +4,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import JobFilters, { FilterState } from '../components/JobFilters';
 import { EnhancedJobList } from '../components/EnhancedJobList';
+import JobList from '../components/JobList';
 import { JobApplicationModal } from '../components/JobApplicationModal';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getJobsAndTenders, type DBJobFilters } from '../lib/data';
 import { useLayoutContext } from '../components/ConditionalFooter';
+import { useFilterContext } from '../contexts/FilterContext';
 
 // Dynamically import heavy components to reduce initial bundle size
 const EnhancedMapViewGoogleMaps = dynamic(
@@ -41,27 +43,14 @@ export default function HomePage() {
   const { user } = useUserProfile();
   const router = useRouter();
   const { isMapExpanded, setIsMapExpanded } = useLayoutContext();
+  const { filters, setFilters, primaryLocation, setPrimaryLocation, setLocationChangeHandler, onLocationChangeRequest } = useFilterContext();
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [isMapVisible, setIsMapVisible] = useState(true);
-  const [filters, setFilters] = useState<FilterState>({
-    categories: [],
-    subcategories: [],
-    contractTypes: [],
-    locations: [],
-    salaryRange: [0, 1000],
-    rating: 0,
-    clientTypes: [],
-    postTypes: ['job', 'tender'],
-    tenderTypes: [],
-    searchRadius: 25,
-    useGeolocation: false,
-    searchQuery: ''
-  });
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredJobId, setHoveredJobId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [searchRadius, setSearchRadius] = useState(25);
+  // Keep map-related state for when map is expanded
   const [applicationModalOpen, setApplicationModalOpen] = useState(false);
   const [selectedApplicationJobId, setSelectedApplicationJobId] = useState<string | null>(null);
   const [selectedApplicationJob, setSelectedApplicationJob] = useState<any>(null);
@@ -72,47 +61,71 @@ export default function HomePage() {
     additionalNotes: ''
   });
   const [showMessaging, setShowMessaging] = useState(false);
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [loadedJobs, setLoadedJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]); // Keep for map and other uses
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
-  const [primaryLocation, setPrimaryLocation] = useState<string>('Polska');
+  const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
   const [showCitySelector, setShowCitySelector] = useState(false);
 
-  // Load jobs from database
-  useEffect(() => {
-    async function loadJobsFromDatabase() {
-      try {
-        setIsLoadingJobs(true);
-        
-        const dbFilters: DBJobFilters = {
-          status: 'active',
-          limit: 100,
-        };
-        
-        const { data, error } = await getJobsAndTenders(dbFilters);
-        
-        if (error) {
-          console.error('Error fetching jobs from database:', error);
-          // Use empty array if database fails
-          setJobs([]);
-        } else if (data) {
-          setJobs(data);
-        } else {
-          setJobs([]);
-        }
-      } catch (error) {
-        console.error('Error loading jobs from database:', error);
+  // Load jobs from database function - fetch all jobs within bounds
+  const loadJobsFromDatabase = async (bounds?: { north: number; south: number; east: number; west: number } | null) => {
+    try {
+      setIsLoadingJobs(true);
+      
+      // Fetch all jobs within bounds (with reasonable maximum to prevent overload)
+      const dbFilters: DBJobFilters = {
+        status: 'active',
+        limit: 500, // Reasonable maximum to prevent performance issues
+        offset: 0,
+        ...(bounds && { bounds }),
+      };
+      
+      const { data, error } = await getJobsAndTenders(dbFilters);
+      
+      if (error) {
+        console.error('Error fetching jobs from database:', error);
+        setLoadedJobs([]);
         setJobs([]);
-      } finally {
-        setIsLoadingJobs(false);
+      } else if (data) {
+        // Store all jobs
+        setLoadedJobs(data);
+        setJobs(data);
+      } else {
+        setLoadedJobs([]);
+        setJobs([]);
       }
+    } catch (error) {
+      console.error('Error loading jobs from database:', error);
+      setLoadedJobs([]);
+      setJobs([]);
+    } finally {
+      setIsLoadingJobs(false);
     }
-    
-    loadJobsFromDatabase();
+  };
+
+  // Load initial jobs from database (without bounds initially)
+  useEffect(() => {
+    loadJobsFromDatabase(null);
   }, []);
 
+  // Handle map bounds changes
+  const handleMapBoundsChange = (bounds: { north: number; south: number; east: number; west: number }) => {
+    setMapBounds(bounds);
+    // Reload all jobs when bounds change
+    loadJobsFromDatabase(bounds);
+  };
 
-  const toggleMapVisible = () => {
-    setIsMapVisible(!isMapVisible);
+  // Refetch jobs when filters change (keeping current bounds)
+  useEffect(() => {
+    if (mapBounds) {
+      loadJobsFromDatabase(mapBounds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
+
+  const handleToggleMap = () => {
+    setIsMapExpanded(!isMapExpanded);
   };
 
   const handleJobSelect = (jobId: string) => {
@@ -159,6 +172,17 @@ export default function HomePage() {
   const handlePrimaryLocationChange = (location: string) => {
     setPrimaryLocation(location);
   };
+  
+  // Initialize filter context on mount
+  React.useEffect(() => {
+    // Sync search query with filters
+    if (searchQuery !== filters.searchQuery) {
+      setFilters(prev => ({
+        ...prev,
+        searchQuery: searchQuery
+      }));
+    }
+  }, [searchQuery]);
 
   const handleCityNameChange = (cityName: string | null) => {
     if (cityName) {
@@ -169,6 +193,11 @@ export default function HomePage() {
   const handleLocationChangeRequest = () => {
     setShowCitySelector(true);
   };
+
+  // Set the location change handler in context
+  React.useEffect(() => {
+    setLocationChangeHandler(handleLocationChangeRequest);
+  }, [setLocationChangeHandler]);
 
   const handleCitySelectorClose = () => {
     setShowCitySelector(false);
@@ -285,38 +314,34 @@ export default function HomePage() {
       )}
       
       <div className="flex min-h-[calc(100vh-12rem)]">
-        {/* Filters Sidebar */}
+        {/* Filters Sidebar - Visible only on laptop and above */}
         {!isMapExpanded && (
-          <JobFilters 
-            onFilterChange={setFilters} 
-            primaryLocation={primaryLocation}
-            onLocationChange={handleLocationChangeRequest}
-          />
+          <div className="hidden lg:block">
+            <JobFilters 
+              onFilterChange={setFilters} 
+              primaryLocation={primaryLocation}
+              onLocationChange={handleLocationChangeRequest}
+              jobs={loadedJobs}
+            />
+          </div>
         )}
         
-        {/* Main Content */}
-        <div className="flex flex-1 overflow-hidden gap-4">
-          {/* Enhanced Job List */}
-          {!isMapExpanded && (
-            <EnhancedJobList 
-              jobs={jobs}
-              isLoadingJobs={isLoadingJobs}
+        {/* Main Content - JobList and Map */}
+        <div className="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-6">
+          {/* JobList - Always visible, hidden on mobile/tablet when map is expanded */}
+          <div className={`flex-1 ${isMapExpanded ? 'hidden lg:flex' : 'flex'}`}>
+            <JobList 
+              jobs={loadedJobs}
               filters={filters}
               onJobSelect={handleJobSelect}
-              onToggleMap={toggleMapVisible}
-              isMapVisible={isMapVisible}
-              hoveredJobId={hoveredJobId}
-              onJobHover={setHoveredJobId}
-              userLocation={userLocation}
-              searchRadius={searchRadius}
-              onApplyClick={handleApplyClick}
-              onClearSearch={handleClearSearch}
-              onPrimaryLocationChange={handlePrimaryLocationChange}
+              onToggleMap={handleToggleMap}
+              isMapVisible={false}
+              isLoadingJobs={isLoadingJobs}
             />
-          )}
+          </div>
           
-          {/* Enhanced Map View - only show if visible */}
-          {isMapVisible && (
+          {/* Map View - Visible only on laptop and above, conditional on mobile/tablet */}
+          <div className={`${isMapExpanded ? 'block' : 'hidden lg:block'} lg:flex-shrink-0 lg:w-[450px]`}>
             <EnhancedMapView 
               jobs={jobs}
               isExpanded={isMapExpanded}
@@ -334,8 +359,9 @@ export default function HomePage() {
               onFiltersChange={setFilters}
               showCitySelector={showCitySelector}
               onCitySelectorClose={handleCitySelectorClose}
+              onBoundsChanged={handleMapBoundsChange}
             />
-          )}
+          </div>
         </div>
       </div>
     </div>

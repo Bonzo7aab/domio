@@ -12,7 +12,8 @@ export interface Job {
   skills: string[];
   postedTime: string;
   applications: number;
-  rating: number;
+  visits_count?: number;
+  bookmarks_count?: number;
   verified: boolean;
   urgent: boolean;
   category: string;

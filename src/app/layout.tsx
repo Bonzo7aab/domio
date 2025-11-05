@@ -6,6 +6,10 @@ import AuthProvider from '../contexts/AuthContext'
 import { HeaderWrapper } from '../components/HeaderWrapper'
 import { LayoutProvider } from '../components/ConditionalFooter'
 import { GlobalCommandPaletteClient } from '../components/GlobalCommandPaletteClient'
+import { FilterProvider } from '../contexts/FilterContext'
+import { GlobalCommandPalette } from '../components/GlobalCommandPalette'
+import { MobileMenuDock } from '../components/MobileMenuDock'
+import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -43,6 +47,7 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <body className={inter.className}>
+        <ServiceWorkerRegistration />
         <AuthProvider>
           <LayoutProvider>
             <HeaderWrapper />
@@ -52,6 +57,17 @@ export default function RootLayout({
             <Toaster />
             <GlobalCommandPaletteClient />
           </LayoutProvider>
+          <FilterProvider>
+            <LayoutProvider>
+              <HeaderWrapper />
+              <main className="min-h-[calc(100vh-10rem)] pb-20 lg:pb-0">
+                {children}
+              </main>
+              <MobileMenuDock />
+              <Toaster />
+              <GlobalCommandPalette />
+            </LayoutProvider>
+          </FilterProvider>
         </AuthProvider>
       </body>
     </html>

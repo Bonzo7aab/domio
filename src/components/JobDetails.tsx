@@ -21,7 +21,8 @@ interface JobDetailsProps {
     skills: string[];
     postedTime: string;
     applications: number;
-    rating: number;
+    visits_count?: number;
+    bookmarks_count?: number;
     verified: boolean;
     urgent: boolean;
     companyLogo?: string;
@@ -87,7 +88,8 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
                       isPremium={job.isPremium}
                       hasInsurance={job.hasInsurance}
                       certificates={job.certificates}
-                      rating={job.rating}
+                      visits_count={job.visits_count}
+                      bookmarks_count={job.bookmarks_count}
                       completedJobs={job.completedJobs}
                       clientType={job.clientType}
                       urgent={job.urgent}
