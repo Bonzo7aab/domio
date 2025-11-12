@@ -843,6 +843,59 @@ export interface Database {
           }
         ]
       }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder'
+          title: string
+          message: string
+          data: Json | null
+          is_read: boolean
+          read_at: string | null
+          action_url: string | null
+          expires_at: string | null
+          priority: 'low' | 'normal' | 'high' | 'urgent'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder'
+          title: string
+          message: string
+          data?: Json | null
+          is_read?: boolean
+          read_at?: string | null
+          action_url?: string | null
+          expires_at?: string | null
+          priority?: 'low' | 'normal' | 'high' | 'urgent'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder'
+          title?: string
+          message?: string
+          data?: Json | null
+          is_read?: boolean
+          read_at?: string | null
+          action_url?: string | null
+          expires_at?: string | null
+          priority?: 'low' | 'normal' | 'high' | 'urgent'
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       push_subscriptions: {
         Row: {
           id: string

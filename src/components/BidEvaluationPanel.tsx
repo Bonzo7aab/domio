@@ -236,11 +236,24 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
+            {/* Empty State */}
+            {bids.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="bg-gray-100 rounded-full p-6 mb-4">
+                  <FileText className="h-16 w-16 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Brak złożonych ofert</h3>
+                <p className="text-gray-500 text-center max-w-md">
+                  Jeszcze żadna oferta nie została złożona w tym przetargu. Oferty pojawią się tutaj po ich złożeniu przez wykonawców.
+                </p>
+              </div>
+            ) : (
+              <>
             {/* Overview Mode */}
             {evaluationMode === 'overview' && (
               <div className="space-y-6">
                 {/* Statistics */}
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
@@ -264,7 +277,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                         <div>
                           <p className="text-sm text-gray-600">Najniższa cena</p>
                           <p className="text-2xl font-bold">
-                            {formatCurrency(Math.min(...bids.map(b => b.totalPrice)), 'PLN')}
+                            {bids.length > 0 ? formatCurrency(Math.min(...bids.map(b => b.totalPrice)), bids[0]?.currency || 'PLN') : '-'}
                           </p>
                         </div>
                       </div>
@@ -280,7 +293,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                         <div>
                           <p className="text-sm text-gray-600">Najkrótszy czas</p>
                           <p className="text-2xl font-bold">
-                            {Math.min(...bids.map(b => b.proposedTimeline))} dni
+                            {bids.length > 0 ? `${Math.min(...bids.map(b => b.proposedTimeline))} dni` : '-'}
                           </p>
                         </div>
                       </div>
@@ -296,7 +309,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                         <div>
                           <p className="text-sm text-gray-600">Średnia ocena</p>
                           <p className="text-2xl font-bold">
-                            {(bids.reduce((sum, b) => sum + b.contractorRating, 0) / bids.length).toFixed(1)}
+                            {bids.length > 0 ? (bids.reduce((sum, b) => sum + b.contractorRating, 0) / bids.length).toFixed(1) : '-'}
                           </p>
                         </div>
                       </div>
@@ -313,50 +326,63 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {getSortedBids().map((bid, index) => {
                         const totalScore = calculateTotalScore(bid);
                         return (
                           <div
                             key={bid.id}
-                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                             onClick={() => {
                               setSelectedBidId(bid.id);
                               setEvaluationMode('detailed');
                             }}
                           >
-                            <div className="flex items-center gap-4">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                                index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                                index === 1 ? 'bg-gray-100 text-gray-700' :
-                                index === 2 ? 'bg-orange-100 text-orange-700' :
-                                'bg-gray-50 text-gray-600'
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                                index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white shadow-lg' :
+                                index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white' :
+                                index === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white' :
+                                'bg-gray-100 text-gray-600'
                               }`}>
-                                {index === 0 && <Crown className="h-4 w-4" />}
+                                {index === 0 && <Crown className="h-5 w-5" />}
                                 {index !== 0 && (index + 1)}
                               </div>
                               
-                              <Avatar>
-                                <AvatarFallback>
-                                  {bid.contractorName.split(' ').map(n => n[0]).join('')}
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={bid.contractorAvatar} />
+                                <AvatarFallback className="bg-blue-100 text-blue-700">
+                                  {bid.contractorName.split(' ').map(n => n[0]).join('').toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
                               
-                              <div>
-                                <h4 className="font-medium">{bid.contractorName}</h4>
-                                <p className="text-sm text-gray-600">{bid.contractorCompany}</p>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-gray-900 truncate">{bid.contractorName}</h4>
+                                <p className="text-sm text-gray-600 truncate">{bid.contractorCompany}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-xs text-gray-600">{bid.contractorRating.toFixed(1)}</span>
+                                  <span className="text-xs text-gray-500">•</span>
+                                  <span className="text-xs text-gray-600">{bid.contractorCompletedJobs} projektów</span>
+                                </div>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-6">
-                              <div className="text-right">
-                                <p className="font-medium">{formatCurrency(bid.totalPrice, bid.currency)}</p>
-                                <p className="text-sm text-gray-600">{bid.proposedTimeline} dni</p>
+                              <div className="text-right min-w-[120px]">
+                                <p className="font-semibold text-gray-900">{formatCurrency(bid.totalPrice, bid.currency)}</p>
+                                <p className="text-sm text-gray-600 flex items-center justify-end gap-1 mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  {bid.proposedTimeline} dni
+                                </p>
                               </div>
                               
-                              <div className="text-right">
-                                <p className="font-bold text-lg">{totalScore}/100</p>
-                                <Progress value={totalScore} className="w-20 h-2" />
+                              <div className="text-right min-w-[100px]">
+                                <div className="flex items-center justify-end gap-2 mb-1">
+                                  <p className="font-bold text-lg text-gray-900">{totalScore}</p>
+                                  <span className="text-sm text-gray-500">/100</span>
+                                </div>
+                                <Progress value={totalScore} className="w-24 h-2" />
                               </div>
                               
                               <div className="flex items-center gap-2">
@@ -384,90 +410,139 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
             )}
 
             {/* Detailed Evaluation Mode */}
-            {evaluationMode === 'detailed' && selectedBid && (
-              <div className="space-y-6">
+            {evaluationMode === 'detailed' && (
+              <>
+                {selectedBid ? (
+                  <div className="space-y-6">
                 {/* Bid Header */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold">{selectedBid.contractorName}</h3>
-                    <p className="text-gray-600">{selectedBid.contractorCompany}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => handleRejectBid(selectedBid.id)}
-                      disabled={selectedBid.status === 'awarded' || selectedBid.status === 'rejected'}
-                    >
-                      Odrzuć
-                    </Button>
-                    <Button 
-                      onClick={() => handleAwardTender(selectedBid.id)}
-                      disabled={selectedBid.status === 'awarded' || selectedBid.status === 'rejected'}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <Crown className="h-4 w-4 mr-2" />
-                      Wybierz ofertę
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-6">
-                  {/* Evaluation Criteria */}
-                  <div className="col-span-2 space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Ocena według kryteriów</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {evaluationCriteria.map(criterion => {
-                          const currentScore = selectedBid.evaluation?.criteriaScores[criterion.id] || 
-                                             calculateAutomaticScore(selectedBid, criterion);
-                          const response = selectedBid.criteriaResponses.find(r => r.criterionId === criterion.id);
-                          
-                          return (
-                            <div key={criterion.id} className="border rounded-lg p-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-medium">{criterion.name}</h4>
-                                <Badge variant="outline">{criterion.weight}%</Badge>
-                              </div>
-                              
-                              <p className="text-sm text-gray-600 mb-3">{criterion.description}</p>
-                              
-                              {response && (
-                                <div className="mb-3 p-3 bg-gray-50 rounded">
-                                  <p className="text-sm">{response.response}</p>
-                                </div>
-                              )}
-                              
-                              <div className="flex items-center gap-4">
-                                <div className="flex-1">
-                                  <Label>Ocena (0-100 punktów)</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={currentScore}
-                                    onChange={(e) => updateEvaluationScore(
-                                      selectedBid.id, 
-                                      criterion.id, 
-                                      Number(e.target.value)
-                                    )}
-                                  />
-                                </div>
-                                <div className="text-sm text-gray-600">
-                                  {((currentScore * criterion.weight) / 100).toFixed(1)} pkt
-                                </div>
-                              </div>
+                <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-16 w-16 border-2 border-white shadow-md">
+                          <AvatarImage src={selectedBid.contractorAvatar} />
+                          <AvatarFallback className="bg-blue-600 text-white text-lg font-semibold">
+                            {selectedBid.contractorName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="text-2xl font-bold text-gray-900">{selectedBid.contractorName}</h3>
+                          <p className="text-gray-600 mt-1">{selectedBid.contractorCompany}</p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <div className="flex items-center gap-1">
+                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                              <span className="text-sm font-medium">{selectedBid.contractorRating.toFixed(1)}</span>
                             </div>
-                          );
-                        })}
-                        
-                        <div className="border-t pt-4">
-                          <div className="flex items-center justify-between text-lg font-bold">
-                            <span>Łączna ocena:</span>
-                            <span>{calculateTotalScore(selectedBid)}/100 punktów</span>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-sm text-gray-600">{selectedBid.contractorCompletedJobs} ukończonych projektów</span>
                           </div>
                         </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => handleRejectBid(selectedBid.id)}
+                          disabled={selectedBid.status === 'awarded' || selectedBid.status === 'rejected'}
+                        >
+                          Odrzuć
+                        </Button>
+                        <Button 
+                          onClick={() => handleAwardTender(selectedBid.id)}
+                          disabled={selectedBid.status === 'awarded' || selectedBid.status === 'rejected'}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <Crown className="h-4 w-4 mr-2" />
+                          Wybierz ofertę
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Evaluation Criteria */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Award className="h-5 w-5" />
+                          Ocena według kryteriów
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {evaluationCriteria && evaluationCriteria.length > 0 ? (
+                          <>
+                            {evaluationCriteria.map(criterion => {
+                              const currentScore = selectedBid.evaluation?.criteriaScores[criterion.id] || 
+                                                 calculateAutomaticScore(selectedBid, criterion);
+                              const response = selectedBid.criteriaResponses?.find(r => r.criterionId === criterion.id);
+                              
+                              return (
+                                <div key={criterion.id} className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <h4 className="font-semibold text-gray-900">{criterion.name}</h4>
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                      {criterion.weight}%
+                                    </Badge>
+                                  </div>
+                                  
+                                  {criterion.description && (
+                                    <p className="text-sm text-gray-600 mb-3">{criterion.description}</p>
+                                  )}
+                                  
+                                  {response && response.response ? (
+                                    <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                      <p className="text-sm text-gray-700 whitespace-pre-line">{response.response}</p>
+                                    </div>
+                                  ) : (
+                                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                      <p className="text-sm text-amber-700 flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Brak odpowiedzi na to kryterium
+                                      </p>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex-1">
+                                      <Label className="text-sm font-medium">Ocena (0-100 punktów)</Label>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={currentScore}
+                                        onChange={(e) => updateEvaluationScore(
+                                          selectedBid.id, 
+                                          criterion.id, 
+                                          Number(e.target.value)
+                                        )}
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                    <div className="text-right min-w-[80px]">
+                                      <p className="text-xs text-gray-500 mb-1">Punkty</p>
+                                      <p className="text-lg font-semibold text-blue-600">
+                                        {((currentScore * criterion.weight) / 100).toFixed(1)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            
+                            <div className="border-t-2 border-gray-200 pt-4 mt-6">
+                              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                                <span className="text-lg font-semibold text-gray-900">Łączna ocena:</span>
+                                <span className="text-2xl font-bold text-blue-600">{calculateTotalScore(selectedBid)}/100 punktów</span>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                            <Award className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                            <p className="text-gray-500">Brak zdefiniowanych kryteriów oceny</p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -476,44 +551,58 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                   <div className="space-y-4">
                     <Card>
                       <CardHeader>
-                        <CardTitle>Szczegóły oferty</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          Szczegóły oferty
+                        </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div>
-                          <Label>Cena całkowita</Label>
-                          <p className="font-bold text-lg">{formatCurrency(selectedBid.totalPrice, selectedBid.currency)}</p>
+                      <CardContent className="space-y-4">
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <Label className="text-xs text-gray-500 mb-1 block">Cena całkowita</Label>
+                          <p className="font-bold text-xl text-green-700">{formatCurrency(selectedBid.totalPrice, selectedBid.currency)}</p>
                         </div>
                         
-                        <div>
-                          <Label>Czas realizacji</Label>
-                          <p>{selectedBid.proposedTimeline} dni</p>
-                        </div>
-                        
-                        <div>
-                          <Label>Planowany start</Label>
-                          <p>{selectedBid.proposedStartDate.toLocaleDateString('pl-PL')}</p>
-                        </div>
-                        
-                        <div>
-                          <Label>Gwarancja</Label>
-                          <p>{selectedBid.guaranteePeriod} miesięcy</p>
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="text-sm text-gray-500">Czas realizacji</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Clock className="h-4 w-4 text-gray-400" />
+                              <p className="font-medium text-gray-900">{selectedBid.proposedTimeline} dni</p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <Label className="text-sm text-gray-500">Planowany start</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Calendar className="h-4 w-4 text-gray-400" />
+                              <p className="font-medium text-gray-900">{selectedBid.proposedStartDate.toLocaleDateString('pl-PL')}</p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <Label className="text-sm text-gray-500">Gwarancja</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Shield className="h-4 w-4 text-gray-400" />
+                              <p className="font-medium text-gray-900">{selectedBid.guaranteePeriod} miesięcy</p>
+                            </div>
+                          </div>
                         </div>
                         
                         <Separator />
                         
                         <div>
-                          <Label>Ocena wykonawcy</Label>
-                          <div className="flex items-center gap-2">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span>{selectedBid.contractorRating}</span>
-                            <span className="text-sm text-gray-500">
+                          <Label className="text-sm text-gray-500 mb-2 block">Ocena wykonawcy</Label>
+                          <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                            <span className="font-semibold">{selectedBid.contractorRating.toFixed(1)}</span>
+                            <span className="text-sm text-gray-600">
                               ({selectedBid.contractorCompletedJobs} projektów)
                             </span>
                           </div>
                         </div>
                         
                         <div>
-                          <Label>Status</Label>
+                          <Label className="text-sm text-gray-500 mb-2 block">Status</Label>
                           <div className="mt-1">
                             {getStatusBadge(selectedBid.status)}
                           </div>
@@ -521,18 +610,52 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                       </CardContent>
                     </Card>
 
-                    {selectedBid.attachments.length > 0 && (
+                    {selectedBid.description && (
                       <Card>
                         <CardHeader>
-                          <CardTitle>Załączniki</CardTitle>
+                          <CardTitle className="text-base">Opis oferty</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                            {selectedBid.description}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {selectedBid.technicalProposal && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Propozycja techniczna</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                            {selectedBid.technicalProposal}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {selectedBid.attachments && selectedBid.attachments.length > 0 ? (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            <FileText className="h-4 w-4" />
+                            Załączniki ({selectedBid.attachments.length})
+                          </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
                             {selectedBid.attachments.map(attachment => (
-                              <div key={attachment.id} className="flex items-center justify-between p-2 border rounded">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="h-4 w-4" />
-                                  <span className="text-sm">{attachment.name}</span>
+                              <div key={attachment.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div className="p-2 bg-blue-100 rounded">
+                                    <FileText className="h-4 w-4 text-blue-600" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{attachment.name}</p>
+                                    <p className="text-xs text-gray-500">{(attachment.size / 1024).toFixed(1)} KB</p>
+                                  </div>
                                 </div>
                                 <Button variant="ghost" size="sm">
                                   <Download className="h-4 w-4" />
@@ -542,10 +665,29 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                           </div>
                         </CardContent>
                       </Card>
+                    ) : (
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-500 text-sm">Brak załączników</p>
+                        </CardContent>
+                      </Card>
                     )}
                   </div>
                 </div>
               </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="bg-gray-100 rounded-full p-6 mb-4">
+                      <Eye className="h-16 w-16 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Wybierz ofertę do oceny</h3>
+                    <p className="text-gray-500 text-center max-w-md">
+                      Kliknij na jedną z ofert w rankingu, aby zobaczyć szczegóły i przeprowadzić ocenę.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Compare Mode */}
@@ -553,81 +695,101 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Porównanie ofert</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5" />
+                      Porównanie ofert
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Alert className="mb-4">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        Wybierz maksymalnie 3 oferty do porównania
-                      </AlertDescription>
-                    </Alert>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left p-2">Kryterium</th>
-                            {bids.slice(0, 3).map(bid => (
-                              <th key={bid.id} className="text-center p-2">
-                                <div>
-                                  <p className="font-medium">{bid.contractorName}</p>
-                                  <p className="text-sm text-gray-600">{bid.contractorCompany}</p>
-                                </div>
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr className="border-b">
-                            <td className="p-2 font-medium">Cena</td>
-                            {bids.slice(0, 3).map(bid => (
-                              <td key={bid.id} className="text-center p-2">
-                                {formatCurrency(bid.totalPrice, bid.currency)}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr className="border-b">
-                            <td className="p-2 font-medium">Czas realizacji</td>
-                            {bids.slice(0, 3).map(bid => (
-                              <td key={bid.id} className="text-center p-2">
-                                {bid.proposedTimeline} dni
-                              </td>
-                            ))}
-                          </tr>
-                          <tr className="border-b">
-                            <td className="p-2 font-medium">Gwarancja</td>
-                            {bids.slice(0, 3).map(bid => (
-                              <td key={bid.id} className="text-center p-2">
-                                {bid.guaranteePeriod} miesięcy
-                              </td>
-                            ))}
-                          </tr>
-                          <tr className="border-b">
-                            <td className="p-2 font-medium">Ocena wykonawcy</td>
-                            {bids.slice(0, 3).map(bid => (
-                              <td key={bid.id} className="text-center p-2">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                  {bid.contractorRating}
-                                </div>
-                              </td>
-                            ))}
-                          </tr>
-                          <tr className="border-b bg-blue-50">
-                            <td className="p-2 font-bold">Łączna ocena</td>
-                            {bids.slice(0, 3).map(bid => (
-                              <td key={bid.id} className="text-center p-2 font-bold">
-                                {calculateTotalScore(bid)}/100
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    {bids.length > 0 ? (
+                      <>
+                        <Alert className="mb-4">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            Wybierz maksymalnie 3 oferty do porównania
+                          </AlertDescription>
+                        </Alert>
+                        
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b-2 border-gray-200">
+                                <th className="text-left p-3 font-semibold text-gray-900">Kryterium</th>
+                                {bids.slice(0, 3).map(bid => (
+                                  <th key={bid.id} className="text-center p-3">
+                                    <div className="bg-gray-50 rounded-lg p-2">
+                                      <p className="font-semibold text-gray-900">{bid.contractorName}</p>
+                                      <p className="text-xs text-gray-600 mt-1">{bid.contractorCompany}</p>
+                                    </div>
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b hover:bg-gray-50">
+                                <td className="p-3 font-medium text-gray-900">Cena</td>
+                                {bids.slice(0, 3).map(bid => (
+                                  <td key={bid.id} className="text-center p-3">
+                                    <span className="font-semibold">{formatCurrency(bid.totalPrice, bid.currency)}</span>
+                                  </td>
+                                ))}
+                              </tr>
+                              <tr className="border-b hover:bg-gray-50">
+                                <td className="p-3 font-medium text-gray-900">Czas realizacji</td>
+                                {bids.slice(0, 3).map(bid => (
+                                  <td key={bid.id} className="text-center p-3">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Clock className="h-4 w-4 text-gray-400" />
+                                      <span>{bid.proposedTimeline} dni</span>
+                                    </div>
+                                  </td>
+                                ))}
+                              </tr>
+                              <tr className="border-b hover:bg-gray-50">
+                                <td className="p-3 font-medium text-gray-900">Gwarancja</td>
+                                {bids.slice(0, 3).map(bid => (
+                                  <td key={bid.id} className="text-center p-3">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Shield className="h-4 w-4 text-gray-400" />
+                                      <span>{bid.guaranteePeriod} miesięcy</span>
+                                    </div>
+                                  </td>
+                                ))}
+                              </tr>
+                              <tr className="border-b hover:bg-gray-50">
+                                <td className="p-3 font-medium text-gray-900">Ocena wykonawcy</td>
+                                {bids.slice(0, 3).map(bid => (
+                                  <td key={bid.id} className="text-center p-3">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                      <span className="font-medium">{bid.contractorRating.toFixed(1)}</span>
+                                    </div>
+                                  </td>
+                                ))}
+                              </tr>
+                              <tr className="border-b-2 border-gray-300 bg-gradient-to-r from-blue-50 to-indigo-50">
+                                <td className="p-3 font-bold text-gray-900">Łączna ocena</td>
+                                {bids.slice(0, 3).map(bid => (
+                                  <td key={bid.id} className="text-center p-3">
+                                    <span className="text-xl font-bold text-blue-600">{calculateTotalScore(bid)}/100</span>
+                                  </td>
+                                ))}
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                        <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-500">Brak ofert do porównania</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
+            )}
+              </>
             )}
           </div>
 

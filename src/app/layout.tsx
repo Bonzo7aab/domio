@@ -3,9 +3,8 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '../components/ui/sonner'
 import AuthProvider from '../contexts/AuthContext'
-import { HeaderWrapper } from '../components/HeaderWrapper'
+import { Header } from '../components/Header'
 import { LayoutProvider } from '../components/ConditionalFooter'
-import { GlobalCommandPaletteClient } from '../components/GlobalCommandPaletteClient'
 import { FilterProvider } from '../contexts/FilterContext'
 import { GlobalCommandPalette } from '../components/GlobalCommandPalette'
 import { MobileMenuDock } from '../components/MobileMenuDock'
@@ -49,17 +48,9 @@ export default function RootLayout({
       <body className={inter.className}>
         <ServiceWorkerRegistration />
         <AuthProvider>
-          <LayoutProvider>
-            <HeaderWrapper />
-            <main className="min-h-[calc(100vh-10rem)]">
-              {children}
-            </main>
-            <Toaster />
-            <GlobalCommandPaletteClient />
-          </LayoutProvider>
           <FilterProvider>
             <LayoutProvider>
-              <HeaderWrapper />
+              <Header />
               <main className="min-h-[calc(100vh-10rem)] pb-20 lg:pb-0">
                 {children}
               </main>

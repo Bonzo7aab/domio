@@ -6,18 +6,23 @@ import {
   Eye,
   FileText,
   MapPin,
+  Pencil,
   Plus,
   Search,
   Trophy,
   Users
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TenderStatusBadge } from './TenderStatusBadge';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useUserProfile } from '../contexts/AuthContext';
+import { createClient } from '../lib/supabase/client';
+import { fetchTenders } from '../lib/database/jobs';
+import { TenderStatus } from '../types/tender';
 
 // Types now imported from centralized types folder
 
@@ -26,22 +31,90 @@ interface TenderSystemProps {
   onTenderCreate?: () => void;
   onTenderSelect?: (tenderId: string) => void;
   onBidSubmit?: (tenderId: string) => void;
+  onTenderEdit?: (tenderId: string) => void;
   onBack?: () => void;
 }
 
-import { mockTenders, Tender, TenderDocument, EvaluationCriteria, TenderStatus } from '../mocks';
+interface Tender {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  estimatedValue: string;
+  currency: string;
+  status: TenderStatus;
+  submissionDeadline: Date;
+  evaluationDeadline?: Date;
+  bidCount: number;
+  createdBy: string;
+  category: string;
+  winnerName?: string;
+}
 
 export const TenderSystem: React.FC<TenderSystemProps> = ({
   userRole,
   onTenderCreate,
   onTenderSelect,
   onBidSubmit,
+  onTenderEdit,
   onBack
 }) => {
-  const [tenders, setTenders] = useState<Tender[]>(mockTenders);
+  const { user } = useUserProfile();
+  const [tenders, setTenders] = useState<Tender[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<TenderStatus | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  // Fetch tenders from database
+  useEffect(() => {
+    const loadTenders = async () => {
+      setIsLoading(true);
+      try {
+        const supabase = createClient();
+        const filters: any = {
+          status: statusFilter === 'all' ? undefined : statusFilter,
+        };
+        
+        // For managers, pass their user ID to see drafts
+        const managerId = userRole === 'manager' ? user?.id : undefined;
+        
+        const { data, error } = await fetchTenders(supabase, filters, managerId);
+        
+        if (error) {
+          console.error('Error fetching tenders:', error);
+          setTenders([]);
+        } else if (data) {
+          // Convert database format to component format
+          const convertedTenders: Tender[] = data.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            location: t.location,
+            estimatedValue: t.estimated_value?.toString() || '0',
+            currency: t.currency || 'PLN',
+            status: t.status as TenderStatus,
+            submissionDeadline: new Date(t.submission_deadline),
+            evaluationDeadline: t.evaluation_deadline ? new Date(t.evaluation_deadline) : undefined,
+            bidCount: t.bids_count || 0,
+            createdBy: t.company?.name || 'Unknown',
+            category: t.category?.name || 'Inne',
+            winnerName: t.winner_name || undefined,
+          }));
+          setTenders(convertedTenders);
+        } else {
+          setTenders([]);
+        }
+      } catch (error) {
+        console.error('Error loading tenders:', error);
+        setTenders([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadTenders();
+  }, [userRole, user?.id, statusFilter]);
 
   // Filter tenders based on search and filters
   const filteredTenders = tenders.filter(tender => {
@@ -203,6 +276,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Wszystkie statusy</SelectItem>
+                <SelectItem value="draft">Szkice</SelectItem>
                 <SelectItem value="active">Aktywne</SelectItem>
                 <SelectItem value="evaluation">W ocenie</SelectItem>
                 <SelectItem value="awarded">Rozstrzygnięte</SelectItem>
@@ -229,7 +303,14 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
 
       {/* Tenders List */}
       <div className="space-y-4">
-        {filteredTenders.length === 0 ? (
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-sm text-gray-500">Ładowanie przetargów...</p>
+            </CardContent>
+          </Card>
+        ) : filteredTenders.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -306,6 +387,22 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
                       <Eye className="h-4 w-4 mr-2" />
                       Szczegóły
                     </Button>
+                    
+                    {userRole === 'manager' && tender.status === 'draft' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onTenderEdit) {
+                            onTenderEdit(tender.id);
+                          }
+                        }}
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edytuj
+                      </Button>
+                    )}
                     
                     {userRole === 'contractor' && tender.status === 'active' && (
                       <Button 

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Search, Bell, User, MessageCircle, GraduationCap, Play, Bookmark, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { UnifiedNotifications } from './UnifiedNotifications';
@@ -23,24 +23,30 @@ interface HeaderProps {
 
 export function Header({ initialUser }: HeaderProps) {
   const router = useRouter()
-  const { user: contextUser, isAuthenticated: contextIsAuthenticated, logout, isLoading } = useUserProfile();
+  const { user: contextUser, session, isAuthenticated: contextIsAuthenticated, logout, isLoading } = useUserProfile();
   
-  // Use context user for real-time updates, fall back to initial server-side user
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialUser || null)
+  // Authentication state: use context (which is immediately true when session exists)
+  const userIsAuthenticated = contextIsAuthenticated
   
-  // Update current user when context user changes (for real-time updates)
-  useEffect(() => {
-    if (!isLoading) {
-      setCurrentUser(contextUser || initialUser || null)
-    }
-  }, [contextUser, isLoading, initialUser])
+  // Determine current user for display:
+  // Priority: contextUser > initialUser > temporary user from session
+  // This ensures we show user info immediately after login, even if profile is still loading
+  const currentUser = contextUser || initialUser || 
+    (session?.user ? {
+      id: session.user.id,
+      email: session.user.email || '',
+      firstName: session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'User',
+      lastName: session.user.user_metadata?.last_name || '',
+      userType: session.user.user_metadata?.user_type || 'contractor',
+    } as AuthUser : null)
   
-  const userIsAuthenticated = !isLoading && (contextIsAuthenticated || !!currentUser)
-  
-  // Enhanced logout that refreshes the page
+  // Enhanced logout that redirects to login
+  // We don't call router.refresh() to avoid race condition where server might still see session cookie
+  // The context state update will handle the UI update, then we redirect
   const handleLogout = async () => {
     await logout()
-    router.refresh() // Refresh server components
+    // Redirect to login - the new page load will have correct server state
+    router.push('/login')
   }
 
   // Navigation handlers

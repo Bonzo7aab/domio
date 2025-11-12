@@ -574,3 +574,39 @@ html {
     padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Toast notifications - ensure they're always visible on top */
+.toaster,
+[data-sonner-toaster] {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+/* Ensure individual toast items have solid backgrounds and proper z-index */
+[data-sonner-toast] {
+  z-index: 99999 !important;
+  position: relative !important;
+  background-color: hsl(var(--popover)) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Ensure toast content is fully opaque */
+[data-sonner-toast] * {
+  opacity: 1 !important;
+}
+
+/* Ensure toast description and title are visible */
+[data-sonner-toast] [data-title],
+[data-sonner-toast] [data-description] {
+  opacity: 1 !important;
+  color: hsl(var(--popover-foreground)) !important;
+}
+
+/* Override any transparency that might be applied by sonner */
+[data-sonner-toast][data-styled="true"],
+[data-sonner-toast][data-styled="false"] {
+  background-color: hsl(var(--popover)) !important;
+  opacity: 1 !important;
+}

@@ -46,8 +46,10 @@ const nextConfig = {
       'recharts',
     ],
   },
+  // Webpack config is only used for production builds
+  // In dev mode with --turbopack, this config is ignored (warning is harmless)
   webpack: (config, { dev, isServer }) => {
-    // Optimize bundle size
+    // Optimize bundle size (only applies in production builds, not with Turbopack)
     if (!dev && !isServer) {
       config.optimization = {
         ...config.optimization,

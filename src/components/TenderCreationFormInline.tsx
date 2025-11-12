@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -24,10 +24,13 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { toast } from 'sonner';
+import { TenderWithCompany } from '../lib/database/jobs';
 
 interface TenderCreationFormInlineProps {
   onClose: () => void;
-  onSubmit: (tender: NewTender) => void;
+  onSubmit: (tender: NewTender, tenderId?: string) => void;
+  tenderId?: string;
+  initialData?: TenderWithCompany;
 }
 
 interface NewTender {
@@ -50,6 +53,7 @@ interface NewTender {
   insuranceRequired: string;
   advancePayment: boolean;
   performanceBond: boolean;
+  status?: 'draft' | 'active';
 }
 
 interface EvaluationCriterion {
@@ -108,8 +112,12 @@ const defaultCriteria: EvaluationCriterion[] = [
 
 export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> = ({
   onClose,
-  onSubmit
+  onSubmit,
+  tenderId,
+  initialData
 }) => {
+  const isEditMode = !!tenderId && !!initialData;
+
   const [formData, setFormData] = useState<NewTender>({
     title: '',
     description: '',
@@ -135,6 +143,44 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
+
+  // Populate form with initial data when editing
+  useEffect(() => {
+    if (isEditMode && initialData) {
+      setFormData({
+        title: initialData.title || '',
+        description: initialData.description || '',
+        category: initialData.category?.name || '',
+        location: initialData.location || '',
+        estimatedValue: initialData.estimated_value?.toString() || '',
+        currency: initialData.currency || 'PLN',
+        submissionDeadline: initialData.submission_deadline ? new Date(initialData.submission_deadline) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        evaluationDeadline: initialData.evaluation_deadline ? new Date(initialData.evaluation_deadline) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        requirements: initialData.requirements && initialData.requirements.length > 0 
+          ? initialData.requirements 
+          : [''],
+        evaluationCriteria: initialData.evaluation_criteria && Array.isArray(initialData.evaluation_criteria)
+          ? initialData.evaluation_criteria.map((criterion: any) => ({
+              id: criterion.id || `criterion-${Date.now()}-${Math.random()}`,
+              name: criterion.name || '',
+              description: criterion.description || '',
+              weight: criterion.weight || 0,
+              type: criterion.type || 'quality'
+            }))
+          : defaultCriteria,
+        documents: [], // Documents from DB are not File objects, so we start fresh
+        isPublic: initialData.is_public ?? true,
+        allowQuestions: true, // Not stored in DB, default to true
+        questionsDeadline: undefined,
+        minimumExperience: 1,
+        requiredCertificates: [],
+        insuranceRequired: '500000',
+        advancePayment: false,
+        performanceBond: false,
+        status: initialData.status as 'draft' | 'active' || 'draft'
+      });
+    }
+  }, [isEditMode, initialData]);
 
   const validateStep = (step: number): boolean => {
     const newErrors: Record<string, string> = {};
@@ -179,11 +225,16 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
 
     const tender: NewTender = {
       ...formData,
-      requirements: formData.requirements.filter(req => req.trim() !== '')
+      requirements: formData.requirements.filter(req => req.trim() !== ''),
+      status: asDraft ? 'draft' : 'active'
     };
 
-    onSubmit(tender);
-    toast.success(asDraft ? 'Przetarg zapisany jako szkic' : 'Przetarg został opublikowany');
+    onSubmit(tender, tenderId);
+    toast.success(
+      isEditMode 
+        ? (asDraft ? 'Przetarg zaktualizowany jako szkic' : 'Przetarg został zaktualizowany i opublikowany')
+        : (asDraft ? 'Przetarg zapisany jako szkic' : 'Przetarg został opublikowany')
+    );
     onClose();
   };
 
@@ -590,7 +641,7 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5" />
-                Podsumowanie i publikacja przetargu
+                {isEditMode ? 'Podsumowanie i aktualizacja przetargu' : 'Podsumowanie i publikacja przetargu'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">

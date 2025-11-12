@@ -197,7 +197,8 @@ export async function fetchJobs(
  */
 export async function fetchTenders(
   supabase: SupabaseClient<Database>,
-  filters: JobFilters = {}
+  filters: JobFilters = {},
+  managerId?: string // If provided, include manager's drafts even if not public
 ): Promise<{ data: TenderWithCompany[] | null; error: any }> {
   try {
     // Type assertion needed as tenders table may not be in generated types yet
@@ -215,9 +216,31 @@ export async function fetchTenders(
           name,
           slug
         )
-      `)
-      .eq('status', filters.status || 'active')
-      .eq('is_public', true);
+      `);
+
+    // Apply status filter
+    // Only filter by status if explicitly set and not 'all'
+    // If managerId is provided, RLS policies will allow them to see their own tenders regardless of status
+    if (filters.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status);
+    }
+    // If no status filter and no managerId, default to active (public view)
+    else if (!filters.status && !managerId) {
+      query = query.eq('status', 'active');
+    }
+
+    // For public tenders, only show public ones
+    // For managers viewing their own tenders, show all (including drafts)
+    if (managerId) {
+      // Manager can see their own tenders regardless of public status
+      // Use a more complex filter: show manager's tenders OR public tenders
+      // We'll filter after fetching if needed, or use a better query structure
+      // For now, fetch all tenders and filter client-side for manager's own tenders
+      // This is simpler and works with RLS policies
+    } else {
+      // Public view - only show public tenders
+      query = query.eq('is_public', true);
+    }
 
     // Apply filters (using any to avoid type issues with tenders table)
     if (filters.categories && filters.categories.length > 0) {
@@ -648,6 +671,371 @@ function getTimeAgo(date: string): string {
   if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} dni temu`;
   
   return past.toLocaleDateString('pl-PL');
+}
+
+/**
+ * Create a new tender in the database
+ */
+export async function createTender(
+  supabase: SupabaseClient<Database>,
+  tenderData: {
+    title: string;
+    description: string;
+    category: string; // Category name, will be converted to category_id
+    location: string;
+    estimatedValue: string;
+    currency: string;
+    submissionDeadline: Date;
+    evaluationDeadline: Date;
+    requirements: string[];
+    evaluationCriteria: any[];
+    documents?: any[];
+    isPublic: boolean;
+    allowQuestions: boolean;
+    questionsDeadline?: Date;
+    minimumExperience: number;
+    requiredCertificates: string[];
+    insuranceRequired: string;
+    advancePayment: boolean;
+    performanceBond: boolean;
+    status?: 'draft' | 'active';
+    managerId: string; // User profile ID
+    companyId: string; // Company ID
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    projectDuration?: string;
+  }
+): Promise<{ data: TenderWithCompany | null; error: any }> {
+  try {
+    // Map form category names to database category names
+    const categoryMapping: Record<string, string> = {
+      'Utrzymanie Czystości i Zieleni': 'Usługi Sprzątające',
+      'Roboty Remontowo-Budowlane': 'Remonty i Budownictwo',
+      'Instalacje i systemy': 'Instalacje Techniczne',
+      'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
+      'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
+    };
+
+    // Use mapped category name if available, otherwise use original
+    const searchCategoryName = categoryMapping[tenderData.category] || tenderData.category;
+
+    // First, try exact match (case-insensitive)
+    let { data: categoryData, error: categoryError } = await (supabase as any)
+      .from('job_categories')
+      .select('id, name')
+      .ilike('name', searchCategoryName)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    // If exact match fails, try partial match
+    if (categoryError || !categoryData) {
+      const { data: partialMatch, error: partialError } = await (supabase as any)
+        .from('job_categories')
+        .select('id, name')
+        .ilike('name', `%${searchCategoryName}%`)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!partialError && partialMatch) {
+        categoryData = partialMatch;
+        categoryError = null;
+      }
+    }
+
+    // If still no match, try searching with the original category name
+    if (categoryError || !categoryData) {
+      const { data: originalMatch, error: originalError } = await (supabase as any)
+        .from('job_categories')
+        .select('id, name')
+        .ilike('name', `%${tenderData.category}%`)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!originalError && originalMatch) {
+        categoryData = originalMatch;
+        categoryError = null;
+      }
+    }
+
+    if (categoryError || !categoryData) {
+      console.error('Error finding category:', {
+        error: categoryError,
+        searchedCategory: tenderData.category,
+        mappedCategory: searchCategoryName,
+      });
+      
+      // Try to get all available categories for debugging
+      const { data: allCategories } = await (supabase as any)
+        .from('job_categories')
+        .select('name, slug')
+        .eq('is_active', true)
+        .limit(20);
+      
+      console.error('Available categories:', allCategories);
+      
+      return { 
+        data: null, 
+        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: any) => c.name).join(', ') || 'none'}`) 
+      };
+    }
+
+    const categoryId = categoryData.id;
+
+    // Prepare documents JSONB
+    const documentsJson = tenderData.documents ? tenderData.documents.map(doc => ({
+      id: doc.id,
+      name: doc.name,
+      type: doc.type,
+      // Note: File objects can't be stored directly, they need to be uploaded first
+      // For now, we'll store metadata only
+    })) : null;
+
+    // Insert tender
+    const { data: insertedTender, error: insertError } = await (supabase as any)
+      .from('tenders')
+      .insert({
+        title: tenderData.title,
+        description: tenderData.description,
+        category_id: categoryId,
+        manager_id: tenderData.managerId,
+        company_id: tenderData.companyId,
+        location: tenderData.location,
+        address: tenderData.address || null,
+        latitude: tenderData.latitude || null,
+        longitude: tenderData.longitude || null,
+        estimated_value: parseFloat(tenderData.estimatedValue),
+        currency: tenderData.currency,
+        status: tenderData.status || 'draft',
+        submission_deadline: tenderData.submissionDeadline.toISOString(),
+        evaluation_deadline: tenderData.evaluationDeadline.toISOString(),
+        project_duration: tenderData.projectDuration || null,
+        is_public: tenderData.isPublic,
+        requirements: tenderData.requirements,
+        evaluation_criteria: tenderData.evaluationCriteria,
+        documents: documentsJson,
+        published_at: tenderData.status === 'active' ? new Date().toISOString() : null,
+      })
+      .select(`
+        *,
+        company:companies!tenders_company_id_fkey (
+          id,
+          name,
+          logo_url,
+          is_verified
+        ),
+        category:job_categories!tenders_category_id_fkey (
+          name,
+          slug
+        )
+      `)
+      .single();
+
+    if (insertError) {
+      console.error('Error creating tender:', insertError);
+      return { data: null, error: insertError };
+    }
+
+    return { data: insertedTender as any, error: null };
+  } catch (err) {
+    console.error('Error creating tender:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Update an existing draft tender in the database
+ * Only draft tenders can be updated
+ */
+export async function updateTender(
+  supabase: SupabaseClient<Database>,
+  tenderId: string,
+  tenderData: {
+    title: string;
+    description: string;
+    category: string; // Category name, will be converted to category_id
+    location: string;
+    estimatedValue: string;
+    currency: string;
+    submissionDeadline: Date;
+    evaluationDeadline: Date;
+    requirements: string[];
+    evaluationCriteria: any[];
+    documents?: any[];
+    isPublic: boolean;
+    allowQuestions: boolean;
+    questionsDeadline?: Date;
+    minimumExperience: number;
+    requiredCertificates: string[];
+    insuranceRequired: string;
+    advancePayment: boolean;
+    performanceBond: boolean;
+    status?: 'draft' | 'active';
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    projectDuration?: string;
+  }
+): Promise<{ data: TenderWithCompany | null; error: any }> {
+  try {
+    // First, verify the tender exists and is in draft status
+    const { data: existingTender, error: fetchError } = await (supabase as any)
+      .from('tenders')
+      .select('id, status')
+      .eq('id', tenderId)
+      .single();
+
+    if (fetchError || !existingTender) {
+      return { 
+        data: null, 
+        error: new Error('Przetarg nie został znaleziony') 
+      };
+    }
+
+    if (existingTender.status !== 'draft') {
+      return { 
+        data: null, 
+        error: new Error('Tylko przetargi w statusie szkicu mogą być edytowane') 
+      };
+    }
+
+    // Map form category names to database category names
+    const categoryMapping: Record<string, string> = {
+      'Utrzymanie Czystości i Zieleni': 'Usługi Sprzątające',
+      'Roboty Remontowo-Budowlane': 'Remonty i Budownictwo',
+      'Instalacje i systemy': 'Instalacje Techniczne',
+      'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
+      'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
+    };
+
+    // Use mapped category name if available, otherwise use original
+    const searchCategoryName = categoryMapping[tenderData.category] || tenderData.category;
+
+    // First, try exact match (case-insensitive)
+    let { data: categoryData, error: categoryError } = await (supabase as any)
+      .from('job_categories')
+      .select('id, name')
+      .ilike('name', searchCategoryName)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    // If exact match fails, try partial match
+    if (categoryError || !categoryData) {
+      const { data: partialMatch, error: partialError } = await (supabase as any)
+        .from('job_categories')
+        .select('id, name')
+        .ilike('name', `%${searchCategoryName}%`)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!partialError && partialMatch) {
+        categoryData = partialMatch;
+        categoryError = null;
+      }
+    }
+
+    // If still no match, try searching with the original category name
+    if (categoryError || !categoryData) {
+      const { data: originalMatch, error: originalError } = await (supabase as any)
+        .from('job_categories')
+        .select('id, name')
+        .ilike('name', `%${tenderData.category}%`)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!originalError && originalMatch) {
+        categoryData = originalMatch;
+        categoryError = null;
+      }
+    }
+
+    if (categoryError || !categoryData) {
+      console.error('Error finding category:', {
+        error: categoryError,
+        searchedCategory: tenderData.category,
+        mappedCategory: searchCategoryName,
+      });
+      
+      // Try to get all available categories for debugging
+      const { data: allCategories } = await (supabase as any)
+        .from('job_categories')
+        .select('name, slug')
+        .eq('is_active', true)
+        .limit(20);
+      
+      console.error('Available categories:', allCategories);
+      
+      return { 
+        data: null, 
+        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: any) => c.name).join(', ') || 'none'}`) 
+      };
+    }
+
+    const categoryId = categoryData.id;
+
+    // Prepare documents JSONB
+    const documentsJson = tenderData.documents ? tenderData.documents.map(doc => ({
+      id: doc.id,
+      name: doc.name,
+      type: doc.type,
+      // Note: File objects can't be stored directly, they need to be uploaded first
+      // For now, we'll store metadata only
+    })) : null;
+
+    // Update tender
+    const { data: updatedTender, error: updateError } = await (supabase as any)
+      .from('tenders')
+      .update({
+        title: tenderData.title,
+        description: tenderData.description,
+        category_id: categoryId,
+        location: tenderData.location,
+        address: tenderData.address || null,
+        latitude: tenderData.latitude || null,
+        longitude: tenderData.longitude || null,
+        estimated_value: parseFloat(tenderData.estimatedValue),
+        currency: tenderData.currency,
+        status: tenderData.status || 'draft',
+        submission_deadline: tenderData.submissionDeadline.toISOString(),
+        evaluation_deadline: tenderData.evaluationDeadline.toISOString(),
+        project_duration: tenderData.projectDuration || null,
+        is_public: tenderData.isPublic,
+        requirements: tenderData.requirements,
+        evaluation_criteria: tenderData.evaluationCriteria,
+        documents: documentsJson,
+        published_at: tenderData.status === 'active' ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', tenderId)
+      .select(`
+        *,
+        company:companies!tenders_company_id_fkey (
+          id,
+          name,
+          logo_url,
+          is_verified
+        ),
+        category:job_categories!tenders_category_id_fkey (
+          name,
+          slug
+        )
+      `)
+      .single();
+
+    if (updateError) {
+      console.error('Error updating tender:', updateError);
+      return { data: null, error: updateError };
+    }
+
+    return { data: updatedTender as any, error: null };
+  } catch (err) {
+    console.error('Error updating tender:', err);
+    return { data: null, error: err };
+  }
 }
 
 

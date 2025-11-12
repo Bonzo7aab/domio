@@ -3,6 +3,11 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { TenderCreationFormInline } from './TenderCreationFormInline';
 import { useUserProfile } from '../contexts/AuthContext';
+import { createClient } from '../lib/supabase/client';
+import { createTender } from '../lib/database/jobs';
+import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 interface TenderCreationPageProps {
   onBack: () => void;
@@ -28,6 +33,7 @@ interface NewTender {
   insuranceRequired: string;
   advancePayment: boolean;
   performanceBond: boolean;
+  status?: 'draft' | 'active';
 }
 
 interface EvaluationCriterion {
@@ -47,13 +53,47 @@ interface TenderDocument {
 
 export default function TenderCreationPage({ onBack }: TenderCreationPageProps) {
   const { user } = useUserProfile();
+  const router = useRouter();
 
-  const handleTenderSubmit = (tender: NewTender) => {
-    // W prawdziwej aplikacji tutaj byłoby wysyłanie danych do API
-    console.log('Nowy przetarg:', tender);
-    
-    // Po pomyślnym utworzeniu przetargu, wracamy do poprzedniego widoku
-    onBack();
+  const handleTenderSubmit = async (tender: NewTender) => {
+    if (!user?.id) {
+      toast.error('Musisz być zalogowany, aby utworzyć przetarg');
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      
+      // Get user's primary company
+      const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
+      
+      if (companyError || !company) {
+        toast.error('Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.');
+        console.error('Error fetching company:', companyError);
+        return;
+      }
+
+      // Save tender to database
+      const { data: savedTender, error: saveError } = await createTender(supabase, {
+        ...tender,
+        managerId: user.id,
+        companyId: company.id,
+      });
+
+      if (saveError) {
+        toast.error('Nie udało się zapisać przetargu: ' + (saveError.message || 'Nieznany błąd'));
+        console.error('Error saving tender:', saveError);
+        return;
+      }
+
+      toast.success(tender.status === 'draft' ? 'Przetarg zapisany jako szkic' : 'Przetarg został opublikowany');
+      
+      // Redirect to manager dashboard to see the new tender
+      router.push('/manager-dashboard');
+    } catch (error) {
+      toast.error('Wystąpił błąd podczas zapisywania przetargu');
+      console.error('Error in handleTenderSubmit:', error);
+    }
   };
 
   const handleFormClose = () => {

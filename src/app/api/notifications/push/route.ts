@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { sendPushNotificationToUser, initializeVAPID, type PushNotificationPayload } from '@/lib/push-notifications/server';
+import { createAdminClient } from '../../../../lib/supabase/admin';
+import { sendPushNotificationToUser, initializeVAPID, type PushNotificationPayload } from '../../../../lib/push-notifications/server';
 import webpush from 'web-push';
 
 /**
