@@ -6,6 +6,7 @@ import JobFilters, { FilterState } from '../components/JobFilters';
 import { EnhancedJobList } from '../components/EnhancedJobList';
 import JobList from '../components/JobList';
 import { JobApplicationModal } from '../components/JobApplicationModal';
+import { MapPlaceholder } from '../components/MapPlaceholder';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -289,8 +290,7 @@ export default function HomePage() {
   // }
 
   return (
-    <div className="domio-main">
-      
+      <>
       {/* Job Application Modal */}
       {applicationModalOpen && selectedApplicationJobId && (
         <JobApplicationModal
@@ -313,57 +313,64 @@ export default function HomePage() {
         />
       )}
       
-      <div className="flex min-h-[calc(100vh-12rem)]">
-        {/* Filters Sidebar - Visible only on laptop and above */}
-        {!isMapExpanded && (
-          <div className="hidden lg:block">
-            <JobFilters 
-              onFilterChange={setFilters} 
-              primaryLocation={primaryLocation}
-              onLocationChange={handleLocationChangeRequest}
-              jobs={loadedJobs}
-            />
-          </div>
-        )}
-        
-        {/* Main Content - JobList and Map */}
-        <div className="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-6">
-          {/* JobList - Always visible, hidden on mobile/tablet when map is expanded */}
-          <div className={`flex-1 ${isMapExpanded ? 'hidden lg:flex' : 'flex'}`}>
-            <JobList 
-              jobs={loadedJobs}
-              filters={filters}
-              onJobSelect={handleJobSelect}
-              onToggleMap={handleToggleMap}
-              isMapVisible={false}
-              isLoadingJobs={isLoadingJobs}
-            />
-          </div>
-          
-          {/* Map View - Visible only on laptop and above, conditional on mobile/tablet */}
-          <div className={`${isMapExpanded ? 'block' : 'hidden lg:block'} lg:flex-shrink-0 lg:w-[450px]`}>
-            <EnhancedMapView 
-              jobs={jobs}
-              isExpanded={isMapExpanded}
-              onToggleExpand={() => setIsMapExpanded(!isMapExpanded)}
-              selectedJobId={selectedJobId}
-              onJobSelect={handleJobSelect}
-              hoveredJobId={hoveredJobId}
-              onJobHover={setHoveredJobId}
-              userLocation={userLocation}
-              onLocationChange={setUserLocation}
-              onCityNameChange={handleCityNameChange}
-              searchRadius={searchRadius}
-              onRadiusChange={setSearchRadius}
-              filters={filters}
-              onFiltersChange={setFilters}
-              showCitySelector={showCitySelector}
-              onCitySelectorClose={handleCitySelectorClose}
-              onBoundsChanged={handleMapBoundsChange}
-            />
+      {/* Full Screen Map - Rendered outside container when expanded for full width */}
+      {isMapExpanded && (
+        <EnhancedMapView 
+          jobs={jobs}
+          isExpanded={isMapExpanded}
+          onToggleExpand={() => setIsMapExpanded(!isMapExpanded)}
+          selectedJobId={selectedJobId}
+          onJobSelect={handleJobSelect}
+          hoveredJobId={hoveredJobId}
+          onJobHover={setHoveredJobId}
+          userLocation={userLocation}
+          onLocationChange={setUserLocation}
+          onCityNameChange={handleCityNameChange}
+          searchRadius={searchRadius}
+          onRadiusChange={setSearchRadius}
+          filters={filters}
+          onFiltersChange={setFilters}
+          showCitySelector={showCitySelector}
+          onCitySelectorClose={handleCitySelectorClose}
+          onBoundsChanged={handleMapBoundsChange}
+        />
+      )}
+      
+      {/* Main Layout - Hidden when map is expanded, wrapped in max-w-7xl container */}
+      {!isMapExpanded && (
+        <div className="max-w-7xl mx-auto">
+          <div className="flex min-h-[calc(100vh-12rem)]">
+            {/* Filters Sidebar - Visible only on laptop and above */}
+            <div className="hidden lg:flex flex-col">
+              {/* Map Placeholder */}
+              <div className="mb-4">
+                <MapPlaceholder 
+                  onToggleExpand={() => setIsMapExpanded(!isMapExpanded)}
+                />
+              </div>
+              {/* Filters */}
+              <JobFilters 
+                onFilterChange={setFilters} 
+                primaryLocation={primaryLocation}
+                onLocationChange={handleLocationChangeRequest}
+                jobs={loadedJobs}
+              />
+            </div>
+            
+            {/* Main Content - JobList */}
+            <div className="flex-1">
+              <JobList 
+                jobs={loadedJobs}
+                filters={filters}
+                onJobSelect={handleJobSelect}
+                onToggleMap={handleToggleMap}
+                isMapVisible={false}
+                isLoadingJobs={isLoadingJobs}
+              />
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

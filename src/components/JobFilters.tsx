@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronUp, MapPin, Clock, Star, Gavel, Wrench, Check, PanelLeftClose, PanelLeftOpen, X, Edit3, ChevronDown as ArrowDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Clock, Star, Gavel, Wrench, Check, X, Edit3, ChevronDown as ArrowDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
@@ -26,7 +26,6 @@ interface JobFiltersProps {
   onFilterChange?: (filters: FilterState) => void;
   primaryLocation?: string;
   onLocationChange?: () => void;
-  forceExpanded?: boolean; // Force filters to stay expanded (useful in drawers)
   jobs?: any[]; // Available jobs to calculate dynamic categories/subcategories
 }
 
@@ -60,9 +59,7 @@ const CustomCheckbox: React.FC<{
 };
 
 
-export default function JobFilters({ onFilterChange, primaryLocation, onLocationChange, forceExpanded = false, jobs = [] }: JobFiltersProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const effectiveIsExpanded = forceExpanded ? true : isExpanded;
+export default function JobFilters({ onFilterChange, primaryLocation, onLocationChange, jobs = [] }: JobFiltersProps) {
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [expandedFilterSections, setExpandedFilterSections] = useState<string[]>(['post-type']);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -343,48 +340,17 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
 
   return (
     <div 
-      className={`${effectiveIsExpanded ? (forceExpanded ? 'w-full' : 'w-80') : 'w-16'} transition-all duration-300 ease-in-out overflow-hidden ${forceExpanded ? '' : 'border-r border-gray-200'} h-full`}
-      style={{ backgroundColor: forceExpanded ? 'transparent' : '#ffffff' }}
+      className="w-80 overflow-hidden h-full"
+      style={{ backgroundColor: '#ffffff' }}
     >
-      {/* Collapsed state - show only toggle button */}
-      {!effectiveIsExpanded && (
-        <div className="flex flex-col items-center py-6 px-2 h-full">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsExpanded(true)}
-            className="mb-4 hover:bg-gray-100"
-            title="Rozwiń filtry"
-          >
-            <PanelLeftOpen className="h-5 w-5 text-gray-600" />
-          </Button>
-          <div className="text-gray-500 mt-4" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-            Filtry
-          </div>
-        </div>
-      )}
-
-      {/* Expanded state - show all filters */}
-      {effectiveIsExpanded && (
-        <div className="flex flex-col h-full">
-          {/* Fixed Header */}
-          <div className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-bold text-gray-900">Filtry</h3>
-              </div>
-              {!forceExpanded && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsExpanded(false)}
-                  className="h-8 w-8 hover:bg-gray-100"
-                  title="Zwiń filtry"
-                >
-                  <PanelLeftClose className="h-4 w-4 text-gray-600" />
-                </Button>
-              )}
+      <div className="flex flex-col h-full">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 px-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-lg font-bold text-gray-900">Filtry</h3>
             </div>
+          </div>
 
             {/* Current Location Display */}
             {primaryLocation && primaryLocation !== 'Polska' && (
@@ -413,17 +379,16 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
               </div>
             )}
 
-             <div className="mb-4">
-                <Button variant="ghost" size="sm" className="text-sm text-gray-600 hover:text-gray-900" onClick={clearAllFilters}>
-                  <X className="h-3 w-3 mr-1" />
-                  Wyczyść wszystko
-                </Button>
-              </div>
-
               {/* Applied Filters */}
               {getAppliedFilters().length > 0 && (
                 <div className="mb-4">
-                  <Label className="text-xs font-semibold text-gray-700 mb-2 block">Aktywne filtry</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-xs font-semibold text-gray-700">Aktywne filtry</Label>
+                    <div className="text-xs cursor-pointer flex items-center text-gray-500 hover:text-gray-900 h-auto py-0 px-2" onClick={clearAllFilters}>
+                      <X className="h-3 w-3 mr-1" />
+                      Wyczyść wszystko
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-1">
                     {getAppliedFilters().map((filter) => (
                       <Badge
@@ -737,7 +702,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
                 <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Stawka Godzinowa
+                  Stawka
                 </Label>
                 {expandedFilterSections.includes('salary') ? 
                   <ChevronUp className="w-4 h-4 text-gray-600" /> : 
@@ -937,17 +902,16 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Scroll Indicator */}
-            {showScrollIndicator && (
-              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-10">
-                <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full p-2 shadow-lg">
-                  <ArrowDown className="w-4 h-4 text-gray-600 animate-pulse" />
-                </div>
+          {/* Scroll Indicator */}
+          {showScrollIndicator && (
+            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-10">
+              <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full p-2 shadow-lg">
+                <ArrowDown className="w-4 h-4 text-gray-600 animate-pulse" />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

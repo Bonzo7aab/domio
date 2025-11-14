@@ -185,7 +185,6 @@ export function MobileMenuDock() {
                   onFilterChange={setFilters}
                   primaryLocation={primaryLocation}
                   onLocationChange={onLocationChangeRequest}
-                  forceExpanded={true}
                 />
               </div>
             </div>
