@@ -1038,5 +1038,215 @@ export async function updateTender(
   }
 }
 
+/**
+ * Create a new job in the database
+ */
+export async function createJob(
+  supabase: SupabaseClient<Database>,
+  jobData: {
+    title: string;
+    description: string;
+    category: string; // Category name, will be converted to category_id
+    subcategory?: string;
+    location: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    budgetMin?: number;
+    budgetMax?: number;
+    budgetType?: 'fixed' | 'hourly' | 'negotiable' | 'range';
+    currency?: string;
+    projectDuration?: string;
+    deadline?: Date | string;
+    urgency?: 'low' | 'medium' | 'high';
+    status?: 'draft' | 'active';
+    type?: 'regular' | 'urgent' | 'premium';
+    isPublic?: boolean;
+    contactPerson?: string;
+    contactPhone?: string;
+    contactEmail?: string;
+    buildingType?: string;
+    buildingYear?: number;
+    surfaceArea?: string;
+    additionalInfo?: string;
+    requirements?: string[];
+    responsibilities?: string[];
+    skillsRequired?: string[];
+    images?: string[];
+    managerId: string; // User profile ID
+    companyId: string; // Company ID
+  }
+): Promise<{ data: JobWithCompany | null; error: any }> {
+  try {
+    // Map form category names to database category names
+    const categoryMapping: Record<string, string> = {
+      'Utrzymanie Czystości i Zieleni': 'Usługi Sprzątające',
+      'Roboty Remontowo-Budowlane': 'Remonty i Budownictwo',
+      'Instalacje i systemy': 'Instalacje Techniczne',
+      'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
+      'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
+    };
+
+    // Use mapped category name if available, otherwise use original
+    const searchCategoryName = categoryMapping[jobData.category] || jobData.category;
+
+    // First, try exact match (case-insensitive)
+    let { data: categoryData, error: categoryError } = await supabase
+      .from('job_categories')
+      .select('id, name')
+      .ilike('name', searchCategoryName)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    // If exact match fails, try partial match
+    if (categoryError || !categoryData) {
+      const { data: partialMatch, error: partialError } = await supabase
+        .from('job_categories')
+        .select('id, name')
+        .ilike('name', `%${searchCategoryName}%`)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!partialError && partialMatch) {
+        categoryData = partialMatch;
+        categoryError = null;
+      }
+    }
+
+    // If still no match, try searching with the original category name
+    if (categoryError || !categoryData) {
+      const { data: originalMatch, error: originalError } = await supabase
+        .from('job_categories')
+        .select('id, name')
+        .ilike('name', `%${jobData.category}%`)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!originalError && originalMatch) {
+        categoryData = originalMatch;
+        categoryError = null;
+      }
+    }
+
+    if (categoryError || !categoryData) {
+      console.error('Error finding category:', {
+        error: categoryError,
+        searchedCategory: jobData.category,
+        mappedCategory: searchCategoryName,
+      });
+      
+      // Try to get all available categories for debugging
+      const { data: allCategories } = await supabase
+        .from('job_categories')
+        .select('name, slug')
+        .eq('is_active', true)
+        .limit(20);
+      
+      console.error('Available categories:', allCategories);
+      
+      return { 
+        data: null, 
+        error: new Error(`Category "${jobData.category}" not found. Available categories: ${allCategories?.map((c: any) => c.name).join(', ') || 'none'}`) 
+      };
+    }
+
+    const categoryId = categoryData.id;
+
+    // Parse deadline if provided
+    let deadlineDate: string | null = null;
+    if (jobData.deadline) {
+      if (typeof jobData.deadline === 'string') {
+        deadlineDate = jobData.deadline;
+      } else {
+        deadlineDate = jobData.deadline.toISOString().split('T')[0];
+      }
+    }
+
+    // Parse budget values
+    const budgetMin = jobData.budgetMin !== undefined ? jobData.budgetMin : null;
+    const budgetMax = jobData.budgetMax !== undefined ? jobData.budgetMax : null;
+
+    // Prepare insert data
+    const insertData = {
+      title: jobData.title,
+      description: jobData.description,
+      category_id: categoryId,
+      subcategory: jobData.subcategory || null,
+      manager_id: jobData.managerId,
+      company_id: jobData.companyId,
+      location: jobData.location,
+      address: jobData.address || null,
+      latitude: jobData.latitude || null,
+      longitude: jobData.longitude || null,
+      budget_min: budgetMin,
+      budget_max: budgetMax,
+      budget_type: jobData.budgetType || 'fixed',
+      currency: jobData.currency || 'PLN',
+      project_duration: jobData.projectDuration || null,
+      deadline: deadlineDate,
+      urgency: jobData.urgency || 'medium',
+      status: jobData.status || 'active',
+      type: jobData.type || 'regular',
+      is_public: jobData.isPublic !== undefined ? jobData.isPublic : true,
+      contact_person: jobData.contactPerson || null,
+      contact_phone: jobData.contactPhone || null,
+      contact_email: jobData.contactEmail || null,
+      building_type: jobData.buildingType || null,
+      building_year: jobData.buildingYear || null,
+      surface_area: jobData.surfaceArea || null,
+      additional_info: jobData.additionalInfo || null,
+      requirements: jobData.requirements || null,
+      responsibilities: jobData.responsibilities || null,
+      skills_required: jobData.skillsRequired || null,
+      images: jobData.images || null,
+      published_at: jobData.status === 'active' ? new Date().toISOString() : null,
+    };
+
+    console.log('Inserting job with data:', {
+      ...insertData,
+      manager_id: jobData.managerId,
+      company_id: jobData.companyId,
+      category_id: categoryId,
+    });
+
+    // Insert job
+    const { data: insertedJob, error: insertError } = await supabase
+      .from('jobs')
+      .insert(insertData)
+      .select(`
+        *,
+        company:companies!jobs_company_id_fkey (
+          id,
+          name,
+          logo_url,
+          is_verified
+        ),
+        category:job_categories!jobs_category_id_fkey (
+          name,
+          slug
+        )
+      `)
+      .single();
+
+    if (insertError) {
+      console.error('Error creating job:', {
+        error: insertError,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code,
+      });
+      return { data: null, error: insertError };
+    }
+
+    return { data: insertedJob as any, error: null };
+  } catch (err) {
+    console.error('Error creating job:', err);
+    return { data: null, error: err };
+  }
+}
+
 
 

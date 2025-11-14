@@ -16,7 +16,6 @@ import {
   Map
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { Separator } from './ui/separator';
 import {
   Drawer,
   DrawerContent,
@@ -24,7 +23,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from './ui/drawer';
-import { MenuDock, type MenuDockItem } from './ui/menu-dock';
+import { FloatingDock, type FloatingDockItem } from './ui/floating-dock';
 import { useUserProfile } from '../contexts/AuthContext';
 import { useLayoutContext } from './ConditionalFooter';
 import { useFilterContext } from '../contexts/FilterContext';
@@ -45,19 +44,32 @@ export function MobileMenuDock() {
 
   const isActive = (path: string) => pathname === path || pathname?.startsWith(path + '/');
 
-  const menuItems: MenuDockItem[] = [
+  const getPathForLabel = (title: string): string => {
+    const titleToPath: Record<string, string> = {
+      'Strona główna': '/',
+      'Wykonawcy': '/contractors',
+      'Zarządcy': '/managers',
+      'Zapisane': '/bookmarked-jobs',
+      'Wiadomości': '/messages',
+      'Profil': '/account',
+      'Cennik': '/pricing',
+    };
+    return titleToPath[title] || '';
+  };
+
+  const menuItems: FloatingDockItem[] = [
     {
-      label: 'Strona główna',
-      icon: Home,
+      title: 'Strona główna',
+      icon: <Home className="size-6" />,
+      href: '/',
       onClick: () => {
         router.push('/');
         setMenuDrawerOpen(false);
       },
-      active: isActive('/'),
     },
     {
-      label: 'Szukaj',
-      icon: Search,
+      title: 'Szukaj',
+      icon: <Search className="size-6" />,
       onClick: () => {
         // Trigger command palette
         const event = new KeyboardEvent('keydown', {
@@ -70,72 +82,91 @@ export function MobileMenuDock() {
       },
     },
     {
-      label: 'Wykonawcy',
-      icon: Briefcase,
+      title: 'Wykonawcy',
+      icon: <Briefcase className="size-6" />,
+      href: '/contractors',
       onClick: () => {
         router.push('/contractors');
         setMenuDrawerOpen(false);
       },
-      active: isActive('/contractors'),
     },
     {
-      label: 'Zarządcy',
-      icon: Users,
+      title: 'Zarządcy',
+      icon: <Users className="size-6" />,
+      href: '/managers',
       onClick: () => {
         router.push('/managers');
         setMenuDrawerOpen(false);
       },
-      active: isActive('/managers'),
     },
     {
-      label: 'Zapisane',
-      icon: Bookmark,
+      title: 'Zapisane',
+      icon: <Bookmark className="size-6" />,
+      href: '/bookmarked-jobs',
       onClick: () => {
         router.push('/bookmarked-jobs');
         setMenuDrawerOpen(false);
       },
-      active: isActive('/bookmarked-jobs'),
     },
     ...(isAuthenticated
       ? [
           {
-            label: 'Wiadomości',
-            icon: MessageCircle,
+            title: 'Wiadomości',
+            icon: <MessageCircle className="size-6" />,
+            href: '/messages',
             onClick: () => {
               router.push('/messages');
               setMenuDrawerOpen(false);
             },
-            active: isActive('/messages'),
-          } as MenuDockItem,
+          } as FloatingDockItem,
           {
-            label: 'Profil',
-            icon: User,
+            title: 'Profil',
+            icon: <User className="size-6" />,
+            href: '/account',
             onClick: () => {
               router.push('/account');
               setMenuDrawerOpen(false);
             },
-            active: isActive('/account'),
-          } as MenuDockItem,
+          } as FloatingDockItem,
         ]
       : [
           {
-            label: 'Cennik',
-            icon: DollarSign,
+            title: 'Cennik',
+            icon: <DollarSign className="size-6" />,
+            href: '/pricing',
             onClick: () => {
               router.push('/pricing');
               setMenuDrawerOpen(false);
             },
-            active: isActive('/pricing'),
-          } as MenuDockItem,
+          } as FloatingDockItem,
           {
-            label: 'Zaloguj',
-            icon: User,
+            title: 'Zaloguj',
+            icon: <User className="size-6" />,
+            href: '/user-type-selection',
             onClick: () => {
               router.push('/user-type-selection');
               setMenuDrawerOpen(false);
             },
-          } as MenuDockItem,
+          } as FloatingDockItem,
         ]),
+  ];
+
+  const compactDockItems: FloatingDockItem[] = [
+    {
+      title: isMapExpanded ? 'Ukryj mapę' : 'Pokaż mapę',
+      icon: <Map className="size-6" />,
+      onClick: () => setIsMapExpanded(!isMapExpanded),
+    },
+    {
+      title: 'Filtry',
+      icon: <SlidersHorizontal className="size-6" />,
+      onClick: () => setFiltersDrawerOpen(true),
+    },
+    {
+      title: 'Menu',
+      icon: <Menu className="size-6" />,
+      onClick: () => setMenuDrawerOpen(true),
+    },
   ];
 
   // Compact mode: Filters button + Separator + Hamburger menu
@@ -170,16 +201,17 @@ export function MobileMenuDock() {
             <div className="overflow-y-auto flex-1 p-4">
               <div className="space-y-1">
                 {menuItems.map((item, index) => {
-                  const Icon = item.icon;
+                  const itemPath = getPathForLabel(item.title || '');
+                  const active = itemPath ? isActive(itemPath) : false;
                   return (
                     <Button
                       key={index}
-                      variant={item.active ? 'secondary' : 'ghost'}
-                      className={`w-full justify-start ${item.active ? 'bg-primary/10 text-primary' : ''}`}
+                      variant={active ? 'secondary' : 'ghost'}
+                      className={`w-full justify-start ${active ? 'bg-primary/10 text-primary' : ''}`}
                       onClick={item.onClick}
                     >
-                      <Icon className="h-4 w-4 mr-3" />
-                      <span>{item.label}</span>
+                      <div className="h-4 w-4 mr-3">{item.icon}</div>
+                      <span>{item.title}</span>
                     </Button>
                   );
                 })}
@@ -190,51 +222,11 @@ export function MobileMenuDock() {
 
         {/* Dock container - hidden when filters drawer is open, visible on mobile and tablet */}
         {!filtersDrawerOpen && (
-          <div className="fixed bottom-4 left-1/2 z-[100] mobile-bottom-nav lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))', transform: 'translateX(-50%)' }}>
-            <div className="flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 w-auto max-w-[calc(100vw-2rem)]" style={{ backgroundColor: '#e2e8f0' }}>
-              {/* Map Toggle Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-lg hover:bg-accent/50 shrink-0"
-                onClick={() => setIsMapExpanded(!isMapExpanded)}
-                title={isMapExpanded ? 'Ukryj mapę' : 'Pokaż mapę'}
-                style={{ boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)' }}
-              >
-                <Map className={`h-4 w-4 ${isMapExpanded ? 'text-primary' : ''}`} />
-              </Button>
-              {/* Filters Button */}
-              <Drawer open={filtersDrawerOpen} onOpenChange={setFiltersDrawerOpen}>
-                <DrawerTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="flex-1 min-w-0 max-w-[200px] justify-start h-10 rounded-lg hover:bg-accent/50"
-                    style={{ boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)' }}
-                  >
-                    <SlidersHorizontal className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="text-sm truncate">Filtry</span>
-                  </Button>
-                </DrawerTrigger>
-              </Drawer>
-
-              {/* Separator */}
-              <Separator orientation="vertical" className="h-8" />
-
-
-              {/* Hamburger Menu Button */}
-              <Drawer open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
-                <DrawerTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 w-10 rounded-lg hover:bg-accent/50 shrink-0"
-                    style={{ boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)' }}
-                  >
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </DrawerTrigger>
-              </Drawer>
-            </div>
+          <div className="mobile-bottom-nav lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+            <FloatingDock
+              items={compactDockItems}
+              mobileClassName="lg:hidden"
+            />
           </div>
         )}
       </>
@@ -243,13 +235,10 @@ export function MobileMenuDock() {
 
   // Normal mode: Show all menu items - visible on mobile and tablet
   return (
-    <div className="fixed bottom-4 left-1/2 z-[100] mobile-bottom-nav lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))', transform: 'translateX(-50%)' }}>
-      <MenuDock
+    <div className="mobile-bottom-nav lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+      <FloatingDock
         items={menuItems}
-        variant="compact"
-        orientation="horizontal"
-        showLabels={false}
-        className="px-3 py-2"
+        mobileClassName="lg:hidden"
       />
     </div>
   );

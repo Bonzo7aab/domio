@@ -11,7 +11,11 @@ import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { ArrowLeft, Upload, MapPin, Calendar, FileText, Phone, Mail, Building } from 'lucide-react';
 import { toast } from 'sonner';
-import { createJobFromFormData, saveJob, getStoredJobs } from '../utils/jobStorage';
+import { useUserProfile } from '../contexts/AuthContext';
+import { createClient } from '../lib/supabase/client';
+import { createJob } from '../lib/database/jobs';
+import { fetchUserPrimaryCompany, upsertUserCompany } from '../lib/database/companies';
+import { geocodeAddress } from '../lib/google-maps/geocoding';
 
 interface PostJobPageProps {
   onBack: () => void;
@@ -105,6 +109,10 @@ const organizationTypes = [
 ];
 
 export default function PostJobPage({ onBack }: PostJobPageProps) {
+  const { user, isAuthenticated } = useUserProfile();
+  const supabase = createClient();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState<JobFormData>({
     title: '',
     category: '',
@@ -142,9 +150,15 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check authentication
+    if (!isAuthenticated || !user) {
+      toast.error('Musisz być zalogowany, aby opublikować zlecenie');
+      return;
+    }
+
     // Walidacja podstawowa
     if (!formData.title || !formData.category || !formData.subcategory || !formData.description || !formData.location) {
       toast.error('Proszę wypełnić wszystkie wymagane pola');
@@ -157,30 +171,188 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
-      // Tworzenie obiektu zlecenia
-      const newJob = createJobFromFormData(formData);
-      console.log('🔍 Debug - Tworzenie nowego zlecenia:', newJob);
+      // Verify session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        console.error('No active session:', sessionError);
+        throw new Error('Brak aktywnej sesji. Proszę się zalogować ponownie.');
+      }
+
+      const sessionUserId = sessionData.session.user.id;
       
-      // Zapisanie do localStorage
-      saveJob(newJob);
-      console.log('🔍 Debug - Zlecenie zapisane do localStorage');
+      console.log('Session verified:', {
+        userId: sessionUserId,
+        userEmail: sessionData.session.user.email,
+        contextUserId: user.id,
+        match: sessionUserId === user.id,
+      });
+
+      // Use session user ID to ensure it matches auth.uid() in RLS policies
+      const managerId = sessionUserId;
+
+      // Get or create company
+      let company = await fetchUserPrimaryCompany(supabase, managerId);
       
-      // Sprawdzenie czy zostało zapisane
-      const storedJobs = getStoredJobs();
-      console.log('🔍 Debug - Wszystkie zapisane zlecenia:', storedJobs);
+      if (!company.data) {
+        // Map organization type to database type
+        const orgTypeMapping: Record<string, string> = {
+          'Spółdzielnia Mieszkaniowa': 'spółdzielnia',
+          'Wspólnota Mieszkaniowa': 'wspólnota',
+          'Zarządca Nieruchomości': 'property_management',
+          'Deweloper': 'property_management',
+          'Inne': 'property_management',
+        };
+
+        const companyType = orgTypeMapping[formData.organizationType] || 'property_management';
+
+        // Create company
+        const createResult = await upsertUserCompany(supabase, managerId, {
+          name: formData.organizationName,
+          type: companyType,
+          phone: formData.contactPhone || undefined,
+          email: formData.contactEmail,
+          city: formData.location,
+          address: formData.address || undefined,
+        });
+
+        if (createResult.error || !createResult.data) {
+          throw new Error(createResult.error?.message || 'Nie udało się utworzyć firmy');
+        }
+
+        company = { data: createResult.data, error: null };
+      }
+
+      if (!company.data) {
+        throw new Error('Nie udało się pobrać lub utworzyć firmy');
+      }
+
+      // Geocode location
+      let latitude: number | undefined;
+      let longitude: number | undefined;
       
-      toast.success(`✅ Zlecenie "${newJob.title}" zostało opublikowane pomyślnie!`);
-      console.log('Zapisane zlecenie:', newJob);
-      console.log('Załączniki:', attachments);
+      const geocodeAddressString = formData.address || formData.location;
+      if (geocodeAddressString) {
+        try {
+          const geocodeResult = await geocodeAddress(geocodeAddressString);
+          if (geocodeResult) {
+            latitude = geocodeResult.coordinates.lat;
+            longitude = geocodeResult.coordinates.lng;
+          }
+        } catch (geocodeError) {
+          console.warn('Geocoding failed, continuing without coordinates:', geocodeError);
+        }
+      }
+
+      // Parse budget
+      let budgetMin: number | undefined;
+      let budgetMax: number | undefined;
+      
+      if (formData.budget) {
+        const budgetValue = parseFloat(formData.budget.replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (!isNaN(budgetValue)) {
+          budgetMin = budgetValue;
+          budgetMax = formData.budgetType === 'fixed' ? budgetValue : undefined;
+        }
+      }
+
+      // Parse requirements string to array
+      const requirementsArray = formData.requirements
+        ? formData.requirements.split('\n').filter(r => r.trim().length > 0)
+        : [];
+
+      // Create job in database
+      console.log('Creating job with data:', {
+        title: formData.title,
+        category: formData.category,
+        managerId: managerId,
+        companyId: company.data.id,
+      });
+
+      const jobResult = await createJob(supabase, {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        subcategory: formData.subcategory,
+        location: formData.location,
+        address: formData.address || undefined,
+        latitude,
+        longitude,
+        budgetMin,
+        budgetMax,
+        budgetType: formData.budgetType,
+        currency: 'PLN',
+        deadline: formData.deadline || undefined,
+        urgency: formData.urgency,
+        status: 'active',
+        type: formData.urgency === 'high' ? 'urgent' : 'regular',
+        isPublic: true,
+        contactPerson: formData.contactName,
+        contactPhone: formData.contactPhone || undefined,
+        contactEmail: formData.contactEmail,
+        additionalInfo: formData.additionalInfo || undefined,
+        requirements: requirementsArray.length > 0 ? requirementsArray : undefined,
+        managerId: managerId,
+        companyId: company.data.id,
+      });
+
+      console.log('Job creation result:', jobResult);
+
+      if (jobResult.error) {
+        console.error('Job creation error details:', {
+          error: jobResult.error,
+          message: jobResult.error?.message,
+          details: jobResult.error?.details,
+          hint: jobResult.error?.hint,
+          code: jobResult.error?.code,
+        });
+        throw new Error(
+          jobResult.error?.message || 
+          jobResult.error?.details || 
+          jobResult.error?.hint || 
+          'Nie udało się utworzyć zlecenia w bazie danych'
+        );
+      }
+
+      if (!jobResult.data) {
+        throw new Error('Nie udało się utworzyć zlecenia - brak danych zwrotnych');
+      }
+
+      toast.success(`✅ Zlecenie "${formData.title}" zostało opublikowane pomyślnie!`);
+      
+      // Reset form
+      setFormData({
+        title: '',
+        category: '',
+        subcategory: '',
+        description: '',
+        location: '',
+        address: '',
+        budget: '',
+        budgetType: 'fixed',
+        deadline: '',
+        urgency: 'medium',
+        contactName: '',
+        contactPhone: '',
+        contactEmail: '',
+        organizationType: '',
+        organizationName: '',
+        requirements: '',
+        additionalInfo: ''
+      });
+      setAttachments([]);
       
       // Powrót do listy zleceń po krótkim opóźnieniu
       setTimeout(() => {
         onBack();
       }, 1500);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Błąd podczas zapisywania zlecenia:', error);
-      toast.error('Wystąpił błąd podczas publikowania zlecenia');
+      toast.error(error?.message || 'Wystąpił błąd podczas publikowania zlecenia');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -541,8 +713,12 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
             <Button type="button" variant="outline" onClick={onBack}>
               Anuluj
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              Opublikuj zlecenie
+            <Button 
+              type="submit" 
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={isSubmitting || !isAuthenticated}
+            >
+              {isSubmitting ? 'Publikowanie...' : 'Opublikuj zlecenie'}
             </Button>
           </div>
         </form>
