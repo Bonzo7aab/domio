@@ -116,7 +116,7 @@ export const MapFilters: React.FC<MapFiltersProps> = ({
   };
 
   return (
-    <Card className="w-[320px] max-h-[80vh] overflow-hidden shadow-xl bg-white border-border map-overlay-panel">
+    <Card className="w-[320px] max-h-[80vh] overflow-hidden shadow-xl bg-white border-border backdrop-blur-sm">
       <CardHeader className="p-4 pb-3 border-b border-border">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-foreground">Filtry</h3>

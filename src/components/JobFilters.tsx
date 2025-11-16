@@ -1,32 +1,38 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronUp, MapPin, Clock, Star, Gavel, Wrench, Check, X, Edit3, ChevronDown as ArrowDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Clock, Gavel, Wrench, Check, X, Edit3, ChevronDown as ArrowDown, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
-import { Slider } from './ui/slider';
 import { Label } from './ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { extractCity, extractSublocality, getProvinceForCity, getProvincesFromCities, type LocationData } from '../utils/locationMapping';
+import type { Job } from '../types/job';
 
 export interface FilterState {
   categories: string[];
   subcategories: string[];
   contractTypes: string[];
   locations: string[];
-  salaryRange: [number, number];
-  rating: number;
+  cities: string[];
+  sublocalities: string[]; // Format: "city:sublocality" e.g., "Warszawa:Ursynów"
+  provinces: string[];
+  budgetRanges: string[]; // ['<5000', '5000-20000', '20000+']
+  budgetMin?: number;
+  budgetMax?: number;
   clientTypes: string[];
   postTypes: string[]; // Zlecenia vs Przetargi
-  tenderTypes: string[]; // Typy przetargów (tylko gdy wybrano przetargi)
-  searchRadius?: number;
-  useGeolocation?: boolean;
-  searchQuery?: string; // Dodane pole wyszukiwania
+  urgency: string[]; // ['low', 'medium', 'high']
+  searchQuery?: string; // Search by title
+  endingSoon?: boolean; // Tenders ending in less than 7 days
 }
 
 interface JobFiltersProps {
   onFilterChange?: (filters: FilterState) => void;
   primaryLocation?: string;
   onLocationChange?: () => void;
-  jobs?: any[]; // Available jobs to calculate dynamic categories/subcategories
+  jobs?: Job[]; // Available jobs to calculate dynamic categories/subcategories
+  initialFilters?: FilterState; // Initial filters from parent
+  isMapView?: boolean; // If true, applies map-specific padding adjustments
 }
 
 // Custom Checkbox Component to match the image styling
@@ -59,95 +65,170 @@ const CustomCheckbox: React.FC<{
 };
 
 
-export default function JobFilters({ onFilterChange, primaryLocation, onLocationChange, jobs = [] }: JobFiltersProps) {
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [expandedFilterSections, setExpandedFilterSections] = useState<string[]>(['post-type']);
+export default function JobFilters({ onFilterChange, primaryLocation, onLocationChange, jobs = [], initialFilters, isMapView = false }: JobFiltersProps) {
+  const [expandedFilterSections, setExpandedFilterSections] = useState<string[]>(['post-type', 'search']);
+  const [expandedCities, setExpandedCities] = useState<Set<string>>(new Set());
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [selectedContractTypes, setSelectedContractTypes] = useState<string[]>([]);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedSublocalities, setSelectedSublocalities] = useState<string[]>([]); // Format: "city:sublocality"
+  const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
   const [selectedClientTypes, setSelectedClientTypes] = useState<string[]>([]);
   const [selectedPostTypes, setSelectedPostTypes] = useState<string[]>(['job', 'tender']);
-  const [selectedTenderTypes, setSelectedTenderTypes] = useState<string[]>([]);
-  const [salaryRange, setSalaryRange] = useState<[number, number]>([0, 200]);
-  const [minRating, setMinRating] = useState(0);
-  const [useGeolocation, setUseGeolocation] = useState(false);
-  const [searchRadius, setSearchRadius] = useState(25);
+  const [selectedUrgency, setSelectedUrgency] = useState<string[]>([]);
+  const [selectedBudgetRanges, setSelectedBudgetRanges] = useState<string[]>([]);
+  const [budgetMin, setBudgetMin] = useState<string>('');
+  const [budgetMax, setBudgetMax] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [endingSoon, setEndingSoon] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isUpdatingFromSelfRef = useRef(false);
 
-  // Calculate categories and subcategories dynamically from jobs
+  // Sync local state with incoming filters (from quick filters or URL)
+  useEffect(() => {
+    if (initialFilters && !isUpdatingFromSelfRef.current) {
+      if (initialFilters.categories !== undefined) setSelectedCategories(initialFilters.categories);
+      if (initialFilters.subcategories !== undefined) setSelectedSubcategories(initialFilters.subcategories);
+      if (initialFilters.contractTypes !== undefined) setSelectedContractTypes(initialFilters.contractTypes);
+      if (initialFilters.cities !== undefined) setSelectedCities(initialFilters.cities);
+      if (initialFilters.sublocalities !== undefined) setSelectedSublocalities(initialFilters.sublocalities);
+      if (initialFilters.provinces !== undefined) setSelectedProvinces(initialFilters.provinces);
+      if (initialFilters.clientTypes !== undefined) setSelectedClientTypes(initialFilters.clientTypes);
+      if (initialFilters.postTypes !== undefined) setSelectedPostTypes(initialFilters.postTypes);
+      if (initialFilters.urgency !== undefined) setSelectedUrgency(initialFilters.urgency);
+      if (initialFilters.budgetRanges !== undefined) setSelectedBudgetRanges(initialFilters.budgetRanges);
+      if (initialFilters.budgetMin !== undefined) setBudgetMin(initialFilters.budgetMin.toString());
+      if (initialFilters.budgetMax !== undefined) setBudgetMax(initialFilters.budgetMax.toString());
+      if (initialFilters.searchQuery !== undefined) setSearchQuery(initialFilters.searchQuery);
+      if (initialFilters.endingSoon !== undefined) setEndingSoon(initialFilters.endingSoon);
+    }
+    // Reset the flag after syncing
+    isUpdatingFromSelfRef.current = false;
+  }, [initialFilters]);
+
+  // Calculate categories dynamically from jobs (using category.name)
   const categories = useMemo(() => {
     if (!jobs || jobs.length === 0) {
       return [];
     }
 
-    // Group jobs by category
-    const categoryMap = new Map<string, { count: number; subcategories: Map<string, number> }>();
+    // Group jobs by category name
+    const categoryMap = new Map<string, number>();
 
     jobs.forEach(job => {
-      const categoryName = job.category || 'Inne';
-      const subcategoryName = job.subcategory;
-
-      if (!categoryMap.has(categoryName)) {
-        categoryMap.set(categoryName, { count: 0, subcategories: new Map<string, number>() });
-      }
-
-      const categoryData = categoryMap.get(categoryName)!;
-      categoryData.count += 1;
-
-      if (subcategoryName) {
-        const currentCount = categoryData.subcategories.get(subcategoryName) || 0;
-        categoryData.subcategories.set(subcategoryName, currentCount + 1);
-      }
+      // Handle category as either string or object with name property
+      const categoryName = typeof job.category === 'string' 
+        ? job.category 
+        : (job.category?.name || 'Inne');
+      const currentCount = categoryMap.get(categoryName) || 0;
+      categoryMap.set(categoryName, currentCount + 1);
     });
 
-    // Convert to array format with sorted subcategories
+    // Convert to array format sorted by count
     return Array.from(categoryMap.entries())
-      .map(([name, data]) => ({
-        name,
-        count: data.count,
-        subcategories: Array.from(data.subcategories.keys()).sort()
-      }))
+      .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count); // Sort by count descending
   }, [jobs]);
 
-  // Extract unique locations from jobs
-  const locations = useMemo(() => {
+  // Extract unique cities and their sublocalities from jobs
+  const citiesWithSublocalities = useMemo(() => {
     if (!jobs || jobs.length === 0) {
-      return [];
+      return new Map<string, Set<string>>();
     }
 
-    const locationSet = new Set<string>();
+    const citySublocalityMap = new Map<string, Set<string>>();
+    
     jobs.forEach(job => {
       if (job.location) {
-        locationSet.add(job.location);
+        const city = extractCity(job.location);
+        const sublocality = extractSublocality(job.location);
+        
+        if (city) {
+          if (!citySublocalityMap.has(city)) {
+            citySublocalityMap.set(city, new Set<string>());
+          }
+          
+          if (sublocality) {
+            citySublocalityMap.get(city)!.add(sublocality);
+          }
+        }
       }
     });
 
-    return Array.from(locationSet).sort();
+    return citySublocalityMap;
+  }, [jobs]);
+
+  // Get sorted list of cities
+  const cities = useMemo(() => {
+    return Array.from(citiesWithSublocalities.keys()).sort();
+  }, [citiesWithSublocalities]);
+
+  // Get sublocalities for a specific city
+  const getSublocalitiesForCity = (city: string): string[] => {
+    const sublocalities = citiesWithSublocalities.get(city);
+    return sublocalities ? Array.from(sublocalities).sort() : [];
+  };
+
+  // Get available provinces based on selected cities
+  const availableProvinces = useMemo(() => {
+    if (selectedCities.length === 0) {
+      return [];
+    }
+    return getProvincesFromCities(selectedCities);
+  }, [selectedCities]);
+
+  // Calculate client type counts from jobs
+  const clientTypeCounts = useMemo(() => {
+    if (!jobs || jobs.length === 0) {
+      return {};
+    }
+
+    const counts: Record<string, number> = {};
+    const clientTypes = ['Wspólnota Mieszkaniowa', 'Spółdzielnia Mieszkaniowa'];
+    
+    // Initialize counts for all client types
+    clientTypes.forEach(type => {
+      counts[type] = 0;
+    });
+
+    // Count jobs for each client type
+    jobs.forEach(job => {
+      if (job.clientType && clientTypes.includes(job.clientType)) {
+        counts[job.clientType]++;
+      }
+    });
+
+    return counts;
   }, [jobs]);
 
   // Emit filter changes to parent
   useEffect(() => {
     if (onFilterChange) {
+      isUpdatingFromSelfRef.current = true;
+      const budgetMinNum = budgetMin && budgetMin.trim() ? parseFloat(budgetMin) : undefined;
+      const budgetMaxNum = budgetMax && budgetMax.trim() ? parseFloat(budgetMax) : undefined;
+      
       onFilterChange({
         categories: selectedCategories,
         subcategories: selectedSubcategories,
         contractTypes: selectedContractTypes,
-        locations: selectedLocations,
+        locations: [], // Keep for backward compatibility, but use cities/provinces
+        cities: selectedCities,
+        sublocalities: selectedSublocalities,
+        provinces: selectedProvinces,
+        budgetRanges: selectedBudgetRanges,
+        budgetMin: budgetMinNum !== undefined && !isNaN(budgetMinNum) ? budgetMinNum : undefined,
+        budgetMax: budgetMaxNum !== undefined && !isNaN(budgetMaxNum) ? budgetMaxNum : undefined,
         clientTypes: selectedClientTypes,
         postTypes: selectedPostTypes,
-        tenderTypes: selectedTenderTypes,
-        salaryRange,
-        rating: minRating,
-        useGeolocation,
-        searchRadius,
-        searchQuery
+        urgency: selectedUrgency,
+        searchQuery,
+        endingSoon: endingSoon
       });
     }
-  }, [selectedCategories, selectedSubcategories, selectedContractTypes, selectedLocations, selectedClientTypes, selectedPostTypes, selectedTenderTypes, salaryRange, minRating, useGeolocation, searchRadius, searchQuery, onFilterChange]);
+  }, [selectedCategories, selectedSubcategories, selectedContractTypes, selectedCities, selectedSublocalities, selectedProvinces, selectedClientTypes, selectedPostTypes, selectedUrgency, selectedBudgetRanges, budgetMin, budgetMax, searchQuery, endingSoon, onFilterChange]);
 
   // Scroll detection for showing scroll indicator
   useEffect(() => {
@@ -175,17 +256,12 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       scrollContainer.removeEventListener('scroll', checkScrollPosition);
       window.removeEventListener('resize', checkScrollPosition);
     };
-  }, [expandedFilterSections, expandedCategories]); // Re-check when sections expand/collapse
-
-  const toggleCategory = (categoryName: string) => {
-    setExpandedCategories(prev => 
-      prev.includes(categoryName) 
-        ? prev.filter(name => name !== categoryName)
-        : [...prev, categoryName]
-    );
-  };
+  }, [expandedFilterSections]); // Re-check when sections expand/collapse
 
   const toggleFilterSection = (sectionName: string) => {
+    // Don't allow closing search section
+    if (sectionName === 'search') return;
+    
     setExpandedFilterSections(prev => 
       prev.includes(sectionName) 
         ? prev.filter(name => name !== sectionName)
@@ -193,19 +269,53 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
     );
   };
 
+  // Handle city selection - update provinces when cities change
+  const handleCityChange = (city: string, checked: boolean) => {
+    if (checked) {
+      setSelectedCities(prev => [...prev, city]);
+    } else {
+      setSelectedCities(prev => prev.filter(c => c !== city));
+      // Remove sublocalities for this city when city is deselected
+      setSelectedSublocalities(prev => prev.filter(s => !s.startsWith(`${city}:`)));
+      // Remove provinces that are no longer relevant
+      const removedCityProvince = getProvinceForCity(city);
+      if (removedCityProvince) {
+        const remainingCities = selectedCities.filter(c => c !== city);
+        const remainingProvinces = getProvincesFromCities(remainingCities);
+        setSelectedProvinces(prev => prev.filter(p => remainingProvinces.includes(p)));
+      }
+    }
+  };
+
+  // Handle sublocality selection
+  const handleSublocalityChange = (city: string, sublocality: string, checked: boolean) => {
+    const sublocalityKey = `${city}:${sublocality}`;
+    if (checked) {
+      setSelectedSublocalities(prev => [...prev, sublocalityKey]);
+      // Ensure city is also selected
+      if (!selectedCities.includes(city)) {
+        setSelectedCities(prev => [...prev, city]);
+      }
+    } else {
+      setSelectedSublocalities(prev => prev.filter(s => s !== sublocalityKey));
+    }
+  };
+
   const clearAllFilters = () => {
     setSelectedCategories([]);
     setSelectedSubcategories([]);
     setSelectedContractTypes([]);
-    setSelectedLocations([]);
+    setSelectedCities([]);
+    setSelectedSublocalities([]);
+    setSelectedProvinces([]);
     setSelectedClientTypes([]);
     setSelectedPostTypes(['job', 'tender']); // Domyślnie pokazuj wszystkie typy
-    setSelectedTenderTypes([]);
-    setSalaryRange([0, 200]);
-    setMinRating(0);
-    setUseGeolocation(false);
-    setSearchRadius(25);
+    setSelectedUrgency([]);
+    setSelectedBudgetRanges([]);
+    setBudgetMin('');
+    setBudgetMax('');
     setSearchQuery('');
+    setEndingSoon(false);
   };
 
   // Get all applied filters
@@ -225,17 +335,6 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       });
     }
 
-    // Tender types
-    selectedTenderTypes.forEach(type => {
-      applied.push({
-        label: type,
-        value: type,
-        onRemove: () => {
-          setSelectedTenderTypes(prev => prev.filter(t => t !== type));
-        }
-      });
-    });
-
     // Categories
     selectedCategories.forEach(category => {
       applied.push({
@@ -247,24 +346,40 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       });
     });
 
-    // Subcategories
-    selectedSubcategories.forEach(sub => {
+    // Cities (only if no sublocalities are selected for that city)
+    selectedCities.forEach(city => {
+      const citySublocalities = selectedSublocalities.filter(s => s.startsWith(`${city}:`));
+      // Only show city badge if no sublocalities are selected for this city
+      if (citySublocalities.length === 0) {
+        applied.push({
+          label: city,
+          value: `city-${city}`,
+          onRemove: () => {
+            handleCityChange(city, false);
+          }
+        });
+      }
+    });
+
+    // Sublocalities
+    selectedSublocalities.forEach(sublocalityKey => {
+      const [city, sublocality] = sublocalityKey.split(':');
       applied.push({
-        label: sub,
-        value: sub,
+        label: `${city} - ${sublocality}`,
+        value: `sublocality-${sublocalityKey}`,
         onRemove: () => {
-          setSelectedSubcategories(prev => prev.filter(c => c !== sub));
+          handleSublocalityChange(city, sublocality, false);
         }
       });
     });
 
-    // Locations
-    selectedLocations.forEach(location => {
+    // Provinces
+    selectedProvinces.forEach(province => {
       applied.push({
-        label: location,
-        value: location,
+        label: province,
+        value: `province-${province}`,
         onRemove: () => {
-          setSelectedLocations(prev => prev.filter(l => l !== location));
+          setSelectedProvinces(prev => prev.filter(p => p !== province));
         }
       });
     });
@@ -291,35 +406,39 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       });
     });
 
-    // Salary range
-    if (salaryRange[0] > 0 || salaryRange[1] < 200) {
+    // Budget ranges
+    selectedBudgetRanges.forEach(range => {
+      const rangeLabels: Record<string, string> = {
+        '<5000': 'Mniej niż 5000 PLN',
+        '5000-20000': '5000 - 20000 PLN',
+        '20000+': '20000+ PLN'
+      };
       applied.push({
-        label: `Stawka: ${salaryRange[0]}-${salaryRange[1]} zł/h`,
-        value: 'salary-range',
+        label: rangeLabels[range] || range,
+        value: `budget-${range}`,
         onRemove: () => {
-          setSalaryRange([0, 200]);
+          setSelectedBudgetRanges(prev => prev.filter(r => r !== range));
+        }
+      });
+    });
+
+    // Budget min/max
+    if (budgetMin) {
+      applied.push({
+        label: `Budżet min: ${budgetMin} PLN`,
+        value: 'budget-min',
+        onRemove: () => {
+          setBudgetMin('');
         }
       });
     }
 
-    // Rating
-    if (minRating > 0) {
+    if (budgetMax) {
       applied.push({
-        label: `Ocena: ${minRating}+`,
-        value: 'rating',
+        label: `Budżet max: ${budgetMax} PLN`,
+        value: 'budget-max',
         onRemove: () => {
-          setMinRating(0);
-        }
-      });
-    }
-
-    // Geolocation
-    if (useGeolocation) {
-      applied.push({
-        label: `Odległość: ${searchRadius} km`,
-        value: 'geolocation',
-        onRemove: () => {
-          setUseGeolocation(false);
+          setBudgetMax('');
         }
       });
     }
@@ -335,6 +454,33 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       });
     }
 
+    // Urgency
+    selectedUrgency.forEach(urgency => {
+      const urgencyLabels: Record<string, string> = {
+        'low': 'Niski priorytet',
+        'medium': 'Średni priorytet',
+        'high': 'Wysoki priorytet'
+      };
+      applied.push({
+        label: urgencyLabels[urgency] || urgency,
+        value: `urgency-${urgency}`,
+        onRemove: () => {
+          setSelectedUrgency(prev => prev.filter(u => u !== urgency));
+        }
+      });
+    });
+
+    // Ending soon filter
+    if (endingSoon) {
+      applied.push({
+        label: 'Kończące się wkrótce',
+        value: 'ending-soon',
+        onRemove: () => {
+          setEndingSoon(false);
+        }
+      });
+    }
+
     return applied;
   };
 
@@ -345,7 +491,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
     >
       <div className="flex flex-col h-full">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 px-6">
+        <div className={`flex-shrink-0 px-6 ${isMapView ? 'pt-6' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <h3 className="text-lg font-bold text-gray-900">Filtry</h3>
@@ -409,7 +555,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
           {/* Scrollable Filters Content */}
           <div 
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto px-6 pb-6 max-h-[calc(100vh-20rem)] relative"
+            className={`flex-1 overflow-y-auto px-6 ${isMapView ? 'pb-4' : 'pb-6'} max-h-[calc(100vh-20rem)] relative`}
           >
 
             {/* Post Type Filter */}
@@ -428,8 +574,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                 }
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 pl-2">
-                {/* Zlecenia bezpośrednie */}
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <div className="flex items-center space-x-2">
                     <CustomCheckbox 
                       id="job"
@@ -444,16 +589,10 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                     />
                     <Label htmlFor="job" className="text-sm cursor-pointer flex items-center space-x-2">
                       <Wrench className="w-4 h-4 text-primary" />
-                      <span className="text-foreground">Zlecenia bezpośrednie</span>
+                      <span className="text-foreground">Zlecenia</span>
                     </Label>
                   </div>
-                  <div className="text-xs font-light text-foreground pl-6">
-                    Bezpośrednie aplikowanie, szybkie procesy
-                  </div>
-                </div>
 
-                {/* Przetargi z sub-filtrami */}
-                <div className="space-y-1">
                   <div className="flex items-center space-x-2">
                     <CustomCheckbox 
                       id="tender"
@@ -463,7 +602,6 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                           setSelectedPostTypes(prev => [...prev, 'tender']);
                         } else {
                           setSelectedPostTypes(prev => prev.filter(t => t !== 'tender'));
-                          setSelectedTenderTypes([]);
                         }
                       }}
                     />
@@ -472,40 +610,23 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                       <span className="text-foreground">Przetargi</span>
                     </Label>
                   </div>
-                  <div className="text-xs font-light text-foreground pl-6">
-                    Formalna konkurencja, duże projekty
-                  </div>
 
-                  {/* Sub-filtry dla przetargów */}
+                  {/* Ending Soon Filter - Only show when tenders are selected */}
                   {selectedPostTypes.includes('tender') && (
-                    <div className="ml-6 mt-2 space-y-2 border-l-2 border-orange-600/20 pl-3">
-                      {[
-                        { value: 'Przetarg publiczny', label: 'Przetarg publiczny', description: 'Otwarty dla wszystkich wykonawców' },
-                        { value: 'Przetarg ograniczony', label: 'Przetarg ograniczony', description: 'Tylko wybrani wykonawcy' }
-                      ].map(({ value, label, description }) => (
-                        <div key={value} className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <CustomCheckbox 
-                              id={value}
-                              checked={selectedTenderTypes.includes(value)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedTenderTypes(prev => [...prev, value]);
-                                } else {
-                                  setSelectedTenderTypes(prev => prev.filter(t => t !== value));
-                                }
-                              }}
-                            />
-                            <Label htmlFor={value} className="text-sm cursor-pointer">
-                              <span className="font-medium text-foreground">{label}</span>
-                            </Label>
-                          </div>
-                          <div className="text-xs text-foreground pl-6">
-                            {description}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <>
+                      <div className="h-px bg-gray-200 my-2" />
+                      <div className="flex items-center space-x-2">
+                        <CustomCheckbox 
+                          id="ending-soon"
+                          checked={endingSoon}
+                          onCheckedChange={setEndingSoon}
+                        />
+                        <Label htmlFor="ending-soon" className="text-sm cursor-pointer flex items-center space-x-2">
+                          <Clock className="w-4 h-4 text-orange-600" />
+                          <span className="text-foreground">Kończące się wkrótce (&lt;7 dni)</span>
+                        </Label>
+                      </div>
+                    </>
                   )}
                 </div>
               </CollapsibleContent>
@@ -530,85 +651,31 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                 <div className="space-y-2">
                 {categories.length > 0 ? (
                   categories.map(category => (
-                    <div key={category.name}>
-                      <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                        <div className="flex items-center space-x-2 flex-1">
-                          <CustomCheckbox 
-                            id={`category-${category.name}`}
-                            checked={selectedCategories.includes(category.name)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedCategories(prev => [...prev, category.name]);
-                              } else {
-                                setSelectedCategories(prev => prev.filter(c => c !== category.name));
-                                // Also remove subcategories of this category
-                                const categorySubs = category.subcategories;
-                                setSelectedSubcategories(prev => 
-                                  prev.filter(sub => !categorySubs.includes(sub))
-                                );
-                              }
-                            }}
-                          />
-                          <span className="text-sm text-foreground">{category.name}</span>
-                          <span className="text-xs text-gray-500">({category.count})</span>
-                        </div>
-                        <div
-                          className="cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleCategory(category.name);
-                          }}
-                        >
-                          {expandedCategories.includes(category.name) ? 
-                            <ChevronUp className="w-4 h-4 text-foreground" /> : 
-                            <ChevronDown className="w-4 h-4 text-gray-600" />
+                    <div key={category.name} className="flex items-center space-x-2">
+                      <CustomCheckbox 
+                        id={`category-${category.name}`}
+                        checked={selectedCategories.includes(category.name)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedCategories(prev => [...prev, category.name]);
+                          } else {
+                            setSelectedCategories(prev => prev.filter(c => c !== category.name));
                           }
-                        </div>
-                      </div>
-                      
-                      {expandedCategories.includes(category.name) && (
-                        <div className="ml-4 space-y-2 mt-2">
-                          {category.subcategories.length > 0 ? (
-                            category.subcategories.map(sub => {
-                              // Calculate count for this subcategory
-                              const subCount = jobs.filter(job => 
-                                job.category === category.name && job.subcategory === sub
-                              ).length;
-                              
-                              return (
-                                <div key={sub} className="flex items-center space-x-2">
-                                  <CustomCheckbox 
-                                    id={sub}
-                                    checked={selectedSubcategories.includes(sub)}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedSubcategories(prev => [...prev, sub]);
-                                      } else {
-                                        setSelectedSubcategories(prev => prev.filter(c => c !== sub));
-                                      }
-                                    }}
-                                  />
-                                  <Label htmlFor={sub} className="text-sm text-gray-500 font-light cursor-pointer">
-                                    {sub} ({subCount})
-                                  </Label>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-xs text-gray-400 pl-6">(0)</div>
-                          )}
-                        </div>
-                      )}
+                        }}
+                      />
+                      <Label htmlFor={`category-${category.name}`} className="text-sm cursor-pointer text-gray-900 font-light">
+                        {category.name} ({category.count})
+                      </Label>
                     </div>
                   ))
                 ) : (
-                  <div className="text-xs text-gray-400 pl-2">(0)</div>
+                  <div className="text-xs text-gray-400 pl-2">Brak kategorii</div>
                 )}
               </div>
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Location */}
+            {/* Location - Two Level (City and Province) */}
             <Collapsible
               open={expandedFilterSections.includes('location')}
               onOpenChange={() => toggleFilterSection('location')}
@@ -624,34 +691,121 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                 }
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-2">
-                {locations.length > 0 ? (
-                  locations.map(location => {
-                    const locationCount = jobs.filter(job => job.location === location).length;
-                    return (
-                      <div key={location} className="flex items-center space-x-2">
+                {/* City Selection with Sublocalities */}
+                <div className="space-y-3 mb-4">
+                  <Label className="text-xs font-semibold text-gray-700 mb-2 block">Miasto</Label>
+                  {cities.length > 0 ? (
+                    cities.map(city => {
+                      const cityCount = jobs.filter(job => {
+                        const jobCity = extractCity(job.location);
+                        return jobCity === city;
+                      }).length;
+                      
+                      const sublocalities = getSublocalitiesForCity(city);
+                      const hasSublocalities = sublocalities.length > 0;
+                      
+                      const isCityExpanded = expandedCities.has(city);
+                      const isCitySelected = selectedCities.includes(city);
+                      const showSublocalities = hasSublocalities && (isCitySelected || isCityExpanded);
+                      
+                      return (
+                        <div key={city} className="space-y-1">
+                          {/* City checkbox with expand/collapse */}
+                          <div className="flex items-center space-x-2">
+                            <CustomCheckbox 
+                              id={`city-${city}`}
+                              checked={isCitySelected}
+                              onCheckedChange={(checked) => handleCityChange(city, checked)}
+                            />
+                            <Label htmlFor={`city-${city}`} className="text-sm cursor-pointer flex items-center text-gray-900 font-light flex-1">
+                              <MapPin className="w-3 h-3 mr-1 text-gray-600" />
+                              {city} ({cityCount})
+                            </Label>
+                            {hasSublocalities && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setExpandedCities(prev => {
+                                    const newSet = new Set(prev);
+                                    if (newSet.has(city)) {
+                                      newSet.delete(city);
+                                    } else {
+                                      newSet.add(city);
+                                    }
+                                    return newSet;
+                                  });
+                                }}
+                                className="ml-auto p-1 hover:bg-gray-100 rounded transition-colors"
+                                aria-label={isCityExpanded ? 'Zwiń' : 'Rozwiń'}
+                              >
+                                {isCityExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-gray-600" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                          
+                          {/* Sublocalities nested under city - shown when city is selected or expanded */}
+                          {showSublocalities && (
+                            <div className="ml-6 space-y-1 pl-1 border-l-2 border-gray-200">
+                              {sublocalities.map(sublocality => {
+                                const sublocalityKey = `${city}:${sublocality}`;
+                                const sublocalityCount = jobs.filter(job => {
+                                  const jobCity = extractCity(job.location);
+                                  const jobSublocality = extractSublocality(job.location);
+                                  return jobCity === city && jobSublocality === sublocality;
+                                }).length;
+                                
+                                return (
+                                  <div key={sublocalityKey} className="flex items-center space-x-2">
+                                    <CustomCheckbox 
+                                      id={`sublocality-${sublocalityKey}`}
+                                      checked={selectedSublocalities.includes(sublocalityKey)}
+                                      onCheckedChange={(checked) => handleSublocalityChange(city, sublocality, checked)}
+                                    />
+                                    <Label htmlFor={`sublocality-${sublocalityKey}`} className="text-xs cursor-pointer flex items-center text-gray-700 font-light">
+                                      {sublocality} ({sublocalityCount})
+                                    </Label>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-xs text-gray-400 pl-2">Brak miast</div>
+                  )}
+                </div>
+
+                {/* Province Selection - Only shown when cities are selected */}
+                {selectedCities.length > 0 && availableProvinces.length > 0 && (
+                  <div className="space-y-2 border-t pt-3">
+                    <Label className="text-xs font-semibold text-gray-700 mb-2 block">Województwo</Label>
+                    {availableProvinces.map(province => (
+                      <div key={province} className="flex items-center space-x-2">
                         <CustomCheckbox 
-                          id={location}
-                          checked={selectedLocations.includes(location)}
+                          id={`province-${province}`}
+                          checked={selectedProvinces.includes(province)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setSelectedLocations(prev => [...prev, location]);
+                              setSelectedProvinces(prev => [...prev, province]);
                             } else {
-                              setSelectedLocations(prev => prev.filter(l => l !== location));
+                              setSelectedProvinces(prev => prev.filter(p => p !== province));
                             }
                           }}
                         />
-                        <Label htmlFor={location} className="text-sm cursor-pointer flex items-center text-gray-900 font-light">
-                          <MapPin className="w-3 h-3 mr-1 text-gray-600" />
-                          {location} ({locationCount})
+                        <Label htmlFor={`province-${province}`} className="text-sm cursor-pointer text-gray-900 font-light">
+                          {province}
                         </Label>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-xs text-gray-400 pl-2">(0)</div>
+                    ))}
+                  </div>
                 )}
-              </div>
               </CollapsibleContent>
             </Collapsible>
 
@@ -672,58 +826,176 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 pl-2">
                 <div className="space-y-2">
-                {['Wspólnota Mieszkaniowa', 'Spółdzielnia Mieszkaniowa'].map(clientType => (
-                  <div key={clientType} className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id={clientType}
-                      checked={selectedClientTypes.includes(clientType)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedClientTypes(prev => [...prev, clientType]);
-                        } else {
-                          setSelectedClientTypes(prev => prev.filter(t => t !== clientType));
-                        }
-                      }}
-                    />
-                    <Label htmlFor={clientType} className="text-sm cursor-pointer text-gray-900 font-light">
-                      {clientType}
-                    </Label>
-                  </div>
-                ))}
+                {['Wspólnota Mieszkaniowa', 'Spółdzielnia Mieszkaniowa'].map(clientType => {
+                  const count = clientTypeCounts[clientType] || 0;
+                  return (
+                    <div key={clientType} className="flex items-center space-x-2">
+                      <CustomCheckbox 
+                        id={clientType}
+                        checked={selectedClientTypes.includes(clientType)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedClientTypes(prev => [...prev, clientType]);
+                          } else {
+                            setSelectedClientTypes(prev => prev.filter(t => t !== clientType));
+                          }
+                        }}
+                      />
+                      <Label htmlFor={clientType} className="text-sm cursor-pointer text-gray-900 font-light">
+                        {clientType} ({count})
+                      </Label>
+                    </div>
+                  );
+                })}
               </div>
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Salary Range */}
+            {/* Urgency Filter */}
             <Collapsible
-              open={expandedFilterSections.includes('salary')}
-              onOpenChange={() => toggleFilterSection('salary')}
+              open={expandedFilterSections.includes('urgency')}
+              onOpenChange={() => toggleFilterSection('urgency')}
               className="mb-4"
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
                 <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Stawka
+                  Priorytet
                 </Label>
-                {expandedFilterSections.includes('salary') ? 
+                {expandedFilterSections.includes('urgency') ? 
                   <ChevronUp className="w-4 h-4 text-gray-600" /> : 
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 }
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 pl-2">
-                <div className="px-2">
-                <Slider
-                  value={salaryRange}
-                  onValueChange={(value) => setSalaryRange([value[0], value[1]])}
-                  max={200}
-                  step={10}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-900 mt-2">
-                  <span>0 zł/h</span>
-                  <span>{salaryRange[0]} zł/h</span>
-                  <span>200+ zł/h</span>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <CustomCheckbox 
+                      id="urgency-low"
+                      checked={selectedUrgency.includes('low')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedUrgency(prev => [...prev, 'low']);
+                        } else {
+                          setSelectedUrgency(prev => prev.filter(u => u !== 'low'));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="urgency-low" className="text-sm cursor-pointer flex items-center space-x-2">
+                      <AlertCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-foreground">Niski</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CustomCheckbox 
+                      id="urgency-medium"
+                      checked={selectedUrgency.includes('medium')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedUrgency(prev => [...prev, 'medium']);
+                        } else {
+                          setSelectedUrgency(prev => prev.filter(u => u !== 'medium'));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="urgency-medium" className="text-sm cursor-pointer flex items-center space-x-2">
+                      <AlertCircle className="w-4 h-4 text-yellow-600" />
+                      <span className="text-foreground">Średni</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CustomCheckbox 
+                      id="urgency-high"
+                      checked={selectedUrgency.includes('high')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedUrgency(prev => [...prev, 'high']);
+                        } else {
+                          setSelectedUrgency(prev => prev.filter(u => u !== 'high'));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="urgency-high" className="text-sm cursor-pointer flex items-center space-x-2">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <span className="text-foreground">Wysoki (Pilne)</span>
+                    </Label>
+                  </div>
                 </div>
-              </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Budget Range */}
+            <Collapsible
+              open={expandedFilterSections.includes('budget')}
+              onOpenChange={() => toggleFilterSection('budget')}
+              className="mb-4"
+            >
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
+                  Budżet
+                </Label>
+                {expandedFilterSections.includes('budget') ? 
+                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                }
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3 pl-2">
+                <div className="space-y-3">
+                  {/* Budget Range Checkboxes */}
+                  <div className="space-y-2">
+                    {[
+                      { value: '<5000', label: 'Mniej niż 5000 PLN' },
+                      { value: '5000-20000', label: '5000 - 20000 PLN' },
+                      { value: '20000+', label: '20000+ PLN' }
+                    ].map(({ value, label }) => (
+                      <div key={value} className="flex items-center space-x-2">
+                        <CustomCheckbox 
+                          id={`budget-${value}`}
+                          checked={selectedBudgetRanges.includes(value)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedBudgetRanges(prev => [...prev, value]);
+                            } else {
+                              setSelectedBudgetRanges(prev => prev.filter(r => r !== value));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`budget-${value}`} className="text-sm cursor-pointer text-gray-900 font-light">
+                          {label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Budget Min/Max Inputs */}
+                  <div className="pt-2 border-t">
+                    <div className="flex gap-2">
+                      <div className="flex-1 flex flex-col space-y-1">
+                        <Label htmlFor="budget-min-input" className="text-xs text-gray-700">Budżet min (PLN)</Label>
+                        <input
+                          id="budget-min-input"
+                          type="number"
+                          value={budgetMin}
+                          onChange={(e) => setBudgetMin(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary text-sm"
+                          placeholder="0"
+                          min="0"
+                        />
+                      </div>
+                      <div className="flex-1 flex flex-col space-y-1">
+                        <Label htmlFor="budget-max-input" className="text-xs text-gray-700">Budżet max (PLN)</Label>
+                        <input
+                          id="budget-max-input"
+                          type="number"
+                          value={budgetMax}
+                          onChange={(e) => setBudgetMax(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary text-sm"
+                          placeholder="0"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </CollapsibleContent>
             </Collapsible>
 
@@ -767,140 +1039,20 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Geographic Filters */}
-            <Collapsible
-              open={expandedFilterSections.includes('geographic')}
-              onOpenChange={() => toggleFilterSection('geographic')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Filtry Geograficzne
-                </Label>
-                {expandedFilterSections.includes('geographic') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-3">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id="use-geolocation"
-                      checked={useGeolocation}
-                      onCheckedChange={(checked) => setUseGeolocation(checked)}
-                    />
-                    <Label htmlFor="use-geolocation" className="text-sm cursor-pointer text-gray-900 font-light">
-                      Filtruj według odległości
-                    </Label>
-                  </div>
-                  <p className="text-xs text-gray-600 pl-6">
-                    Wybierz miasto na mapie, aby filtrować zlecenia według odległości
-                  </p>
+            {/* Search Query - Always Open */}
+            <div className="mb-4">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary"
+                    placeholder="Wpisz szukany termin"
+                  />
                 </div>
-                
-                {useGeolocation && (
-                  <div className="space-y-2 pl-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm text-gray-900 font-light">Promień wyszukiwania</Label>
-                      <span className="text-sm text-gray-600">{searchRadius} km</span>
-                    </div>
-                    <Slider
-                      value={[searchRadius]}
-                      onValueChange={(value) => setSearchRadius(value[0])}
-                      max={100}
-                      min={5}
-                      step={5}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-gray-900">
-                      <span>5 km</span>
-                      <span>100 km</span>
-                    </div>
-                  </div>
-                )}
               </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Rating Filter */}
-            <Collapsible
-              open={expandedFilterSections.includes('rating')}
-              onOpenChange={() => toggleFilterSection('rating')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Minimalna Ocena
-                </Label>
-                {expandedFilterSections.includes('rating') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-2">
-                {[0, 3, 4, 4.5].map(rating => (
-                  <div key={rating} className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id={`rating-${rating}`}
-                      checked={minRating === rating}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setMinRating(rating);
-                        } else {
-                          setMinRating(0);
-                        }
-                      }}
-                    />
-                    <Label htmlFor={`rating-${rating}`} className="text-sm cursor-pointer flex items-center text-gray-900 font-light">
-                      <div className="flex items-center space-x-1">
-                        {rating === 0 ? (
-                          <span>Wszystkie oceny</span>
-                        ) : (
-                          <>
-                            <span>{rating}+</span>
-                            {[...Array(Math.floor(rating))].map((_, i) => (
-                              <Star key={i} className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    </Label>
-                  </div>
-                ))}
-              </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Search Query */}
-            <Collapsible
-              open={expandedFilterSections.includes('search')}
-              onOpenChange={() => toggleFilterSection('search')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Szukaj
-                </Label>
-                {expandedFilterSections.includes('search') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="px-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary"
-                  placeholder="Wpisz szukany termin"
-                />
-              </div>
-              </CollapsibleContent>
-            </Collapsible>
+            </div>
 
           {/* Scroll Indicator */}
           {showScrollIndicator && (

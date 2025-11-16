@@ -1,5 +1,5 @@
 import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, Search, Settings, Star, Trophy, UserCheck, X } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
@@ -77,6 +77,12 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
   const { user } = useUserProfile();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Ensure consistent hydration by only rendering user-dependent content after mount
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   // Job notifications
   const [jobNotifications] = useState<JobNotification[]>([
@@ -194,12 +200,15 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
   const getAllNotifications = (): UnifiedNotification[] => {
     let notifications: UnifiedNotification[] = [...jobNotifications];
     
-    if (user?.userType === 'manager') {
-      notifications = [...notifications, ...applicationNotifications];
-    }
-    
-    if (user?.userType === 'contractor') {
-      notifications = [...notifications, ...tenderNotifications];
+    // Only include user-specific notifications after mount to prevent hydration mismatch
+    if (isMounted) {
+      if (user?.userType === 'manager') {
+        notifications = [...notifications, ...applicationNotifications];
+      }
+      
+      if (user?.userType === 'contractor') {
+        notifications = [...notifications, ...tenderNotifications];
+      }
     }
     
     return notifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -499,16 +508,16 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
           <div className="px-6 pb-4">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className={`grid w-full ${
-                user?.userType === 'manager' ? 'grid-cols-3' :
-                user?.userType === 'contractor' ? 'grid-cols-3' :
+                isMounted && user?.userType === 'manager' ? 'grid-cols-3' :
+                isMounted && user?.userType === 'contractor' ? 'grid-cols-3' :
                 'grid-cols-2'
               }`}>
                 <TabsTrigger value="all" className="text-xs">Wszystkie</TabsTrigger>
                 <TabsTrigger value="jobs" className="text-xs">Zlecenia</TabsTrigger>
-                {user?.userType === 'manager' && (
+                {isMounted && user?.userType === 'manager' && (
                   <TabsTrigger value="applications" className="text-xs">Oferty</TabsTrigger>
                 )}
-                {user?.userType === 'contractor' && (
+                {isMounted && user?.userType === 'contractor' && (
                   <TabsTrigger value="tenders" className="text-xs">Przetargi</TabsTrigger>
                 )}
               </TabsList>

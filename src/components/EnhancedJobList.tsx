@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { addBookmark, getBookmarkedJobs, removeBookmark } from '../utils/bookmarkStorage';
-import { getStoredJobs, Job } from '../utils/jobStorage';
+import { getStoredJobs, Job as StorageJob } from '../utils/jobStorage';
 import JobCard from './JobCard';
 import { FilterState } from './JobFilters';
 import { JobListHeader } from './JobListHeader';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { extractCity, extractSublocality, getProvinceForCity } from '../utils/locationMapping';
+import { isTenderEndingSoon } from '../utils/tenderHelpers';
+import type { Job } from '../types/job';
 
 interface EnhancedJobListProps {
-  jobs?: any[]; // Jobs data from parent
+  jobs?: Job[]; // Jobs data from parent
   isLoadingJobs?: boolean; // Loading state from parent
   filters?: FilterState;
   onJobSelect?: (jobId: string) => void;
@@ -18,9 +21,9 @@ interface EnhancedJobListProps {
   onJobHover?: (jobId: string | null) => void;
   userLocation?: { lat: number; lng: number } | null;
   searchRadius?: number;
-  onApplyClick?: (jobId: string, jobData?: any) => void;
-  onClearSearch?: () => void; // Dodane do czyszczenia wyszukiwania
-  onPrimaryLocationChange?: (location: string) => void; // Dodane do przekazywania primaryLocation
+  onApplyClick?: (jobId: string, jobData?: Job) => void;
+  onClearSearch?: () => void;
+  onPrimaryLocationChange?: (location: string) => void;
 }
 
 export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
@@ -42,7 +45,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   const [sortBy, setSortBy] = useState('newest');
   const [bookmarkedJobs, setBookmarkedJobs] = useState<string[]>([]);
   const [loadedCount, setLoadedCount] = useState(20);
-  const [storedJobs, setStoredJobs] = useState<Job[]>([]);
+  const [storedJobs, setStoredJobs] = useState<StorageJob[]>([]);
   
   // Load stored jobs from localStorage (simplified) - fallback
   useEffect(() => {
@@ -102,7 +105,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     return uniqueJobs;
   }, [jobs, storedJobs, isLoadingJobs]);
 
-  // Simple search functionality
+  // Simple search functionality (title only)
   const searchFilteredJobs = useMemo(() => {
     // Use search query from filters if available, otherwise fall back to local state
     const activeSearchQuery = filters?.searchQuery || searchQuery;
@@ -111,17 +114,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
 
     const query = activeSearchQuery.toLowerCase();
     return allJobs.filter(job => {
-      const searchText = [
-        job.title,
-        job.description,
-        job.company,
-        job.location,
-        job.category,
-        job.subcategory,
-        ...(job.searchKeywords || [])
-      ].join(' ').toLowerCase();
-
-      return searchText.includes(query);
+      const jobTitle = (job.title || '').toLowerCase();
+      return jobTitle.includes(query);
     });
   }, [filters?.searchQuery, searchQuery, allJobs]);
 
@@ -153,24 +147,175 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       }
       
       // Filter by categories
-      if (filters.categories && filters.categories.length > 0 && !filters.categories.includes(job.category)) {
-        return false;
+      if (filters.categories && filters.categories.length > 0) {
+        const jobCategory = typeof job.category === 'string' 
+          ? job.category 
+          : (job.category?.name || 'Inne');
+        if (!filters.categories.includes(jobCategory)) {
+          return false;
+        }
       }
       
-      // Filter by locations
-      if (filters.locations && filters.locations.length > 0 && !filters.locations.includes(job.location)) {
-        return false;
+      // Filter by cities and sublocalities
+      if ((filters.cities && filters.cities.length > 0) || (filters.sublocalities && filters.sublocalities.length > 0)) {
+        const jobCity = extractCity(job.location);
+        const jobSublocality = extractSublocality(job.location);
+        
+        // If sublocalities are selected, prioritize sublocality matching
+        if (filters.sublocalities && filters.sublocalities.length > 0) {
+          const matchesSublocality = filters.sublocalities.some(sublocalityKey => {
+            const [filterCity, filterSublocality] = sublocalityKey.split(':');
+            return jobCity === filterCity && jobSublocality === filterSublocality;
+          });
+          
+          if (matchesSublocality) {
+            // Job matches a selected sublocality, include it
+            // Continue to next filter check
+          } else {
+            // Check if city is explicitly selected (not just auto-selected via sublocality)
+            // Get cities that have selected sublocalities
+            const citiesWithSelectedSublocalities = new Set(
+              filters.sublocalities.map(s => s.split(':')[0])
+            );
+            
+            // If city is selected AND doesn't have any selected sublocalities, include all jobs in that city
+            // Otherwise, exclude jobs that don't match sublocalities
+            const cityExplicitlySelected = filters.cities && filters.cities.some(city => 
+              city === jobCity && !citiesWithSelectedSublocalities.has(city)
+            );
+            
+            if (cityExplicitlySelected) {
+              // City is selected without sublocalities, include all jobs in city
+              // Continue to next filter check
+            } else {
+              // No match, exclude job
+              return false;
+            }
+          }
+        } else if (filters.cities && filters.cities.length > 0) {
+          // Only cities selected, no sublocalities
+          if (!jobCity || !filters.cities.includes(jobCity)) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by provinces
+      if (filters.provinces && filters.provinces.length > 0) {
+        const jobCity = extractCity(job.location);
+        const jobProvince = jobCity ? getProvinceForCity(jobCity) : null;
+        if (!jobProvince || !filters.provinces.includes(jobProvince)) {
+          return false;
+        }
+      }
+
+      // Legacy location filter support
+      if (filters.locations && filters.locations.length > 0) {
+        const jobLocationString = typeof job.location === 'string' ? job.location : job.location?.city || '';
+        if (!filters.locations.includes(jobLocationString)) {
+          return false;
+        }
       }
       
       // Filter by client types
       if (filters.clientTypes && filters.clientTypes.length > 0 && !filters.clientTypes.includes(job.clientType)) {
         return false;
       }
+
+      // Filter by urgency
+      if (filters.urgency && filters.urgency.length > 0) {
+        if (!filters.urgency.includes(job.urgency)) {
+          return false;
+        }
+      }
+
+      // Filter by ending soon (tenders ending in less than 7 days)
+      if (filters.endingSoon && job.postType === 'tender' && job.tenderInfo?.submissionDeadline) {
+        if (!isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline))) {
+          return false;
+        }
+      }
       
-      // Filter by salary range
-      const jobSalary = (job as any).salaryMin || 0;
-      if (jobSalary < filters.salaryRange[0] || jobSalary > filters.salaryRange[1]) {
-        return false;
+      // Filter by budget ranges (checkboxes)
+      if (filters.budgetRanges && filters.budgetRanges.length > 0) {
+        const jobBudgetMin = (job as any).budget_min;
+        const jobBudgetMax = (job as any).budget_max;
+        
+        // Check if job has budget info (null/undefined check, but 0 is valid)
+        const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
+        const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
+        
+        // If job has no budget info, skip budget range filtering (include the job)
+        if (!hasBudgetMin && !hasBudgetMax) {
+          // Job has no budget, skip range filtering
+        } else {
+          // Use actual min/max values, handling nulls appropriately
+          // If max is null, use min as both min and max (single value)
+          // If min is null but max exists, use 0 as min
+          const min = hasBudgetMin ? Number(jobBudgetMin) : (hasBudgetMax ? 0 : 0);
+          const max = hasBudgetMax ? Number(jobBudgetMax) : (hasBudgetMin ? Number(jobBudgetMin) : Infinity);
+
+          let matchesRange = false;
+          for (const range of filters.budgetRanges) {
+            if (range === '<5000') {
+              // Match if job's max budget is less than 5000
+              if (max < 5000) {
+                matchesRange = true;
+                break;
+              }
+            } else if (range === '5000-20000') {
+              // Match if job's budget range overlaps with 5000-20000
+              // Overlap occurs when: min <= 20000 AND max >= 5000
+              if (min <= 20000 && max >= 5000) {
+                matchesRange = true;
+                break;
+              }
+            } else if (range === '20000+') {
+              // Match if job's min budget is >= 20000
+              if (min >= 20000) {
+                matchesRange = true;
+                break;
+              }
+            }
+          }
+          
+          if (!matchesRange) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by budget min/max inputs
+      if (filters.budgetMin !== undefined && filters.budgetMin !== null) {
+        const jobBudgetMin = (job as any).budget_min ?? null;
+        const jobBudgetMax = (job as any).budget_max ?? null;
+        
+        // If job has no budget info, skip this filter (include the job)
+        if (jobBudgetMin === null && jobBudgetMax === null) {
+          // Skip filter
+        } else {
+          // Job must have budget_max >= filters.budgetMin (or budget_min if max is null)
+          const jobMaxBudget = jobBudgetMax ?? jobBudgetMin ?? 0;
+          if (jobMaxBudget < filters.budgetMin) {
+            return false;
+          }
+        }
+      }
+
+      if (filters.budgetMax !== undefined && filters.budgetMax !== null) {
+        const jobBudgetMin = (job as any).budget_min ?? null;
+        const jobBudgetMax = (job as any).budget_max ?? null;
+        
+        // If job has no budget info, skip this filter (include the job)
+        if (jobBudgetMin === null && jobBudgetMax === null) {
+          // Skip filter
+        } else {
+          // Job must have budget_min <= filters.budgetMax (or budget_max if min is null)
+          const jobMinBudget = jobBudgetMin ?? jobBudgetMax ?? 0;
+          if (jobMinBudget > filters.budgetMax) {
+            return false;
+          }
+        }
       }
       
       return true;
@@ -293,7 +438,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   return (
     <div className="flex-1 overflow-hidden">
       <div className="flex flex-col h-full">
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {/* Job List Header */}
           <div className="p-4 pb-0">
             <JobListHeader 

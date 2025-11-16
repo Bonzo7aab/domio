@@ -51,9 +51,9 @@ export const MapLegend: React.FC = () => {
       {isExpanded && (
         <CardContent className="p-3 pt-0 space-y-2">
           {legendItems.map((item, index) => (
-            <div key={index} className="map-legend-item flex items-center gap-3">
+            <div key={index} className="flex items-center gap-3">
               <div
-                className="marker-color-dot flex-shrink-0"
+                className="flex-shrink-0"
                 style={{
                   backgroundColor: item.color,
                   width: '16px',

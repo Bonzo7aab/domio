@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Bell, User, MessageCircle, GraduationCap, Play, Bookmark, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { UnifiedNotifications } from './UnifiedNotifications';
@@ -31,9 +31,16 @@ interface HeaderProps {
 export function Header({ initialUser }: HeaderProps) {
   const router = useRouter()
   const { user: contextUser, session, isAuthenticated: contextIsAuthenticated, logout, isLoading } = useUserProfile();
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Ensure consistent hydration
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   // Authentication state: use context (which is immediately true when session exists)
-  const userIsAuthenticated = contextIsAuthenticated
+  // Only use after mount to prevent hydration mismatch
+  const userIsAuthenticated = isMounted ? contextIsAuthenticated : false
   
   // Determine current user for display:
   // Priority: contextUser > initialUser > temporary user from session
@@ -116,7 +123,7 @@ export function Header({ initialUser }: HeaderProps) {
   }
 
   return (
-    <header className="domio-header sticky top-0 z-50 w-full" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+    <header className="sticky top-0 z-50 w-full bg-white border-b border-slate-200" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* 1. Logo Section - Left */}
@@ -151,7 +158,7 @@ export function Header({ initialUser }: HeaderProps) {
                   const event = new KeyboardEvent('keydown', {
                     key: 'k',
                     metaKey: true,
-                    ctrlKey: navigator.platform.includes('Mac') ? true : false,
+                    ctrlKey: typeof window !== 'undefined' && navigator.platform.includes('Mac') ? true : false,
                   });
                   document.dispatchEvent(event);
                 }}
@@ -162,7 +169,7 @@ export function Header({ initialUser }: HeaderProps) {
                 </div>
                 <div className="flex items-center space-x-1 text-xs">
                   <kbd className="px-1.5 py-0.5 bg-muted border rounded text-xs">
-                    {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}
+                    {isMounted && typeof window !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}
                   </kbd>
                   <kbd className="px-1.5 py-0.5 bg-muted border rounded text-xs">K</kbd>
                 </div>
@@ -198,7 +205,7 @@ export function Header({ initialUser }: HeaderProps) {
             )}
             
             {/* User Actions */}
-            {isLoading ? (
+            {!isMounted || isLoading ? (
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse"></div>
                 <span className="text-sm text-gray-500">Ładowanie...</span>

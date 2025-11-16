@@ -5,44 +5,23 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { TenderStatusBadge } from './TenderStatusBadge';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
+import type { Job, TenderInfo } from '../types/job';
 
 interface JobCardProps {
-  job: {
+  job: Partial<Job> & {
     id: string;
     title: string;
     company: string;
     location: string;
     type: string;
-    postType?: string; // 'job' | 'tender'
     salary: string;
     description: string;
-    skills?: string[];
     postedTime: string;
     applications: number;
-    visits_count?: number;
-    bookmarks_count?: number;
     verified: boolean;
     urgent: boolean;
-    companyLogo?: string;
-    clientType?: string;
-    category?: string;
-    subcategory?: string;
-    isPremium?: boolean;
-    premium?: boolean;
-    hasInsurance?: boolean;
-    completedJobs?: number;
-    certificates?: string[];
     distance?: number;
-    tenderInfo?: {
-      tenderType: string;
-      phases: string[];
-      currentPhase: string;
-      wadium: string;
-      evaluationCriteria: { name: string; weight: number }[];
-      documentsRequired: string[];
-      submissionDeadline: string;
-      projectDuration: string;
-    };
   };
   onClick?: () => void;
   onBookmark?: (jobId: string) => void;
@@ -76,22 +55,13 @@ const JobCard = React.memo(function JobCard({
   }, [job.id, job, onApplyClick]);
 
   const isTender = useMemo(() => job.postType === 'tender', [job.postType]);
-  
-  // Helper function to get days remaining for tenders
-  const getDaysRemaining = useCallback((deadline: string) => {
-    const now = new Date();
-    const deadlineDate = new Date(deadline);
-    const diffTime = deadlineDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
-  }, []);
 
   // Render tender card with new design
   const daysRemaining = useMemo(() => {
     return isTender && job.tenderInfo?.submissionDeadline 
-      ? getDaysRemaining(job.tenderInfo.submissionDeadline)
+      ? getDaysRemaining(new Date(job.tenderInfo.submissionDeadline))
       : 0;
-  }, [isTender, job.tenderInfo?.submissionDeadline, getDaysRemaining]);
+  }, [isTender, job.tenderInfo?.submissionDeadline]);
 
   if (isTender) {
 
@@ -145,9 +115,17 @@ const JobCard = React.memo(function JobCard({
                 <span className="font-medium">{job.company}</span>
                 <div className="flex items-center gap-1">
                   <MapPin className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">{job.location}</span>
+                  <span className="truncate">
+                    {typeof job.location === 'string' 
+                      ? job.location 
+                      : job.location?.sublocality_level_1
+                        ? `${job.location.city || 'Unknown'}, ${job.location.sublocality_level_1}`
+                        : job.location?.city || 'Unknown'}
+                  </span>
                 </div>
-                <Badge variant="outline" className="w-fit">{job.category || job.type}</Badge>
+                <Badge variant="outline" className="w-fit">
+                  {typeof job.category === 'string' ? job.category : job.category?.name || job.type}
+                </Badge>
               </div>
               
               <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-4 line-clamp-2">
@@ -169,7 +147,7 @@ const JobCard = React.memo(function JobCard({
                   {daysRemaining > 0 && (
                     <div className="flex items-center gap-2 text-orange-600">
                       <Clock className="h-4 w-4 flex-shrink-0" />
-                      <span>{daysRemaining} {daysRemaining === 1 ? 'dzień' : 'dni'} do końca</span>
+                      <span>{formatDaysRemaining(daysRemaining)} do końca</span>
                     </div>
                   )}
                 </div>
@@ -258,12 +236,20 @@ const JobCard = React.memo(function JobCard({
               <div className='flex flex-wrap gap-2 sm:gap-4 items-center'>
                 <div className="flex items-center gap-1">
                   <MapPin className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">{job.location}</span>
+                  <span className="truncate">
+                    {typeof job.location === 'string' 
+                      ? job.location 
+                      : job.location?.sublocality_level_1
+                        ? `${job.location.city || 'Unknown'}, ${job.location.sublocality_level_1}`
+                        : job.location?.city || 'Unknown'}
+                  </span>
                 </div>
                 <span className="hidden sm:inline h-4 border-gray-300 border-r-2" />
                 <span className="font-normal text-gray-500">{job.company}</span>
               </div>
-              <Badge variant="secondary" className="w-fit">{job.category || job.type}</Badge>
+              <Badge variant="secondary" className="w-fit">
+                {typeof job.category === 'string' ? job.category : job.category?.name || job.type}
+              </Badge>
             </div>
             
             <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-4 line-clamp-2">

@@ -18,6 +18,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Input } from './ui/input';
+import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
@@ -147,12 +148,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
     return `${parseInt(amount).toLocaleString('pl-PL')} ${currency}`;
   };
 
-  const getDaysRemaining = (deadline: Date) => {
-    const now = new Date();
-    const diffTime = deadline.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
-  };
+  // Using imported getDaysRemaining helper
 
   const handleTenderClick = (tenderId: string) => {
     if (onTenderSelect) {

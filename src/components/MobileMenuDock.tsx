@@ -38,6 +38,12 @@ export function MobileMenuDock() {
   
   const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Prevent hydration mismatch by waiting for client mount
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const isHomepage = pathname === '/';
   const isCompactMode = isHomepage || isMapExpanded;
@@ -169,6 +175,11 @@ export function MobileMenuDock() {
     },
   ];
 
+  // Don't render until mounted to prevent hydration mismatch
+  if (!isMounted) {
+    return null;
+  }
+
   // Compact mode: Filters button + Separator + Hamburger menu
   if (isCompactMode) {
     return (
@@ -221,7 +232,7 @@ export function MobileMenuDock() {
 
         {/* Dock container - hidden when filters drawer is open, visible on mobile and tablet */}
         {!filtersDrawerOpen && (
-          <div className="mobile-bottom-nav lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+          <div className="lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
             <FloatingDock
               items={compactDockItems}
               mobileClassName="lg:hidden"
@@ -234,7 +245,7 @@ export function MobileMenuDock() {
 
   // Normal mode: Show all menu items - visible on mobile and tablet
   return (
-    <div className="mobile-bottom-nav lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+    <div className="lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
       <FloatingDock
         items={menuItems}
         mobileClassName="lg:hidden"

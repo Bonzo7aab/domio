@@ -16,11 +16,16 @@ export interface JobFilters {
   bounds?: { north: number; south: number; east: number; west: number };
 }
 
+export interface JobLocation {
+  city: string;
+  sublocality_level_1?: string;
+}
+
 export interface JobWithCompany {
   id: string;
   title: string;
   description: string;
-  location: string;
+  location: JobLocation | string; // Support both formats for backward compatibility
   latitude: number | null;
   longitude: number | null;
   budget_min: number | null;
@@ -62,14 +67,16 @@ export interface TenderWithCompany {
   id: string;
   title: string;
   description: string;
-  location: string;
+  location: JobLocation | string; // Support both formats for backward compatibility
   latitude: number | null;
   longitude: number | null;
   estimated_value: number;
   currency: string;
   status: string;
   submission_deadline: string;
+  evaluation_deadline: string | null;
   project_duration: string | null;
+  is_public: boolean;
   requirements: string[] | null;
   evaluation_criteria: any;
   phases: any;
@@ -127,7 +134,10 @@ export async function fetchJobs(
     }
 
     if (filters.locations && filters.locations.length > 0) {
-      query = query.in('location', filters.locations);
+      // Filter by city in JSONB location object
+      query = query.or(
+        filters.locations.map(city => `location->>'city'.eq.${city}`).join(',')
+      );
     }
 
     if (filters.budgetMin !== undefined) {
@@ -319,12 +329,18 @@ export async function fetchJobsAndTenders(
   }
 
   // Combine and normalize the data
-  const jobs = (jobsResult.data || []).map((job) => ({
+  const jobs = (jobsResult.data || []).map((job) => {
+    // Keep location as object to preserve sublocality data
+    const locationData = typeof job.location === 'string' 
+      ? { city: job.location }
+      : job.location || { city: 'Unknown' };
+    
+    return {
     id: job.id,
     title: job.title,
     description: job.description,
     company: job.company?.name || 'Unknown',
-    location: job.location,
+    location: locationData, // Keep as object to preserve sublocality_level_1
     type: job.type,
     postType: 'job' as const,
     salary: job.budget_max
@@ -333,6 +349,8 @@ export async function fetchJobsAndTenders(
     budget: job.budget_max
       ? `${job.budget_min || 0} - ${job.budget_max} ${job.currency}`
       : `${job.budget_min || 0} ${job.currency}`,
+    budget_min: job.budget_min ?? null,
+    budget_max: job.budget_max ?? null,
     category: job.category?.name || 'Inne',
     subcategory: job.subcategory || undefined,
     deadline: job.deadline || undefined,
@@ -342,8 +360,8 @@ export async function fetchJobsAndTenders(
     urgent: job.urgency === 'high',
     premium: job.type === 'premium',
     postedTime: getTimeAgo(job.created_at),
-    lat: ensureValidCoordinates(job.latitude, job.longitude, job.location, job.id)?.lat,
-    lng: ensureValidCoordinates(job.latitude, job.longitude, job.location, job.id)?.lng,
+    lat: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lat,
+    lng: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lng,
     companyLogo: job.company?.logo_url || undefined,
     requirements: job.requirements || [],
     responsibilities: job.responsibilities || [],
@@ -355,14 +373,21 @@ export async function fetchJobsAndTenders(
     certificates: [], // Would need to query
     searchKeywords: job.skills_required || [],
     clientType: mapCompanyTypeToClientType(undefined), // Company type not available in current query
-  }));
+  };
+  });
 
-  const tenders = (tendersResult.data || []).map((tender) => ({
+  const tenders = (tendersResult.data || []).map((tender) => {
+    // Keep location as object to preserve sublocality data
+    const locationData = typeof tender.location === 'string' 
+      ? { city: tender.location }
+      : tender.location || { city: 'Unknown' };
+    
+    return {
     id: tender.id,
     title: tender.title,
     description: tender.description,
     company: tender.company?.name || 'Unknown',
-    location: tender.location,
+    location: locationData, // Keep as object to preserve sublocality_level_1
     type: 'Przetarg',
     postType: 'tender' as const,
     salary: `${tender.estimated_value} ${tender.currency}`,
@@ -374,8 +399,8 @@ export async function fetchJobsAndTenders(
     urgent: false,
     premium: false,
     postedTime: getTimeAgo(tender.created_at),
-    lat: ensureValidCoordinates(tender.latitude, tender.longitude, tender.location, tender.id)?.lat,
-    lng: ensureValidCoordinates(tender.latitude, tender.longitude, tender.location, tender.id)?.lng,
+    lat: ensureValidCoordinates(tender.latitude, tender.longitude, locationData.city || '', tender.id)?.lat,
+    lng: ensureValidCoordinates(tender.latitude, tender.longitude, locationData.city || '', tender.id)?.lng,
     companyLogo: tender.company?.logo_url || undefined,
     visits_count: tender.views_count || 0,
     bookmarks_count: 0, // Tenders don't have bookmarks_count yet
@@ -390,7 +415,8 @@ export async function fetchJobsAndTenders(
       submissionDeadline: tender.submission_deadline,
       projectDuration: tender.project_duration || 'Do uzgodnienia',
     },
-  }));
+  };
+  });
 
   // Combine and sort
   const combined = [...jobs, ...tenders];
@@ -1048,10 +1074,11 @@ export async function createJob(
     description: string;
     category: string; // Category name, will be converted to category_id
     subcategory?: string;
-    location: string;
+    location: JobLocation | string; // Can be object or string for backward compatibility
     address?: string;
     latitude?: number;
     longitude?: number;
+    sublocalityLevel1?: string;
     budgetMin?: number;
     budgetMax?: number;
     budgetType?: 'fixed' | 'hourly' | 'negotiable' | 'range';
@@ -1168,6 +1195,24 @@ export async function createJob(
     const budgetMin = jobData.budgetMin !== undefined ? jobData.budgetMin : null;
     const budgetMax = jobData.budgetMax !== undefined ? jobData.budgetMax : null;
 
+    // Prepare location as JSONB object
+    let locationJsonb: any;
+    if (typeof jobData.location === 'string') {
+      // If location is a string, convert to object format
+      locationJsonb = {
+        city: jobData.location,
+        ...(jobData.sublocalityLevel1 ? { sublocality_level_1: jobData.sublocalityLevel1 } : {})
+      };
+    } else {
+      // If location is already an object, use it directly
+      locationJsonb = {
+        city: jobData.location.city,
+        ...(jobData.location.sublocality_level_1 || jobData.sublocalityLevel1 
+          ? { sublocality_level_1: jobData.location.sublocality_level_1 || jobData.sublocalityLevel1 } 
+          : {})
+      };
+    }
+
     // Prepare insert data
     const insertData = {
       title: jobData.title,
@@ -1176,10 +1221,11 @@ export async function createJob(
       subcategory: jobData.subcategory || null,
       manager_id: jobData.managerId,
       company_id: jobData.companyId,
-      location: jobData.location,
+      location: locationJsonb,
       address: jobData.address || null,
       latitude: jobData.latitude || null,
       longitude: jobData.longitude || null,
+      sublocality_level_1: jobData.sublocalityLevel1 || null,
       budget_min: budgetMin,
       budget_max: budgetMax,
       budget_type: jobData.budgetType || 'fixed',

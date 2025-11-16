@@ -1,48 +1,82 @@
 export interface Job {
+  // Core identifiers
   id: string;
   postType: 'job' | 'tender';
+  
+  // Basic info
   title: string;
   company: string;
-  location: string;
+  location: string | { city: string; sublocality_level_1?: string }; // Support both string and object formats
   type: string;
-  salary: string;
   description: string;
-  requirements: string[];
-  responsibilities: string[];
-  skills: string[];
   postedTime: string;
+  
+  // Budget/Financial
+  salary: string;
+  budget: string;
+  budgetMin?: number;
+  budgetMax?: number;
+  budgetType?: 'fixed' | 'hourly' | 'negotiable' | 'range';
+  currency?: string;
+  
+  // Requirements & Skills
+  requirements?: string[];
+  responsibilities?: string[];
+  skills?: string[];
+  
+  // Metrics
   applications: number;
   visits_count?: number;
   bookmarks_count?: number;
+  
+  // Verification & Priority
   verified: boolean;
   urgent: boolean;
-  category: string;
-  subcategory: string;
-  clientType: string;
-  isPremium: boolean;
-  hasInsurance: boolean;
-  completedJobs: number;
-  certificates: string[];
-  deadline: string;
-  budget: string;
-  projectDuration: string;
-  contractDetails: {
+  urgency: 'low' | 'medium' | 'high';
+  
+  // Categorization
+  category: string | { name: string; slug?: string };
+  subcategory?: string;
+  clientType?: string;
+  
+  // Premium features
+  isPremium?: boolean;
+  hasInsurance?: boolean;
+  completedJobs?: number;
+  certificates?: string[];
+  
+  // Timeline
+  deadline?: string;
+  projectDuration?: string;
+  
+  // Contract details (optional)
+  contractDetails?: {
     contractType: string;
     paymentTerms: string;
     warrantyPeriod: string;
     terminationConditions: string;
   };
-  contactPerson: string;
-  contactPhone: string;
-  contactEmail: string;
-  buildingType: string;
-  buildingYear: number;
-  surface: string;
-  additionalInfo: string;
-  companyLogo: string;
-  images: string[];
-  lat: number;
-  lng: number;
+  
+  // Contact info (optional)
+  contactPerson?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  
+  // Building/Property details (optional)
+  buildingType?: string;
+  buildingYear?: number;
+  surface?: string;
+  additionalInfo?: string;
+  
+  // Media
+  companyLogo?: string;
+  images?: string[];
+  
+  // Location coordinates
+  lat?: number;
+  lng?: number;
+  
+  // Tender-specific info
   tenderInfo?: TenderInfo;
 }
 

@@ -13,6 +13,7 @@ export interface ReverseGeocodingResult {
     district?: string;
     country?: string;
     postalCode?: string;
+    sublocality_level_1?: string;
   };
 }
 
@@ -76,6 +77,8 @@ export const reverseGeocode = async (
             components.country = component.long_name;
           } else if (types.includes('postal_code')) {
             components.postalCode = component.long_name;
+          } else if (types.includes('sublocality_level_1')) {
+            components.sublocality_level_1 = component.long_name;
           }
         });
 

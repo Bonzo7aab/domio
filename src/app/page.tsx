@@ -350,7 +350,8 @@ export default function HomePage() {
               </div>
               {/* Filters */}
               <JobFilters 
-                onFilterChange={setFilters} 
+                onFilterChange={setFilters}
+                initialFilters={filters}
                 primaryLocation={primaryLocation}
                 onLocationChange={handleLocationChangeRequest}
                 jobs={loadedJobs}
@@ -362,6 +363,7 @@ export default function HomePage() {
               <JobList 
                 jobs={loadedJobs}
                 filters={filters}
+                onFilterChange={setFilters}
                 onJobSelect={handleJobSelect}
                 onToggleMap={handleToggleMap}
                 isMapVisible={false}

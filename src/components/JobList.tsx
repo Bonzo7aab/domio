@@ -7,10 +7,14 @@ import JobCard from './JobCard';
 import { FilterState } from './JobFilters';
 import { getBookmarkedJobs, addBookmark, removeBookmark } from '../utils/bookmarkStorage';
 import { jobListMockData } from '../mocks';
+import { extractCity, extractSublocality, getProvinceForCity } from '../utils/locationMapping';
+import { isTenderEndingSoon } from '../utils/tenderHelpers';
+import type { Job } from '../types/job';
 
 interface JobListProps {
-  jobs?: any[];
+  jobs?: Job[];
   filters?: FilterState;
+  onFilterChange?: (filters: FilterState) => void;
   onJobSelect?: (jobId: string) => void;
   onToggleMap?: () => void;
   isMapVisible?: boolean;
@@ -21,7 +25,8 @@ const mockJobs = jobListMockData;
 
 export default function JobList({ 
   jobs: jobsProp,
-  filters, 
+  filters,
+  onFilterChange,
   onJobSelect, 
   onToggleMap, 
   isMapVisible = true,
@@ -88,7 +93,7 @@ export default function JobList({
     return availableJobs.filter(job => {
       // Filter by postTypes (job vs tender)
       if (filters.postTypes && filters.postTypes.length > 0) {
-        const jobPostType = job.postType || 'job';
+        const jobPostType = ('postType' in job && job.postType) ? job.postType : 'job';
         if (!filters.postTypes.includes(jobPostType)) {
           return false;
         }
@@ -96,7 +101,9 @@ export default function JobList({
       
       // Filter by categories
       if (filters.categories && filters.categories.length > 0) {
-        const jobCategory = job.category || 'Inne';
+        const jobCategory = typeof job.category === 'string' 
+          ? job.category 
+          : (job.category?.name || 'Inne');
         if (!filters.categories.includes(jobCategory)) {
           return false;
         }
@@ -111,21 +118,6 @@ export default function JobList({
         // If filter has subcategories but job has none, include it (don't exclude)
       }
       
-      // Filter by tenderTypes (only for tenders)
-      if (filters.tenderTypes && filters.tenderTypes.length > 0) {
-        const jobPostType = job.postType || 'job';
-        if (jobPostType === 'tender') {
-          const tenderType = job.tenderInfo?.tenderType || job.tenderType;
-          if (tenderType && !filters.tenderTypes.includes(tenderType)) {
-            return false;
-          }
-          // If tender has no tenderType specified, exclude it when tenderTypes filter is active
-          if (!tenderType) {
-            return false;
-          }
-        }
-      }
-      
       // Filter by contract types
       if (filters.contractTypes && filters.contractTypes.length > 0) {
         if (!filters.contractTypes.includes(job.type)) {
@@ -133,9 +125,63 @@ export default function JobList({
         }
       }
       
-      // Filter by locations
+      // Filter by cities and sublocalities
+      if ((filters.cities && filters.cities.length > 0) || (filters.sublocalities && filters.sublocalities.length > 0)) {
+        const jobCity = extractCity(job.location);
+        const jobSublocality = extractSublocality(job.location);
+        
+        // If sublocalities are selected, prioritize sublocality matching
+        if (filters.sublocalities && filters.sublocalities.length > 0) {
+          const matchesSublocality = filters.sublocalities.some(sublocalityKey => {
+            const [filterCity, filterSublocality] = sublocalityKey.split(':');
+            return jobCity === filterCity && jobSublocality === filterSublocality;
+          });
+          
+          if (matchesSublocality) {
+            // Job matches a selected sublocality, include it
+            // Continue to next filter check
+          } else {
+            // Check if city is explicitly selected (not just auto-selected via sublocality)
+            // Get cities that have selected sublocalities
+            const citiesWithSelectedSublocalities = new Set(
+              filters.sublocalities.map(s => s.split(':')[0])
+            );
+            
+            // If city is selected AND doesn't have any selected sublocalities, include all jobs in that city
+            // Otherwise, exclude jobs that don't match sublocalities
+            const cityExplicitlySelected = filters.cities && filters.cities.some(city => 
+              city === jobCity && !citiesWithSelectedSublocalities.has(city)
+            );
+            
+            if (cityExplicitlySelected) {
+              // City is selected without sublocalities, include all jobs in city
+              // Continue to next filter check
+            } else {
+              // No match, exclude job
+              return false;
+            }
+          }
+        } else if (filters.cities && filters.cities.length > 0) {
+          // Only cities selected, no sublocalities
+          if (!jobCity || !filters.cities.includes(jobCity)) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by provinces
+      if (filters.provinces && filters.provinces.length > 0) {
+        const jobCity = extractCity(job.location);
+        const jobProvince = jobCity ? getProvinceForCity(jobCity) : null;
+        if (!jobProvince || !filters.provinces.includes(jobProvince)) {
+          return false;
+        }
+      }
+
+      // Legacy location filter support (for backward compatibility)
       if (filters.locations && filters.locations.length > 0) {
-        if (!filters.locations.includes(job.location)) {
+        const jobLocationString = typeof job.location === 'string' ? job.location : job.location?.city || '';
+        if (!filters.locations.includes(jobLocationString)) {
           return false;
         }
       }
@@ -147,46 +193,110 @@ export default function JobList({
           return false;
         }
       }
+
+      // Filter by urgency (only if job has urgency field)
+      if (filters.urgency && filters.urgency.length > 0) {
+        if ('urgency' in job && job.urgency && !filters.urgency.includes(job.urgency)) {
+          return false;
+        }
+      }
+
+      // Filter by ending soon (tenders ending in less than 7 days)
+      if (filters.endingSoon && 'postType' in job && job.postType === 'tender' && 'tenderInfo' in job && job.tenderInfo?.submissionDeadline) {
+        if (!isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline))) {
+          return false;
+        }
+      }
       
-      // Filter by salary range (extract minimum salary for comparison)
-      if (filters.salaryRange && Array.isArray(filters.salaryRange) && filters.salaryRange.length === 2) {
-        const [minRange, maxRange] = filters.salaryRange;
-        // Skip salary filtering if it's the default range [0, 1000] - too restrictive
-        // Only apply salary filter if user explicitly set a meaningful range
-        if (maxRange > 1000 || minRange > 0) {
-          try {
-            // Handle different salary formats: "100 PLN", "0 - 100 PLN", "100-200 PLN"
-            const salaryStr = job.salary || job.budget || '';
-            if (salaryStr) {
-              const numbers = salaryStr.match(/\d+/g);
-              if (numbers && numbers.length > 0) {
-                const jobMinSalary = parseInt(numbers[0]) || 0;
-                if (jobMinSalary < minRange || jobMinSalary > maxRange) {
-                  return false;
-                }
+      // Filter by budget ranges (checkboxes)
+      if (filters.budgetRanges && filters.budgetRanges.length > 0) {
+        // Get job budget values (budget_min and budget_max from job data)
+        const jobBudgetMin = (job as any).budget_min;
+        const jobBudgetMax = (job as any).budget_max;
+        
+        // Check if job has budget info (null/undefined check, but 0 is valid)
+        const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
+        const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
+        
+        // If job has no budget info, skip budget range filtering (include the job)
+        if (!hasBudgetMin && !hasBudgetMax) {
+          // Job has no budget, skip range filtering
+        } else {
+          // Use actual min/max values, handling nulls appropriately
+          // If max is null, use min as both min and max (single value)
+          // If min is null but max exists, use 0 as min
+          const min = hasBudgetMin ? Number(jobBudgetMin) : (hasBudgetMax ? 0 : 0);
+          const max = hasBudgetMax ? Number(jobBudgetMax) : (hasBudgetMin ? Number(jobBudgetMin) : Infinity);
+
+          let matchesRange = false;
+          for (const range of filters.budgetRanges) {
+            if (range === '<5000') {
+              // Match if job's max budget is less than 5000
+              if (max < 5000) {
+                matchesRange = true;
+                break;
+              }
+            } else if (range === '5000-20000') {
+              // Match if job's budget range overlaps with 5000-20000
+              // Overlap occurs when: min <= 20000 AND max >= 5000
+              if (min <= 20000 && max >= 5000) {
+                matchesRange = true;
+                break;
+              }
+            } else if (range === '20000+') {
+              // Match if job's min budget is >= 20000
+              if (min >= 20000) {
+                matchesRange = true;
+                break;
               }
             }
-            // If no salary info, include the job (don't exclude)
-          } catch (e) {
-            // If salary parsing fails, include the job (don't exclude)
-            console.warn('Failed to parse salary for job:', job.id, e);
+          }
+          
+          if (!matchesRange) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by budget min/max inputs
+      if (filters.budgetMin !== undefined && filters.budgetMin !== null) {
+        const jobBudgetMin = (job as any).budget_min ?? null;
+        const jobBudgetMax = (job as any).budget_max ?? null;
+        
+        // If job has no budget info, skip this filter (include the job)
+        if (jobBudgetMin === null && jobBudgetMax === null) {
+          // Skip filter
+        } else {
+          // Job must have budget_max >= filters.budgetMin (or budget_min if max is null)
+          const jobMaxBudget = jobBudgetMax ?? jobBudgetMin ?? 0;
+          if (jobMaxBudget < filters.budgetMin) {
+            return false;
+          }
+        }
+      }
+
+      if (filters.budgetMax !== undefined && filters.budgetMax !== null) {
+        const jobBudgetMin = (job as any).budget_min ?? null;
+        const jobBudgetMax = (job as any).budget_max ?? null;
+        
+        // If job has no budget info, skip this filter (include the job)
+        if (jobBudgetMin === null && jobBudgetMax === null) {
+          // Skip filter
+        } else {
+          // Job must have budget_min <= filters.budgetMax (or budget_max if min is null)
+          const jobMinBudget = jobBudgetMin ?? jobBudgetMax ?? 0;
+          if (jobMinBudget > filters.budgetMax) {
+            return false;
           }
         }
       }
       
-      // Filter by search query
+      // Filter by search query (title only)
       if (filters.searchQuery && filters.searchQuery.trim().length > 0) {
         const searchTerm = filters.searchQuery.toLowerCase().trim();
-        const searchableFields = [
-          job.title,
-          job.description,
-          job.location,
-          job.company,
-          job.category,
-          job.subcategory
-        ].filter(Boolean).join(' ').toLowerCase();
+        const jobTitle = (job.title || '').toLowerCase();
         
-        if (!searchableFields.includes(searchTerm)) {
+        if (!jobTitle.includes(searchTerm)) {
           return false;
         }
       }
@@ -244,20 +354,78 @@ export default function JobList({
 
       {/* Quick Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4 overflow-x-auto">
-        <Badge variant="secondary" className="cursor-pointer hover:bg-muted-foreground/10 text-xs whitespace-nowrap">
-          Pilne zlecenia
+        <Badge 
+          variant={filters?.urgency?.includes('high') ? "default" : "secondary"} 
+          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
+          onClick={() => {
+            if (filters?.urgency?.includes('high')) {
+              // Remove high urgency filter
+              onFilterChange?.({ ...filters, urgency: filters.urgency.filter(u => u !== 'high') });
+            } else {
+              // Add high urgency filter
+              onFilterChange?.({ ...filters, urgency: [...(filters?.urgency || []), 'high'] });
+            }
+          }}
+        >
+          🔥 Pilne zlecenia
         </Badge>
-        <Badge variant="secondary" className="cursor-pointer hover:bg-muted-foreground/10 text-xs whitespace-nowrap">
-          Zweryfikowani klienci
+        <Badge 
+          variant={filters?.postTypes?.includes('tender') && filters.postTypes.length === 1 ? "default" : "secondary"}
+          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
+          onClick={() => {
+            if (filters?.postTypes?.includes('tender') && filters.postTypes.length === 1) {
+              // Show all
+              onFilterChange?.({ ...filters, postTypes: ['job', 'tender'] });
+            } else {
+              // Show only tenders
+              onFilterChange?.({ ...filters, postTypes: ['tender'] });
+            }
+          }}
+        >
+          📋 Tylko przetargi
         </Badge>
-        <Badge variant="secondary" className="cursor-pointer hover:bg-muted-foreground/10 text-xs whitespace-nowrap">
-          Wysoko płatne (100+ zł/h)
+        <Badge 
+          variant={filters?.endingSoon ? "default" : "secondary"}
+          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
+          onClick={() => {
+            onFilterChange?.({ 
+              ...filters, 
+              endingSoon: !filters?.endingSoon,
+              postTypes: filters?.endingSoon ? filters.postTypes : ['tender'] // Auto-select tenders when enabling
+            });
+          }}
+        >
+          ⏰ Kończące się wkrótce
         </Badge>
-        <Badge variant="secondary" className="cursor-pointer hover:bg-muted-foreground/10 text-xs whitespace-nowrap">
-          Premium wykonawcy
+        <Badge 
+          variant={filters?.budgetRanges?.includes('20000+') ? "default" : "secondary"}
+          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
+          onClick={() => {
+            if (filters?.budgetRanges?.includes('20000+')) {
+              // Remove high budget filter
+              onFilterChange?.({ ...filters, budgetRanges: filters.budgetRanges.filter(r => r !== '20000+') });
+            } else {
+              // Add high budget filter
+              onFilterChange?.({ ...filters, budgetRanges: [...(filters?.budgetRanges || []), '20000+'] });
+            }
+          }}
+        >
+          💰 Wysokobudżetowe (20k+)
         </Badge>
-        <Badge variant="secondary" className="cursor-pointer hover:bg-muted-foreground/10 text-xs whitespace-nowrap">
-          Z ubezpieczeniem OC
+        <Badge 
+          variant={filters?.postTypes?.includes('job') && filters.postTypes.length === 1 ? "default" : "secondary"}
+          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
+          onClick={() => {
+            if (filters?.postTypes?.includes('job') && filters.postTypes.length === 1) {
+              // Show all
+              onFilterChange?.({ ...filters, postTypes: ['job', 'tender'] });
+            } else {
+              // Show only jobs
+              onFilterChange?.({ ...filters, postTypes: ['job'] });
+            }
+          }}
+        >
+          🔧 Tylko zlecenia
         </Badge>
       </div>
 

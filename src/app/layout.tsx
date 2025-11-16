@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Suspense } from 'react'
 import './globals.css'
 import { Toaster } from '../components/ui/sonner'
 import AuthProvider from '../contexts/AuthContext'
@@ -48,17 +49,19 @@ export default function RootLayout({
       <body className={inter.className}>
         <ServiceWorkerRegistration />
         <AuthProvider>
-          <FilterProvider>
-            <LayoutProvider>
-              <Header />
-              <main className="min-h-[calc(100vh-10rem)] pb-20 lg:pb-0">
-                {children}
-              </main>
-              <MobileMenuDock />
-              <Toaster />
-              <GlobalCommandPalette />
-            </LayoutProvider>
-          </FilterProvider>
+          <Suspense fallback={null}>
+            <FilterProvider>
+              <LayoutProvider>
+                <Header />
+                <main className="min-h-[calc(100vh-10rem)] pb-20 lg:pb-0">
+                  {children}
+                </main>
+                <MobileMenuDock />
+                <Toaster />
+                <GlobalCommandPalette />
+              </LayoutProvider>
+            </FilterProvider>
+          </Suspense>
         </AuthProvider>
       </body>
     </html>

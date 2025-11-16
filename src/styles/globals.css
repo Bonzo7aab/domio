@@ -210,7 +210,7 @@ html {
   font-size: var(--font-size);
 }
 
-/* Custom Map Animations */
+/* Custom Map Animations - Required by tailwindcss-animate plugin */
 @keyframes fade-in-0 {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -233,90 +233,25 @@ html {
   animation-name: zoom-in-95;
 }
 
-.duration-200 {
-  animation-duration: 200ms;
+/* Info window content animation - Used in Google Maps HTML string templates */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-/* Compact job cards for better density */
-.line-clamp-1 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+.info-window-content {
+  animation: fadeInScale 0.2s ease-out;
+  user-select: none;
 }
 
-.line-clamp-2 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-/* Force new color scheme */
-.domio-header {
-  background-color: #ffffff !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-}
-
-.domio-main {
-  background-color: #ffffff !important;
-}
-
-.domio-primary {
-  color: #1e40af !important;
-}
-
-.domio-bg-primary {
-  background-color: #1e40af !important;
-}
-
-/* Kompaktowe karty bez opisu */
-.compact-job-card {
-  min-height: auto !important;
-}
-
-.compact-job-card .card-header {
-  padding: 12px !important;
-  padding-bottom: 4px !important;
-}
-
-.compact-job-card .card-content {
-  padding: 0 12px 12px 12px !important;
-}
-
-/* Loading states and animations */
-.loading-spinner {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Map specific styles */
-.map-container {
-  position: relative;
-  overflow: hidden;
-}
-
-.map-marker {
-  transition: all 0.2s ease-out;
-  cursor: pointer;
-}
-
-.map-marker:hover {
-  transform: scale(1.1);
-}
-
-/* Error states */
-.error-message {
-  color: var(--destructive);
-  background-color: var(--destructive-foreground);
-  border: 1px solid var(--destructive);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  margin: 0.5rem 0;
+.info-window-content:hover {
+  transform: scale(1.01);
 }
 
 /* Custom Google Maps Info Window Styles */
@@ -364,215 +299,11 @@ html {
   z-index: 1001 !important;
 }
 
-/* Info window animations */
-.info-window-content {
-  animation: fadeInScale 0.2s ease-out;
-  user-select: none;
-}
-
-@keyframes fadeInScale {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Info window hover effect */
-.info-window-content:hover {
-  transform: scale(1.01);
-}
-
 /* Ensure clickability throughout the info window */
 .gm-style .gm-style-iw-d,
 .info-window-content,
 .info-window-content * {
   pointer-events: auto !important;
-}
-
-/* Map overlay components */
-.map-overlay-panel {
-  backdrop-filter: blur(10px);
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.map-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.marker-color-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-/* Hide scrollbars */
-.scrollbar-hide {
-  /* Firefox */
-  scrollbar-width: none;
-  /* Internet Explorer 10+ */
-  -ms-overflow-style: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  /* WebKit */
-  display: none;
-}
-
-/* Mobile App Styles */
-.mobile-app {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-
-.mobile-header {
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-}
-
-.mobile-bottom-nav {
-  /* Backdrop blur removed for better visibility */
-}
-
-.mobile-job-list {
-  scroll-behavior: smooth;
-}
-
-.mobile-swipe-refresh {
-  overscroll-behavior-y: contain;
-}
-
-.mobile-fab {
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
-}
-
-.mobile-search {
-  -webkit-overflow-scrolling: touch;
-}
-
-.mobile-job-details {
-  -webkit-overflow-scrolling: touch;
-}
-
-.mobile-profile {
-  -webkit-overflow-scrolling: touch;
-}
-
-.mobile-map-view {
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Touch-friendly tap targets */
-@media (max-width: 768px) {
-  .mobile-app button {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  
-  .mobile-app .card {
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-}
-
-/* Line clamp utilities */
-.line-clamp-1 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-}
-
-.line-clamp-2 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.line-clamp-3 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.line-clamp-6 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 6;
-}
-
-/* Mobile-specific animations */
-@keyframes mobile-slide-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes mobile-slide-down {
-  from {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.mobile-slide-up {
-  animation: mobile-slide-up 0.3s ease-out;
-}
-
-.mobile-slide-down {
-  animation: mobile-slide-down 0.3s ease-out;
-}
-
-/* Pull to refresh styles */
-.mobile-swipe-refresh {
-  position: relative;
-  overflow: hidden;
-}
-
-/* Safe area insets for notched devices */
-@supports (padding: max(0px)) {
-  .mobile-app {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  
-  .mobile-header {
-    padding-top: calc(0.75rem + env(safe-area-inset-top));
-  }
-  
-  .mobile-bottom-nav {
-    padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
-  }
 }
 
 /* Toast notifications - ensure they're always visible on top */

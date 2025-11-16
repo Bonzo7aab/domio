@@ -334,7 +334,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
           <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <div className="loading-spinner h-4 w-4 mr-2" />
+                <div className="animate-spin h-4 w-4 mr-2" />
                 Wysyłanie...
               </>
             ) : (

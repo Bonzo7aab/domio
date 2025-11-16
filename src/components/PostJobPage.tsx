@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -15,10 +15,15 @@ import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
 import { createJob } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany, upsertUserCompany } from '../lib/database/companies';
-import { geocodeAddress } from '../lib/google-maps/geocoding';
+import LocationAutocomplete from './LocationAutocomplete';
 
 interface PostJobPageProps {
   onBack: () => void;
+}
+
+interface JobLocation {
+  city: string;
+  sublocality_level_1?: string;
 }
 
 interface JobFormData {
@@ -26,8 +31,11 @@ interface JobFormData {
   category: string;
   subcategory: string;
   description: string;
-  location: string;
+  location: JobLocation | string; // Support both formats during transition
   address: string;
+  latitude?: number;
+  longitude?: number;
+  sublocalityLevel1?: string;
   budget: string;
   budgetType: 'fixed' | 'hourly' | 'negotiable';
   deadline: string;
@@ -112,14 +120,22 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
   const { user, isAuthenticated } = useUserProfile();
   const supabase = createClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const [formData, setFormData] = useState<JobFormData>({
     title: '',
     category: '',
     subcategory: '',
     description: '',
-    location: '',
+    location: { city: '' },
     address: '',
+    latitude: undefined,
+    longitude: undefined,
     budget: '',
     budgetType: 'fixed',
     deadline: '',
@@ -135,8 +151,22 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
 
   const [attachments, setAttachments] = useState<File[]>([]);
 
-  const handleInputChange = (field: keyof JobFormData, value: string) => {
+  const handleInputChange = (field: keyof JobFormData, value: string | number | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleLocationSelect = (location: string, address: string, lat: number, lng: number, sublocalityLevel1?: string) => {
+    setFormData(prev => ({
+      ...prev,
+      location: {
+        city: location,
+        ...(sublocalityLevel1 ? { sublocality_level_1: sublocalityLevel1 } : {})
+      },
+      address,
+      latitude: lat,
+      longitude: lng,
+      sublocalityLevel1: sublocalityLevel1
+    }));
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,8 +190,18 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
     }
 
     // Walidacja podstawowa
-    if (!formData.title || !formData.category || !formData.subcategory || !formData.description || !formData.location) {
+    const locationCity = typeof formData.location === 'string' 
+      ? formData.location 
+      : formData.location?.city;
+    
+    if (!formData.title || !formData.category || !formData.subcategory || !formData.description || !locationCity) {
       toast.error('Proszę wypełnić wszystkie wymagane pola');
+      return;
+    }
+
+    // Walidacja lokalizacji i współrzędnych
+    if (!formData.latitude || !formData.longitude) {
+      toast.error('Proszę wybrać lokalizację z listy lub użyć przycisku geolokalizacji');
       return;
     }
 
@@ -214,7 +254,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
           type: companyType,
           phone: formData.contactPhone || undefined,
           email: formData.contactEmail,
-          city: formData.location,
+          city: typeof formData.location === 'string' ? formData.location : formData.location?.city || '',
           address: formData.address || undefined,
         });
 
@@ -229,22 +269,9 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         throw new Error('Nie udało się pobrać lub utworzyć firmy');
       }
 
-      // Geocode location
-      let latitude: number | undefined;
-      let longitude: number | undefined;
-      
-      const geocodeAddressString = formData.address || formData.location;
-      if (geocodeAddressString) {
-        try {
-          const geocodeResult = await geocodeAddress(geocodeAddressString);
-          if (geocodeResult) {
-            latitude = geocodeResult.coordinates.lat;
-            longitude = geocodeResult.coordinates.lng;
-          }
-        } catch (geocodeError) {
-          console.warn('Geocoding failed, continuing without coordinates:', geocodeError);
-        }
-      }
+      // Use stored coordinates (already geocoded when location was selected)
+      const latitude = formData.latitude;
+      const longitude = formData.longitude;
 
       // Parse budget
       let budgetMin: number | undefined;
@@ -280,6 +307,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         address: formData.address || undefined,
         latitude,
         longitude,
+        sublocalityLevel1: formData.sublocalityLevel1 || undefined,
         budgetMin,
         budgetMax,
         budgetType: formData.budgetType,
@@ -330,6 +358,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         description: '',
         location: '',
         address: '',
+        latitude: undefined,
+        longitude: undefined,
         budget: '',
         budgetType: 'fixed',
         deadline: '',
@@ -477,26 +507,13 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <Label htmlFor="location">Miasto *</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  placeholder="np. Warszawa"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="address">Dokładny adres</Label>
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  placeholder="ul. Przykładowa 123, 00-000 Warszawa"
-                />
-              </div>
+              <LocationAutocomplete
+                value={formData.address || (typeof formData.location === 'string' ? formData.location : formData.location?.city || '')}
+                onLocationSelect={handleLocationSelect}
+                required
+                placeholder="Wpisz adres lub wybierz z listy"
+                label="Lokalizacja *"
+              />
             </CardContent>
           </Card>
 
@@ -716,7 +733,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
             <Button 
               type="submit" 
               className="bg-blue-600 hover:bg-blue-700"
-              disabled={isSubmitting || !isAuthenticated}
+              disabled={isMounted ? (isSubmitting || !isAuthenticated) : false}
             >
               {isSubmitting ? 'Publikowanie...' : 'Opublikuj zlecenie'}
             </Button>
