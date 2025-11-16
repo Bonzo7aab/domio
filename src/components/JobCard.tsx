@@ -13,7 +13,7 @@ interface JobCardProps {
     id: string;
     title: string;
     company: string;
-    location: string;
+    location: string | { city: string; sublocality_level_1?: string };
     type: string;
     salary: string;
     description: string;
@@ -118,9 +118,11 @@ const JobCard = React.memo(function JobCard({
                   <span className="truncate">
                     {typeof job.location === 'string' 
                       ? job.location 
-                      : job.location?.sublocality_level_1
-                        ? `${job.location.city || 'Unknown'}, ${job.location.sublocality_level_1}`
-                        : job.location?.city || 'Unknown'}
+                      : (job.location && typeof job.location === 'object' && 'city' in job.location)
+                        ? (job.location.sublocality_level_1
+                            ? `${job.location.city || 'Unknown'}, ${job.location.sublocality_level_1}`
+                            : job.location.city || 'Unknown')
+                        : 'Unknown'}
                   </span>
                 </div>
                 <Badge variant="outline" className="w-fit">
@@ -239,9 +241,11 @@ const JobCard = React.memo(function JobCard({
                   <span className="truncate">
                     {typeof job.location === 'string' 
                       ? job.location 
-                      : job.location?.sublocality_level_1
-                        ? `${job.location.city || 'Unknown'}, ${job.location.sublocality_level_1}`
-                        : job.location?.city || 'Unknown'}
+                      : (job.location && typeof job.location === 'object' && 'city' in job.location)
+                        ? (job.location.sublocality_level_1
+                            ? `${job.location.city || 'Unknown'}, ${job.location.sublocality_level_1}`
+                            : job.location.city || 'Unknown')
+                        : 'Unknown'}
                   </span>
                 </div>
                 <span className="hidden sm:inline h-4 border-gray-300 border-r-2" />
