@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
+import type { Budget, BudgetInput, BudgetDatabase } from '../../types/budget';
+import { budgetFromDatabase, budgetToDatabase, formatBudget } from '../../types/budget';
 
 export interface JobFilters {
   categories?: string[];
@@ -14,6 +16,7 @@ export interface JobFilters {
   limit?: number;
   offset?: number;
   bounds?: { north: number; south: number; east: number; west: number };
+  dateAdded?: string[]; // ['today', 'last-week', 'last-month', 'last-3-months', 'last-6-months', 'last-year']
 }
 
 export interface JobLocation {
@@ -32,6 +35,8 @@ export interface JobWithCompany {
   budget_max: number | null;
   budget_type: string | null;
   currency: string;
+  // Consolidated budget object (computed from above fields)
+  budget?: Budget;
   project_duration: string | null;
   deadline: string | null;
   urgency: string;
@@ -154,6 +159,63 @@ export async function fetchJobs(
       );
     }
 
+    // Apply date added filtering (created_at)
+    if (filters.dateAdded && filters.dateAdded.length > 0) {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      todayStart.setHours(0, 0, 0, 0);
+      
+      // Calculate the earliest date from all selected filters
+      let earliestDate: Date | null = null;
+      
+      for (const dateFilter of filters.dateAdded) {
+        let filterStartDate: Date;
+        
+        switch (dateFilter) {
+          case 'today':
+            filterStartDate = new Date(todayStart);
+            break;
+          case 'last-week':
+            // Last 7 days
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'last-month':
+            // Last 30 days (more reliable than setMonth)
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+            break;
+          case 'last-3-months':
+            // Last 90 days
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+            break;
+          case 'last-6-months':
+            // Last 180 days
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 180 * 24 * 60 * 60 * 1000);
+            break;
+          case 'last-year':
+            // Last 365 days
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 365 * 24 * 60 * 60 * 1000);
+            break;
+          default:
+            continue;
+        }
+        
+        // Use the earliest date (most inclusive filter)
+        if (!earliestDate || filterStartDate < earliestDate) {
+          earliestDate = filterStartDate;
+        }
+      }
+      
+      // Apply the date filter - jobs created_at >= earliestDate
+      if (earliestDate) {
+        query = query.gte('created_at', earliestDate.toISOString());
+      }
+    }
+
     // Apply bounds filtering (geographic bounds)
     if (filters.bounds) {
       query = query
@@ -267,6 +329,63 @@ export async function fetchTenders(
       );
     }
 
+    // Apply date added filtering (created_at)
+    if (filters.dateAdded && filters.dateAdded.length > 0) {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      todayStart.setHours(0, 0, 0, 0);
+      
+      // Calculate the earliest date from all selected filters
+      let earliestDate: Date | null = null;
+      
+      for (const dateFilter of filters.dateAdded) {
+        let filterStartDate: Date;
+        
+        switch (dateFilter) {
+          case 'today':
+            filterStartDate = new Date(todayStart);
+            break;
+          case 'last-week':
+            // Last 7 days
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'last-month':
+            // Last 30 days (more reliable than setMonth)
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+            break;
+          case 'last-3-months':
+            // Last 90 days
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+            break;
+          case 'last-6-months':
+            // Last 180 days
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 180 * 24 * 60 * 60 * 1000);
+            break;
+          case 'last-year':
+            // Last 365 days
+            filterStartDate = new Date(todayStart);
+            filterStartDate.setTime(filterStartDate.getTime() - 365 * 24 * 60 * 60 * 1000);
+            break;
+          default:
+            continue;
+        }
+        
+        // Use the earliest date (most inclusive filter)
+        if (!earliestDate || filterStartDate < earliestDate) {
+          earliestDate = filterStartDate;
+        }
+      }
+      
+      // Apply the date filter - tenders created_at >= earliestDate
+      if (earliestDate) {
+        query = query.gte('created_at' as any, earliestDate.toISOString());
+      }
+    }
+
     // Apply bounds filtering (geographic bounds)
     if (filters.bounds) {
       query = query
@@ -287,7 +406,7 @@ export async function fetchTenders(
       case 'deadline':
         query = query.order('submission_deadline', { ascending: true });
         break;
-      default:
+        default:
         query = query.order('created_at', { ascending: false });
     }
 
@@ -335,6 +454,14 @@ export async function fetchJobsAndTenders(
       ? { city: job.location }
       : job.location || { city: 'Unknown' };
     
+    // Create consolidated budget object
+    const budget: Budget = budgetFromDatabase({
+      budget_min: job.budget_min ?? null,
+      budget_max: job.budget_max ?? null,
+      budget_type: (job.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
+      currency: job.currency || 'PLN',
+    });
+    
     return {
     id: job.id,
     title: job.title,
@@ -343,14 +470,13 @@ export async function fetchJobsAndTenders(
     location: locationData, // Keep as object to preserve sublocality_level_1
     type: job.type,
     postType: 'job' as const,
-    salary: job.budget_max
-      ? `${job.budget_min || 0} - ${job.budget_max} ${job.currency}`
-      : `${job.budget_min || 0} ${job.currency}`,
-    budget: job.budget_max
-      ? `${job.budget_min || 0} - ${job.budget_max} ${job.currency}`
-      : `${job.budget_min || 0} ${job.currency}`,
+    salary: formatBudget(budget), // Display string for salary
+    budget, // Budget object with all fields (min, max, type, currency)
+    // Legacy fields (deprecated - use budget.min/max/type/currency instead)
     budget_min: job.budget_min ?? null,
     budget_max: job.budget_max ?? null,
+    budgetType: budget.type,
+    currency: budget.currency,
     category: job.category?.name || 'Inne',
     subcategory: job.subcategory || undefined,
     deadline: job.deadline || undefined,
@@ -360,6 +486,7 @@ export async function fetchJobsAndTenders(
     urgent: job.urgency === 'high',
     premium: job.type === 'premium',
     postedTime: getTimeAgo(job.created_at),
+    created_at: job.created_at, // Preserve original timestamp for filtering
     lat: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lat,
     lng: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lng,
     companyLogo: job.company?.logo_url || undefined,
@@ -399,6 +526,7 @@ export async function fetchJobsAndTenders(
     urgent: false,
     premium: false,
     postedTime: getTimeAgo(tender.created_at),
+    created_at: tender.created_at, // Preserve original timestamp for filtering
     lat: ensureValidCoordinates(tender.latitude, tender.longitude, locationData.city || '', tender.id)?.lat,
     lng: ensureValidCoordinates(tender.latitude, tender.longitude, locationData.city || '', tender.id)?.lng,
     companyLogo: tender.company?.logo_url || undefined,
@@ -1112,6 +1240,7 @@ export async function createJob(
       'Instalacje i systemy': 'Instalacje Techniczne',
       'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
       'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
+      'Inne': 'Zarządzanie Nieruchomościami',
     };
 
     // Use mapped category name if available, otherwise use original
@@ -1191,9 +1320,14 @@ export async function createJob(
       }
     }
 
-    // Parse budget values
-    const budgetMin = jobData.budgetMin !== undefined ? jobData.budgetMin : null;
-    const budgetMax = jobData.budgetMax !== undefined ? jobData.budgetMax : null;
+    // Parse budget values using Budget type
+    const budgetInput: BudgetInput = {
+      min: jobData.budgetMin,
+      max: jobData.budgetMax,
+      type: jobData.budgetType || 'fixed',
+      currency: jobData.currency || 'PLN',
+    };
+    const budgetDb = budgetToDatabase(budgetInput);
 
     // Prepare location as JSONB object
     let locationJsonb: any;
@@ -1226,10 +1360,10 @@ export async function createJob(
       latitude: jobData.latitude || null,
       longitude: jobData.longitude || null,
       sublocality_level_1: jobData.sublocalityLevel1 || null,
-      budget_min: budgetMin,
-      budget_max: budgetMax,
-      budget_type: jobData.budgetType || 'fixed',
-      currency: jobData.currency || 'PLN',
+      budget_min: budgetDb.budget_min,
+      budget_max: budgetDb.budget_max,
+      budget_type: budgetDb.budget_type,
+      currency: budgetDb.currency,
       project_duration: jobData.projectDuration || null,
       deadline: deadlineDate,
       urgency: jobData.urgency || 'medium',

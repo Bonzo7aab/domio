@@ -30,12 +30,14 @@ const defaultFilters: FilterState = {
   contractTypes: [],
   locations: [],
   cities: [],
+  sublocalities: [],
   provinces: [],
   budgetRanges: [],
   clientTypes: [],
   postTypes: ['job', 'tender'],
   urgency: [],
-  searchQuery: ''
+  searchQuery: '',
+  dateAdded: []
 };
 
 interface FilterProviderProps {

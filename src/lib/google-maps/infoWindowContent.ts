@@ -18,7 +18,6 @@ export function generateInfoWindowContent(jobData?: Job, isSmallMap: boolean = f
     description,
     skills = [],
     applications,
-    rating,
     postedTime,
     urgent,
     verified,
@@ -26,6 +25,9 @@ export function generateInfoWindowContent(jobData?: Job, isSmallMap: boolean = f
     companyLogo,
     postType,
   } = jobData;
+  
+  // Rating is not part of Job type, so we'll skip it
+  const rating = undefined;
 
   const isTender = postType === 'tender';
   const displaySkills = skills.slice(0, 3);
@@ -41,11 +43,18 @@ export function generateInfoWindowContent(jobData?: Job, isSmallMap: boolean = f
       .replace(/'/g, '&#39;');
   };
 
+  // Convert location to string if it's an object
+  const locationString = typeof location === 'string' 
+    ? location 
+    : location && typeof location === 'object' && 'city' in location
+      ? location.city + (location.sublocality_level_1 ? `, ${location.sublocality_level_1}` : '')
+      : '';
+  
   const safeTitle = escapeHtml(title);
   const safeCompany = escapeHtml(company);
-  const safeLocation = escapeHtml(location);
+  const safeLocation = escapeHtml(locationString);
   const safeDescription = escapeHtml(description);
-  const safeCategory = escapeHtml(category || 'Inne');
+  const safeCategory = typeof category === 'string' ? escapeHtml(category) : escapeHtml(category?.name || 'Inne');
 
   // If small map, show compact version
   if (isSmallMap) {
@@ -292,10 +301,17 @@ function generateCompactInfoWindow(jobData: Job, escapeHtml: (text: string) => s
     postType,
   } = jobData;
 
+  // Convert location to string if it's an object
+  const locationString = typeof location === 'string' 
+    ? location 
+    : location && typeof location === 'object' && 'city' in location
+      ? location.city + (location.sublocality_level_1 ? `, ${location.sublocality_level_1}` : '')
+      : '';
+
   const isTender = postType === 'tender';
   const safeTitle = escapeHtml(title);
   const safeCompany = escapeHtml(company);
-  const safeLocation = escapeHtml(location);
+  const safeLocation = escapeHtml(locationString);
 
   return `
     <div class="info-window-content" data-job-id="${id}" style="cursor: pointer; width: 100%; max-width: 240px;">

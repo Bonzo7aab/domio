@@ -21,3 +21,6 @@ export * from './user';
 
 // Notification types
 export * from './notification';
+
+// Budget types
+export * from './budget';

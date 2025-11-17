@@ -16,6 +16,7 @@ import { createClient } from '../lib/supabase/client';
 import { createJob } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany, upsertUserCompany } from '../lib/database/companies';
 import LocationAutocomplete from './LocationAutocomplete';
+import type { BudgetInput } from '../types/budget';
 
 interface PostJobPageProps {
   onBack: () => void;
@@ -99,6 +100,9 @@ const categories = {
     'Geodezja',
     'Usługi księgowe',
     'Doradztwo techniczne'
+  ],
+  'Inne': [
+    'Inne'
   ]
 };
 
@@ -194,7 +198,31 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       ? formData.location 
       : formData.location?.city;
     
-    if (!formData.title || !formData.category || !formData.subcategory || !formData.description || !locationCity) {
+    // Validate category
+    if (!formData.category) {
+      toast.error('Proszę wybrać kategorię');
+      return;
+    }
+    
+    // Validate subcategory - accept "-" when category is "Inne"
+    // Ensure subcategory is set correctly for "Inne" category
+    const currentSubcategory = formData.category === 'Inne' ? '-' : formData.subcategory;
+    
+    const isValidSubcategory = formData.category === 'Inne'
+      ? currentSubcategory === '-' // For "Inne", must be "-"
+      : currentSubcategory && currentSubcategory !== '' && currentSubcategory !== '-'; // For others, must be selected
+    
+    if (!isValidSubcategory) {
+      toast.error('Proszę wybrać podkategorię');
+      return;
+    }
+    
+    // Update formData with correct subcategory if needed
+    if (formData.category === 'Inne' && formData.subcategory !== '-') {
+      setFormData(prev => ({ ...prev, subcategory: '-' }));
+    }
+    
+    if (!formData.title || !formData.description || !locationCity) {
       toast.error('Proszę wypełnić wszystkie wymagane pola');
       return;
     }
@@ -203,6 +231,21 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
     if (!formData.latitude || !formData.longitude) {
       toast.error('Proszę wybrać lokalizację z listy lub użyć przycisku geolokalizacji');
       return;
+    }
+
+    // Walidacja budżetu - wymagany dla fixed i hourly, opcjonalny dla negotiable
+    if (formData.budgetType !== 'negotiable') {
+      if (!formData.budget || formData.budget.trim() === '') {
+        toast.error(`Proszę podać ${formData.budgetType === 'hourly' ? 'stawkę godzinową' : 'budżet'}`);
+        return;
+      }
+      
+      // Validate budget is a valid number
+      const budgetValue = parseFloat(formData.budget.replace(/[^\d.,]/g, '').replace(',', '.'));
+      if (isNaN(budgetValue) || budgetValue <= 0) {
+        toast.error('Proszę podać prawidłową wartość budżetu');
+        return;
+      }
     }
 
     // Walidacja dodatkowych pól
@@ -273,17 +316,38 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       const latitude = formData.latitude;
       const longitude = formData.longitude;
 
-      // Parse budget
+      // Parse budget using Budget type
       let budgetMin: number | undefined;
       let budgetMax: number | undefined;
       
-      if (formData.budget) {
-        const budgetValue = parseFloat(formData.budget.replace(/[^\d.,]/g, '').replace(',', '.'));
-        if (!isNaN(budgetValue)) {
+      if (formData.budget && formData.budget.trim() !== '') {
+        const cleanedBudget = formData.budget.replace(/[^\d.,]/g, '').replace(',', '.');
+        const budgetValue = parseFloat(cleanedBudget);
+        
+        if (!isNaN(budgetValue) && budgetValue > 0) {
           budgetMin = budgetValue;
+          // For fixed type, min and max are the same
+          // For hourly, only min is set
+          // For negotiable, both can be undefined
           budgetMax = formData.budgetType === 'fixed' ? budgetValue : undefined;
+        } else {
+          console.warn('Invalid budget value:', formData.budget);
         }
       }
+      
+      // Create BudgetInput object
+      const budgetInput: BudgetInput = {
+        min: budgetMin,
+        max: budgetMax,
+        type: formData.budgetType,
+        currency: 'PLN',
+      };
+      
+      console.log('Budget input:', {
+        raw: formData.budget,
+        budgetType: formData.budgetType,
+        parsed: budgetInput
+      });
 
       // Parse requirements string to array
       const requirementsArray = formData.requirements
@@ -294,6 +358,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       console.log('Creating job with data:', {
         title: formData.title,
         category: formData.category,
+        subcategory: formData.subcategory,
+        budget: budgetInput,
         managerId: managerId,
         companyId: company.data.id,
       });
@@ -308,10 +374,10 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         latitude,
         longitude,
         sublocalityLevel1: formData.sublocalityLevel1 || undefined,
-        budgetMin,
-        budgetMax,
-        budgetType: formData.budgetType,
-        currency: 'PLN',
+        budgetMin: budgetInput.min,
+        budgetMax: budgetInput.max,
+        budgetType: budgetInput.type || 'fixed',
+        currency: budgetInput.currency || 'PLN',
         deadline: formData.deadline || undefined,
         urgency: formData.urgency,
         status: 'active',
@@ -437,7 +503,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
                   <Label htmlFor="category">Kategoria *</Label>
                   <Select value={formData.category} onValueChange={(value) => {
                     handleInputChange('category', value);
-                    handleInputChange('subcategory', ''); // Reset subcategory when category changes
+                    // Set subcategory to "-" if "Inne" is selected, otherwise reset
+                    handleInputChange('subcategory', value === 'Inne' ? '-' : '');
                   }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Wybierz kategorię" />
@@ -454,22 +521,33 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
 
                 <div>
                   <Label htmlFor="subcategory">Podkategoria *</Label>
-                  <Select 
-                    value={formData.subcategory} 
-                    onValueChange={(value) => handleInputChange('subcategory', value)}
-                    disabled={!formData.category}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Wybierz podkategorię" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.category && categories[formData.category as keyof typeof categories]?.map((subcategory) => (
-                        <SelectItem key={subcategory} value={subcategory}>
-                          {subcategory}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {formData.category === 'Inne' ? (
+                    <div>
+                      <Input
+                        value="-"
+                        disabled
+                        className="bg-gray-100"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">(automatycznie ustawione dla kategorii "Inne")</p>
+                    </div>
+                  ) : (
+                    <Select 
+                      value={formData.subcategory} 
+                      onValueChange={(value) => handleInputChange('subcategory', value)}
+                      disabled={!formData.category}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Wybierz podkategorię" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formData.category && categories[formData.category as keyof typeof categories]?.map((subcategory) => (
+                          <SelectItem key={subcategory} value={subcategory}>
+                            {subcategory}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
 
@@ -528,18 +606,33 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="budget">Budżet</Label>
+                  <Label htmlFor="budget">
+                    {formData.budgetType === 'hourly' ? 'Stawka godzinowa' : 
+                     formData.budgetType === 'negotiable' ? 'Budżet (opcjonalnie)' : 
+                     'Budżet'}
+                  </Label>
                   <Input
                     id="budget"
                     value={formData.budget}
                     onChange={(e) => handleInputChange('budget', e.target.value)}
-                    placeholder="np. 5000"
+                    placeholder={
+                      formData.budgetType === 'hourly' ? 'np. 50 PLN/h' :
+                      formData.budgetType === 'negotiable' ? 'np. 5000-10000 PLN (opcjonalnie)' :
+                      'np. 5000 PLN'
+                    }
                   />
+                  {formData.budgetType === 'negotiable' && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Możesz podać orientacyjny zakres budżetu lub pozostawić puste - budżet będzie przedmiotem negocjacji
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <Label htmlFor="budgetType">Typ budżetu</Label>
-                  <Select value={formData.budgetType} onValueChange={(value: 'fixed' | 'hourly' | 'negotiable') => handleInputChange('budgetType', value)}>
+                  <Select value={formData.budgetType} onValueChange={(value: 'fixed' | 'hourly' | 'negotiable') => {
+                    handleInputChange('budgetType', value);
+                  }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>

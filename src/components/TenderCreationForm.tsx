@@ -182,11 +182,18 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
   // Populate form with initial data when editing
   useEffect(() => {
     if (isEditMode && initialData) {
+      // Convert location to string if it's an object
+      const locationString = typeof initialData.location === 'string' 
+        ? initialData.location 
+        : initialData.location && typeof initialData.location === 'object' && 'city' in initialData.location
+          ? initialData.location.city + (initialData.location.sublocality_level_1 ? `, ${initialData.location.sublocality_level_1}` : '')
+          : '';
+      
       setFormData({
         title: initialData.title || '',
         description: initialData.description || '',
         category: initialData.category?.name || '',
-        location: initialData.location || '',
+        location: locationString,
         estimatedValue: initialData.estimated_value?.toString() || '',
         currency: initialData.currency || 'PLN',
         submissionDeadline: initialData.submission_deadline ? new Date(initialData.submission_deadline) : new Date(),

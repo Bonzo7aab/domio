@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronUp, MapPin, Clock, Gavel, Wrench, Check, X, Edit3, ChevronDown as ArrowDown, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Clock, Gavel, Wrench, Check, X, Edit3, ChevronDown as ArrowDown, AlertCircle, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
@@ -24,6 +24,7 @@ export interface FilterState {
   urgency: string[]; // ['low', 'medium', 'high']
   searchQuery?: string; // Search by title
   endingSoon?: boolean; // Tenders ending in less than 7 days
+  dateAdded: string[]; // ['today', 'last-week', 'last-month', 'last-3-months', 'last-6-months', 'last-year']
 }
 
 interface JobFiltersProps {
@@ -82,6 +83,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
   const [budgetMax, setBudgetMax] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [endingSoon, setEndingSoon] = useState(false);
+  const [selectedDateAdded, setSelectedDateAdded] = useState<string[]>([]);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUpdatingFromSelfRef = useRef(false);
@@ -103,6 +105,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       if (initialFilters.budgetMax !== undefined) setBudgetMax(initialFilters.budgetMax.toString());
       if (initialFilters.searchQuery !== undefined) setSearchQuery(initialFilters.searchQuery);
       if (initialFilters.endingSoon !== undefined) setEndingSoon(initialFilters.endingSoon);
+      if (initialFilters.dateAdded !== undefined) setSelectedDateAdded(initialFilters.dateAdded);
     }
     // Reset the flag after syncing
     isUpdatingFromSelfRef.current = false;
@@ -225,10 +228,11 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
         postTypes: selectedPostTypes,
         urgency: selectedUrgency,
         searchQuery,
-        endingSoon: endingSoon
+        endingSoon: endingSoon,
+        dateAdded: selectedDateAdded
       });
     }
-  }, [selectedCategories, selectedSubcategories, selectedContractTypes, selectedCities, selectedSublocalities, selectedProvinces, selectedClientTypes, selectedPostTypes, selectedUrgency, selectedBudgetRanges, budgetMin, budgetMax, searchQuery, endingSoon, onFilterChange]);
+  }, [selectedCategories, selectedSubcategories, selectedContractTypes, selectedCities, selectedSublocalities, selectedProvinces, selectedClientTypes, selectedPostTypes, selectedUrgency, selectedBudgetRanges, budgetMin, budgetMax, searchQuery, endingSoon, selectedDateAdded, onFilterChange]);
 
   // Scroll detection for showing scroll indicator
   useEffect(() => {
@@ -316,6 +320,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
     setBudgetMax('');
     setSearchQuery('');
     setEndingSoon(false);
+    setSelectedDateAdded([]);
   };
 
   // Get all applied filters
@@ -480,6 +485,25 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
         }
       });
     }
+
+    // Date added filters
+    selectedDateAdded.forEach(dateFilter => {
+      const dateLabels: Record<string, string> = {
+        'today': 'Dzisiaj',
+        'last-week': 'Ostatni tydzień',
+        'last-month': 'Ostatni miesiąc',
+        'last-3-months': 'Ostatnie 3 miesiące',
+        'last-6-months': 'Ostatnie 6 miesięcy',
+        'last-year': 'Ostatni rok'
+      };
+      applied.push({
+        label: dateLabels[dateFilter] || dateFilter,
+        value: `date-${dateFilter}`,
+        onRemove: () => {
+          setSelectedDateAdded(prev => prev.filter(d => d !== dateFilter));
+        }
+      });
+    });
 
     return applied;
   };
@@ -919,6 +943,53 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                       <span className="text-foreground">Wysoki (Pilne)</span>
                     </Label>
                   </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Date Added Filter */}
+            <Collapsible
+              open={expandedFilterSections.includes('date-added')}
+              onOpenChange={() => toggleFilterSection('date-added')}
+              className="mb-4"
+            >
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
+                  Data dodania
+                </Label>
+                {expandedFilterSections.includes('date-added') ? 
+                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                }
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3 pl-2">
+                <div className="space-y-2">
+                  {[
+                    { value: 'today', label: 'Dzisiaj' },
+                    { value: 'last-week', label: 'Ostatni tydzień' },
+                    { value: 'last-month', label: 'Ostatni miesiąc' },
+                    { value: 'last-3-months', label: 'Ostatnie 3 miesiące' },
+                    { value: 'last-6-months', label: 'Ostatnie 6 miesięcy' },
+                    { value: 'last-year', label: 'Ostatni rok' }
+                  ].map(({ value, label }) => (
+                    <div key={value} className="flex items-center space-x-2">
+                      <CustomCheckbox 
+                        id={`date-${value}`}
+                        checked={selectedDateAdded.includes(value)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedDateAdded(prev => [...prev, value]);
+                          } else {
+                            setSelectedDateAdded(prev => prev.filter(d => d !== value));
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`date-${value}`} className="text-sm cursor-pointer flex items-center space-x-2">
+                        <Calendar className="w-3 h-3 mr-1 text-gray-600" />
+                        <span className="text-foreground">{label}</span>
+                      </Label>
+                    </div>
+                  ))}
                 </div>
               </CollapsibleContent>
             </Collapsible>

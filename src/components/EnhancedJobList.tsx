@@ -416,7 +416,12 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
         company: job.company,
         location: job.location,
         postType: (job.postType || 'job') as 'job' | 'tender',
-        budget: job.budget || job.salary,
+        budget: typeof job.budget === 'object' ? job.budget : {
+          min: null,
+          max: null,
+          type: 'negotiable',
+          currency: 'PLN',
+        },
         deadline: job.deadline
       };
       addBookmark(bookmarkData);

@@ -151,7 +151,11 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
         title: initialData.title || '',
         description: initialData.description || '',
         category: initialData.category?.name || '',
-        location: initialData.location || '',
+        location: typeof initialData.location === 'string' 
+          ? initialData.location 
+          : initialData.location && typeof initialData.location === 'object' && 'city' in initialData.location
+            ? initialData.location.city + (initialData.location.sublocality_level_1 ? `, ${initialData.location.sublocality_level_1}` : '')
+            : '',
         estimatedValue: initialData.estimated_value?.toString() || '',
         currency: initialData.currency || 'PLN',
         submissionDeadline: initialData.submission_deadline ? new Date(initialData.submission_deadline) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),

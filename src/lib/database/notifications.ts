@@ -60,7 +60,7 @@ export async function saveNotificationPreferences(
     email_notifications: preferences.emailNotifications,
     push_notifications: preferences.pushNotifications,
     sms_notifications: preferences.smsNotifications ?? false,
-    new_job_notifications: preferences.newJobNotifications ?? preferences.jobUpdates ?? true,
+    new_job_notifications: preferences.newJobNotifications ?? true,
     new_tender_notifications: preferences.newTenderNotifications ?? true,
     message_notifications: preferences.messageNotifications,
     status_update_notifications: preferences.statusUpdateNotifications ?? true,

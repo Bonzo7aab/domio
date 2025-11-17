@@ -6,7 +6,6 @@ import { Badge } from './ui/badge';
 import JobCard from './JobCard';
 import { FilterState } from './JobFilters';
 import { getBookmarkedJobs, addBookmark, removeBookmark } from '../utils/bookmarkStorage';
-import { jobListMockData } from '../mocks';
 import { extractCity, extractSublocality, getProvinceForCity } from '../utils/locationMapping';
 import { isTenderEndingSoon } from '../utils/tenderHelpers';
 import type { Job } from '../types/job';
@@ -20,8 +19,6 @@ interface JobListProps {
   isMapVisible?: boolean;
   isLoadingJobs?: boolean;
 }
-
-const mockJobs = jobListMockData;
 
 export default function JobList({ 
   jobs: jobsProp,
@@ -58,8 +55,8 @@ export default function JobList({
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Use jobs from props if provided, otherwise fallback to mock data
-  const availableJobs = (jobsProp && jobsProp.length > 0) ? jobsProp : mockJobs;
+  // Use jobs from props
+  const availableJobs = jobsProp || [];
 
   const handleBookmark = (jobId: string) => {
     const job = availableJobs.find(j => j.id === jobId);
@@ -298,6 +295,92 @@ export default function JobList({
         
         if (!jobTitle.includes(searchTerm)) {
           return false;
+        }
+      }
+
+      // Filter by date added (created_at)
+      if (filters.dateAdded && filters.dateAdded.length > 0) {
+        // Get job's created_at timestamp (ISO string from database)
+        const jobCreatedAt = (job as any).created_at;
+        if (!jobCreatedAt) {
+          // If job has no created_at, skip this filter (include the job)
+        } else {
+          // Parse the ISO timestamp string to Date
+          const jobDate = new Date(jobCreatedAt);
+          
+          // Validate the date
+          if (isNaN(jobDate.getTime())) {
+            // Invalid date, skip filter
+            return true;
+          }
+          
+          const now = new Date();
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          todayStart.setHours(0, 0, 0, 0);
+          
+          // Normalize jobDate to start of day for consistent comparison
+          const jobDateStart = new Date(jobDate.getFullYear(), jobDate.getMonth(), jobDate.getDate());
+          jobDateStart.setHours(0, 0, 0, 0);
+          
+          let matchesDateFilter = false;
+          for (const dateFilter of filters.dateAdded) {
+            let filterStartDate: Date;
+            
+            switch (dateFilter) {
+              case 'today':
+                filterStartDate = new Date(todayStart);
+                if (jobDateStart >= filterStartDate) {
+                  matchesDateFilter = true;
+                }
+                break;
+              case 'last-week':
+                // Last 7 days (including today)
+                filterStartDate = new Date(todayStart);
+                filterStartDate.setTime(filterStartDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+                if (jobDateStart >= filterStartDate) {
+                  matchesDateFilter = true;
+                }
+                break;
+              case 'last-month':
+                // Last 30 days (including today)
+                filterStartDate = new Date(todayStart);
+                filterStartDate.setTime(filterStartDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+                if (jobDateStart >= filterStartDate) {
+                  matchesDateFilter = true;
+                }
+                break;
+              case 'last-3-months':
+                // Last 90 days (including today)
+                filterStartDate = new Date(todayStart);
+                filterStartDate.setTime(filterStartDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+                if (jobDateStart >= filterStartDate) {
+                  matchesDateFilter = true;
+                }
+                break;
+              case 'last-6-months':
+                // Last 180 days (including today)
+                filterStartDate = new Date(todayStart);
+                filterStartDate.setTime(filterStartDate.getTime() - 180 * 24 * 60 * 60 * 1000);
+                if (jobDateStart >= filterStartDate) {
+                  matchesDateFilter = true;
+                }
+                break;
+              case 'last-year':
+                // Last 365 days (including today)
+                filterStartDate = new Date(todayStart);
+                filterStartDate.setTime(filterStartDate.getTime() - 365 * 24 * 60 * 60 * 1000);
+                if (jobDateStart >= filterStartDate) {
+                  matchesDateFilter = true;
+                }
+                break;
+            }
+            
+            if (matchesDateFilter) break;
+          }
+          
+          if (!matchesDateFilter) {
+            return false;
+          }
         }
       }
       

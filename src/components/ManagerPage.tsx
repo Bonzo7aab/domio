@@ -18,6 +18,8 @@ import { createClient } from '../lib/supabase/client';
 import { createTender, updateTender, fetchTenderById } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { toast } from 'sonner';
+import { formatBudget } from '../types/budget';
+import type { Budget } from '../types/budget';
 import BidEvaluationPanel from './BidEvaluationPanel';
 import JobApplicationsList from './JobApplicationsList';
 import TenderCreationForm from './TenderCreationForm';
@@ -442,7 +444,18 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">{job.budget} zł</p>
+                        <p className="font-medium">
+                          {formatBudget(
+                            typeof job.budget === 'string' 
+                              ? {
+                                  min: parseFloat(job.budget) || null,
+                                  max: parseFloat(job.budget) || null,
+                                  type: 'fixed',
+                                  currency: 'PLN',
+                                }
+                              : job.budget
+                          )}
+                        </p>
                         <p className="text-xs text-gray-500">{job.deadline}</p>
                       </div>
                     </div>
@@ -520,7 +533,18 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-green-600">{job.budget} zł</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {formatBudget(
+                            typeof job.budget === 'string' 
+                              ? {
+                                  min: parseFloat(job.budget) || null,
+                                  max: parseFloat(job.budget) || null,
+                                  type: 'fixed',
+                                  currency: 'PLN',
+                                }
+                              : job.budget
+                          )}
+                        </p>
                         <div className="flex gap-2 mt-2">
                           <Button variant="outline" size="sm">Szczegóły</Button>
                           <Button 
@@ -619,7 +643,18 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-bold text-green-600">{job.budget} zł</p>
+                            <p className="text-2xl font-bold text-green-600">
+                          {formatBudget(
+                            typeof job.budget === 'string' 
+                              ? {
+                                  min: parseFloat(job.budget) || null,
+                                  max: parseFloat(job.budget) || null,
+                                  type: 'fixed',
+                                  currency: 'PLN',
+                                }
+                              : job.budget
+                          )}
+                        </p>
                             <div className="flex gap-2 mt-2">
                               <Button 
                                 variant="outline" 

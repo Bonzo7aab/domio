@@ -6,6 +6,7 @@ import { Card, CardContent } from './ui/card';
 import { TenderStatusBadge } from './TenderStatusBadge';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
+import { useUserProfile } from '../contexts/AuthContext';
 import type { Job, TenderInfo } from '../types/job';
 
 interface JobCardProps {
@@ -42,6 +43,9 @@ const JobCard = React.memo(function JobCard({
   isHighlighted = false,
   onApplyClick
 }: JobCardProps) {
+  const { user } = useUserProfile();
+  const isManager = user?.userType === 'manager';
+
   const handleBookmarkClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onBookmark?.(job.id);
@@ -153,12 +157,14 @@ const JobCard = React.memo(function JobCard({
                     </div>
                   )}
                 </div>
-                <Button 
-                  onClick={handleApplyClick}
-                  className="w-full sm:w-auto"
-                >
-                  Złóż ofertę
-                </Button>
+                {!isManager && (
+                  <Button 
+                    onClick={handleApplyClick}
+                    className="w-full sm:w-auto"
+                  >
+                    Złóż ofertę
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -319,14 +325,16 @@ const JobCard = React.memo(function JobCard({
               </div>
 
               {/* Apply button at bottom */}
-              <div className="flex md:flex-wrap md:content-end">
-                <Button
-                  className="bg-blue-800 hover:bg-blue-900 text-white w-full md:w-auto"
-                  onClick={handleApplyClick}
-                >
-                  Złóż ofertę
-                </Button>
-              </div>
+              {!isManager && (
+                <div className="flex md:flex-wrap md:content-end">
+                  <Button
+                    className="bg-blue-800 hover:bg-blue-900 text-white w-full md:w-auto"
+                    onClick={handleApplyClick}
+                  >
+                    Złóż ofertę
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>

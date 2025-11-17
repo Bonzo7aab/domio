@@ -1,3 +1,5 @@
+import type { Budget } from '../../types/budget';
+
 export interface JobMock {
   id: string;
   title: string;
@@ -22,7 +24,7 @@ export interface JobMock {
   completedJobs: number;
   certificates: string[];
   deadline: string;
-  budget: string;
+  budget: Budget | string; // Support both Budget object and string for backward compatibility
   projectDuration: string;
   contactPerson: string;
   contactPhone: string;
@@ -312,7 +314,7 @@ export interface MobileJobMock {
   id: string;
   title: string;
   category: string;
-  budget: string;
+  budget: Budget | string; // Support both Budget object and string for backward compatibility
   location: string;
   distance: number;
   postedTime: string;

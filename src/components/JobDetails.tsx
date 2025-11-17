@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import TrustIndicators from './TrustIndicators';
+import { formatBudget } from '../types/budget';
+import type { Budget } from '../types/budget';
 
 interface JobDetailsProps {
   job: {
@@ -34,7 +36,7 @@ interface JobDetailsProps {
     completedJobs?: number;
     certificates?: string[];
     deadline?: string;
-    budget?: string;
+    budget?: Budget | string; // Accept Budget object or string for backward compatibility
     projectDuration?: string;
     contactPerson?: string;
     contactPhone?: string;
@@ -338,7 +340,9 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
                 {job.budget && (
                   <div>
                     <p className="text-sm text-gray-500">Budżet</p>
-                    <p className="font-medium text-green-600">{job.budget}</p>
+                    <p className="font-medium text-green-600">
+                      {typeof job.budget === 'object' ? formatBudget(job.budget) : job.budget}
+                    </p>
                   </div>
                 )}
               </CardContent>

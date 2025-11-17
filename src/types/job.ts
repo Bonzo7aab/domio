@@ -1,3 +1,5 @@
+import type { Budget, BudgetInput } from './budget';
+
 export interface Job {
   // Core identifiers
   id: string;
@@ -12,11 +14,16 @@ export interface Job {
   postedTime: string;
   
   // Budget/Financial
-  salary: string;
-  budget: string;
+  salary: string; // Display string for salary/budget
+  budget: Budget; // Consolidated budget object with all budget fields
+  // Legacy fields (deprecated - use budget.min/max/type/currency instead)
+  /** @deprecated Use budget.min instead */
   budgetMin?: number;
+  /** @deprecated Use budget.max instead */
   budgetMax?: number;
+  /** @deprecated Use budget.type instead */
   budgetType?: 'fixed' | 'hourly' | 'negotiable' | 'range';
+  /** @deprecated Use budget.currency instead */
   currency?: string;
   
   // Requirements & Skills

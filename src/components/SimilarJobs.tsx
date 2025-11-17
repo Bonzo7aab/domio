@@ -4,6 +4,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { MapPin, Clock, DollarSign, Building } from 'lucide-react';
 import { getStoredJobs } from '../utils/jobStorage';
+import { formatBudget } from '../types/budget';
+import type { Budget, BudgetType } from '../types/budget';
 // Removed mock import - now using database data via props
 
 interface SimilarJobsProps {
@@ -18,7 +20,7 @@ interface SimilarJob {
   title: string;
   company: string;
   location: string;
-  budget: string;
+  budget: Budget | string; // Budget object or string for backward compatibility
   postedTime: string;
   postType: 'job' | 'tender';
   category: string;
@@ -41,7 +43,12 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
       title: job.title,
       company: job.company,
       location: job.location,
-      budget: job.budget || job.salary,
+      budget: typeof job.budget === 'object' ? job.budget : {
+        min: null,
+        max: null,
+        type: 'negotiable' as BudgetType,
+        currency: 'PLN',
+      },
       postedTime: job.postedTime,
       postType: job.postType || 'job' as 'job' | 'tender',
       category: job.category
@@ -109,7 +116,7 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
                   
                   <div className="flex items-center gap-1 text-green-600 font-medium">
                     <DollarSign className="w-3 h-3" />
-                    <span>{job.budget}</span>
+                    <span>{typeof job.budget === 'object' ? formatBudget(job.budget) : job.budget}</span>
                   </div>
                 </div>
               </div>

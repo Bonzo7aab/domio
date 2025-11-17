@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { createClient } from '../lib/supabase/client';
 import { getJobById, getTenderById } from '../lib/data';
 import { incrementJobViews, incrementTenderViews } from '../lib/database/jobs';
+import { formatBudget } from '../types/budget';
 
 interface JobPageProps {
   jobId: string;
@@ -107,9 +108,18 @@ const convertDatabaseJobToDetailedFormat = (job: any) => {
     company: job.company?.name || 'Unknown',
     location: job.location,
     type: job.type,
-    salary: job.budget_max 
-      ? `${job.budget_min || 0} - ${job.budget_max} ${job.currency}`
-      : `${job.budget_min || 0} ${job.currency}`,
+    // Create Budget object
+    budget: job.budget || {
+      min: job.budget_min ?? null,
+      max: job.budget_max ?? null,
+      type: (job.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
+      currency: job.currency || 'PLN',
+    },
+    salary: job.budget 
+      ? formatBudget(job.budget)
+      : (job.budget_max 
+        ? `${job.budget_min || 0} - ${job.budget_max} ${job.currency}`
+        : `${job.budget_min || 0} ${job.currency}`),
     description: job.description,
     requirements: job.requirements || [],
     responsibilities: job.responsibilities || [],
@@ -125,9 +135,6 @@ const convertDatabaseJobToDetailedFormat = (job: any) => {
     subcategory: job.subcategory,
     clientType: mapCompanyTypeToClientType(job.company?.type),
     deadline: job.deadline,
-    budget: job.budget_max 
-      ? `${job.budget_min || 0} - ${job.budget_max} ${job.currency}`
-      : `${job.budget_min || 0} ${job.currency}`,
     projectDuration: job.project_duration,
     contactPerson: job.contact_person,
     contactPhone: job.contact_phone,
@@ -211,6 +218,24 @@ const mapCompanyTypeToClientType = (companyType?: string): string => {
     default:
       return 'Wspólnota Mieszkaniowa';
   }
+};
+
+// Helper function to format location (string or object)
+const formatLocation = (location: string | { city: string; sublocality_level_1?: string } | undefined): string => {
+  if (!location) return 'Unknown';
+  
+  if (typeof location === 'string') {
+    return location;
+  }
+  
+  if (typeof location === 'object' && location !== null && 'city' in location) {
+    if (location.sublocality_level_1) {
+      return `${location.city || 'Unknown'}, ${location.sublocality_level_1}`;
+    }
+    return location.city || 'Unknown';
+  }
+  
+  return 'Unknown';
 };
 
 const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
@@ -507,7 +532,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         company: job.company,
         location: job.location,
         postType: job.postType || 'job',
-        budget: job.budget || job.salary,
+        budget: typeof job.budget === 'object' ? job.budget : {
+          min: null,
+          max: null,
+          type: 'negotiable',
+          currency: 'PLN',
+        },
         deadline: job.deadline
       };
       addBookmark(bookmarkData);
@@ -563,7 +593,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         </div>
                         <div className="flex items-center gap-1">
                           <MapPin className="w-4 h-4" />
-                          {job.location}
+                          {formatLocation(job.location)}
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
@@ -597,7 +627,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground font-medium">Budżet</div>
-                      <div className="font-bold text-success">{job.budget}</div>
+                      <div className="font-bold text-success">{formatBudget(job.budget)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground font-medium">Czas realizacji</div>

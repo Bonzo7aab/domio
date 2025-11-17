@@ -43,6 +43,10 @@ export function filtersToSearchParams(filters: FilterState): URLSearchParams {
   if (filters.urgency && filters.urgency.length > 0) {
     params.set('urgency', filters.urgency.join(','));
   }
+
+  if (filters.dateAdded && filters.dateAdded.length > 0) {
+    params.set('dateAdded', filters.dateAdded.join(','));
+  }
   
   // Numbers
   if (filters.budgetMin !== undefined && filters.budgetMin !== null) {
@@ -127,6 +131,11 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
     filters.urgency = urgency.split(',').filter(Boolean);
   }
 
+  const dateAdded = searchParams.get('dateAdded');
+  if (dateAdded) {
+    filters.dateAdded = dateAdded.split(',').filter(Boolean);
+  }
+
   // Numbers
   const budgetMin = searchParams.get('budgetMin');
   if (budgetMin) {
@@ -194,6 +203,7 @@ export function hasActiveFilters(filters: FilterState): boolean {
     (filters.searchQuery && filters.searchQuery.trim()) ||
     (filters.postTypes && filters.postTypes.length !== 2) ||
     (filters.urgency && filters.urgency.length > 0) ||
+    (filters.dateAdded && filters.dateAdded.length > 0) ||
     (filters.locations && filters.locations.length > 0) ||
     filters.endingSoon
   );
