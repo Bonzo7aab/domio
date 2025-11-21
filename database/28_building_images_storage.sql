@@ -1,0 +1,123 @@
+-- =============================================
+-- DOMIO PLATFORM - BUILDING IMAGES STORAGE
+-- =============================================
+-- Storage bucket setup and RLS policies for building images
+--
+-- NOTE: Storage buckets in Supabase must be created via:
+-- 1. Supabase Dashboard: Storage > Create Bucket
+-- 2. Supabase CLI: supabase storage create building-images --public
+-- 3. Supabase Management API
+--
+-- This file documents the RLS policies that should be applied to the bucket.
+-- Apply these policies via Supabase Dashboard: Storage > building-images > Policies
+
+-- =============================================
+-- STORAGE BUCKET: building-images
+-- =============================================
+-- Bucket should be created with:
+-- - Name: building-images
+-- - Public: true (or false with proper RLS policies)
+-- - File size limit: 5MB
+-- - Allowed MIME types: image/jpeg, image/jpg, image/png, image/webp
+
+-- =============================================
+-- STORAGE POLICIES (Apply via Dashboard or API)
+-- =============================================
+
+-- Policy 1: Users can upload images for buildings they manage
+-- Policy Name: "Managers can upload building images"
+-- Policy Type: INSERT
+-- Policy Definition:
+--   (bucket_id = 'building-images'::text) AND 
+--   (auth.role() = 'authenticated'::text) AND
+--   (
+--     EXISTS (
+--       SELECT 1 FROM buildings b
+--       JOIN user_companies uc ON uc.company_id = b.company_id
+--       WHERE b.id::text = (storage.foldername(name))[1]
+--       AND uc.user_id = auth.uid()
+--       AND uc.role IN ('owner', 'manager')
+--       AND uc.is_active = true
+--     )
+--   )
+
+-- Policy 2: Users can view images for buildings they have access to
+-- Policy Name: "Users can view building images"
+-- Policy Type: SELECT
+-- Policy Definition:
+--   (bucket_id = 'building-images'::text) AND 
+--   (auth.role() = 'authenticated'::text) AND
+--   (
+--     EXISTS (
+--       SELECT 1 FROM buildings b
+--       JOIN user_companies uc ON uc.company_id = b.company_id
+--       WHERE b.id::text = (storage.foldername(name))[1]
+--       AND uc.user_id = auth.uid()
+--     )
+--   )
+
+-- Policy 3: Users can delete images for buildings they manage
+-- Policy Name: "Managers can delete building images"
+-- Policy Type: DELETE
+-- Policy Definition:
+--   (bucket_id = 'building-images'::text) AND 
+--   (auth.role() = 'authenticated'::text) AND
+--   (
+--     EXISTS (
+--       SELECT 1 FROM buildings b
+--       JOIN user_companies uc ON uc.company_id = b.company_id
+--       WHERE b.id::text = (storage.foldername(name))[1]
+--       AND uc.user_id = auth.uid()
+--       AND uc.role IN ('owner', 'manager')
+--       AND uc.is_active = true
+--     )
+--   )
+
+-- =============================================
+-- ALTERNATIVE: SIMPLER POLICIES (If folder structure is different)
+-- =============================================
+-- If the storage path structure is {userId}/{buildingId}/filename,
+-- use these simpler policies:
+
+-- Policy 1 (Simple): Users can upload to their own folder
+-- Policy Name: "Users can upload to their folder"
+-- Policy Type: INSERT
+-- Policy Definition:
+--   (bucket_id = 'building-images'::text) AND 
+--   (auth.role() = 'authenticated'::text) AND
+--   ((storage.foldername(name))[1] = auth.uid()::text)
+
+-- Policy 2 (Simple): Users can view images in their folder
+-- Policy Name: "Users can view their folder images"
+-- Policy Type: SELECT
+-- Policy Definition:
+--   (bucket_id = 'building-images'::text) AND 
+--   (auth.role() = 'authenticated'::text) AND
+--   ((storage.foldername(name))[1] = auth.uid()::text)
+
+-- Policy 3 (Simple): Users can delete images in their folder
+-- Policy Name: "Users can delete their folder images"
+-- Policy Type: DELETE
+-- Policy Definition:
+--   (bucket_id = 'building-images'::text) AND 
+--   (auth.role() = 'authenticated'::text) AND
+--   ((storage.foldername(name))[1] = auth.uid()::text)
+
+-- =============================================
+-- SETUP INSTRUCTIONS
+-- =============================================
+-- 1. Create the bucket via Supabase Dashboard:
+--    - Go to Storage > New Bucket
+--    - Name: building-images
+--    - Public: true (recommended for easier access)
+--    - File size limit: 5242880 (5MB)
+--
+-- 2. Apply RLS policies via Dashboard:
+--    - Go to Storage > building-images > Policies
+--    - Add the policies listed above
+--    - Or use the simpler folder-based policies if preferred
+--
+-- 3. Verify bucket is accessible:
+--    - Test upload via the application
+--    - Check that images are accessible via public URLs
+

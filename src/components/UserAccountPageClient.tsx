@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowLeft, Camera, Shield, User } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
 import type { UserAccountPageProps } from '../types/auth';
@@ -24,7 +24,46 @@ export function UserAccountPageClient({
 }: UserAccountPageProps) {
   const { user, isLoading, session } = useUserProfile();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const hasCheckedAuth = React.useRef(false);
+  const [isMounted, setIsMounted] = React.useState(false);
+  
+  // Priority 1 & 5: Controlled tabs with URL persistence
+  const [activeTab, setActiveTab] = React.useState('profile');
+
+  const hasInitializedTabFromUrl = React.useRef(false);
+
+  // Track client-side mount to prevent hydration mismatch
+  React.useEffect(() => {
+    setIsMounted(true);
+    
+    // Priority 5: Initialize tab from URL on mount (only once)
+    if (!hasInitializedTabFromUrl.current) {
+      const tabFromUrl = searchParams.get('tab');
+      if (tabFromUrl && ['profile', 'company', 'security', 'notifications'].includes(tabFromUrl)) {
+        setActiveTab(tabFromUrl);
+      }
+      hasInitializedTabFromUrl.current = true;
+    }
+  }, [searchParams]);
+
+  // Priority 5: Persist tab state in URL
+  React.useEffect(() => {
+    if (!isMounted || !hasInitializedTabFromUrl.current) return;
+    
+    const currentTab = searchParams.get('tab') || 'profile';
+    if (currentTab === activeTab) return; // No change needed
+    
+    const params = new URLSearchParams(searchParams);
+    if (activeTab !== 'profile') {
+      params.set('tab', activeTab);
+    } else {
+      params.delete('tab');
+    }
+    
+    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [activeTab, isMounted, router, searchParams]);
 
   // Wait for auth check to complete before redirecting
   React.useEffect(() => {
@@ -53,7 +92,8 @@ export function UserAccountPageClient({
     }
   }, [user, session, isLoading, router]);
 
-  if (isLoading) {
+  // Prevent hydration mismatch by not rendering loading state during SSR
+  if (!isMounted || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -167,7 +207,7 @@ export function UserAccountPageClient({
 
           {/* Account Settings Tabs */}
           <Card>
-            <Tabs defaultValue="profile" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <CardHeader>
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="profile">Profil</TabsTrigger>

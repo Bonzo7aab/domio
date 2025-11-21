@@ -1,7 +1,6 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { usePathname } from 'next/navigation'
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js'
 import { createClient } from '../lib/supabase/client'
 import type { AuthUser } from '../types/auth'
@@ -26,7 +25,6 @@ export default function AuthProvider({
   children: React.ReactNode
 }) {
   const supabase = createClient()
-  const pathname = usePathname()
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -167,25 +165,6 @@ export default function AuthProvider({
     }
   }, [supabase, fetchUserProfile])
 
-  // Refresh session on route changes (catches redirects after login)
-  useEffect(() => {
-    // Small delay to ensure cookies are synced after redirect
-    const timeoutId = setTimeout(() => {
-      refreshSession()
-    }, 100)
-
-    return () => clearTimeout(timeoutId)
-  }, [pathname, refreshSession])
-
-  // Refresh session when window gains focus (catches tab switches after login)
-  useEffect(() => {
-    const handleFocus = () => {
-      refreshSession()
-    }
-
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [refreshSession])
   return (
     <AuthContext.Provider value={{ session, supabase, user, logout, isAuthenticated, isLoading }}>
       <>{children}</>

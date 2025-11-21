@@ -137,6 +137,74 @@ export interface Database {
         }
         Relationships: []
       }
+      buildings: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          street_address: string
+          city: string
+          postal_code: string | null
+          country: string
+          building_type: 'residential' | 'commercial' | 'mixed' | 'office' | 'industrial' | null
+          year_built: number | null
+          units_count: number | null
+          floors_count: number | null
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          images: string[] | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          name: string
+          street_address: string
+          city: string
+          postal_code?: string | null
+          country?: string
+          building_type?: 'residential' | 'commercial' | 'mixed' | 'office' | 'industrial' | null
+          year_built?: number | null
+          units_count?: number | null
+          floors_count?: number | null
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          images?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          name?: string
+          street_address?: string
+          city?: string
+          postal_code?: string | null
+          country?: string
+          building_type?: 'residential' | 'commercial' | 'mixed' | 'office' | 'industrial' | null
+          year_built?: number | null
+          units_count?: number | null
+          floors_count?: number | null
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          images?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buildings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       subscription_plans: {
         Row: {
           id: string

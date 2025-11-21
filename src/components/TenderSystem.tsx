@@ -87,21 +87,33 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
           setTenders([]);
         } else if (data) {
           // Convert database format to component format
-          const convertedTenders: Tender[] = data.map((t: any) => ({
-            id: t.id,
-            title: t.title,
-            description: t.description,
-            location: t.location,
-            estimatedValue: t.estimated_value?.toString() || '0',
-            currency: t.currency || 'PLN',
-            status: t.status as TenderStatus,
-            submissionDeadline: new Date(t.submission_deadline),
-            evaluationDeadline: t.evaluation_deadline ? new Date(t.evaluation_deadline) : undefined,
-            bidCount: t.bids_count || 0,
-            createdBy: t.company?.name || 'Unknown',
-            category: t.category?.name || 'Inne',
-            winnerName: t.winner_name || undefined,
-          }));
+          const convertedTenders: Tender[] = data.map((t: any) => {
+            // Convert location to string if it's an object
+            let locationString: string;
+            if (typeof t.location === 'string') {
+              locationString = t.location;
+            } else if (t.location && typeof t.location === 'object' && 'city' in t.location) {
+              locationString = t.location.city + (t.location.sublocality_level_1 ? `, ${t.location.sublocality_level_1}` : '');
+            } else {
+              locationString = 'Nieznana lokalizacja';
+            }
+
+            return {
+              id: t.id,
+              title: t.title,
+              description: t.description,
+              location: locationString,
+              estimatedValue: t.estimated_value?.toString() || '0',
+              currency: t.currency || 'PLN',
+              status: t.status as TenderStatus,
+              submissionDeadline: new Date(t.submission_deadline),
+              evaluationDeadline: t.evaluation_deadline ? new Date(t.evaluation_deadline) : undefined,
+              bidCount: t.bids_count || 0,
+              createdBy: t.company?.name || 'Unknown',
+              category: t.category?.name || 'Inne',
+              winnerName: t.winner_name || undefined,
+            };
+          });
           setTenders(convertedTenders);
         } else {
           setTenders([]);

@@ -49,25 +49,59 @@ interface BatchGeocodingOptions {
 }
 
 /**
+ * Wait for Google Maps API to load
+ */
+async function waitForGoogleMaps(maxWait = 5000): Promise<boolean> {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  // Check if already loaded
+  if (window.google?.maps?.Geocoder) {
+    return true;
+  }
+
+  // Wait for it to load
+  const startTime = Date.now();
+  return new Promise((resolve) => {
+    const checkInterval = setInterval(() => {
+      if (window.google?.maps?.Geocoder) {
+        clearInterval(checkInterval);
+        resolve(true);
+      } else if (Date.now() - startTime > maxWait) {
+        clearInterval(checkInterval);
+        resolve(false);
+      }
+    }, 100);
+  });
+}
+
+/**
  * Geocode a single address using Google Maps API or city fallback
  */
 export async function geocodeAddressWithFallback(
   address: string,
   options: { useCityFallback?: boolean } = {}
 ): Promise<GeocodingResult> {
-  try {
-    // Try Google Maps geocoding first
-    const result = await geocodeAddress(address);
-    if (result) {
-      return {
-        success: true,
-        latitude: result.coordinates.lat,
-        longitude: result.coordinates.lng,
-        address: result.formattedAddress
-      };
+  // Check if Google Maps is available, wait a bit if not
+  const googleMapsAvailable = await waitForGoogleMaps(2000);
+  
+  if (googleMapsAvailable) {
+    try {
+      // Try Google Maps geocoding first
+      const result = await geocodeAddress(address);
+      if (result) {
+        return {
+          success: true,
+          latitude: result.coordinates.lat,
+          longitude: result.coordinates.lng,
+          address: result.formattedAddress
+        };
+      }
+    } catch (error) {
+      // Silently fall through to city fallback
+      console.warn('Google Maps geocoding failed, using fallback:', error);
     }
-  } catch (error) {
-    console.warn('Google Maps geocoding failed:', error);
   }
 
   // Fallback to city-based coordinates

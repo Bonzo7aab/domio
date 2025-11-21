@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Bookmark, HelpCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Bookmark, HelpCircle, Image as ImageIcon, FileText, ExternalLink } from 'lucide-react';
+import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -13,13 +14,13 @@ import JobApplicationModal from './JobApplicationModal';
 import { AskQuestionModal } from './AskQuestionModal';
 import SimilarJobs from './SimilarJobs';
 import { useUserProfile } from '../contexts/AuthContext';
-import { getStoredJobs, Job } from '../utils/jobStorage';
+import { getStoredJobs, Job as StoredJob } from '../utils/jobStorage';
 import { addBookmark, removeBookmark, isJobBookmarked } from '../utils/bookmarkStorage';
 import { toast } from 'sonner';
-import { createClient } from '../lib/supabase/client';
 import { getJobById, getTenderById } from '../lib/data';
-import { incrementJobViews, incrementTenderViews } from '../lib/database/jobs';
-import { formatBudget } from '../types/budget';
+import { incrementJobViews, incrementTenderViews, type JobWithCompany, type TenderWithCompany } from '../lib/database/jobs';
+import { formatBudget, budgetFromDatabase, type Budget } from '../types/budget';
+import { type Job, type TenderInfo } from '../types/job';
 
 interface JobPageProps {
   jobId: string;
@@ -27,172 +28,16 @@ interface JobPageProps {
   onJobSelect?: (jobId: string) => void;
 }
 
-// Helper function to convert stored job to detailed format
-const convertStoredJobToDetailedFormat = (storedJob: Job): any => {
-  return {
-    id: storedJob.id,
-    postType: storedJob.postType || 'job',
-    title: storedJob.title,
-    company: storedJob.company,
-    location: storedJob.location,
-    type: storedJob.type,
-    salary: storedJob.salary,
-    description: storedJob.description,
-    requirements: storedJob.requirements ? storedJob.requirements.split('\n').filter(r => r.trim()) : [
-      'Minimum 2 lata doświadczenia w branży',
-      'Własne narzędzia i sprzęt',
-      'Ubezpieczenie OC min. 500 000 PLN',
-      'Pozytywne referencje z ostatnich 3 realizacji'
-    ],
-    responsibilities: [
-      'Wykonanie zlecenia zgodnie z opisem',
-      'Terminowe wykonanie prac',
-      'Zapewnienie wysokiej jakości usług',
-      'Utrzymanie porządku na terenie prac'
-    ],
-    skills: storedJob.searchKeywords || [],
-    postedTime: storedJob.postedTime,
-    applications: storedJob.applications,
-    visits_count: storedJob.visits_count,
-    bookmarks_count: storedJob.bookmarks_count,
-    verified: storedJob.verified,
-    urgent: storedJob.urgent,
-    category: storedJob.category,
-    subcategory: storedJob.subcategory,
-    clientType: storedJob.clientType,
-    isPremium: storedJob.premium,
-    hasInsurance: storedJob.hasInsurance,
-    completedJobs: storedJob.completedJobs || 0,
-    certificates: storedJob.certificates || [],
-    deadline: storedJob.deadline,
-    budget: storedJob.budget,
-    projectDuration: 'Do uzgodnienia',
-    contractDetails: {
-      contractType: 'Umowa o świadczenie usług',
-      paymentTerms: 'Do uzgodnienia z wykonawcą',
-      warrantyPeriod: 'Zgodnie z przepisami',
-      terminationConditions: 'Zgodnie z kodeksem cywilnym'
-    },
-    contactPerson: storedJob.contactName || 'Przedstawiciel organizacji',
-    contactPhone: storedJob.contactPhone || '+48 000 000 000',
-    contactEmail: storedJob.contactEmail || 'kontakt@organizacja.pl',
-    buildingType: storedJob.organizationType || 'Budynek mieszkalny',
-    buildingYear: 2000,
-    surface: 'Do uzgodnienia',
-    additionalInfo: storedJob.additionalInfo || 'Szczegóły do uzgodnienia z wykonawcą.',
-    companyLogo: '/api/placeholder/64/64',
-    images: ['/api/placeholder/800/400', '/api/placeholder/600/400', '/api/placeholder/400/300'],
-    lat: storedJob.lat || 52.2297,
-    lng: storedJob.lng || 21.0122,
-    // Tender specific data - simplified
-    tenderInfo: storedJob.postType === 'tender' ? {
-      submissionDeadline: '15.01.2025',
-      wadium: '5 000 PLN',
-      projectDuration: '90 dni kalendarzowych',
-      currentPhase: 'Składanie ofert',
-      evaluationCriteria: [
-        'Cena (60%)',
-        'Termin realizacji (25%)', 
-        'Doświadczenie (15%)'
-      ]
-    } : null
-  };
-};
+// Extended Job type for component display with additional fields
+interface JobDisplayData extends Job {
+  address?: string;
+  status?: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
+  published_at?: string | null;
+  expires_at?: string | null;
+}
 
-
-// Convert database job to detailed format
-const convertDatabaseJobToDetailedFormat = (job: any) => {
-  return {
-    id: job.id,
-    title: job.title,
-    company: job.company?.name || 'Unknown',
-    location: job.location,
-    type: job.type,
-    // Create Budget object
-    budget: job.budget || {
-      min: job.budget_min ?? null,
-      max: job.budget_max ?? null,
-      type: (job.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
-      currency: job.currency || 'PLN',
-    },
-    salary: job.budget 
-      ? formatBudget(job.budget)
-      : (job.budget_max 
-        ? `${job.budget_min || 0} - ${job.budget_max} ${job.currency}`
-        : `${job.budget_min || 0} ${job.currency}`),
-    description: job.description,
-    requirements: job.requirements || [],
-    responsibilities: job.responsibilities || [],
-    skills: job.skills_required || [],
-    postedTime: getTimeAgo(job.created_at),
-    applications: job.applications_count || 0,
-    visits_count: job.views_count || 0,
-    bookmarks_count: job.bookmarks_count || 0,
-    verified: job.company?.is_verified || false,
-    urgent: job.urgency === 'high',
-    premium: job.type === 'premium',
-    category: job.category?.name || 'Inne',
-    subcategory: job.subcategory,
-    clientType: mapCompanyTypeToClientType(job.company?.type),
-    deadline: job.deadline,
-    projectDuration: job.project_duration,
-    contactPerson: job.contact_person,
-    contactPhone: job.contact_phone,
-    contactEmail: job.contact_email,
-    buildingType: job.building_type,
-    buildingYear: job.building_year,
-    surface: job.surface_area,
-    additionalInfo: job.additional_info,
-    companyLogo: job.company?.logo_url,
-    images: job.images || [],
-    lat: job.latitude,
-    lng: job.longitude,
-    postType: 'job'
-  };
-};
-
-// Convert database tender to detailed format
-const convertDatabaseTenderToDetailedFormat = (tender: any) => {
-  return {
-    id: tender.id,
-    title: tender.title,
-    company: tender.company?.name || 'Unknown',
-    location: tender.location,
-    type: 'Przetarg',
-    salary: `${tender.estimated_value} ${tender.currency}`,
-    description: tender.description,
-    postedTime: getTimeAgo(tender.created_at),
-    applications: tender.bids_count || 0,
-    visits_count: tender.views_count || 0,
-    bookmarks_count: 0,
-    verified: tender.company?.is_verified || false,
-    urgent: false,
-    premium: false,
-    category: tender.category?.name || 'Inne',
-    deadline: tender.submission_deadline,
-    budget: `${tender.estimated_value} ${tender.currency}`,
-    projectDuration: tender.project_duration,
-    contactPerson: 'Komisja Przetargowa',
-    companyLogo: tender.company?.logo_url,
-    images: [],
-    lat: tender.latitude,
-    lng: tender.longitude,
-    postType: 'tender',
-    tenderInfo: {
-      tenderType: 'Zamówienie publiczne',
-      phases: tender.phases || [],
-      currentPhase: tender.current_phase || 'Składanie ofert',
-      wadium: tender.wadium ? `${tender.wadium} ${tender.currency}` : '0 PLN',
-      evaluationCriteria: tender.evaluation_criteria || [],
-      documentsRequired: tender.requirements || [],
-      submissionDeadline: tender.submission_deadline,
-      projectDuration: tender.project_duration || 'Do uzgodnienia',
-    }
-  };
-};
-
-// Helper functions
-const getTimeAgo = (date: string): string => {
+// Helper function to convert date to "time ago" format
+function getTimeAgo(date: string): string {
   const now = new Date();
   const past = new Date(date);
   const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
@@ -203,9 +48,10 @@ const getTimeAgo = (date: string): string => {
   if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} dni temu`;
   
   return past.toLocaleDateString('pl-PL');
-};
+}
 
-const mapCompanyTypeToClientType = (companyType?: string): string => {
+// Helper function to map company type to client type
+function mapCompanyTypeToClientType(companyType?: string): string {
   switch (companyType) {
     case 'spółdzielnia':
       return 'Spółdzielnia Mieszkaniowa';
@@ -215,13 +61,17 @@ const mapCompanyTypeToClientType = (companyType?: string): string => {
       return 'Wspólnota Mieszkaniowa';
     case 'cooperative':
       return 'Spółdzielnia Mieszkaniowa';
+    case 'condo_management':
+      return 'Wspólnota Mieszkaniowa';
+    case 'property_management':
+      return 'Wspólnota Mieszkaniowa';
     default:
       return 'Wspólnota Mieszkaniowa';
   }
-};
+}
 
 // Helper function to format location (string or object)
-const formatLocation = (location: string | { city: string; sublocality_level_1?: string } | undefined): string => {
+function formatLocation(location: string | { city: string; sublocality_level_1?: string } | undefined): string {
   if (!location) return 'Unknown';
   
   if (typeof location === 'string') {
@@ -236,7 +86,284 @@ const formatLocation = (location: string | { city: string; sublocality_level_1?:
   }
   
   return 'Unknown';
-};
+}
+
+// Get status badge variant
+function getStatusBadgeVariant(status?: string) {
+  switch (status) {
+    case 'active':
+      return 'default';
+    case 'draft':
+      return 'secondary';
+    case 'paused':
+      return 'outline';
+    case 'completed':
+      return 'default';
+    case 'cancelled':
+      return 'destructive';
+    default:
+      return 'default';
+  }
+}
+
+// Get status label in Polish
+function getStatusLabel(status?: string): string {
+  switch (status) {
+    case 'active':
+      return 'Aktywne';
+    case 'draft':
+      return 'Szkic';
+    case 'paused':
+      return 'Wstrzymane';
+    case 'completed':
+      return 'Zakończone';
+    case 'cancelled':
+      return 'Anulowane';
+    default:
+      return 'Aktywne';
+  }
+}
+
+/**
+ * Unified function to normalize job/tender data from various sources
+ */
+function normalizeJobData(
+  data: JobWithCompany | TenderWithCompany | StoredJob | null,
+  source: 'job' | 'tender' | 'stored'
+): JobDisplayData | null {
+  if (!data) return null;
+
+  // Handle stored job from localStorage
+  if (source === 'stored') {
+    const storedJob = data as StoredJob;
+    const locationData = typeof storedJob.location === 'string' 
+      ? { city: storedJob.location }
+      : storedJob.location;
+    
+    // Parse budget if it's a string
+    let budget: Budget;
+    if (typeof storedJob.budget === 'string') {
+      // Try to parse budget string
+      const budgetMatch = storedJob.budget.match(/(\d+(?:\s*\d+)*)\s*(?:-\s*(\d+(?:\s*\d+)*))?\s*(PLN|zł)?/i);
+      if (budgetMatch) {
+        const min = parseInt(budgetMatch[1].replace(/\s+/g, ''));
+        const max = budgetMatch[2] ? parseInt(budgetMatch[2].replace(/\s+/g, '')) : null;
+        budget = {
+          min,
+          max,
+          type: (storedJob.budgetType || 'fixed') as Budget['type'],
+          currency: 'PLN',
+        };
+      } else {
+        budget = {
+          min: null,
+          max: null,
+          type: 'negotiable',
+          currency: 'PLN',
+        };
+      }
+    } else {
+      budget = storedJob.budget as Budget;
+    }
+
+    return {
+      id: storedJob.id,
+      postType: storedJob.postType || 'job',
+      title: storedJob.title,
+      company: storedJob.company,
+      location: locationData,
+      type: storedJob.type,
+      description: storedJob.description,
+      postedTime: storedJob.postedTime || getTimeAgo(new Date().toISOString()),
+      salary: formatBudget(budget),
+      budget,
+      requirements: storedJob.requirements ? (typeof storedJob.requirements === 'string' 
+        ? storedJob.requirements.split('\n').filter(r => r.trim())
+        : []) : [],
+      responsibilities: [],
+      skills: storedJob.searchKeywords || [],
+      applications: storedJob.applications || 0,
+      visits_count: storedJob.visits_count || 0,
+      bookmarks_count: storedJob.bookmarks_count || 0,
+      verified: storedJob.verified || false,
+      urgent: storedJob.urgent || false,
+      urgency: storedJob.urgency || 'medium',
+      isPremium: storedJob.premium || false,
+      category: storedJob.category || 'Inne',
+      subcategory: storedJob.subcategory,
+      clientType: storedJob.clientType,
+      deadline: storedJob.deadline,
+      projectDuration: 'Do uzgodnienia',
+      contactPerson: storedJob.contactName,
+      contactPhone: storedJob.contactPhone,
+      contactEmail: storedJob.contactEmail,
+      buildingType: storedJob.organizationType,
+      buildingYear: undefined,
+      surface: undefined,
+      additionalInfo: storedJob.additionalInfo,
+      companyLogo: undefined,
+      images: [],
+      lat: storedJob.lat,
+      lng: storedJob.lng,
+      address: storedJob.address,
+      certificates: storedJob.certificates || [],
+      tenderInfo: storedJob.postType === 'tender' && storedJob.tenderInfo ? {
+        tenderType: 'Zamówienie publiczne',
+        phases: storedJob.tenderInfo.phases?.map((phase: string) => ({ name: phase, status: 'pending' as const, deadline: '' })) || [],
+        currentPhase: storedJob.tenderInfo.currentPhase || 'Składanie ofert',
+        wadium: storedJob.tenderInfo.wadium || '0 PLN',
+        evaluationCriteria: storedJob.tenderInfo.evaluationCriteria || [],
+        documentsRequired: storedJob.tenderInfo.documentsRequired || [],
+        submissionDeadline: storedJob.tenderInfo.submissionDeadline || '',
+        projectDuration: storedJob.tenderInfo.projectDuration || 'Do uzgodnienia',
+        technicalSpecifications: {},
+      } : undefined,
+    };
+  }
+
+  // Handle database job
+  if (source === 'job') {
+    const dbJob = data as JobWithCompany;
+    const locationData = typeof dbJob.location === 'string' 
+      ? { city: dbJob.location }
+      : dbJob.location || { city: 'Unknown' };
+    
+    const budget = budgetFromDatabase({
+      budget_min: dbJob.budget_min ?? null,
+      budget_max: dbJob.budget_max ?? null,
+      budget_type: (dbJob.budget_type || 'fixed') as Budget['type'],
+      currency: dbJob.currency || 'PLN',
+    });
+
+    return {
+      id: dbJob.id,
+      postType: 'job',
+      title: dbJob.title,
+      company: dbJob.company?.name || 'Unknown',
+      location: locationData,
+      type: dbJob.type,
+      description: dbJob.description,
+      postedTime: dbJob.published_at ? getTimeAgo(dbJob.published_at) : getTimeAgo(dbJob.created_at),
+      salary: formatBudget(budget),
+      budget,
+      requirements: dbJob.requirements || [],
+      responsibilities: dbJob.responsibilities || [],
+      skills: dbJob.skills_required || [],
+      applications: dbJob.applications_count || 0,
+      visits_count: dbJob.views_count || 0,
+      bookmarks_count: dbJob.bookmarks_count || 0,
+      verified: dbJob.company?.is_verified || false,
+      urgent: dbJob.urgency === 'high',
+      urgency: dbJob.urgency as 'low' | 'medium' | 'high',
+      isPremium: dbJob.type === 'premium',
+      category: dbJob.category?.name || 'Inne',
+      subcategory: dbJob.subcategory || undefined,
+      clientType: undefined, // Company type not available in current query
+      deadline: dbJob.deadline || undefined,
+      projectDuration: dbJob.project_duration || undefined,
+      contactPerson: dbJob.contact_person || undefined,
+      contactPhone: dbJob.contact_phone || undefined,
+      contactEmail: dbJob.contact_email || undefined,
+      buildingType: dbJob.building_type || undefined,
+      buildingYear: undefined, // Not in current JobWithCompany schema
+      surface: undefined, // Not in current JobWithCompany schema
+      additionalInfo: undefined, // Not in current schema
+      companyLogo: dbJob.company?.logo_url || undefined,
+      images: dbJob.images || [],
+      lat: dbJob.latitude || undefined,
+      lng: dbJob.longitude || undefined,
+      certificates: [], // Not in current JobWithCompany schema
+      status: dbJob.status as JobDisplayData['status'],
+      published_at: dbJob.published_at,
+      expires_at: undefined, // Not in current JobWithCompany interface
+    };
+  }
+
+  // Handle database tender
+  if (source === 'tender') {
+    const dbTender = data as TenderWithCompany;
+    const locationData = typeof dbTender.location === 'string' 
+      ? { city: dbTender.location }
+      : dbTender.location || { city: 'Unknown' };
+    
+    const budget: Budget = {
+      min: dbTender.estimated_value,
+      max: dbTender.estimated_value,
+      type: 'fixed',
+      currency: dbTender.currency || 'PLN',
+    };
+
+    // Parse evaluation criteria
+    let evaluationCriteria: TenderInfo['evaluationCriteria'] = [];
+    if (dbTender.evaluation_criteria) {
+      if (Array.isArray(dbTender.evaluation_criteria)) {
+        evaluationCriteria = dbTender.evaluation_criteria;
+      } else if (dbTender.evaluation_criteria.criteria) {
+        evaluationCriteria = dbTender.evaluation_criteria.criteria;
+      } else if (typeof dbTender.evaluation_criteria === 'object') {
+        evaluationCriteria = Object.entries(dbTender.evaluation_criteria).map(([name, weight]) => ({
+          name,
+          weight: typeof weight === 'number' ? weight : 0,
+        }));
+      }
+    }
+
+    // Parse phases
+    let phases: TenderInfo['phases'] = [];
+    if (dbTender.phases && Array.isArray(dbTender.phases)) {
+      phases = dbTender.phases;
+    }
+
+    return {
+      id: dbTender.id,
+      postType: 'tender',
+      title: dbTender.title,
+      company: dbTender.company?.name || 'Unknown',
+      location: locationData,
+      type: 'Przetarg',
+      description: dbTender.description,
+      postedTime: dbTender.published_at ? getTimeAgo(dbTender.published_at) : getTimeAgo(dbTender.created_at),
+      salary: formatBudget(budget),
+      budget,
+      requirements: dbTender.requirements || [],
+      responsibilities: [],
+      skills: [],
+      applications: dbTender.bids_count || 0,
+      visits_count: dbTender.views_count || 0,
+      bookmarks_count: 0,
+      verified: dbTender.company?.is_verified || false,
+      urgent: false,
+      urgency: 'medium',
+      isPremium: false, // Tenders don't have premium status
+      category: dbTender.category?.name || 'Inne',
+      deadline: dbTender.submission_deadline,
+      projectDuration: dbTender.project_duration || undefined,
+      contactPerson: undefined,
+      contactPhone: undefined,
+      contactEmail: undefined,
+      companyLogo: dbTender.company?.logo_url || undefined,
+      images: [],
+      lat: dbTender.latitude || undefined,
+      lng: dbTender.longitude || undefined,
+      certificates: [], // Not in current TenderWithCompany schema
+      status: dbTender.status as JobDisplayData['status'],
+      published_at: dbTender.published_at,
+      tenderInfo: {
+        tenderType: 'Zamówienie publiczne',
+        phases,
+        currentPhase: dbTender.current_phase || 'Składanie ofert',
+        wadium: dbTender.wadium ? `${dbTender.wadium} ${dbTender.currency}` : '0 PLN',
+        evaluationCriteria,
+        documentsRequired: dbTender.requirements || [],
+        submissionDeadline: dbTender.submission_deadline,
+        projectDuration: dbTender.project_duration || 'Do uzgodnienia',
+        technicalSpecifications: {},
+      },
+    };
+  }
+
+  return null;
+}
 
 const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const { user, supabase } = useUserProfile();
@@ -251,13 +378,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     additionalNotes: ''
   });
 
-  const [jobData, setJobData] = useState<any>(null);
+  const [jobData, setJobData] = useState<JobDisplayData | null>(null);
   const [isLoadingJob, setIsLoadingJob] = useState(true);
   const hasIncrementedViews = useRef<string | null>(null);
 
   // Fetch job data from database
   useEffect(() => {
-    // Reset views increment flag when jobId changes
     hasIncrementedViews.current = null;
     
     async function loadJobData() {
@@ -270,138 +396,38 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       
       if (dbJob && !jobError) {
         console.log('✅ JobPage - Found job in database:', dbJob);
-        // Convert database job to component format
-        const formattedJob = {
-          id: dbJob.id,
-          postType: 'job',
-          title: dbJob.title,
-          company: dbJob.company?.name || 'Unknown',
-          location: dbJob.location,
-          type: dbJob.type,
-          salary: dbJob.budget_max
-            ? `${dbJob.budget_min || 0} - ${dbJob.budget_max} ${dbJob.currency}`
-            : `${dbJob.budget_min || 0} ${dbJob.currency}`,
-          description: dbJob.description,
-          requirements: dbJob.requirements || [],
-          responsibilities: dbJob.responsibilities || [],
-          skills: dbJob.skills_required || [],
-          postedTime: new Date(dbJob.created_at).toLocaleDateString('pl-PL'),
-          applications: dbJob.applications_count,
-          visits_count: dbJob.views_count || 0,
-          bookmarks_count: dbJob.bookmarks_count || 0,
-          verified: dbJob.company?.is_verified || false,
-          urgent: dbJob.urgency === 'high',
-          category: dbJob.category?.name || 'Inne',
-          subcategory: dbJob.subcategory,
-          clientType: dbJob.company?.name,
-          isPremium: dbJob.type === 'premium',
-          hasInsurance: false,
-          completedJobs: 0,
-          certificates: [],
-          deadline: dbJob.deadline,
-          budget: dbJob.budget_max
-            ? `${dbJob.budget_min || 0} - ${dbJob.budget_max} ${dbJob.currency}`
-            : `${dbJob.budget_min || 0} ${dbJob.currency}`,
-          projectDuration: dbJob.project_duration || 'Do uzgodnienia',
-          contractDetails: {
-            contractType: 'Umowa o świadczenie usług',
-            paymentTerms: 'Do uzgodnienia z wykonawcą',
-            warrantyPeriod: 'Zgodnie z przepisami',
-            terminationConditions: 'Zgodnie z kodeksem cywilnym'
-          },
-          contactPerson: dbJob.contact_person || 'Przedstawiciel organizacji',
-          contactPhone: dbJob.contact_phone || '+48 000 000 000',
-          contactEmail: dbJob.contact_email || 'kontakt@organizacja.pl',
-          buildingType: dbJob.building_type || 'Budynek mieszkalny',
-          buildingYear: 2000,
-          surface: 'Do uzgodnienia',
-          additionalInfo: 'Szczegóły do uzgodnienia z wykonawcą.',
-          companyLogo: dbJob.company?.logo_url || '/api/placeholder/64/64',
-          images: dbJob.images || ['/api/placeholder/800/400'],
-          lat: dbJob.latitude || 52.2297,
-          lng: dbJob.longitude || 21.0122,
-          tenderInfo: null
-        };
-        setJobData(formattedJob);
-        setIsLoadingJob(false);
-        
-        // Increment views count (only once per job)
-        if (hasIncrementedViews.current !== jobId && supabase) {
-          hasIncrementedViews.current = jobId;
-          incrementJobViews(supabase, jobId).catch(err => {
-            console.error('Failed to increment job views:', err);
-          });
+        const normalizedJob = normalizeJobData(dbJob, 'job');
+        if (normalizedJob) {
+          setJobData(normalizedJob);
+          setIsLoadingJob(false);
+          
+          // Increment views count (only once per job)
+          if (hasIncrementedViews.current !== jobId && supabase) {
+            hasIncrementedViews.current = jobId;
+            incrementJobViews(supabase, jobId).catch(err => {
+              console.error('Failed to increment job views:', err);
+            });
+          }
+          return;
         }
-        return;
       }
       
       if (dbTender && !tenderError) {
         console.log('✅ JobPage - Found tender in database:', dbTender);
-        // Convert database tender to component format
-        const formattedTender = {
-          id: dbTender.id,
-          postType: 'tender',
-          title: dbTender.title,
-          company: dbTender.company?.name || 'Unknown',
-          location: dbTender.location,
-          type: 'Przetarg',
-          salary: `${dbTender.estimated_value} ${dbTender.currency}`,
-          description: dbTender.description,
-          requirements: dbTender.requirements || [],
-          responsibilities: [],
-          skills: [],
-          postedTime: new Date(dbTender.created_at).toLocaleDateString('pl-PL'),
-          applications: dbTender.bids_count,
-          visits_count: dbTender.views_count || 0,
-          bookmarks_count: 0,
-          verified: dbTender.company?.is_verified || false,
-          urgent: false,
-          category: dbTender.category?.name || 'Inne',
-          clientType: dbTender.company?.name,
-          isPremium: false,
-          hasInsurance: false,
-          completedJobs: 0,
-          certificates: [],
-          deadline: dbTender.submission_deadline,
-          budget: `${dbTender.estimated_value} ${dbTender.currency}`,
-          projectDuration: dbTender.project_duration || 'Do uzgodnienia',
-          contractDetails: {
-            contractType: 'Umowa o zamówienie publiczne',
-            paymentTerms: 'Zgodnie z SIWZ',
-            warrantyPeriod: 'Zgodnie z przepisami',
-            terminationConditions: 'Zgodnie z umową'
-          },
-          contactPerson: 'Przedstawiciel zamawiającego',
-          contactPhone: '+48 000 000 000',
-          contactEmail: 'przetargi@organizacja.pl',
-          buildingType: 'Obiekt publiczny',
-          companyLogo: dbTender.company?.logo_url || '/api/placeholder/64/64',
-          images: ['/api/placeholder/800/400'],
-          lat: dbTender.latitude || 52.2297,
-          lng: dbTender.longitude || 21.0122,
-          tenderInfo: {
-            submissionDeadline: new Date(dbTender.submission_deadline).toLocaleDateString('pl-PL'),
-            wadium: dbTender.wadium ? `${dbTender.wadium} ${dbTender.currency}` : '0 PLN',
-            projectDuration: dbTender.project_duration || '90 dni kalendarzowych',
-            currentPhase: dbTender.current_phase || 'Składanie ofert',
-            evaluationCriteria: dbTender.evaluation_criteria?.criteria || [
-              'Cena (60%)',
-              'Termin realizacji (25%)',
-              'Doświadczenie (15%)'
-            ]
+        const normalizedTender = normalizeJobData(dbTender, 'tender');
+        if (normalizedTender) {
+          setJobData(normalizedTender);
+          setIsLoadingJob(false);
+          
+          // Increment views count (only once per tender)
+          if (hasIncrementedViews.current !== jobId && supabase) {
+            hasIncrementedViews.current = jobId;
+            incrementTenderViews(supabase, jobId).catch(err => {
+              console.error('Failed to increment tender views:', err);
+            });
           }
-        };
-        setJobData(formattedTender);
-        setIsLoadingJob(false);
-        
-        // Increment views count (only once per tender)
-        if (hasIncrementedViews.current !== jobId && supabase) {
-          hasIncrementedViews.current = jobId;
-          incrementTenderViews(supabase, jobId).catch(err => {
-            console.error('Failed to increment tender views:', err);
-          });
+          return;
         }
-        return;
       }
       
       // Fallback to localStorage
@@ -410,38 +436,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       
       if (storedJob) {
         console.log('🔍 JobPage - Found job in localStorage:', storedJob);
-        setJobData(convertStoredJobToDetailedFormat(storedJob));
-        setIsLoadingJob(false);
-        return;
-      }
-      
-      // Fetch from database as fallback
-      try {
-        // Try to fetch as job first
-        const { data: jobData, error: jobError } = await getJobById(jobId);
-        
-        if (!jobError && jobData) {
-          console.log('🔍 JobPage - Found job in database:', jobData);
-          const convertedJob = convertDatabaseJobToDetailedFormat(jobData);
-          setJobData(convertedJob);
+        const normalizedStoredJob = normalizeJobData(storedJob, 'stored');
+        if (normalizedStoredJob) {
+          setJobData(normalizedStoredJob);
           setIsLoadingJob(false);
           return;
         }
-        
-        // Try to fetch as tender if not found as job
-        const { data: tenderData, error: tenderError } = await getTenderById(jobId);
-        
-        if (!tenderError && tenderData) {
-          console.log('🔍 JobPage - Found tender in database:', tenderData);
-          const convertedTender = convertDatabaseTenderToDetailedFormat(tenderData);
-          setJobData(convertedTender);
-          setIsLoadingJob(false);
-          return;
-        }
-        
-        console.warn('🔍 JobPage - Job not found in database:', jobId);
-      } catch (error) {
-        console.error('🔍 JobPage - Error fetching from database:', error);
       }
       
       console.log('❌ JobPage - Job not found:', jobId);
@@ -450,9 +450,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     }
     
     loadJobData();
-  }, [jobId]);
+  }, [jobId, supabase]);
 
-  // Check if job is bookmarked - MUST be called before any early returns
+  // Check if job is bookmarked
   useEffect(() => {
     if (jobData) {
       setIsBookmarked(isJobBookmarked(jobData.id));
@@ -466,9 +466,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
             <h1 className="text-2xl mb-4">Ładowanie ogłoszenia...</h1>
-            <p className="text-muted-foreground mb-6">
-              Proszę czekać
-            </p>
+            <p className="text-muted-foreground mb-6">Proszę czekać</p>
           </div>
         </div>
       </div>
@@ -507,12 +505,10 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       return;
     }
 
-    // Show application form instead of direct submission
     setShowApplicationForm(true);
   };
 
   const handleApplicationFormSubmit = (applicationData: any) => {
-    // Application logic here
     console.log('Application submitted:', applicationData);
     toast.success(job.postType === 'tender' ? 'Oferta w przetargu została złożona!' : 'Oferta została złożona!');
     setShowApplicationForm(false);
@@ -530,14 +526,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         id: job.id,
         title: job.title,
         company: job.company,
-        location: job.location,
-        postType: job.postType || 'job',
-        budget: typeof job.budget === 'object' ? job.budget : {
-          min: null,
-          max: null,
-          type: 'negotiable',
-          currency: 'PLN',
-        },
+        location: typeof job.location === 'string' ? job.location : job.location?.city || 'Unknown',
+        postType: job.postType,
+        budget: formatBudget(job.budget),
         deadline: job.deadline
       };
       addBookmark(bookmarkData);
@@ -551,7 +542,6 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   };
 
   const handleJobSelect = (selectedJobId: string) => {
-    // Redirect to the selected job page
     onJobSelect?.(selectedJobId);
   };
 
@@ -575,30 +565,65 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           <div className="lg:col-span-2 space-y-6">
             {/* Job Header */}
             <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="w-16 h-16 bg-gray-100">
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4 flex-1">
+                    <Avatar className="w-16 h-16 bg-gray-100 border-2 border-border">
                       <AvatarImage src={job.companyLogo} alt={job.company} />
-                      <AvatarFallback>{job.company.charAt(0)}</AvatarFallback>
+                      <AvatarFallback className="text-lg font-semibold">
+                        {job.company?.charAt(0).toUpperCase() || '?'}
+                      </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <h1 className="text-2xl mb-2">
-                        {job.title}
-                      </h1>
-                      <div className="flex items-center gap-4 text-muted-foreground mb-2">
-                        <div className="flex items-center gap-1">
-                          <Building className="w-4 h-4" />
-                          {job.company}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-2 mb-2">
+                        <h1 className="text-2xl md:text-3xl font-bold leading-tight">
+                          {job.title}
+                        </h1>
+                        {job.status && (
+                          <Badge variant={getStatusBadgeVariant(job.status)} className="shrink-0">
+                            {getStatusLabel(job.status)}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-4 text-muted-foreground text-sm mb-3">
+                        <div className="flex items-center gap-1.5">
+                          <Building className="w-4 h-4 shrink-0" />
+                          <span className="truncate">{job.company}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4" />
-                          {formatLocation(job.location)}
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-4 h-4 shrink-0" />
+                          <span className="truncate">{formatLocation(job.location)}</span>
+                          {job.address && (
+                            <span className="text-xs text-muted-foreground/70">({job.address})</span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {job.postedTime}
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 shrink-0" />
+                          <span>{job.postedTime}</span>
                         </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {job.verified && (
+                          <Badge variant="outline" className="text-xs">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Zweryfikowany
+                          </Badge>
+                        )}
+                        {job.urgent && (
+                          <Badge variant="destructive" className="text-xs">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Pilne
+                          </Badge>
+                        )}
+                        {job.isPremium && (
+                          <Badge variant="default" className="text-xs bg-yellow-500">
+                            <Star className="w-3 h-3 mr-1" />
+                            Premium
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-xs">
+                          {typeof job.category === 'string' ? job.category : job.category?.name || 'Inne'}
+                        </Badge>
                       </div>
                     </div>
                   </div>
@@ -608,41 +633,73 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
             {/* Key Tender Information - only for tenders */}
             {job.postType === 'tender' && job.tenderInfo && (
-              <Card className="border-2 border-blue-200 bg-blue-50">
+              <Card className="border-2 border-blue-200 bg-blue-50/50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-blue-900">
                     <Gavel className="w-5 h-5" />
-                    Kluczowe informacje
+                    Kluczowe informacje przetargu
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     <div>
-                      <div className="text-sm text-muted-foreground font-medium">Termin składania</div>
-                      <div className="font-bold text-foreground">{job.tenderInfo.submissionDeadline}</div>
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Termin składania</div>
+                      <div className="font-bold text-foreground text-sm">
+                        {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
+                      </div>
                     </div>
                     <div>
-                      <div className="text-sm text-muted-foreground font-medium">Wadium</div>
-                      <div className="font-bold text-warning">{job.tenderInfo.wadium}</div>
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
+                      <div className="font-bold text-warning text-sm">{job.tenderInfo.wadium}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-muted-foreground font-medium">Budżet</div>
-                      <div className="font-bold text-success">{formatBudget(job.budget)}</div>
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Budżet</div>
+                      <div className="font-bold text-success text-sm">{formatBudget(job.budget)}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-muted-foreground font-medium">Czas realizacji</div>
-                      <div className="font-bold text-foreground">{job.tenderInfo.projectDuration}</div>
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Czas realizacji</div>
+                      <div className="font-bold text-foreground text-sm">{job.tenderInfo.projectDuration}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-muted-foreground font-medium">Złożone oferty</div>
-                      <div className="font-bold text-primary">{job.applications}</div>
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Złożone oferty</div>
+                      <div className="font-bold text-primary text-sm">{job.applications}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-muted-foreground font-medium">Status</div>
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Status</div>
                       <Badge variant="default" className="bg-primary text-xs">
                         {job.tenderInfo.currentPhase}
                       </Badge>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Job Images */}
+            {job.images && job.images.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5" />
+                    Zdjęcia zlecenia
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {job.images.map((imageUrl, index) => (
+                      <div key={index} className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted">
+                        <ImageZoom>
+                          <img
+                            src={imageUrl}
+                            alt={`Zdjęcie ${index + 1} zlecenia ${job.title}`}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-200 cursor-zoom-in"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/api/placeholder/800/600';
+                            }}
+                          />
+                        </ImageZoom>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -660,487 +717,63 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     <TabsTrigger value="object">Obiekt</TabsTrigger>
                   </TabsList>
                 ) : (
-                  <TabsList className="grid grid-cols-4 w-full">
+                  <TabsList className="grid grid-cols-3 w-full">
                     <TabsTrigger value="overview">Przegląd</TabsTrigger>
                     <TabsTrigger value="requirements">Wymagania</TabsTrigger>
                     <TabsTrigger value="object">Obiekt</TabsTrigger>
-                    <TabsTrigger value="contract">Warunki umowy</TabsTrigger>
                   </TabsList>
                 )}
 
                 {/* Overview Tab */}
-                <TabsContent value="overview" className="p-6">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg mb-3">Opis {job.postType === 'tender' ? 'przetargu' : 'zlecenia'}</h3>
-                      <p className="text-muted-foreground leading-relaxed">{job.description}</p>
-                    </div>
-
-                    {job.responsibilities && (
-                      <div>
-                        <h3 className="text-lg mb-3">Zakres prac</h3>
-                        <ul className="space-y-2">
-                          {job.responsibilities.map((responsibility: string, index: number) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                              <span>{responsibility}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {job.postType === 'tender' && job.tenderInfo && (
-                      <div>
-                        <h3 className="text-lg mb-3">Kryteria oceny ofert</h3>
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                          <ul className="space-y-1">
-                            {job.tenderInfo.evaluationCriteria.map((criterion: any, index: number) => (
-                              <li key={index} className="flex items-center gap-2">
-                                <Star className="w-4 h-4 text-green-600" />
-                                <span>
-                                  {typeof criterion === 'string' 
-                                    ? criterion 
-                                    : `${criterion.name} (${criterion.weight}%)`
-                                  }
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    )}
+                <TabsContent value="overview" className="p-6 space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Opis {job.postType === 'tender' ? 'przetargu' : 'zlecenia'}</h3>
+                    <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{job.description}</p>
                   </div>
-                </TabsContent>
 
-                {/* Requirements Tab */}
-                <TabsContent value="requirements" className="p-6">
-                  <div className="space-y-6">
+                  {job.responsibilities && job.responsibilities.length > 0 && (
                     <div>
-                      <h3 className="text-lg mb-3">Wymagania wobec wykonawców</h3>
-                      <ul className="space-y-3">
-                        {job.requirements.map((requirement: string, index: number) => (
+                      <h3 className="text-lg font-semibold mb-3">Zakres prac</h3>
+                      <ul className="space-y-2">
+                        {job.responsibilities.map((responsibility, index) => (
                           <li key={index} className="flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                            <span>{requirement}</span>
+                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span>{responsibility}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
+                  )}
 
-                    {job.skills && job.skills.length > 0 && (
-                      <div>
-                        <h3 className="text-lg mb-3">Wymagane umiejętności</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {job.skills.map((skill: string, index: number) => (
-                            <Badge key={index} variant="outline">{skill}</Badge>
+                  {job.postType === 'tender' && job.tenderInfo && job.tenderInfo.evaluationCriteria && job.tenderInfo.evaluationCriteria.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Kryteria oceny ofert</h3>
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <ul className="space-y-2">
+                          {job.tenderInfo.evaluationCriteria.map((criterion, index) => (
+                            <li key={index} className="flex items-center gap-2">
+                              <Star className="w-4 h-4 text-green-600 shrink-0" />
+                              <span>
+                                {typeof criterion === 'string' 
+                                  ? criterion 
+                                  : `${criterion.name} (${criterion.weight}%)`
+                                }
+                              </span>
+                            </li>
                           ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {job.certificates && job.certificates.length > 0 && (
-                      <div>
-                        <h3 className="text-lg mb-3">Wymagane certyfikaty</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {job.certificates.map((cert: string, index: number) => (
-                            <Badge key={index} variant="secondary">
-                              <Award className="w-3 h-3 mr-1" />
-                              {cert}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {job.postType === 'tender' && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <h4 className="font-medium text-amber-800 mb-2">Uwaga dla przetargu</h4>
-                            <p className="text-sm text-amber-700">
-                              Wszystkie wymagania są obowiązkowe. Brak spełnienia któregokolwiek z wymagań 
-                              skutkuje odrzuceniem oferty na etapie weryfikacji formalnej.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                {/* Other tabs - simplified implementations */}
-                <TabsContent value="procedure" className="p-6">
-                  <div className="space-y-6">
-                    <h3 className="text-lg mb-3">Harmonogram przetargu</h3>
-                    
-                    <div className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="font-medium text-blue-900 mb-3">Fazy postępowania przetargowego</h4>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs">✓</div>
-                            <div>
-                              <div className="font-medium">Ogłoszenie przetargu</div>
-                              <div className="text-sm text-muted-foreground">15.12.2024 - Publikacja w Biuletynie Zamówień Publicznych</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs">✓</div>
-                            <div>
-                              <div className="font-medium">Wizja lokalna (opcjonalna)</div>
-                              <div className="text-sm text-muted-foreground">18.12.2024 - 22.12.2024, godz. 9:00-15:00 (po uprzednim umówieniu)</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs">2</div>
-                            <div>
-                              <div className="font-medium">Składanie ofert</div>
-                              <div className="text-sm text-muted-foreground">Do 15.01.2025, godz. 10:00 - Sekretariat Spółdzielni</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs">3</div>
-                            <div>
-                              <div className="font-medium">Otwarcie ofert</div>
-                              <div className="text-sm text-muted-foreground">15.01.2025, godz. 11:00 - Sala konferencyjna Spółdzielni</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs">4</div>
-                            <div>
-                              <div className="font-medium">Badanie i ocena ofert</div>
-                              <div className="text-sm text-muted-foreground">16.01.2025 - 22.01.2025</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs">5</div>
-                            <div>
-                              <div className="font-medium">Wybór najkorzystniejszej oferty</div>
-                              <div className="text-sm text-muted-foreground">23.01.2025</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs">6</div>
-                            <div>
-                              <div className="font-medium">Podpisanie umowy</div>
-                              <div className="text-sm text-muted-foreground">Do 30.01.2025</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <h4 className="font-medium text-amber-800 mb-3">Ważne terminy</h4>
-                        <ul className="space-y-2 text-sm">
-                          <li className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-amber-600" />
-                            <span><strong>Pytania:</strong> Do 08.01.2025, godz. 12:00</span>
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-amber-600" />
-                            <span><strong>Odpowiedzi:</strong> Do 10.01.2025, godz. 16:00</span>
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-amber-600" />
-                            <span><strong>Wadium:</strong> Do 14.01.2025, godz. 16:00</span>
-                          </li>
                         </ul>
                       </div>
+                    </div>
+                  )}
 
+                  {/* Contract Conditions - Only for jobs, merged into overview */}
+                  {job.postType === 'job' && (
+                    <div className="space-y-6 pt-6 border-t border-border">
+                      <h3 className="text-lg font-semibold mb-3">Warunki umowy</h3>
+                      
+                      {/* Podstawowe warunki - Always visible, not collapsible */}
                       <div>
-                        <h4 className="font-medium mb-3">Kryteria wyboru wykonawcy</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                            <span>Cena (C)</span>
-                            <span className="font-bold text-green-700">60%</span>
-                          </div>
-                          <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                            <span>Doświadczenie wykonawcy (D)</span>
-                            <span className="font-bold text-blue-700">25%</span>
-                          </div>
-                          <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                            <span>Termin realizacji (T)</span>
-                            <span className="font-bold text-purple-700">15%</span>
-                          </div>
-                        </div>
-                        <div className="mt-3 text-sm text-muted-foreground">
-                          <strong>Formuła:</strong> Ocena końcowa = C × 0,60 + D × 0,25 + T × 0,15
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="documents" className="p-6">
-                  <div className="space-y-6">
-                    <h3 className="text-lg mb-3">Dokumentacja przetargowa</h3>
-                    
-                    <div className="space-y-4">
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <h4 className="font-medium text-green-900 mb-3">Dokumenty do pobrania</h4>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                                <span className="text-xs font-bold text-red-600">PDF</span>
-                              </div>
-                              <div>
-                                <div className="font-medium">Specyfikacja Istotnych Warunków Zamówienia (SIWZ)</div>
-                                <div className="text-sm text-muted-foreground">Wersja 1.2 • 2.8 MB • Aktualizacja: 15.12.2024</div>
-                              </div>
-                            </div>
-                            <Button variant="outline" size="sm">Pobierz</Button>
-                          </div>
-                          
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                                <span className="text-xs font-bold text-blue-600">DOC</span>
-                              </div>
-                              <div>
-                                <div className="font-medium">Formularz ofertowy</div>
-                                <div className="text-sm text-muted-foreground">Wzór oferty • 156 KB</div>
-                              </div>
-                            </div>
-                            <Button variant="outline" size="sm">Pobierz</Button>
-                          </div>
-
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                                <span className="text-xs font-bold text-blue-600">DOC</span>
-                              </div>
-                              <div>
-                                <div className="font-medium">Wzór umowy</div>
-                                <div className="text-sm text-muted-foreground">Projekt umowy • 89 KB</div>
-                              </div>
-                            </div>
-                            <Button variant="outline" size="sm">Pobierz</Button>
-                          </div>
-
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
-                                <span className="text-xs font-bold text-green-600">XLS</span>
-                              </div>
-                              <div>
-                                <div className="font-medium">Kosztorys orientacyjny</div>
-                                <div className="text-sm text-muted-foreground">Zestawienie kosztów • 245 KB</div>
-                              </div>
-                            </div>
-                            <Button variant="outline" size="sm">Pobierz</Button>
-                          </div>
-
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                                <span className="text-xs font-bold text-red-600">PDF</span>
-                              </div>
-                              <div>
-                                <div className="font-medium">Dokumentacja techniczna</div>
-                                <div className="text-sm text-muted-foreground">Rysunki techniczne • 15.2 MB</div>
-                              </div>
-                            </div>
-                            <Button variant="outline" size="sm">Pobierz</Button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="font-medium text-blue-900 mb-3">Dokumenty składane przez wykonawcę</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                            <span className="text-sm">Wypełniony formularz ofertowy (podpisany i opieczętowany)</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                            <span className="text-sm">Oświadczenie o spełnianiu warunków udziału w postępowaniu</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                            <span className="text-sm">Oświadczenie o braku podstaw wykluczenia</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                            <span className="text-sm">Referencje z co najmniej 3 podobnych realizacji</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                            <span className="text-sm">Kopia polisy ubezpieczeniowej OC (min. 500 000 PLN)</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                            <span className="text-sm">Aktualny odpis z KRS lub CEIDG (nie starszy niż 6 miesięcy)</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                            <span className="text-sm">Zaświadczenie o niezaleganiu z podatkami i ZUS</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-                          <div>
-                            <h4 className="font-medium text-amber-800 mb-2">Ważne informacje</h4>
-                            <ul className="text-sm text-amber-700 space-y-1">
-                              <li>• Oferty składane w zamkniętych kopertach z opisem zewnętrznym</li>
-                              <li>• Możliwość zadawania pytań do 08.01.2025 r.</li>
-                              <li>• Wszystkie dokumenty w języku polskim</li>
-                              <li>• Oferty wariantowe nie są dopuszczone</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="object" className="p-6">
-                  <div className="space-y-6">
-                    <h3 className="text-lg mb-3">Informacje o obiekcie</h3>
-                    
-                    <div className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="font-medium text-blue-900 mb-3">Dane podstawowe</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <div className="text-sm text-muted-foreground">Typ budynku</div>
-                            <div className="font-medium">Wielorodzinny mieszkalny</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Rok budowy</div>
-                            <div className="font-medium">1978 (modernizacja 2010)</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Liczba klatek</div>
-                            <div className="font-medium">5 klatek schodowych</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Liczba mieszkań</div>
-                            <div className="font-medium">120 mieszkań</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Powierzchnia użytkowa</div>
-                            <div className="font-medium">8 500 m²</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Wysokość budynku</div>
-                            <div className="font-medium">11 kondygnacji</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Powierzchnia elewacji</div>
-                            <div className="font-medium">4 200 m²</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">System grzewczy</div>
-                            <div className="font-medium">Miejska sieć ciepłownicza</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <h4 className="font-medium text-green-900 mb-3">Lokalizacja i dostępność</h4>
-                        <div className="space-y-3">
-                          <div>
-                            <div className="text-sm text-muted-foreground">Adres</div>
-                            <div className="font-medium">ul. Parkowa 15-25, 00-001 Warszawa</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Dojazd</div>
-                            <div className="font-medium">Bezpośredni dojazd z ul. Parkowej, parking dla wykonawców</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Dostęp do mediów</div>
-                            <div className="font-medium">Prąd 380V, woda, kanalizacja na terenie osiedla</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Ograniczenia</div>
-                            <div className="font-medium">Prace hałaśliwe: pon-pt 8:00-18:00, soboty 9:00-15:00</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <h4 className="font-medium text-purple-900 mb-3">Stan techniczny</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                            <span className="text-sm"><strong>Konstrukcja:</strong> Żelbet, stan dobry</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                            <span className="text-sm"><strong>Elewacja:</strong> Wymagana termomodernizacja</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                            <span className="text-sm"><strong>Dach:</strong> Papa termozgrzewalna, wymieniona 2019</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                            <span className="text-sm"><strong>Okna:</strong> Częściowo wymienione (klatki do wymiany)</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                            <span className="text-sm"><strong>Instalacje:</strong> C.O. i wod-kan zmodernizowane</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <h4 className="font-medium text-gray-900 mb-3">Materiały i specyfikacje</h4>
-                        <div className="space-y-3">
-                          <div>
-                            <div className="text-sm text-muted-foreground">Ściany zewnętrzne</div>
-                            <div className="text-sm">Żelbet gr. 25cm + planowane ocieplenie styropianem 15cm</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Tynk zewnętrzny</div>
-                            <div className="text-sm">Tynk akrylowy, struktura baranek 2mm</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Kolorystyka</div>
-                            <div className="text-sm">Jasnobeżowy RAL 1013 (główny), akcenty RAL 7040</div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-muted-foreground">Okna do wymiany</div>
-                            <div className="text-sm">PCV białe, 5-komorowe, szyba 4/16/4/16/4</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                        <h4 className="font-medium text-orange-900 mb-3">Wizja lokalna</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-orange-600" />
-                            <span className="text-sm">Możliwa po umówieniu: 18-22.12.2024, godz. 9:00-15:00</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Building className="w-4 h-4 text-orange-600" />
-                            <span className="text-sm">Kontakt: Zarządca nieruchomości - tel. +48 22 123 45 67</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-orange-600" />
-                            <span className="text-sm">Wymagane: dokument tożsamości, odzież robocza, obuwie BHP</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="contract" className="p-6">
-                  <Accordion type="multiple" className="w-full">
-                    <AccordionItem value="basic-conditions">
-                      <AccordionTrigger className="text-left">
-                        Podstawowe warunki
-                      </AccordionTrigger>
-                      <AccordionContent>
+                        <h4 className="text-base font-medium mb-3">Podstawowe warunki</h4>
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -1151,178 +784,263 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                               <div className="text-sm text-muted-foreground">Czas realizacji</div>
                               <div className="font-medium">{job.projectDuration || 'Do uzgodnienia'}</div>
                             </div>
+                            {job.deadline && (
+                              <div>
+                                <div className="text-sm text-muted-foreground">Termin</div>
+                                <div className="font-medium">{new Date(job.deadline).toLocaleDateString('pl-PL')}</div>
+                              </div>
+                            )}
                             <div>
-                              <div className="text-sm text-muted-foreground">Termin płatności</div>
-                              <div className="font-medium">30 dni od daty faktury</div>
+                              <div className="text-sm text-muted-foreground">Budżet</div>
+                              <div className="font-medium">{formatBudget(job.budget)}</div>
+                              {job.budget.type === 'hourly' && (
+                                <div className="text-xs text-muted-foreground mt-1">Stawka godzinowa</div>
+                              )}
+                              {job.budget.type === 'negotiable' && (
+                                <div className="text-xs text-muted-foreground mt-1">Do negocjacji</div>
+                              )}
                             </div>
-                            <div>
-                              <div className="text-sm text-muted-foreground">Forma płatności</div>
-                              <div className="font-medium">Przelew bankowy</div>
-                            </div>
-                            <div>
-                              <div className="text-sm text-muted-foreground">Okres gwarancji</div>
-                              <div className="font-medium">24 miesiące na wykonane prace</div>
-                            </div>
-                            <div>
-                              <div className="text-sm text-muted-foreground">Ubezpieczenie OC</div>
-                              <div className="font-medium">Minimum 500 000 PLN</div>
-                            </div>
+                            {job.contactPerson && (
+                              <div>
+                                <div className="text-sm text-muted-foreground">Osoba kontaktowa</div>
+                                <div className="font-medium">{job.contactPerson}</div>
+                              </div>
+                            )}
+                            {job.contactPhone && (
+                              <div>
+                                <div className="text-sm text-muted-foreground">Telefon</div>
+                                <div className="font-medium">{job.contactPhone}</div>
+                              </div>
+                            )}
+                            {job.contactEmail && (
+                              <div>
+                                <div className="text-sm text-muted-foreground">Email</div>
+                                <div className="font-medium">{job.contactEmail}</div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </AccordionContent>
-                    </AccordionItem>
+                      </div>
 
-                    <AccordionItem value="financial-conditions">
-                      <AccordionTrigger className="text-left">
-                        Warunki finansowe
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                              <span className="text-sm">Rozliczenie miesięczne na podstawie faktury VAT</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                              <span className="text-sm">Możliwość płatności zaliczki do 30% wartości umowy</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                              <span className="text-sm">Kary umowne za opóźnienie: 0,5% wartości umowy za każdy dzień</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                              <span className="text-sm">Zabezpieczenie należytego wykonania: 5% wartości umowy</span>
-                            </div>
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
+                      {/* Other contract details - Collapsible accordion */}
+                      {job.contractDetails && (
+                        <Accordion type="multiple" className="w-full">
+                          <AccordionItem value="payment-conditions">
+                            <AccordionTrigger className="text-left">
+                              Warunki płatności
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <div className="space-y-2">
+                                  {job.contractDetails.paymentTerms && (
+                                    <div>
+                                      <div className="text-sm text-muted-foreground mb-1">Warunki płatności</div>
+                                      <div className="text-sm">{job.contractDetails.paymentTerms}</div>
+                                    </div>
+                                  )}
+                                  {job.contractDetails.warrantyPeriod && (
+                                    <div>
+                                      <div className="text-sm text-muted-foreground mb-1">Okres gwarancji</div>
+                                      <div className="text-sm">{job.contractDetails.warrantyPeriod}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
 
-                    <AccordionItem value="contractor-obligations">
-                      <AccordionTrigger className="text-left">
-                        Obowiązki wykonawcy
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="w-4 h-4 text-purple-600 mt-0.5" />
-                              <span className="text-sm">Wykonanie prac zgodnie z obowiązującymi normami i przepisami</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="w-4 h-4 text-purple-600 mt-0.5" />
-                              <span className="text-sm">Zapewnienie materiałów o odpowiedniej jakości i certyfikatach</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="w-4 h-4 text-purple-600 mt-0.5" />
-                              <span className="text-sm">Utrzymanie porządku i bezpieczeństwa na terenie prac</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="w-4 h-4 text-purple-600 mt-0.5" />
-                              <span className="text-sm">Usunięcie wad i usterek na własny koszt w okresie gwarancji</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="w-4 h-4 text-purple-600 mt-0.5" />
-                              <span className="text-sm">Przekazanie dokumentacji powykonawczej i certyfikatów</span>
-                            </div>
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <AccordionItem value="client-obligations">
-                      <AccordionTrigger className="text-left">
-                        Obowiązki zamawiającego
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-orange-600 mt-0.5" />
-                              <span className="text-sm">Zapewnienie dostępu do terenu prac w uzgodnionych godzinach</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-orange-600 mt-0.5" />
-                              <span className="text-sm">Udostępnienie niezbędnych mediów (prąd, woda)</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-orange-600 mt-0.5" />
-                              <span className="text-sm">Terminowe płatności zgodnie z harmonogramem</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-orange-600 mt-0.5" />
-                              <span className="text-sm">Współpraca przy odbiorze poszczególnych etapów prac</span>
-                            </div>
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <AccordionItem value="additional-conditions">
-                      <AccordionTrigger className="text-left">
-                        Warunki dodatkowe
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                          <div className="space-y-3">
-                            <div>
-                              <div className="text-sm text-muted-foreground">Rozwiązanie umowy</div>
-                              <div className="text-sm">Możliwe za 30-dniowym wypowiedzeniem lub natychmiast w przypadku rażącego naruszenia warunków umowy</div>
-                            </div>
-                            <div>
-                              <div className="text-sm text-muted-foreground">Siła wyższa</div>
-                              <div className="text-sm">Strony zwolnione z odpowiedzialności w przypadku działania siły wyższej</div>
-                            </div>
-                            <div>
-                              <div className="text-sm text-muted-foreground">Prawo właściwe</div>
-                              <div className="text-sm">Umowa podlega prawu polskiemu</div>
-                            </div>
-                            <div>
-                              <div className="text-sm text-muted-foreground">Rozstrzyganie sporów</div>
-                              <div className="text-sm">Spory rozstrzygane przez sąd właściwy dla siedziby zamawiającego</div>
-                            </div>
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <AccordionItem value="important-info">
-                      <AccordionTrigger className="text-left">
-                        Ważne informacje
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                          <div className="flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <ul className="text-sm text-amber-700 space-y-1">
-                                <li>• Szczegółowe warunki umowy zostaną uzgodnione przed podpisaniem</li>
-                                <li>• Możliwość negocjacji niektórych warunków w zależności od specyfiki zlecenia</li>
-                                <li>• Wykonawca zobowiązany do przestrzegania regulaminu obiektu</li>
-                                <li>• Wymagana aktualna polisa ubezpieczeniowa OC w trakcie realizacji</li>
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                          <AccordionItem value="termination-conditions">
+                            <AccordionTrigger className="text-left">
+                              Warunki rozwiązania
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <div className="text-sm text-muted-foreground">
+                                  {job.contractDetails.terminationConditions || 'Warunki rozwiązania umowy do uzgodnienia.'}
+                                </div>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      )}
+                    </div>
+                  )}
                 </TabsContent>
+
+                {/* Requirements Tab */}
+                <TabsContent value="requirements" className="p-6 space-y-6">
+                  {job.requirements && job.requirements.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Wymagania wobec wykonawców</h3>
+                      <ul className="space-y-3">
+                        {job.requirements.map((requirement, index) => (
+                          <li key={index} className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                            <span>{requirement}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {job.skills && job.skills.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Wymagane umiejętności</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {job.skills.map((skill, index) => (
+                          <Badge key={index} variant="outline">{skill}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {job.certificates && job.certificates.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Wymagane certyfikaty</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {job.certificates.map((cert, index) => (
+                          <Badge key={index} variant="secondary">
+                            <Award className="w-3 h-3 mr-1" />
+                            {cert}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {job.postType === 'tender' && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <h4 className="font-medium text-amber-800 mb-2">Uwaga dla przetargu</h4>
+                          <p className="text-sm text-amber-700">
+                            Wszystkie wymagania są obowiązkowe. Brak spełnienia któregokolwiek z wymagań 
+                            skutkuje odrzuceniem oferty na etapie weryfikacji formalnej.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Procedure Tab - Only for tenders */}
+                {job.postType === 'tender' && (
+                  <TabsContent value="procedure" className="p-6 space-y-6">
+                    <h3 className="text-lg font-semibold mb-3">Harmonogram przetargu</h3>
+                    {job.tenderInfo?.phases && job.tenderInfo.phases.length > 0 ? (
+                      <div className="space-y-4">
+                        {job.tenderInfo.phases.map((phase, index) => (
+                          <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
+                              phase.status === 'completed' ? 'bg-green-500 text-white' :
+                              phase.status === 'active' ? 'bg-blue-500 text-white' :
+                              'bg-gray-300 text-gray-600'
+                            }`}>
+                              {phase.status === 'completed' ? '✓' : index + 1}
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-medium">{phase.name}</div>
+                              {phase.deadline && (
+                                <div className="text-sm text-muted-foreground">{phase.deadline}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground text-sm">Harmonogram przetargu nie jest dostępny.</div>
+                    )}
+                  </TabsContent>
+                )}
+
+                {/* Documents Tab - Only for tenders */}
+                {job.postType === 'tender' && (
+                  <TabsContent value="documents" className="p-6 space-y-6">
+                    <h3 className="text-lg font-semibold mb-3">Dokumentacja przetargowa</h3>
+                    {job.tenderInfo?.documentsRequired && job.tenderInfo.documentsRequired.length > 0 ? (
+                      <div className="space-y-3">
+                        <h4 className="font-medium mb-3">Wymagane dokumenty</h4>
+                        <div className="space-y-2">
+                          {job.tenderInfo.documentsRequired.map((doc, index) => (
+                            <div key={index} className="flex items-start gap-2 p-3 bg-white border rounded-lg">
+                              <FileText className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                              <span className="text-sm">{doc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground text-sm">Dokumentacja przetargowa nie jest dostępna.</div>
+                    )}
+                  </TabsContent>
+                )}
+
+                {/* Object Tab */}
+                <TabsContent value="object" className="p-6 space-y-6">
+                  <h3 className="text-lg font-semibold mb-3">Informacje o obiekcie</h3>
+                  
+                  <div className="space-y-4">
+                    {(job.buildingType || job.buildingYear || job.surface || job.address) && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-medium text-blue-900 mb-3">Dane podstawowe</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {job.buildingType && (
+                            <div>
+                              <div className="text-sm text-muted-foreground">Typ budynku</div>
+                              <div className="font-medium">{job.buildingType}</div>
+                            </div>
+                          )}
+                          {job.buildingYear && (
+                            <div>
+                              <div className="text-sm text-muted-foreground">Rok budowy</div>
+                              <div className="font-medium">{job.buildingYear}</div>
+                            </div>
+                          )}
+                          {job.surface && (
+                            <div>
+                              <div className="text-sm text-muted-foreground">Powierzchnia</div>
+                              <div className="font-medium">{job.surface}</div>
+                            </div>
+                          )}
+                          {job.address && (
+                            <div>
+                              <div className="text-sm text-muted-foreground">Adres</div>
+                              <div className="font-medium">{job.address}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {job.additionalInfo && (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-3">Dodatkowe informacje</h4>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{job.additionalInfo}</p>
+                      </div>
+                    )}
+
+                    {!job.buildingType && !job.buildingYear && !job.surface && !job.address && !job.additionalInfo && (
+                      <div className="text-muted-foreground text-sm text-center py-8">
+                        Informacje o obiekcie nie są dostępne.
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
               </Tabs>
             </Card>
 
             {/* Similar Jobs Widget */}
             <SimilarJobs 
               currentJobId={job.id}
-              currentJobCategory={job.category}
+              currentJobCategory={typeof job.category === 'string' ? job.category : job.category?.name}
               currentJobType={job.postType}
               onJobSelect={handleJobSelect}
             />
           </div>
 
-          {/* Sidebar - ONLY buttons */}
+          {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
             {/* Action Buttons */}
             <Card>
@@ -1343,7 +1061,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       className="flex items-center gap-2"
                     >
                       <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
-                      {isBookmarked ? 'Zapisano' : 'Zapisz' + (job.postType === 'tender' ? ' przetarg' : ' zlecenie')}
+                      <span className="truncate">
+                        {isBookmarked ? 'Zapisano' : 'Zapisz'}
+                      </span>
                     </Button>
                     
                     <Button 
@@ -1352,9 +1072,30 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       className="flex items-center gap-2"
                     >
                       <HelpCircle className="w-4 h-4" />
-                      Zadaj pytanie
+                      <span className="truncate">Pytanie</span>
                     </Button>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Job Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Statystyki</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Wyświetlenia</span>
+                  <span className="font-semibold">{job.visits_count || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Aplikacje</span>
+                  <span className="font-semibold">{job.applications || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Zapisane</span>
+                  <span className="font-semibold">{job.bookmarks_count || 0}</span>
                 </div>
               </CardContent>
             </Card>

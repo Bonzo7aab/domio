@@ -19,8 +19,8 @@ export interface ReverseGeocodingResult {
 
 // Geocode an address to get coordinates
 export const geocodeAddress = async (address: string): Promise<GeocodingResult | null> => {
-  if (!window.google?.maps?.places?.PlacesService) {
-    console.error('Google Maps Places API not loaded');
+  if (!window.google?.maps?.Geocoder) {
+    // Don't log error here - let the caller handle fallback
     return null;
   }
 

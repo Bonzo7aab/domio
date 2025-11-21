@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { ArrowLeft, Upload, MapPin, Calendar, FileText, Phone, Mail, Building } from 'lucide-react';
+import { ArrowLeft, Upload, MapPin, Calendar, FileText, Phone, Mail, Building, X, File, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
@@ -17,6 +17,9 @@ import { createJob } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany, upsertUserCompany } from '../lib/database/companies';
 import LocationAutocomplete from './LocationAutocomplete';
 import type { BudgetInput } from '../types/budget';
+import { uploadJobAttachments, deleteJobAttachments } from '../lib/storage/job-attachments';
+import { Dropzone, DropzoneContent, DropzoneEmptyState } from './ui/dropzone';
+import type { FileRejection } from 'react-dropzone';
 
 interface PostJobPageProps {
   onBack: () => void;
@@ -154,6 +157,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
   });
 
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [uploadedFileUrls, setUploadedFileUrls] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleInputChange = (field: keyof JobFormData, value: string | number | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -173,16 +178,81 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
     }));
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      setAttachments(prev => [...prev, ...Array.from(files)]);
+  const handleFileUpload = (acceptedFiles: File[], fileRejections: FileRejection[]) => {
+    // Handle rejected files
+    if (fileRejections.length > 0) {
+      const rejection = fileRejections[0];
+      const error = rejection.errors[0];
+      if (error.code === 'file-too-large') {
+        toast.error(`Plik "${rejection.file.name}" jest zbyt duży. Maksymalny rozmiar: 10MB`);
+      } else if (error.code === 'file-invalid-type') {
+        toast.error(`Nieprawidłowy typ pliku "${rejection.file.name}". Dozwolone: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX`);
+      } else {
+        toast.error(`Błąd przy dodawaniu pliku "${rejection.file.name}": ${error.message}`);
+      }
+    }
+
+    // Add accepted files
+    if (acceptedFiles.length > 0) {
+      const maxFiles = 10;
+      const currentCount = attachments.length;
+      const remainingSlots = maxFiles - currentCount;
+      
+      if (remainingSlots <= 0) {
+        toast.error(`Można dodać maksymalnie ${maxFiles} plików`);
+        return;
+      }
+
+      const filesToAdd = acceptedFiles.slice(0, remainingSlots);
+      setAttachments(prev => [...prev, ...filesToAdd]);
+      
+      if (acceptedFiles.length > remainingSlots) {
+        toast.warning(`Dodano ${remainingSlots} z ${acceptedFiles.length} plików (maksymalnie ${maxFiles})`);
+      } else {
+        toast.success(`Dodano ${filesToAdd.length} plik${filesToAdd.length > 1 ? 'i' : ''}`);
+      }
     }
   };
 
   const removeAttachment = (index: number) => {
+    // Clean up preview URL if it exists
+    const file = attachments[index];
+    if (file && isImageFile(file)) {
+      // URL will be cleaned up automatically when component re-renders
+      // since we create it fresh each time
+    }
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const isImageFile = (file: File): boolean => {
+    return file.type.startsWith('image/');
+  };
+
+  // Create and manage preview URLs for image files
+  const previewUrls = useMemo(() => {
+    const urls = new Map<number, string>();
+    attachments.forEach((file, index) => {
+      if (isImageFile(file)) {
+        urls.set(index, URL.createObjectURL(file));
+      }
+    });
+    return urls;
+  }, [attachments]);
+
+  // Cleanup object URLs on component unmount
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -354,6 +424,42 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         ? formData.requirements.split('\n').filter(r => r.trim().length > 0)
         : [];
 
+      // Upload attachments if any
+      let uploadedUrls: string[] = [];
+      if (attachments.length > 0) {
+        setIsUploading(true);
+        try {
+          const uploadResult = await uploadJobAttachments(
+            supabase,
+            attachments,
+            managerId
+            // No jobId yet - files will be in 'draft' folder
+          );
+
+          if (uploadResult.errors.length > 0) {
+            // Some files failed to upload
+            const errorMessages = uploadResult.errors.map(e => 
+              `${e.file}: ${e.error?.message || 'Błąd przesyłania'}`
+            ).join(', ');
+            toast.error(`Niektóre pliki nie zostały przesłane: ${errorMessages}`);
+          }
+
+          if (uploadResult.data.length > 0) {
+            uploadedUrls = uploadResult.data.map(result => result.url);
+            setUploadedFileUrls(uploadedUrls);
+            toast.success(`Przesłano ${uploadResult.data.length} z ${attachments.length} plików`);
+          } else {
+            // All files failed
+            throw new Error('Nie udało się przesłać żadnego pliku. Spróbuj ponownie.');
+          }
+        } catch (uploadError: any) {
+          console.error('Error uploading attachments:', uploadError);
+          throw new Error(uploadError?.message || 'Błąd podczas przesyłania plików');
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
       // Create job in database
       console.log('Creating job with data:', {
         title: formData.title,
@@ -362,6 +468,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         budget: budgetInput,
         managerId: managerId,
         companyId: company.data.id,
+        attachmentsCount: uploadedUrls.length,
       });
 
       const jobResult = await createJob(supabase, {
@@ -388,6 +495,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         contactEmail: formData.contactEmail,
         additionalInfo: formData.additionalInfo || undefined,
         requirements: requirementsArray.length > 0 ? requirementsArray : undefined,
+        images: uploadedUrls.length > 0 ? uploadedUrls : undefined,
         managerId: managerId,
         companyId: company.data.id,
       });
@@ -411,6 +519,15 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       }
 
       if (!jobResult.data) {
+        // Clean up uploaded files if job creation failed
+        if (uploadedUrls.length > 0) {
+          try {
+            await deleteJobAttachments(supabase, uploadedUrls);
+            console.log('Cleaned up uploaded files after job creation failure');
+          } catch (cleanupError) {
+            console.error('Error cleaning up uploaded files:', cleanupError);
+          }
+        }
         throw new Error('Nie udało się utworzyć zlecenia - brak danych zwrotnych');
       }
 
@@ -439,6 +556,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         additionalInfo: ''
       });
       setAttachments([]);
+      setUploadedFileUrls([]);
       
       // Powrót do listy zleceń po krótkim opóźnieniu
       setTimeout(() => {
@@ -446,9 +564,22 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       }, 1500);
     } catch (error: any) {
       console.error('Błąd podczas zapisywania zlecenia:', error);
+      
+      // Clean up uploaded files if job creation failed
+      if (uploadedFileUrls.length > 0) {
+        try {
+          await deleteJobAttachments(supabase, uploadedFileUrls);
+          console.log('Cleaned up uploaded files after error');
+          setUploadedFileUrls([]);
+        } catch (cleanupError) {
+          console.error('Error cleaning up uploaded files:', cleanupError);
+        }
+      }
+      
       toast.error(error?.message || 'Wystąpił błąd podczas publikowania zlecenia');
     } finally {
       setIsSubmitting(false);
+      setIsUploading(false);
     }
   };
 
@@ -772,36 +903,119 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <Label htmlFor="attachments">Dodaj pliki (zdjęcia, dokumenty, specyfikacje)</Label>
-                <Input
-                  id="attachments"
-                  type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
-                  onChange={handleFileUpload}
+                <Label>Dodaj pliki (zdjęcia, dokumenty, specyfikacje)</Label>
+                <Dropzone
+                  accept={{
+                    'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
+                    'application/pdf': ['.pdf'],
+                    'application/msword': ['.doc'],
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+                  }}
+                  maxFiles={10}
+                  maxSize={10 * 1024 * 1024} // 10MB
+                  minSize={1024} // 1KB
+                  onDrop={handleFileUpload}
+                  disabled={attachments.length >= 10 || isSubmitting || isUploading}
+                  src={attachments}
                   className="mt-2"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Obsługiwane formaty: PDF, DOC, DOCX, JPG, PNG, GIF. Maksymalnie 10 plików.
-                </p>
+                >
+                  <DropzoneEmptyState>
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        <Upload className="h-4 w-4" />
+                      </div>
+                      <p className="my-2 w-full truncate text-wrap font-medium text-sm">
+                        Przeciągnij pliki tutaj lub kliknij, aby wybrać
+                      </p>
+                      <p className="w-full truncate text-wrap text-muted-foreground text-xs">
+                        Obsługiwane formaty: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX. Maksymalnie 10 plików, 10MB każdy.
+                      </p>
+                    </div>
+                  </DropzoneEmptyState>
+                  <DropzoneContent>
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        <Upload className="h-4 w-4" />
+                      </div>
+                      <p className="my-2 w-full truncate text-wrap font-medium text-sm">
+                        {attachments.length} plik{attachments.length > 1 ? 'ów' : ''} wybran{attachments.length > 1 ? 'ych' : 'y'}
+                      </p>
+                      <p className="w-full truncate text-wrap text-muted-foreground text-xs">
+                        Kliknij, aby dodać więcej plików
+                      </p>
+                    </div>
+                  </DropzoneContent>
+                </Dropzone>
+                {attachments.length >= 10 && (
+                  <p className="text-sm text-amber-600 mt-1">
+                    Osiągnięto limit 10 plików. Usuń plik, aby dodać nowy.
+                  </p>
+                )}
               </div>
 
               {attachments.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Załączone pliki:</Label>
-                  {attachments.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-sm">{file.name}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeAttachment(index)}
-                      >
-                        Usuń
-                      </Button>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  <Label>Załączone pliki ({attachments.length}/10):</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {attachments.map((file, index) => {
+                      const previewUrl = previewUrls.get(index) || null;
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                        >
+                          {previewUrl ? (
+                            <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden border border-gray-300">
+                              <img
+                                src={previewUrl}
+                                alt={file.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-16 h-16 flex-shrink-0 rounded bg-gray-200 flex items-center justify-center border border-gray-300">
+                              <File className="h-6 w-6 text-gray-500" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate" title={file.name}>
+                                  {file.name}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {formatFileSize(file.size)}
+                                </p>
+                                <div className="flex items-center gap-1 mt-1">
+                                  {isImageFile(file) ? (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <ImageIcon className="h-3 w-3 mr-1" />
+                                      Obraz
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs">
+                                      <File className="h-3 w-3 mr-1" />
+                                      Dokument
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeAttachment(index)}
+                                className="flex-shrink-0 h-8 w-8 p-0"
+                                disabled={isSubmitting || isUploading}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -826,9 +1040,9 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
             <Button 
               type="submit" 
               className="bg-blue-600 hover:bg-blue-700"
-              disabled={isMounted ? (isSubmitting || !isAuthenticated) : false}
+              disabled={isMounted ? (isSubmitting || isUploading || !isAuthenticated) : false}
             >
-              {isSubmitting ? 'Publikowanie...' : 'Opublikuj zlecenie'}
+              {isUploading ? 'Przesyłanie plików...' : isSubmitting ? 'Publikowanie...' : 'Opublikuj zlecenie'}
             </Button>
           </div>
         </form>

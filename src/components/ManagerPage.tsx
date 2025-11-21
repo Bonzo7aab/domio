@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Building as BuildingIcon,
   Building2,
   Calendar,
   ClipboardList,
@@ -12,11 +13,15 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import React from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getManagerById, mockApplications } from '../mocks';
 import { createClient } from '../lib/supabase/client';
 import { createTender, updateTender, fetchTenderById } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { fetchCompanyBuildings } from '../lib/database/buildings';
+import type { Building } from '../types/building';
+import { BUILDING_TYPE_OPTIONS } from '../types/building';
 import { toast } from 'sonner';
 import { formatBudget } from '../types/budget';
 import type { Budget } from '../types/budget';
@@ -30,6 +35,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { TenderWithCompany } from '../lib/database/jobs';
+import Image from 'next/image';
 
 interface ManagerPageProps {
   onBack: () => void;
@@ -39,7 +45,7 @@ interface ManagerPageProps {
 }
 
 export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, onTenderFormOpened }: ManagerPageProps) {
-  const { user } = useUserProfile();
+  const { user, isLoading } = useUserProfile();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedJobForApplications, setSelectedJobForApplications] = useState<string | null>(null);
   const [showTenderCreation, setShowTenderCreation] = useState(false);
@@ -47,6 +53,31 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   const [selectedTenderId, setSelectedTenderId] = useState<string | null>(null);
   const [editingTenderId, setEditingTenderId] = useState<string | null>(null);
   const [editingTenderData, setEditingTenderData] = useState<TenderWithCompany | null>(null);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  // Priority 3: Prevent concurrent fetches
+  const isFetchingRef = React.useRef(false);
+  // Track client-side mount to prevent hydration mismatch
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Helper function to get public URL for building images
+  const getBuildingImageUrl = React.useCallback((imagePath: string | null | undefined): string | null => {
+    if (!imagePath) return null;
+    
+    // If it's already a full URL, return it
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Otherwise, convert storage path to public URL
+    const supabase = createClient();
+    const { data } = supabase.storage
+      .from('building-images')
+      .getPublicUrl(imagePath);
+    
+    return data.publicUrl;
+  }, []);
 
   // Pobierz dane zarządcy na podstawie profileId z konta użytkownika
   const managerProfile = user?.id ? getManagerById(user.id) : null;
@@ -70,6 +101,9 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     managedProperties: managerProfile.portfolio.managedBuildings.map(building => ({
       name: building.name,
       type: building.type,
+      image: building.images?.[0] || '/api/placeholder/400/300',
+      location: building.address,
+      buildings: building.type === 'Bloki mieszkalne' ? 10 : 1,
       units: building.unitsCount,
       since: building.yearBuilt.toString()
     })),
@@ -104,6 +138,11 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     }
   };
 
+  // Track client-side mount to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Auto-open tender form if requested from main page
   useEffect(() => {
     if (shouldOpenTenderForm) {
@@ -112,6 +151,58 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       onTenderFormOpened?.();
     }
   }, [shouldOpenTenderForm, onTenderFormOpened]);
+
+  // Fetch company and buildings
+  useEffect(() => {
+    async function loadBuildings() {
+      if (!user?.id) return;
+
+      // Priority 3: Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        return;
+      }
+
+      isFetchingRef.current = true;
+      setIsLoadingBuildings(true);
+      try {
+        const supabase = createClient();
+        const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
+        
+        if (companyError || !company) {
+          console.log('No company found for user');
+          setBuildings([]);
+          setCompanyId(null);
+          return;
+        }
+
+        setCompanyId(company.id);
+
+        // Fetch buildings from database
+        const { data: buildingsData, error: buildingsError } = await fetchCompanyBuildings(supabase, company.id);
+        
+        if (buildingsError) {
+          console.error('Error fetching buildings:', buildingsError);
+          setBuildings([]);
+        } else {
+          setBuildings(buildingsData || []);
+        }
+      } catch (err) {
+        console.error('Error loading buildings:', err);
+        setBuildings([]);
+      } finally {
+        setIsLoadingBuildings(false);
+        // Priority 3: Reset fetch flag
+        isFetchingRef.current = false;
+      }
+    }
+
+    loadBuildings();
+
+    // Cleanup function
+    return () => {
+      isFetchingRef.current = false;
+    };
+  }, [user?.id]);
 
   const handleStatusChange = (applicationId: string, status: string, notes?: string) => {
     // In real app, this would update the application in the backend
@@ -309,6 +400,19 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     return <Badge className={config.color}>{config.label}</Badge>;
   };
 
+  // Priority 2: Standardize loading states - show loading spinner during auth checks
+  // Must be after all hooks to follow Rules of Hooks
+  // Prevent hydration mismatch by not rendering loading state during SSR
+  if (!isMounted || isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Ładowanie...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -360,11 +464,12 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Przegląd</TabsTrigger>
             <TabsTrigger value="jobs">Zlecenia</TabsTrigger>
             <TabsTrigger value="applications">Oferty</TabsTrigger>
             <TabsTrigger value="tenders">Przetargi</TabsTrigger>
+            <TabsTrigger value="properties">Nieruchomości</TabsTrigger>
             <TabsTrigger value="contractors">Wykonawcy</TabsTrigger>
             <TabsTrigger value="analytics">Analityka</TabsTrigger>
           </TabsList>
@@ -379,9 +484,9 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                   <Building2 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{managerData.stats.totalProperties}</div>
+                  <div className="text-2xl font-bold">{buildings.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    {managerData.stats.totalUnits} lokali mieszkalnych
+                    {buildings.reduce((sum, b) => sum + (b.units_count || 0), 0)} lokali mieszkalnych
                   </p>
                 </CardContent>
               </Card>
@@ -682,6 +787,101 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
               onTenderSelect={handleTenderSelect}
               onTenderEdit={handleTenderEdit}
             />
+          </TabsContent>
+
+          {/* Properties Tab */}
+          <TabsContent value="properties" className="space-y-6">
+            {isLoadingBuildings ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie budynków...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : buildings && buildings.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {buildings.map((building) => {
+                  // Get first image URL if available
+                  const firstImage = building.images && building.images.length > 0 
+                    ? building.images[0] 
+                    : null;
+                  const imageUrl = getBuildingImageUrl(firstImage);
+                  
+                  return (
+                  <Card key={building.id}>
+                    <div className="aspect-video bg-gray-200 rounded-t-lg overflow-hidden flex items-center justify-center relative">
+                      {imageUrl ? (
+                        <Image
+                          src={imageUrl}
+                          alt={building.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, 50vw"
+                        />
+                      ) : (
+                        <Building2 className="w-16 h-16 text-gray-400" />
+                      )}
+                    </div>
+                    <CardHeader>
+                      <CardTitle>{building.name}</CardTitle>
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <MapPin className="w-4 h-4" />
+                        <span>{building.street_address}, {building.city}</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {building.building_type && (
+                          <Badge variant="secondary">
+                            {BUILDING_TYPE_OPTIONS.find(opt => opt.value === building.building_type)?.label || building.building_type}
+                          </Badge>
+                        )}
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          {building.year_built && (
+                            <div>
+                              <div className="font-bold text-lg">{building.year_built}</div>
+                              <div className="text-sm text-gray-600">Rok budowy</div>
+                            </div>
+                          )}
+                          {building.units_count !== null && (
+                            <div>
+                              <div className="font-bold text-lg">{building.units_count}</div>
+                              <div className="text-sm text-gray-600">Lokali</div>
+                            </div>
+                          )}
+                          {building.floors_count !== null && (
+                            <div>
+                              <div className="font-bold text-lg">{building.floors_count}</div>
+                              <div className="text-sm text-gray-600">Pięter</div>
+                            </div>
+                          )}
+                        </div>
+                        {building.notes && (
+                          <p className="text-sm text-gray-600 mt-2">{building.notes}</p>
+                        )}
+                        {building.postal_code && (
+                          <p className="text-xs text-gray-500">Kod pocztowy: {building.postal_code}</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <BuildingIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Brak zarejestrowanych budynków</h3>
+                  <p className="text-gray-600 mb-4">Nie posiadasz jeszcze zarejestrowanych budynków w portfolio.</p>
+                  <p className="text-sm text-gray-500">
+                    Przejdź do sekcji "Firma" w ustawieniach konta, aby dodać budynki.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Contractors Tab */}

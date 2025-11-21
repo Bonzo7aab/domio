@@ -9,19 +9,26 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
 import type { AuthUser } from '../types/auth';
 import { createClient } from '../lib/supabase/client';
 import { fetchUserPrimaryCompany, upsertUserCompany, type CompanyData } from '../lib/database/companies';
+import { BuildingManagement } from './BuildingManagement';
 
 interface CompanyManagementFormProps {
   user: AuthUser;
 }
 
-const COMPANY_TYPES = [
+const MANAGER_COMPANY_TYPES = [
   { value: 'wspólnota', label: 'Wspólnota Mieszkaniowa' },
   { value: 'spółdzielnia', label: 'Spółdzielnia Mieszkaniowa' },
   { value: 'property_management', label: 'Zarząd Nieruchomości' },
   { value: 'condo_management', label: 'Zarząd Wspólnoty' },
+  { value: 'housing_association', label: 'Stowarzyszenie Mieszkaniowe' },
+  { value: 'cooperative', label: 'Spółdzielnia' },
+];
+
+const CONTRACTOR_COMPANY_TYPES = [
   { value: 'contractor', label: 'Firma Wykonawcza' },
   { value: 'construction_company', label: 'Firma Budowlana' },
   { value: 'service_provider', label: 'Usługodawca' },
@@ -34,6 +41,9 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isFetchingCompany, setIsFetchingCompany] = useState(true);
   const [hasCompany, setHasCompany] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  // Priority 3: Prevent concurrent fetches
+  const isFetchingRef = React.useRef(false);
 
   const [companyData, setCompanyData] = useState({
     name: '',
@@ -49,16 +59,31 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
 
   const [originalCompanyData, setOriginalCompanyData] = useState(companyData);
 
-  // Fetch existing company on mount
+  // Fetch existing company on mount and when user changes
   useEffect(() => {
+    let isMounted = true;
+
     async function loadCompany() {
+      // Priority 3: Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        return;
+      }
+      
+      isFetchingRef.current = true;
       setIsFetchingCompany(true);
       try {
         const supabase = createClient();
         const { data: company, error: fetchError } = await fetchUserPrimaryCompany(supabase, user.id);
 
+        // Check if component is still mounted before updating state
+        if (!isMounted) return;
+
         if (fetchError) {
           console.error('Error fetching company:', fetchError);
+          if (isMounted) {
+            setHasCompany(false);
+            setCompanyId(null);
+          }
         } else if (company) {
           const fetchedData = {
             name: company.name || '',
@@ -71,18 +96,41 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
             nip: company.nip || '',
             description: company.description || '',
           };
-          setCompanyData(fetchedData);
-          setOriginalCompanyData(fetchedData);
-          setHasCompany(true);
+          if (isMounted) {
+            setCompanyData(fetchedData);
+            setOriginalCompanyData(fetchedData);
+            setHasCompany(true);
+            setCompanyId(company.id);
+          }
+        } else {
+          // No company found - reset state
+          if (isMounted) {
+            setHasCompany(false);
+            setCompanyId(null);
+          }
         }
       } catch (err) {
         console.error('Error loading company:', err);
+        if (isMounted) {
+          setHasCompany(false);
+          setCompanyId(null);
+        }
       } finally {
-        setIsFetchingCompany(false);
+        if (isMounted) {
+          setIsFetchingCompany(false);
+        }
+        // Priority 3: Reset fetch flag
+        isFetchingRef.current = false;
       }
     }
 
     loadCompany();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      isFetchingRef.current = false;
+    };
   }, [user.id, user.userType]);
 
   const handleCompanyChange = (field: string, value: string) => {
@@ -117,6 +165,9 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
         setSuccess('Dane firmy zostały zapisane pomyślnie');
         setOriginalCompanyData(companyData);
         setHasCompany(true);
+        if (savedCompany) {
+          setCompanyId(savedCompany.id);
+        }
         setIsEditing(false);
         setTimeout(() => setSuccess(''), 3000);
       }
@@ -259,7 +310,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {COMPANY_TYPES.map(type => (
+                        {(user.userType === 'manager' ? MANAGER_COMPANY_TYPES : CONTRACTOR_COMPANY_TYPES).map(type => (
                           <SelectItem key={type.value} value={type.value}>
                             {type.label}
                           </SelectItem>
@@ -268,7 +319,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                     </Select>
                   ) : (
                     <p className="text-sm py-2 px-3 bg-muted rounded-md">
-                      {COMPANY_TYPES.find(t => t.value === companyData.type)?.label || companyData.type || '—'}
+                      {[...MANAGER_COMPANY_TYPES, ...CONTRACTOR_COMPANY_TYPES].find(t => t.value === companyData.type)?.label || companyData.type || '—'}
                     </p>
                   )}
                 </div>
@@ -422,6 +473,45 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
           </div>
         )}
       </div>
+
+      {/* Building Management Section - Only for managers */}
+      {user.userType === 'manager' && (
+        <div className="mt-6">
+          <Separator className="my-6" />
+          {hasCompany && companyId ? (
+            <BuildingManagement companyId={companyId} />
+          ) : (
+            <div className="border rounded-lg p-4 bg-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Building className="h-4 w-4 text-muted-foreground" />
+                <h4 className="font-medium">Zarządzanie budynkami</h4>
+              </div>
+              <div className="text-center py-6">
+                <Building className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  Aby zarządzać budynkami, najpierw dodaj firmę powyżej
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Po dodaniu firmy będziesz mógł dodawać i zarządzać budynkami
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Contractor-specific message (if needed in future) */}
+      {user.userType === 'contractor' && hasCompany && (
+        <div className="mt-6">
+          <Separator className="my-6" />
+          <div className="border rounded-lg p-4 bg-muted/50">
+            <p className="text-xs text-muted-foreground">
+              💡 <strong>Informacja:</strong> Zarządzanie budynkami jest dostępne tylko dla zarządców nieruchomości. 
+              Jako wykonawca możesz zarządzać informacjami o swojej firmie powyżej.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
