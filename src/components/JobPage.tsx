@@ -786,7 +786,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <div className="text-sm text-muted-foreground">Typ umowy</div>
-                              <div className="font-medium">{job.contractDetails?.contractType || 'Umowa o świadczenie usług'}</div>
+                              <div className="font-medium">Umowa o świadczenie usług</div>
                             </div>
                             <div>
                               <div className="text-sm text-muted-foreground">Czas realizacji</div>
@@ -830,47 +830,6 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         </div>
                       </div>
 
-                      {/* Other contract details - Collapsible accordion */}
-                      {job.contractDetails && (
-                        <Accordion type="multiple" className="w-full">
-                          <AccordionItem value="payment-conditions">
-                            <AccordionTrigger className="text-left">
-                              Warunki płatności
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                                <div className="space-y-2">
-                                  {job.contractDetails.paymentTerms && (
-                                    <div>
-                                      <div className="text-sm text-muted-foreground mb-1">Warunki płatności</div>
-                                      <div className="text-sm">{job.contractDetails.paymentTerms}</div>
-                                    </div>
-                                  )}
-                                  {job.contractDetails.warrantyPeriod && (
-                                    <div>
-                                      <div className="text-sm text-muted-foreground mb-1">Okres gwarancji</div>
-                                      <div className="text-sm">{job.contractDetails.warrantyPeriod}</div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </AccordionContent>
-                          </AccordionItem>
-
-                          <AccordionItem value="termination-conditions">
-                            <AccordionTrigger className="text-left">
-                              Warunki rozwiązania
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                                <div className="text-sm text-muted-foreground">
-                                  {job.contractDetails.terminationConditions || 'Warunki rozwiązania umowy do uzgodnienia.'}
-                                </div>
-                              </div>
-                            </AccordionContent>
-                          </AccordionItem>
-                        </Accordion>
-                      )}
                     </div>
                   )}
                 </TabsContent>
