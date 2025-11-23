@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Upload, FileText, Shield, Check, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Shield, Check, AlertTriangle, Info, X } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { useUserProfile } from '../contexts/AuthContext';
+import { Dropzone, DropzoneContent, DropzoneEmptyState } from './ui/dropzone';
+import type { FileRejection } from 'react-dropzone';
+import { toast } from 'sonner';
 
 interface VerificationPageProps {
   onBack: () => void;
@@ -62,6 +66,12 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
       required: true 
     },
     { 
+      type: 'insurance', 
+      name: 'Ubezpieczenie OC zarządcy', 
+      description: 'Polisa ubezpieczenia odpowiedzialności cywilnej zarządcy',
+      required: true 
+    },
+    { 
       type: 'management_license', 
       name: 'Licencja zarządcy', 
       description: 'Certyfikat lub licencja zarządcy nieruchomości',
@@ -72,12 +82,6 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
       name: 'Umowy zarządzania', 
       description: 'Przykłady umów zarządzania nieruchomościami (dane osobowe zamazane)',
       required: false 
-    },
-    { 
-      type: 'insurance', 
-      name: 'Ubezpieczenie OC zarządcy', 
-      description: 'Polisa ubezpieczenia odpowiedzialności cywilnej zarządcy',
-      required: true 
     }
   ];
 
@@ -89,9 +93,46 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
       [documentType]: {
         ...prev[documentType],
         file,
-        type: documentType
+        type: documentType,
+        required: documents.find(d => d.type === documentType)?.required || false
       }
     }));
+  };
+
+  const handleFileDrop = (documentType: string, acceptedFiles: File[], fileRejections: FileRejection[]) => {
+    // Handle rejected files
+    if (fileRejections.length > 0) {
+      const rejection = fileRejections[0];
+      const error = rejection.errors[0];
+      if (error.code === 'file-too-large') {
+        toast.error(`Plik "${rejection.file.name}" jest zbyt duży. Maksymalny rozmiar: 10MB`);
+      } else if (error.code === 'file-invalid-type') {
+        toast.error(`Nieprawidłowy typ pliku "${rejection.file.name}". Dozwolone: PDF, JPG, PNG`);
+      } else {
+        toast.error(`Błąd przy dodawaniu pliku "${rejection.file.name}": ${error.message}`);
+      }
+      return;
+    }
+
+    // Handle accepted files (only one file per document type)
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      handleFileChange(documentType, file);
+      toast.success(`Dodano plik: ${file.name}`);
+    }
+  };
+
+  const removeFile = (documentType: string) => {
+    handleFileChange(documentType, null);
+    toast.info('Plik usunięty');
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
   const handleDescriptionChange = (documentType: string, description: string) => {
@@ -231,7 +272,10 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
               <br />
               Przesłane dokumenty przetwarzamy wyłącznie w celu weryfikacji kwalifikacji i budowania zaufania na platformie. 
               Podstawą prawną jest uzasadniony interes (art. 6 ust. 1 lit. f RODO). Dokumenty przechowujemy bezpiecznie, 
-              a dostęp mają tylko upoważnieni pracownicy. Po zakończeniu weryfikacji dokumenty są automatycznie usuwane.
+              a dostęp mają tylko upoważnieni pracownicy. Po zakończeniu weryfikacji dokumenty są automatycznie usuwane.{' '}
+              <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
+                Więcej informacji w Polityce prywatności
+              </Link>.
             </AlertDescription>
           </Alert>
 
@@ -266,30 +310,65 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor={`file-${doc.type}`}>Plik dokumentu</Label>
-                    <div className="flex items-center space-x-4">
-                      <input
-                        type="file"
-                        id={`file-${doc.type}`}
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => handleFileChange(doc.type, e.target.files?.[0] || null)}
-                        className="flex-1 text-sm text-muted-foreground
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-md file:border-0
-                          file:bg-primary file:text-primary-foreground
-                          file:hover:bg-primary/90
-                          file:cursor-pointer cursor-pointer"
-                      />
-                      {uploads[doc.type]?.file && (
-                        <div className="flex items-center space-x-2 text-success">
-                          <Check className="h-4 w-4" />
-                          <span className="text-sm">Przesłano</span>
+                    <Label>Plik dokumentu</Label>
+                    <Dropzone
+                      accept={{
+                        'application/pdf': ['.pdf'],
+                        'image/*': ['.jpg', '.jpeg', '.png']
+                      }}
+                      maxFiles={1}
+                      maxSize={10 * 1024 * 1024} // 10MB
+                      minSize={1024} // 1KB
+                      onDrop={(acceptedFiles, fileRejections) => handleFileDrop(doc.type, acceptedFiles, fileRejections)}
+                      disabled={isSubmitting}
+                      src={uploads[doc.type]?.file ? [uploads[doc.type].file!] : []}
+                      className="mt-2"
+                    >
+                      <DropzoneEmptyState>
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                            <Upload className="h-4 w-4" />
+                          </div>
+                          <p className="my-2 w-full truncate text-wrap font-medium text-sm">
+                            Przeciągnij plik tutaj lub kliknij, aby wybrać
+                          </p>
+                          <p className="w-full truncate text-wrap text-muted-foreground text-xs">
+                            Obsługiwane formaty: PDF, JPG, PNG. Maksymalnie 10MB.
+                          </p>
                         </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Akceptowane formaty: PDF, JPG, PNG (maks. 10MB)
-                    </p>
+                      </DropzoneEmptyState>
+                      <DropzoneContent>
+                        {uploads[doc.type]?.file && (
+                          <div className="flex flex-col items-center justify-center w-full">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <FileText className="h-5 w-5 text-primary" />
+                              <span className="text-sm font-medium truncate max-w-[200px]">
+                                {uploads[doc.type].file!.name}
+                              </span>
+                              <div className="flex items-center space-x-1 text-success">
+                                <Check className="h-4 w-4" />
+                                <span className="text-xs">Wybrano</span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(uploads[doc.type].file!.size)} • Kliknij, aby zmienić
+                            </p>
+                          </div>
+                        )}
+                      </DropzoneContent>
+                    </Dropzone>
+                    {uploads[doc.type]?.file && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeFile(doc.type)}
+                        className="w-full"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Usuń plik
+                      </Button>
+                    )}
                   </div>
 
                   <div className="space-y-2">

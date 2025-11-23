@@ -135,7 +135,7 @@ export default function TenderCreationPage({ onBack }: TenderCreationPageProps) 
           <div className="p-6 border-b border-gray-200">
             <h1 className="text-3xl font-bold text-gray-900">Utwórz Nowy Przetarg</h1>
             <p className="mt-2 text-gray-600">
-              Wypełnij formularz, aby opublikować przetarg na platformie Urbi.eu. 
+              Wypełnij formularz, aby opublikować przetarg na platformie Domio.
               Wszystkie pola oznaczone gwiazdką (*) są wymagane.
             </p>
           </div>

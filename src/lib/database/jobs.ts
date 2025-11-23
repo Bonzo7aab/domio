@@ -467,6 +467,11 @@ export async function fetchJobsAndTenders(
     title: job.title,
     description: job.description,
     company: job.company?.name || 'Unknown',
+    companyInfo: job.company ? {
+      id: job.company.id,
+      logo_url: job.company.logo_url,
+      is_verified: job.company.is_verified,
+    } : undefined,
     location: locationData, // Keep as object to preserve sublocality_level_1
     type: job.type,
     postType: 'job' as const,
@@ -489,7 +494,6 @@ export async function fetchJobsAndTenders(
     created_at: job.created_at, // Preserve original timestamp for filtering
     lat: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lat,
     lng: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lng,
-    companyLogo: job.company?.logo_url || undefined,
     requirements: job.requirements || [],
     responsibilities: job.responsibilities || [],
     skills: job.skills_required || [],
@@ -514,6 +518,11 @@ export async function fetchJobsAndTenders(
     title: tender.title,
     description: tender.description,
     company: tender.company?.name || 'Unknown',
+    companyInfo: tender.company ? {
+      id: tender.company.id,
+      logo_url: tender.company.logo_url,
+      is_verified: tender.company.is_verified,
+    } : undefined,
     location: locationData, // Keep as object to preserve sublocality_level_1
     type: 'Przetarg',
     postType: 'tender' as const,
@@ -529,7 +538,6 @@ export async function fetchJobsAndTenders(
     created_at: tender.created_at, // Preserve original timestamp for filtering
     lat: ensureValidCoordinates(tender.latitude, tender.longitude, locationData.city || '', tender.id)?.lat,
     lng: ensureValidCoordinates(tender.latitude, tender.longitude, locationData.city || '', tender.id)?.lng,
-    companyLogo: tender.company?.logo_url || undefined,
     visits_count: tender.views_count || 0,
     bookmarks_count: 0, // Tenders don't have bookmarks_count yet
     clientType: mapCompanyTypeToClientType(undefined), // Company type not available in current query
@@ -869,48 +877,86 @@ export async function createTender(
       'Instalacje i systemy': 'Instalacje Techniczne',
       'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
       'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
+      'Inne': 'Zarządzanie Nieruchomościami',
     };
 
-    // Use mapped category name if available, otherwise use original
-    const searchCategoryName = categoryMapping[tenderData.category] || tenderData.category;
+    // List of predefined categories from the form
+    const predefinedCategories = [
+      'Utrzymanie Czystości i Zieleni',
+      'Roboty Remontowo-Budowlane',
+      'Instalacje i systemy',
+      'Utrzymanie techniczne i konserwacja',
+      'Specjalistyczne usługi',
+      'Inne'
+    ];
 
-    // First, try exact match (case-insensitive)
-    let { data: categoryData, error: categoryError } = await (supabase as any)
-      .from('job_categories')
-      .select('id, name')
-      .ilike('name', searchCategoryName)
-      .eq('is_active', true)
-      .maybeSingle();
+    // Check if this is a custom category (not in predefined list)
+    const isCustomCategory = !predefinedCategories.includes(tenderData.category);
+    
+    let categoryData: any = null;
+    let categoryError: any = null;
 
-    // If exact match fails, try partial match
-    if (categoryError || !categoryData) {
-      const { data: partialMatch, error: partialError } = await (supabase as any)
+    // For custom categories, try to find/create category with the exact custom name first
+    // For predefined categories, use the mapped name
+    if (isCustomCategory) {
+      // First, try exact match with the custom category name (case-insensitive)
+      const { data: customMatch, error: customError } = await (supabase as any)
         .from('job_categories')
         .select('id, name')
-        .ilike('name', `%${searchCategoryName}%`)
+        .ilike('name', tenderData.category)
         .eq('is_active', true)
-        .limit(1)
         .maybeSingle();
 
-      if (!partialError && partialMatch) {
-        categoryData = partialMatch;
+      if (!customError && customMatch) {
+        categoryData = customMatch;
         categoryError = null;
+      } else {
+        // If custom category doesn't exist, try partial match
+        const { data: partialCustomMatch, error: partialCustomError } = await (supabase as any)
+          .from('job_categories')
+          .select('id, name')
+          .ilike('name', `%${tenderData.category}%`)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (!partialCustomError && partialCustomMatch) {
+          categoryData = partialCustomMatch;
+          categoryError = null;
+        }
       }
     }
 
-    // If still no match, try searching with the original category name
+    // If custom category search failed or it's a predefined category, use mapped name
     if (categoryError || !categoryData) {
-      const { data: originalMatch, error: originalError } = await (supabase as any)
+      const searchCategoryName = categoryMapping[tenderData.category] || 
+        (isCustomCategory ? 'Zarządzanie Nieruchomościami' : tenderData.category);
+
+      // Try exact match with mapped name
+      const { data: mappedMatch, error: mappedError } = await (supabase as any)
         .from('job_categories')
         .select('id, name')
-        .ilike('name', `%${tenderData.category}%`)
+        .ilike('name', searchCategoryName)
         .eq('is_active', true)
-        .limit(1)
         .maybeSingle();
 
-      if (!originalError && originalMatch) {
-        categoryData = originalMatch;
+      if (!mappedError && mappedMatch) {
+        categoryData = mappedMatch;
         categoryError = null;
+      } else {
+        // If exact match fails, try partial match
+        const { data: partialMatch, error: partialError } = await (supabase as any)
+          .from('job_categories')
+          .select('id, name')
+          .ilike('name', `%${searchCategoryName}%`)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (!partialError && partialMatch) {
+          categoryData = partialMatch;
+          categoryError = null;
+        }
       }
     }
 
@@ -918,7 +964,7 @@ export async function createTender(
       console.error('Error finding category:', {
         error: categoryError,
         searchedCategory: tenderData.category,
-        mappedCategory: searchCategoryName,
+        isCustomCategory,
       });
       
       // Try to get all available categories for debugging
@@ -937,6 +983,10 @@ export async function createTender(
     }
 
     const categoryId = categoryData.id;
+    
+    // Note: For custom categories, if a category with the exact custom name exists in the database,
+    // it will be used and the name is preserved. If it doesn't exist, we fall back to a mapped category.
+    // The category name stored in the database will be what we found/used.
 
     // Prepare documents JSONB
     const documentsJson = tenderData.documents ? tenderData.documents.map(doc => ({
@@ -988,8 +1038,25 @@ export async function createTender(
       .single();
 
     if (insertError) {
-      console.error('Error creating tender:', insertError);
-      return { data: null, error: insertError };
+      console.error('Error creating tender:', {
+        error: insertError,
+        errorMessage: insertError?.message,
+        errorDetails: insertError?.details,
+        errorHint: insertError?.hint,
+        errorCode: insertError?.code,
+        tenderData: {
+          title: tenderData.title,
+          category: tenderData.category,
+          categoryId: categoryId,
+          location: tenderData.location,
+        }
+      });
+      return { 
+        data: null, 
+        error: insertError instanceof Error 
+          ? insertError 
+          : new Error(insertError?.message || insertError?.details || insertError?.hint || 'Unknown database error')
+      };
     }
 
     return { data: insertedTender as any, error: null };
@@ -1359,7 +1426,6 @@ export async function createJob(
       address: jobData.address || null,
       latitude: jobData.latitude || null,
       longitude: jobData.longitude || null,
-      sublocality_level_1: jobData.sublocalityLevel1 || null,
       budget_min: budgetDb.budget_min,
       budget_max: budgetDb.budget_max,
       budget_type: budgetDb.budget_type,

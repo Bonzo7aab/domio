@@ -27,7 +27,11 @@ interface JobDetailsProps {
     bookmarks_count?: number;
     verified: boolean;
     urgent: boolean;
-    companyLogo?: string;
+    companyInfo?: {
+      id: string;
+      logo_url: string | null;
+      is_verified: boolean;
+    };
     clientType?: string;
     category?: string;
     subcategory?: string;
@@ -80,7 +84,7 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4">
                   <Avatar className="w-16 h-16">
-                    <AvatarImage src={job.companyLogo} />
+                    <AvatarImage src={job.companyInfo?.logo_url || undefined} />
                     <AvatarFallback>{job.company.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1">

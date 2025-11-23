@@ -29,6 +29,7 @@ import {
 import { Alert, AlertDescription } from './ui/alert';
 import { toast } from 'sonner';
 import { TenderWithCompany } from '../lib/database/jobs';
+import LocationAutocomplete from './LocationAutocomplete';
 
 interface TenderCreationFormInlineProps {
   onClose: () => void;
@@ -42,6 +43,9 @@ interface NewTender {
   description: string;
   category: string;
   location: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
   estimatedValue: string;
   currency: string;
   submissionDeadline: Date;
@@ -80,7 +84,8 @@ const categories = [
   'Roboty Remontowo-Budowlane', 
   'Instalacje i systemy',
   'Utrzymanie techniczne i konserwacja',
-  'Specjalistyczne usługi'
+  'Specjalistyczne usługi',
+  'Inne'
 ];
 
 // Generate unique colors for criteria based on their position in sorted list
@@ -144,6 +149,9 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
     description: '',
     category: '',
     location: '',
+    address: undefined,
+    latitude: undefined,
+    longitude: undefined,
     estimatedValue: '',
     currency: 'PLN',
     submissionDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dni od teraz
@@ -167,19 +175,31 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(
     new Set()
   );
+  const [customCategory, setCustomCategory] = useState<string>('');
 
   // Populate form with initial data when editing
   useEffect(() => {
     if (isEditMode && initialData) {
+      const categoryName = initialData.category?.name || '';
+      const isCustomCategory = categoryName && !categories.includes(categoryName);
+      
+      const locationString = typeof initialData.location === 'string' 
+        ? initialData.location 
+        : initialData.location && typeof initialData.location === 'object' && 'city' in initialData.location
+          ? initialData.location.city + (initialData.location.sublocality_level_1 ? `, ${initialData.location.sublocality_level_1}` : '')
+          : '';
+      
+      // Access address from the data object (may not be in type definition but exists in DB)
+      const address = (initialData as any).address || locationString || undefined;
+      
       setFormData({
         title: initialData.title || '',
         description: initialData.description || '',
-        category: initialData.category?.name || '',
-        location: typeof initialData.location === 'string' 
-          ? initialData.location 
-          : initialData.location && typeof initialData.location === 'object' && 'city' in initialData.location
-            ? initialData.location.city + (initialData.location.sublocality_level_1 ? `, ${initialData.location.sublocality_level_1}` : '')
-            : '',
+        category: isCustomCategory ? 'Inne' : categoryName,
+        location: locationString,
+        address: address,
+        latitude: initialData.latitude ? Number(initialData.latitude) : undefined,
+        longitude: initialData.longitude ? Number(initialData.longitude) : undefined,
         estimatedValue: initialData.estimated_value?.toString() || '',
         currency: initialData.currency || 'PLN',
         submissionDeadline: initialData.submission_deadline ? new Date(initialData.submission_deadline) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -207,6 +227,13 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
         performanceBond: false,
         status: initialData.status as 'draft' | 'active' || 'draft'
       });
+      
+      // Restore custom category name if it's a custom category
+      if (isCustomCategory && categoryName) {
+        setCustomCategory(categoryName);
+      } else {
+        setCustomCategory('');
+      }
     }
   }, [isEditMode, initialData]);
 
@@ -217,6 +244,9 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
       if (!formData.title.trim()) newErrors.title = 'Tytuł jest wymagany';
       if (!formData.description.trim()) newErrors.description = 'Opis jest wymagany';
       if (!formData.category) newErrors.category = 'Kategoria jest wymagana';
+      if (formData.category === 'Inne' && !customCategory.trim()) {
+        newErrors.customCategory = 'Nazwa kategorii jest wymagana';
+      }
       if (!formData.location.trim()) newErrors.location = 'Lokalizacja jest wymagana';
     }
 
@@ -279,8 +309,13 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
   const handleSubmit = (asDraft: boolean = false) => {
     if (!asDraft && !validateStep(currentStep)) return;
 
+    const finalCategory = formData.category === 'Inne' && customCategory.trim() 
+      ? customCategory.trim() 
+      : formData.category;
+
     const tender: NewTender = {
       ...formData,
+      category: finalCategory,
       requirements: formData.requirements.filter(req => req.trim() !== ''),
       status: asDraft ? 'draft' : 'active'
     };
@@ -690,7 +725,12 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
                   <Label htmlFor="category">Kategoria usług *</Label>
                   <Select 
                     value={formData.category} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                    onValueChange={(value) => {
+                      setFormData(prev => ({ ...prev, category: value }));
+                      if (value !== 'Inne') {
+                        setCustomCategory('');
+                      }
+                    }}
                   >
                     <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
                       <SelectValue placeholder="Wybierz kategorię" />
@@ -706,16 +746,37 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
                   {errors.category && (
                     <p className="text-sm text-destructive mt-1">{errors.category}</p>
                   )}
+                  {formData.category === 'Inne' && (
+                    <div className="mt-2">
+                      <Input
+                        id="customCategory"
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        placeholder="Wpisz nazwę kategorii"
+                        className={errors.customCategory ? 'border-destructive' : ''}
+                      />
+                      {errors.customCategory && (
+                        <p className="text-sm text-destructive mt-1">{errors.customCategory}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <Label htmlFor="location">Lokalizacja realizacji *</Label>
-                  <Input
-                    id="location"
+                  <LocationAutocomplete
                     value={formData.location}
-                    onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                    onLocationSelect={(location, address, lat, lng, sublocalityLevel1) => {
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        location: address,
+                        address: address,
+                        latitude: lat,
+                        longitude: lng
+                      }));
+                    }}
+                    required
                     placeholder="np. Warszawa, Mokotów"
-                    className={errors.location ? 'border-destructive' : ''}
+                    label="Lokalizacja realizacji *"
                   />
                   {errors.location && (
                     <p className="text-sm text-destructive mt-1">{errors.location}</p>
@@ -1095,7 +1156,7 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
                   <h4 className="font-semibold mb-3">Podstawowe informacje</h4>
                   <div className="space-y-2 text-sm">
                     <div><strong>Tytuł:</strong> {formData.title}</div>
-                    <div><strong>Kategoria:</strong> {formData.category}</div>
+                    <div><strong>Kategoria:</strong> {formData.category === 'Inne' && customCategory.trim() ? customCategory : formData.category}</div>
                     <div><strong>Lokalizacja:</strong> {formData.location}</div>
                     <div><strong>Wartość:</strong> {parseInt(formData.estimatedValue || '0').toLocaleString('pl-PL')} {formData.currency}</div>
                   </div>

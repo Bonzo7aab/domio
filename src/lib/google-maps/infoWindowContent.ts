@@ -22,9 +22,11 @@ export function generateInfoWindowContent(jobData?: Job, isSmallMap: boolean = f
     urgent,
     verified,
     category,
-    companyLogo,
+    companyInfo,
     postType,
   } = jobData;
+  
+  const companyLogo = companyInfo?.logo_url || undefined;
   
   // Rating is not part of Job type, so we'll skip it
   const rating = undefined;

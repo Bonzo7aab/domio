@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Building, User, MapPin, Award, Upload, Phone, Mail, Shield } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -603,7 +604,10 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
                         <strong>Informacja RODO:</strong> Dokumenty potwierdzające certyfikaty i ubezpieczenia 
                         przetwarzamy w celu weryfikacji kwalifikacji i budowania zaufania na platformie. 
                         Przesłanie dokumentów jest dobrowolne - możesz korzystać z platformy bez weryfikacji, 
-                        ale zweryfikowane konto otrzymuje więcej zleceń.
+                        ale zweryfikowane konto otrzymuje więcej zleceń.{' '}
+                        <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
+                          Więcej informacji w Polityce prywatności
+                        </Link>.
                       </AlertDescription>
                     </Alert>
                     
@@ -649,7 +653,10 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
                   <Alert variant="destructive">
                     <AlertDescription>
                       <strong>Ochrona danych:</strong> Wszystkie dokumenty są przetwarzane zgodnie z RODO. 
-                      Weryfikacja jest dobrowolna, ale zweryfikowani zarządcy otrzymują więcej ofert od wykonawców.
+                      Weryfikacja jest dobrowolna, ale zweryfikowani zarządcy otrzymują więcej ofert od wykonawców.{' '}
+                      <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
+                        Więcej informacji w Polityce prywatności
+                      </Link>.
                     </AlertDescription>
                   </Alert>
 

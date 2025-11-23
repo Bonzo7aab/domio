@@ -179,7 +179,7 @@ const TenderRegulations: React.FC<TenderRegulationsProps> = ({ tender }) => {
           <div>
             <h4 className="font-semibold mb-3">Forma składania oferty:</h4>
             <ul className="space-y-1 text-sm">
-              <li>• Oferta musi być złożona elektronicznie przez platformę Urbi.eu</li>
+              <li>• Oferta musi być złożona elektronicznie przez platformę Domio</li>
               <li>• Wszystkie wymagane dokumenty w formacie PDF</li>
               <li>• Oferta musi być podpisana kwalifikowanym podpisem elektronicznym</li>
               <li>• Maksymalny rozmiar załączników: 50MB</li>

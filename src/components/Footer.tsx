@@ -36,6 +36,18 @@ export function Footer() {
             >
               Zarządcy
             </Link>
+            <Link 
+              href="/privacy" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Polityka prywatności
+            </Link>
+            <Link 
+              href="/terms" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Regulamin
+            </Link>
           </div>
 
           {/* Copyright */}

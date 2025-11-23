@@ -7,7 +7,12 @@ export interface Job {
   
   // Basic info
   title: string;
-  company: string;
+  company: string; // Company name for display
+  companyInfo?: {
+    id: string;
+    logo_url: string | null;
+    is_verified: boolean;
+  }; // Company details (use companyInfo.id instead of company_id, companyInfo.logo_url instead of company_logo)
   location: string | { city: string; sublocality_level_1?: string }; // Support both string and object formats
   type: string;
   description: string;
@@ -56,14 +61,6 @@ export interface Job {
   deadline?: string;
   projectDuration?: string;
   
-  // Contract details (optional)
-  contractDetails?: {
-    contractType: string;
-    paymentTerms: string;
-    warrantyPeriod: string;
-    terminationConditions: string;
-  };
-  
   // Contact info (optional)
   contactPerson?: string;
   contactPhone?: string;
@@ -76,7 +73,6 @@ export interface Job {
   additionalInfo?: string;
   
   // Media
-  companyLogo?: string;
   images?: string[];
   
   // Location coordinates

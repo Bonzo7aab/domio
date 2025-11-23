@@ -201,7 +201,7 @@ function normalizeJobData(
       buildingYear: undefined,
       surface: undefined,
       additionalInfo: storedJob.additionalInfo,
-      companyLogo: undefined,
+      companyInfo: undefined,
       images: [],
       lat: storedJob.lat,
       lng: storedJob.lng,
@@ -268,7 +268,11 @@ function normalizeJobData(
       buildingYear: undefined, // Not in current JobWithCompany schema
       surface: undefined, // Not in current JobWithCompany schema
       additionalInfo: undefined, // Not in current schema
-      companyLogo: dbJob.company?.logo_url || undefined,
+      companyInfo: dbJob.company ? {
+        id: dbJob.company.id,
+        logo_url: dbJob.company.logo_url,
+        is_verified: dbJob.company.is_verified,
+      } : undefined,
       images: dbJob.images || [],
       lat: dbJob.latitude || undefined,
       lng: dbJob.longitude || undefined,
@@ -341,7 +345,11 @@ function normalizeJobData(
       contactPerson: undefined,
       contactPhone: undefined,
       contactEmail: undefined,
-      companyLogo: dbTender.company?.logo_url || undefined,
+      companyInfo: dbTender.company ? {
+        id: dbTender.company.id,
+        logo_url: dbTender.company.logo_url,
+        is_verified: dbTender.company.is_verified,
+      } : undefined,
       images: [],
       lat: dbTender.latitude || undefined,
       lng: dbTender.longitude || undefined,
@@ -569,7 +577,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 flex-1">
                     <Avatar className="w-16 h-16 bg-gray-100 border-2 border-border">
-                      <AvatarImage src={job.companyLogo} alt={job.company} />
+                      <AvatarImage src={job.companyInfo?.logo_url || undefined} alt={job.company} />
                       <AvatarFallback className="text-lg font-semibold">
                         {job.company?.charAt(0).toUpperCase() || '?'}
                       </AvatarFallback>

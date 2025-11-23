@@ -10,6 +10,7 @@ import { FilterProvider } from '../contexts/FilterContext'
 import { GlobalCommandPalette } from '../components/GlobalCommandPalette'
 import { MobileMenuDock } from '../components/MobileMenuDock'
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration'
+import { CookieConsentBanner } from '../components/CookieConsentBanner'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -49,7 +50,14 @@ export default function RootLayout({
       <body className={inter.className}>
         <ServiceWorkerRegistration />
         <AuthProvider>
-          <Suspense fallback={null}>
+          <Suspense fallback={
+            <div className="min-h-screen bg-background flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-sm text-muted-foreground">Ładowanie...</p>
+              </div>
+            </div>
+          }>
             <FilterProvider>
               <LayoutProvider>
                 <Header />
@@ -57,6 +65,7 @@ export default function RootLayout({
                   {children}
                 </main>
                 <MobileMenuDock />
+                <CookieConsentBanner />
                 <Toaster />
                 <GlobalCommandPalette />
               </LayoutProvider>
