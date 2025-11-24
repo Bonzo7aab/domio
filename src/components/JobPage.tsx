@@ -18,7 +18,7 @@ import { getStoredJobs, Job as StoredJob } from '../utils/jobStorage';
 import { addBookmark, removeBookmark, isJobBookmarked } from '../utils/bookmarkStorage';
 import { toast } from 'sonner';
 import { getJobById, getTenderById } from '../lib/data';
-import { incrementJobViews, incrementTenderViews, type JobWithCompany, type TenderWithCompany } from '../lib/database/jobs';
+import { incrementJobViews, incrementTenderViews, createJobApplication, createTenderBid, type JobWithCompany, type TenderWithCompany } from '../lib/database/jobs';
 import { formatBudget, budgetFromDatabase, type Budget } from '../types/budget';
 import { type Job, type TenderInfo } from '../types/job';
 
@@ -516,10 +516,72 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     setShowApplicationForm(true);
   };
 
-  const handleApplicationFormSubmit = (applicationData: any) => {
-    console.log('Application submitted:', applicationData);
-    toast.success(job.postType === 'tender' ? 'Oferta w przetargu została złożona!' : 'Oferta została złożona!');
-    setShowApplicationForm(false);
+  const handleApplicationFormSubmit = async (applicationData: any) => {
+    if (!user?.id || !supabase) {
+      toast.error('Musisz być zalogowany aby złożyć ofertę');
+      return;
+    }
+
+    try {
+      if (job.postType === 'tender') {
+        // Handle tender bid submission
+        const { data, error } = await createTenderBid(
+          supabase,
+          jobId,
+          user.id,
+          {
+            proposedPrice: applicationData.proposedPrice,
+            estimatedCompletion: applicationData.estimatedCompletion,
+            coverLetter: applicationData.coverLetter,
+            additionalNotes: applicationData.additionalNotes,
+          }
+        );
+
+        if (error) {
+          console.error('Error submitting tender bid:', error);
+          toast.error(error.message || 'Wystąpił błąd podczas składania oferty w przetargu');
+          return;
+        }
+
+        console.log('Tender bid submitted successfully:', data);
+        toast.success('Oferta w przetargu została złożona pomyślnie!');
+      } else {
+        // Handle regular job application submission
+        const { data, error } = await createJobApplication(
+          supabase,
+          jobId,
+          user.id,
+          {
+            proposedPrice: applicationData.proposedPrice,
+            estimatedCompletion: applicationData.estimatedCompletion,
+            coverLetter: applicationData.coverLetter,
+            additionalNotes: applicationData.additionalNotes,
+          }
+        );
+
+        if (error) {
+          console.error('Error submitting application:', error);
+          toast.error(error.message || 'Wystąpił błąd podczas składania oferty');
+          return;
+        }
+
+        console.log('Application submitted successfully:', data);
+        toast.success('Oferta została złożona pomyślnie!');
+      }
+
+      setShowApplicationForm(false);
+      
+      // Reset form
+      setApplicationForm({
+        proposedPrice: '',
+        estimatedCompletion: '',
+        coverLetter: '',
+        additionalNotes: ''
+      });
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      toast.error('Wystąpił błąd podczas składania oferty');
+    }
   };
 
   const handleBookmark = () => {

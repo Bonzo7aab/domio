@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -107,6 +107,11 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
   const [selectedBidId, setSelectedBidId] = useState<string | null>(null);
   const [evaluationMode, setEvaluationMode] = useState<'overview' | 'detailed' | 'compare'>('overview');
   const [selectedBidsForComparison, setSelectedBidsForComparison] = useState<string[]>([]);
+
+  // Update bids when prop changes
+  useEffect(() => {
+    setBids(initialBids);
+  }, [initialBids]);
 
   const selectedBid = selectedBidId ? bids.find(b => b.id === selectedBidId) : null;
 

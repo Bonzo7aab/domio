@@ -38,9 +38,15 @@ function MessagesPageContent() {
   const [messages, setMessages] = useState<{ [conversationId: string]: Message[] }>({});
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Get conversation ID from URL params
   const conversationId = searchParams.get('conversation');
+
+  // Prevent hydration mismatch by only rendering after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -222,6 +228,11 @@ function MessagesPageContent() {
       }));
     }
   };
+
+  // Prevent hydration mismatch - wait for client-side mount
+  if (!mounted) {
+    return <LoadingState label="Ładowanie..." />;
+  }
 
   // Show loading while checking auth
   if (isLoading) {

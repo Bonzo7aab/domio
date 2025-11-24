@@ -11,6 +11,7 @@ import { ProfileForm } from './ProfileForm';
 import { CompanyManagementForm } from './CompanyManagementForm';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { Avatar, AvatarFallback } from './ui/avatar';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Separator } from './ui/separator';
@@ -169,6 +170,11 @@ export function UserAccountPageClient({
                       <span className="text-sm">
                         {user.isVerified ? 'Zweryfikowany' : 'Niezweryfikowany'}
                       </span>
+                      {!user.isVerified && (
+                        <Badge variant="destructive" className="ml-2">
+                          Ważne
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>

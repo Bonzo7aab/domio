@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Search, Bell, User, MessageCircle, GraduationCap, Play, Bookmark, LogOut } from 'lucide-react';
+import { Search, User, MessageCircle, GraduationCap, Play, Bookmark, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { UnifiedNotifications } from './UnifiedNotifications';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -290,13 +290,6 @@ export function Header({ initialUser }: HeaderProps) {
                           <MessageCircle className="mr-2 h-4 w-4" />
                           <span>Wiadomości</span>
                         </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                        >
-                          <Bell className="mr-2 h-4 w-4" />
-                          <span>Powiadomienia</span>
-                        </Button>
                         
                         <div className="h-px bg-border my-2" />
                         
@@ -404,10 +397,6 @@ export function Header({ initialUser }: HeaderProps) {
                     <DropdownMenuItem onClick={handleMessagingClick}>
                       <MessageCircle className="mr-2 h-4 w-4" />
                       <span>Wiadomości</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Bell className="mr-2 h-4 w-4" />
-                      <span>Powiadomienia</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     

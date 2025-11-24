@@ -1494,5 +1494,423 @@ export async function createJob(
   }
 }
 
+/**
+ * Convert estimated completion string to days
+ * Examples: "1 miesiąc" -> 30, "2 tygodnie" -> 14, "1-3 dni" -> 2, "2-4 tygodnie" -> 21
+ */
+function convertEstimatedCompletionToDays(estimatedCompletion: string): number | null {
+  if (!estimatedCompletion) return null;
+  
+  const lower = estimatedCompletion.toLowerCase().trim();
+  
+  // Handle ranges with units (e.g., "2-4 tygodnie", "1-3 dni")
+  if (lower.includes('-')) {
+    // Detect unit first
+    let unitMultiplier = 1;
+    let unitKeyword = '';
+    
+    if (lower.includes('dzień') || lower.includes('dni')) {
+      unitMultiplier = 1;
+      unitKeyword = lower.includes('dzień') ? 'dzień' : 'dni';
+    } else if (lower.includes('tydzień') || lower.includes('tygodni')) {
+      unitMultiplier = 7;
+      unitKeyword = lower.includes('tydzień') ? 'tydzień' : 'tygodni';
+    } else if (lower.includes('miesiąc') || lower.includes('miesięcy')) {
+      unitMultiplier = 30;
+      unitKeyword = lower.includes('miesiąc') ? 'miesiąc' : 'miesięcy';
+    }
+    
+    // If unit found, extract numbers from range
+    if (unitKeyword) {
+      // Remove unit keyword and extract numbers
+      const withoutUnit = lower.replace(new RegExp(unitKeyword, 'g'), '').trim();
+      const parts = withoutUnit.split('-').map(p => p.trim());
+      
+      if (parts.length === 2) {
+        const first = parseInt(parts[0]);
+        const second = parseInt(parts[1]);
+        if (!isNaN(first) && !isNaN(second)) {
+          const average = Math.round((first + second) / 2);
+          return average * unitMultiplier;
+        }
+      }
+    } else {
+      // Range without unit - try to parse as plain numbers
+      const parts = lower.split('-').map(p => p.trim());
+      if (parts.length === 2) {
+        const first = parseInt(parts[0]);
+        const second = parseInt(parts[1]);
+        if (!isNaN(first) && !isNaN(second)) {
+          return Math.round((first + second) / 2);
+        }
+      }
+    }
+  }
+  
+  // Handle specific time periods (non-range)
+  if (lower.includes('dzień') || lower.includes('dni')) {
+    const days = parseInt(lower);
+    return isNaN(days) ? null : days;
+  }
+  
+  if (lower.includes('tydzień') || lower.includes('tygodni')) {
+    const weeks = parseInt(lower);
+    return isNaN(weeks) ? null : weeks * 7;
+  }
+  
+  if (lower.includes('miesiąc') || lower.includes('miesięcy')) {
+    const months = parseInt(lower);
+    return isNaN(months) ? null : months * 30;
+  }
+  
+  // Try to extract number
+  const number = parseInt(lower);
+  return isNaN(number) ? null : number;
+}
+
+/**
+ * Create a new job application
+ */
+export async function createJobApplication(
+  supabase: SupabaseClient<Database>,
+  jobId: string,
+  contractorId: string,
+  applicationData: {
+    proposedPrice: number;
+    estimatedCompletion: string;
+    coverLetter: string;
+    additionalNotes?: string;
+  }
+): Promise<{ data: any | null; error: any }> {
+  try {
+    // Fetch contractor's primary company
+    const { fetchUserPrimaryCompany } = await import('./companies');
+    const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, contractorId);
+    
+    if (companyError) {
+      console.error('Error fetching contractor company:', companyError);
+      return { data: null, error: companyError };
+    }
+    
+    if (!company) {
+      return { 
+        data: null, 
+        error: { message: 'Contractor must have a company to submit applications' } 
+      };
+    }
+    
+    // Convert estimated completion to days
+    const proposedTimeline = convertEstimatedCompletionToDays(applicationData.estimatedCompletion);
+    
+    // Prepare insert data
+    const insertData: any = {
+      job_id: jobId,
+      contractor_id: contractorId,
+      company_id: company.id,
+      proposed_price: applicationData.proposedPrice,
+      currency: 'PLN',
+      cover_letter: applicationData.coverLetter,
+      notes: applicationData.additionalNotes || null,
+      status: 'submitted',
+    };
+    
+    // Only add proposed_timeline if we successfully converted it
+    if (proposedTimeline !== null) {
+      insertData.proposed_timeline = proposedTimeline;
+    }
+    
+    // Insert application
+    const { data: insertedApplication, error: insertError } = await supabase
+      .from('job_applications')
+      .insert(insertData)
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('Error creating job application:', insertError);
+      return { data: null, error: insertError };
+    }
+    
+    return { data: insertedApplication, error: null };
+  } catch (err) {
+    console.error('Error creating job application:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Fetch job applications for a specific job
+ */
+export async function fetchJobApplicationsByJobId(
+  supabase: SupabaseClient<Database>,
+  jobId: string
+): Promise<{ data: any[] | null; error: any }> {
+  try {
+    const { data: applications, error } = await supabase
+      .from('job_applications')
+      .select(`
+        id,
+        job_id,
+        contractor_id,
+        proposed_price,
+        proposed_timeline,
+        cover_letter,
+        experience,
+        team_size,
+        available_from,
+        guarantee_period,
+        status,
+        notes,
+        attachments,
+        certificates,
+        submitted_at,
+        reviewed_at,
+        decision_at,
+        contractor:user_profiles!job_applications_contractor_id_fkey (
+          id,
+          first_name,
+          last_name,
+          avatar_url
+        ),
+        company:companies!job_applications_company_id_fkey (
+          id,
+          name,
+          logo_url
+        )
+      `)
+      .eq('job_id', jobId)
+      .order('submitted_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching job applications:', error);
+      return { data: null, error };
+    }
+    
+    // Transform to Application type format
+    const formattedApplications = await Promise.all(
+      (applications || []).map(async (app) => {
+        // Fetch contractor profile for additional data (rating, completed jobs, location)
+        const { fetchContractorById } = await import('./contractors');
+        const contractorProfile = await fetchContractorById(app.company?.id || '');
+        
+        // Convert proposed_timeline (days) back to readable string
+        let proposedTimeline = 'Nie określono';
+        if (app.proposed_timeline) {
+          const days = app.proposed_timeline;
+          if (days < 7) {
+            proposedTimeline = `${days} ${days === 1 ? 'dzień' : 'dni'}`;
+          } else if (days < 30) {
+            const weeks = Math.round(days / 7);
+            proposedTimeline = `${weeks} ${weeks === 1 ? 'tydzień' : weeks < 5 ? 'tygodnie' : 'tygodni'}`;
+          } else {
+            const months = Math.round(days / 30);
+            proposedTimeline = `${months} ${months === 1 ? 'miesiąc' : months < 5 ? 'miesiące' : 'miesięcy'}`;
+          }
+        }
+        
+        return {
+          id: app.id,
+          jobId: app.job_id,
+          contractorId: app.contractor_id,
+          contractorName: app.contractor 
+            ? `${app.contractor.first_name || ''} ${app.contractor.last_name || ''}`.trim() 
+            : 'Nieznany wykonawca',
+          contractorCompany: app.company?.name || 'Nieznana firma',
+          contractorAvatar: app.contractor?.avatar_url || app.company?.logo_url || '',
+          contractorRating: contractorProfile?.rating?.overall || 0,
+          contractorCompletedJobs: contractorProfile?.experience?.completedProjects || 0,
+          contractorLocation: contractorProfile?.location?.city || 'Nieznana lokalizacja',
+          proposedPrice: app.proposed_price || 0,
+          proposedTimeline: proposedTimeline,
+          coverLetter: app.cover_letter || '',
+          experience: app.experience || '',
+          teamSize: app.team_size || 1,
+          availableFrom: app.available_from || new Date().toISOString(),
+          guaranteePeriod: app.guarantee_period ? `${app.guarantee_period} miesięcy` : '12 miesięcy',
+          attachments: (app.attachments as any) || [],
+          certificates: (app.certificates as string[]) || [],
+          status: (app.status as 'submitted' | 'under_review' | 'accepted' | 'rejected') || 'submitted',
+          submittedAt: new Date(app.submitted_at),
+          lastUpdated: app.reviewed_at ? new Date(app.reviewed_at) : new Date(app.submitted_at),
+          reviewNotes: app.notes || undefined,
+        };
+      })
+    );
+    
+    return { data: formattedApplications, error: null };
+  } catch (err) {
+    console.error('Error fetching job applications:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Create a new tender bid
+ */
+export async function createTenderBid(
+  supabase: SupabaseClient<Database>,
+  tenderId: string,
+  contractorId: string,
+  bidData: {
+    proposedPrice: number;
+    estimatedCompletion: string;
+    coverLetter: string;
+    additionalNotes?: string;
+  }
+): Promise<{ data: any | null; error: any }> {
+  try {
+    // Fetch contractor's primary company
+    const { fetchUserPrimaryCompany } = await import('./companies');
+    const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, contractorId);
+    
+    if (companyError) {
+      console.error('Error fetching contractor company:', companyError);
+      return { data: null, error: companyError };
+    }
+    
+    if (!company) {
+      return { 
+        data: null, 
+        error: { message: 'Contractor must have a company to submit bids' } 
+      };
+    }
+    
+    // Convert estimated completion to days
+    const proposedTimeline = convertEstimatedCompletionToDays(bidData.estimatedCompletion);
+    
+    // Prepare insert data
+    const insertData: any = {
+      tender_id: tenderId,
+      contractor_id: contractorId,
+      company_id: company.id,
+      bid_amount: bidData.proposedPrice,
+      currency: 'PLN',
+      technical_proposal: bidData.coverLetter,
+      financial_proposal: bidData.additionalNotes || null,
+      status: 'submitted',
+    };
+    
+    // Only add proposed_timeline if we successfully converted it
+    if (proposedTimeline !== null) {
+      insertData.proposed_timeline = proposedTimeline;
+    }
+    
+    // Insert bid
+    const { data: insertedBid, error: insertError } = await supabase
+      .from('tender_bids')
+      .insert(insertData)
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('Error creating tender bid:', insertError);
+      return { data: null, error: insertError };
+    }
+    
+    return { data: insertedBid, error: null };
+  } catch (err) {
+    console.error('Error creating tender bid:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Fetch tender bids for a specific tender
+ */
+export async function fetchTenderBidsByTenderId(
+  supabase: SupabaseClient<Database>,
+  tenderId: string
+): Promise<{ data: any[] | null; error: any }> {
+  try {
+    const { data: bids, error } = await supabase
+      .from('tender_bids')
+      .select(`
+        id,
+        tender_id,
+        contractor_id,
+        bid_amount,
+        proposed_timeline,
+        proposed_start_date,
+        technical_proposal,
+        financial_proposal,
+        team_description,
+        experience_summary,
+        project_references,
+        certificates,
+        attachments,
+        status,
+        evaluation_score,
+        evaluation_notes,
+        submitted_at,
+        evaluated_at,
+        contractor:user_profiles!tender_bids_contractor_id_fkey (
+          id,
+          first_name,
+          last_name,
+          avatar_url
+        ),
+        company:companies!tender_bids_company_id_fkey (
+          id,
+          name,
+          logo_url
+        )
+      `)
+      .eq('tender_id', tenderId)
+      .order('submitted_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching tender bids:', error);
+      return { data: null, error };
+    }
+    
+    // Transform to TenderBid type format
+    const formattedBids = await Promise.all(
+      (bids || []).map(async (bid) => {
+        // Fetch contractor profile for additional data
+        const { fetchContractorById } = await import('./contractors');
+        const contractorProfile = await fetchContractorById(bid.company?.id || '');
+        
+        // Convert proposed_timeline (days) to number
+        const proposedTimeline = bid.proposed_timeline || 0;
+        
+        return {
+          id: bid.id,
+          contractorId: bid.contractor_id,
+          contractorName: bid.contractor 
+            ? `${bid.contractor.first_name || ''} ${bid.contractor.last_name || ''}`.trim() 
+            : 'Nieznany wykonawca',
+          contractorCompany: bid.company?.name || 'Nieznana firma',
+          contractorAvatar: bid.contractor?.avatar_url || bid.company?.logo_url || '',
+          contractorRating: contractorProfile?.rating?.overall || 0,
+          contractorCompletedJobs: contractorProfile?.experience?.completedProjects || 0,
+          totalPrice: bid.bid_amount || 0,
+          currency: 'PLN',
+          proposedTimeline: proposedTimeline,
+          proposedStartDate: bid.proposed_start_date ? new Date(bid.proposed_start_date) : new Date(),
+          guaranteePeriod: 12, // Default, could be extracted from bid if available
+          description: bid.technical_proposal || '',
+          technicalProposal: bid.technical_proposal || '',
+          attachments: (bid.attachments as any) || [],
+          criteriaResponses: [], // Would need to be extracted from bid if stored separately
+          submittedAt: new Date(bid.submitted_at),
+          status: (bid.status as 'submitted' | 'under_review' | 'shortlisted' | 'rejected' | 'awarded') || 'submitted',
+          evaluation: bid.evaluation_score || bid.evaluation_notes ? {
+            criteriaScores: {},
+            totalScore: bid.evaluation_score || 0,
+            evaluatorNotes: bid.evaluation_notes || '',
+            evaluatedAt: bid.evaluated_at ? new Date(bid.evaluated_at) : new Date(),
+            evaluatorId: '',
+          } : undefined,
+        };
+      })
+    );
+    
+    return { data: formattedBids, error: null };
+  } catch (err) {
+    console.error('Error fetching tender bids:', err);
+    return { data: null, error: err };
+  }
+}
+
 
 

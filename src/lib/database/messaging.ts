@@ -18,6 +18,7 @@ export interface ConversationData {
   participant2: string;
   subject: string;
   jobId?: string | null;
+  tenderId?: string | null;
 }
 
 export interface MessageData {
@@ -43,6 +44,7 @@ export async function createConversation(
         participant_2: data.participant2,
         subject: data.subject,
         job_id: data.jobId || null,
+        tender_id: data.tenderId || null,
         last_message_at: new Date().toISOString(),
       })
       .select('id')
@@ -148,7 +150,8 @@ export async function createNotification(
   actionUrl?: string
 ): Promise<{ data: string | null; error: any }> {
   try {
-    const { data: notification, error } = await (supabase as any)
+    // Insert notification without select first (RLS might block select for other users)
+    const { error: insertError } = await (supabase as any)
       .from('notifications')
       .insert({
         user_id: userId,
@@ -158,16 +161,43 @@ export async function createNotification(
         data: data || null,
         action_url: actionUrl || null,
         priority: 'normal',
-      })
-      .select('id')
-      .single();
+      });
 
-    if (error) {
-      console.error('Error creating notification:', error);
-      return { data: null, error };
+    if (insertError) {
+      console.error('Error creating notification (insert):', {
+        error: insertError,
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint
+      });
+      return { data: null, error: insertError };
     }
 
-    return { data: notification?.id || null, error: null };
+    // Try to get the ID, but if it fails due to RLS, that's okay - the insert succeeded
+    try {
+      const { data: notification, error: selectError } = await (supabase as any)
+        .from('notifications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('type', type)
+        .eq('title', title)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (selectError) {
+        console.warn('Could not retrieve notification ID (RLS may block select):', selectError);
+        // Insert succeeded, so return success even if we can't get the ID
+        return { data: null, error: null };
+      }
+
+      return { data: notification?.id || null, error: null };
+    } catch (selectErr) {
+      console.warn('Error selecting notification ID:', selectErr);
+      // Insert succeeded, so return success
+      return { data: null, error: null };
+    }
   } catch (err) {
     console.error('Error creating notification:', err);
     return { data: null, error: err };
@@ -367,6 +397,7 @@ export async function fetchUserConversations(
         created_at,
         updated_at,
         job_id,
+        tender_id,
         participant_1_profile:user_profiles!conversations_participant_1_fkey(
           id,
           first_name,
@@ -384,6 +415,10 @@ export async function fetchUserConversations(
           phone
         ),
         job:jobs(
+          id,
+          title
+        ),
+        tender:tenders(
           id,
           title
         )
@@ -428,8 +463,8 @@ export async function fetchUserConversations(
         ],
         lastMessage: undefined, // Will be populated separately
         unreadCount: 0, // Will be calculated separately
-        jobId: conv.job_id,
-        jobTitle: conv.job?.title,
+        jobId: conv.job_id || conv.tender_id, // Support both jobs and tenders
+        jobTitle: conv.job?.title || conv.tender?.title, // Support both jobs and tenders
         createdAt: new Date(conv.created_at),
         updatedAt: new Date(conv.updated_at)
       };

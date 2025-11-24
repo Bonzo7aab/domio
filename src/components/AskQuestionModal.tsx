@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { useUserProfile } from '../contexts/AuthContext';
-import { addQuestion } from '../utils/questionStorage';
+import { submitQuestion } from '../lib/database/questions';
 import { toast } from 'sonner';
 
 interface AskQuestionModalProps {
@@ -23,7 +23,7 @@ export const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
   jobTitle,
   companyName
 }) => {
-  const { user } = useUserProfile();
+  const { user, supabase } = useUserProfile();
   const [question, setQuestion] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -33,23 +33,32 @@ export const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
       return;
     }
 
-    if (!user) {
+    if (!user || !user.id) {
       toast.error('Musisz być zalogowany aby zadać pytanie');
+      return;
+    }
+
+    if (!supabase) {
+      toast.error('Błąd połączenia z bazą danych');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const questionData = {
+      const result = await submitQuestion(
+        supabase,
         jobId,
-        jobTitle,
-        companyName,
-        question: question.trim(),
-        askedBy: user?.email || user?.id || 'Anonymous'
-      };
+        user.id,
+        question.trim()
+      );
 
-      addQuestion(questionData);
+      if (!result.success) {
+        toast.error('Wystąpił błąd podczas wysyłania pytania', {
+          description: result.error?.message || 'Spróbuj ponownie później.'
+        });
+        return;
+      }
       
       toast.success('Pytanie zostało wysłane!', {
         description: 'Organizator otrzyma powiadomienie o Twoim pytaniu.'

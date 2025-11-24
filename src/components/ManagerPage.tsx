@@ -17,7 +17,7 @@ import React from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getManagerById, mockApplications } from '../mocks';
 import { createClient } from '../lib/supabase/client';
-import { createTender, updateTender, fetchTenderById } from '../lib/database/jobs';
+import { createTender, updateTender, fetchTenderById, fetchJobApplicationsByJobId, fetchJobById, fetchTenderBidsByTenderId } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { fetchCompanyBuildings } from '../lib/database/buildings';
 import type { Building } from '../types/building';
@@ -60,6 +60,14 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   const isFetchingRef = React.useRef(false);
   // Track client-side mount to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
+  // Applications state
+  const [applications, setApplications] = useState<any[]>([]);
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false);
+  const [selectedJobData, setSelectedJobData] = useState<{ title: string; budget: string } | null>(null);
+  // Tender bids state
+  const [tenderBids, setTenderBids] = useState<any[]>([]);
+  const [isLoadingTenderBids, setIsLoadingTenderBids] = useState(false);
+  const [selectedTenderData, setSelectedTenderData] = useState<{ title: string } | null>(null);
 
   // Helper function to get public URL for building images
   const getBuildingImageUrl = React.useCallback((imagePath: string | null | undefined): string | null => {
@@ -169,7 +177,6 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
         
         if (companyError || !company) {
-          console.log('No company found for user');
           setBuildings([]);
           setCompanyId(null);
           return;
@@ -206,13 +213,125 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
 
   const handleStatusChange = (applicationId: string, status: string, notes?: string) => {
     // In real app, this would update the application in the backend
-    console.log('Application status changed:', { applicationId, status, notes });
   };
 
   const handleStartConversation = (contractorId: string) => {
     // In real app, this would open messaging interface
-    console.log('Start conversation with contractor:', contractorId);
   };
+
+  // Fetch applications when a job is selected
+  useEffect(() => {
+    async function loadApplications() {
+      if (!selectedJobForApplications) {
+        setApplications([]);
+        setSelectedJobData(null);
+        return;
+      }
+
+      setIsLoadingApplications(true);
+      try {
+        const supabase = createClient();
+        
+        // Fetch job data to get title and budget
+        const { data: jobData, error: jobError } = await fetchJobById(supabase, selectedJobForApplications);
+        
+        if (jobError || !jobData) {
+          console.error('Error fetching job data:', jobError);
+          toast.error('Nie udało się załadować danych zlecenia');
+          setSelectedJobData(null);
+        } else {
+          // Format budget from raw fields
+          const { budgetFromDatabase } = await import('../types/budget');
+          const budget = jobData.budget || budgetFromDatabase({
+            budget_min: jobData.budget_min ?? null,
+            budget_max: jobData.budget_max ?? null,
+            budget_type: (jobData.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
+            currency: jobData.currency || 'PLN',
+          });
+          
+          const budgetStr = formatBudget(budget);
+          
+          setSelectedJobData({
+            title: jobData.title,
+            budget: budgetStr
+          });
+        }
+        
+        // Fetch applications
+        const { data: applicationsData, error: applicationsError } = await fetchJobApplicationsByJobId(
+          supabase,
+          selectedJobForApplications
+        );
+        
+        if (applicationsError) {
+          console.error('Error fetching applications:', applicationsError);
+          toast.error('Nie udało się załadować ofert');
+          setApplications([]);
+        } else {
+          setApplications(applicationsData || []);
+        }
+      } catch (err) {
+        console.error('Error loading applications:', err);
+        toast.error('Wystąpił błąd podczas ładowania ofert');
+        setApplications([]);
+      } finally {
+        setIsLoadingApplications(false);
+      }
+    }
+
+    loadApplications();
+  }, [selectedJobForApplications]);
+
+  // Fetch tender bids when a tender is selected for evaluation
+  useEffect(() => {
+    async function loadTenderBids() {
+      if (!selectedTenderId || !showBidEvaluation) {
+        setTenderBids([]);
+        setSelectedTenderData(null);
+        return;
+      }
+
+      setIsLoadingTenderBids(true);
+      try {
+        const supabase = createClient();
+        
+        // Fetch tender data to get title
+        const { data: tenderData, error: tenderError } = await fetchTenderById(supabase, selectedTenderId);
+        
+        if (tenderError || !tenderData) {
+          console.error('Error fetching tender data:', tenderError);
+          toast.error('Nie udało się załadować danych przetargu');
+          setSelectedTenderData(null);
+        } else {
+          setSelectedTenderData({
+            title: tenderData.title
+          });
+        }
+        
+        // Fetch bids
+        const { data: bidsData, error: bidsError } = await fetchTenderBidsByTenderId(
+          supabase,
+          selectedTenderId
+        );
+        
+        if (bidsError) {
+          console.error('Error fetching tender bids:', bidsError);
+          toast.error('Nie udało się załadować ofert');
+          setTenderBids([]);
+        } else {
+          setTenderBids(bidsData || []);
+        }
+      } catch (err) {
+        console.error('Error loading tender bids:', err);
+        toast.error('Wystąpił błąd podczas ładowania ofert');
+        setTenderBids([]);
+      } finally {
+        setIsLoadingTenderBids(false);
+      }
+    }
+
+    loadTenderBids();
+  }, [selectedTenderId, showBidEvaluation]);
 
   const handleTenderCreate = () => {
     setEditingTenderId(null);
@@ -316,13 +435,11 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
 
   const handleAwardTender = (bidId: string, notes: string) => {
     // In real app, this would award the tender
-    console.log('Tender awarded:', { bidId, notes });
     setShowBidEvaluation(false);
   };
 
   const handleRejectBid = (bidId: string, reason: string) => {
     // In real app, this would reject the bid
-    console.log('Bid rejected:', { bidId, reason });
   };
 
   // Mockowe dane - w przyszłości z backendu
@@ -678,14 +795,25 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                 >
                   ← Powrót do listy ofert
                 </Button>
-                <JobApplicationsList
-                  jobId={selectedJobForApplications}
-                  jobTitle="Kompleksowe sprzątanie klatek schodowych - budynek 5-kondygnacyjny"
-                  jobBudget="2800-3500 zł/miesiąc"
-                  applications={mockApplications.filter(app => app.jobId === selectedJobForApplications)}
-                  onStatusChange={handleStatusChange}
-                  onStartConversation={handleStartConversation}
-                />
+                {isLoadingApplications ? (
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <p className="ml-2 text-sm text-muted-foreground">Ładowanie ofert...</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <JobApplicationsList
+                    jobId={selectedJobForApplications}
+                    jobTitle={selectedJobData?.title || 'Zlecenie'}
+                    jobBudget={selectedJobData?.budget}
+                    applications={applications}
+                    onStatusChange={handleStatusChange}
+                    onStartConversation={handleStartConversation}
+                  />
+                )}
               </div>
             ) : (
               <div>
@@ -965,20 +1093,36 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       )}
 
       {showBidEvaluation && selectedTenderId && (
-        <BidEvaluationPanel
-          tenderId={selectedTenderId}
-          tenderTitle="Kompleksowy remont elewacji budynku mieszkalnego"
-          evaluationCriteria={[
-            { id: 'price', name: 'Cena oferty', description: 'Łączna cena realizacji', weight: 40, type: 'price' },
-            { id: 'quality', name: 'Jakość wykonania', description: 'Doświadczenie i referencje', weight: 30, type: 'quality' },
-            { id: 'time', name: 'Termin realizacji', description: 'Czas wykonania prac', weight: 20, type: 'time' },
-            { id: 'warranty', name: 'Gwarancja', description: 'Okres gwarancji i serwis', weight: 10, type: 'quality' }
-          ]}
-          bids={[]}
-          onClose={() => setShowBidEvaluation(false)}
-          onAwardTender={handleAwardTender}
-          onRejectBid={handleRejectBid}
-        />
+        <>
+          {isLoadingTenderBids ? (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <p className="text-sm text-muted-foreground">Ładowanie ofert...</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <BidEvaluationPanel
+              tenderId={selectedTenderId}
+              tenderTitle={selectedTenderData?.title || 'Przetarg'}
+              evaluationCriteria={[
+                { id: 'price', name: 'Cena oferty', description: 'Łączna cena realizacji', weight: 40, type: 'price' },
+                { id: 'quality', name: 'Jakość wykonania', description: 'Doświadczenie i referencje', weight: 30, type: 'quality' },
+                { id: 'time', name: 'Termin realizacji', description: 'Czas wykonania prac', weight: 20, type: 'time' },
+                { id: 'warranty', name: 'Gwarancja', description: 'Okres gwarancji i serwis', weight: 10, type: 'quality' }
+              ]}
+              bids={tenderBids}
+              onClose={() => {
+                setShowBidEvaluation(false);
+                setSelectedTenderId(null);
+              }}
+              onAwardTender={handleAwardTender}
+              onRejectBid={handleRejectBid}
+            />
+          )}
+        </>
       )}
     </div>
   );
