@@ -115,7 +115,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="min-w-fit max-h-[90vh] p-0 overflow-hidden flex flex-col">
+      <DialogContent className="min-w-[800px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-xl font-semibold">
             {postType === 'tender' ? 'Złóż ofertę w przetargu' : 'Złóż ofertę'}
@@ -315,15 +315,6 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                 />
               </CardContent>
             </Card>
-
-            {/* Podsumowanie */}
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Po wysłaniu oferty otrzymasz potwierdzenie na e-mail. {postType === 'tender' ? 'Komisja przetargowa' : 'Zleceniodawca'} będzie mógł 
-                skontaktować się z Tobą w ciągu 48 godzin.
-              </AlertDescription>
-            </Alert>
           </form>
         </div>
 

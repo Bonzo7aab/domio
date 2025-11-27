@@ -1,11 +1,15 @@
-import React from 'react';
-import { User, Mail, Lock, ArrowRight } from 'lucide-react';
+'use client';
+
+import React, { useState, useTransition } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { User, Mail, Lock, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { loginAction } from '../lib/auth/actions';
+import { useUserProfile } from '../contexts/AuthContext';
 
 interface LoginPageProps {
   searchParams?: {
@@ -16,9 +20,39 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ searchParams }: LoginPageProps) {
-  const error = searchParams?.error;
-  const message = searchParams?.message;
-  const redirectTo = searchParams?.redirectTo || '/';
+  const router = useRouter();
+  const searchParamsObj = useSearchParams();
+  const { refreshSession } = useUserProfile();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(searchParams?.error || null);
+  const [message, setMessage] = useState<string | null>(searchParams?.message || null);
+  
+  const redirectTo = searchParams?.redirectTo || searchParamsObj?.get('redirectTo') || '/';
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    const formData = new FormData(e.currentTarget);
+    
+    startTransition(async () => {
+      const result = await loginAction(formData);
+      
+      if ('error' in result) {
+        setError(result.error);
+      } else {
+        // Login successful - refresh session in context immediately
+        await refreshSession();
+        // Refresh router to update server state
+        router.refresh();
+        // Small delay to ensure context updates, then navigate
+        setTimeout(() => {
+          router.push(redirectTo);
+        }, 100);
+      }
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 py-16">
@@ -50,7 +84,7 @@ export function LoginPage({ searchParams }: LoginPageProps) {
           {/* Login Form Card */}
           <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-6">
-              <form className="space-y-6">
+              <form className="space-y-6" onSubmit={handleSubmit}>
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-slate-900">
                     Adres email *
@@ -64,6 +98,7 @@ export function LoginPage({ searchParams }: LoginPageProps) {
                       placeholder="twoj@email.pl"
                       className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
                       required
+                      disabled={isPending}
                     />
                   </div>
                 </div>
@@ -81,6 +116,7 @@ export function LoginPage({ searchParams }: LoginPageProps) {
                       placeholder="••••••••"
                       className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
                       required
+                      disabled={isPending}
                     />
                   </div>
                 </div>
@@ -88,12 +124,21 @@ export function LoginPage({ searchParams }: LoginPageProps) {
                 <input type="hidden" name="redirectTo" value={redirectTo} />
 
                 <Button 
-                  formAction={loginAction} 
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200"
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   type="submit"
+                  disabled={isPending}
                 >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Logowanie...
+                    </>
+                  ) : (
+                    <>
                   <User className="mr-2 h-5 w-5" />
                   Zaloguj się
+                    </>
+                  )}
                 </Button>
               </form>
 

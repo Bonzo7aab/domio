@@ -29,12 +29,17 @@ export interface UpdateUserData {
 
 /**
  * Server Action for user login
+ * Returns success/error instead of redirecting to allow client-side handling
  */
-export async function loginAction(formData: FormData) {
+export async function loginAction(formData: FormData): Promise<{ success: true } | { error: string }> {
   const supabase = await createClient()
   
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  
+  if (!email || !password) {
+    return { error: 'Email i hasło są wymagane' }
+  }
   
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -42,12 +47,12 @@ export async function loginAction(formData: FormData) {
   })
   
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`)
+    return { error: error.message }
   }
   
   console.log('Login successful')
   revalidatePath('/', 'layout')
-  redirect('/')
+  return { success: true }
 }
 
 /**

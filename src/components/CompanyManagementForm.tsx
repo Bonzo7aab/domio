@@ -1,19 +1,20 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
-import { Building, Edit2, X, Check, Plus, MapPin, Mail, Phone, Globe, FileText, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Building, Edit2, X, Check, Plus, MapPin, Mail, Phone, Globe, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Alert, AlertDescription } from './ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import type { AuthUser } from '../types/auth';
 import { createClient } from '../lib/supabase/client';
 import { fetchUserPrimaryCompany, upsertUserCompany, type CompanyData } from '../lib/database/companies';
 import { BuildingManagement } from './BuildingManagement';
+import { cn } from './ui/utils';
 
 interface CompanyManagementFormProps {
   user: AuthUser;
@@ -42,8 +43,10 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
   const [isFetchingCompany, setIsFetchingCompany] = useState(true);
   const [hasCompany, setHasCompany] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
   // Priority 3: Prevent concurrent fetches
-  const isFetchingRef = React.useRef(false);
+  const isFetchingRef = useRef(false);
+  const isMounted = useRef(true);
 
   const [companyData, setCompanyData] = useState({
     name: '',
@@ -60,84 +63,85 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
   const [originalCompanyData, setOriginalCompanyData] = useState(companyData);
 
   // Fetch existing company on mount and when user changes
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadCompany() {
-      // Priority 3: Prevent concurrent fetches
-      if (isFetchingRef.current) {
-        return;
-      }
-      
-      isFetchingRef.current = true;
-      setIsFetchingCompany(true);
-      try {
-        const supabase = createClient();
-        const { data: company, error: fetchError } = await fetchUserPrimaryCompany(supabase, user.id);
-
-        // Check if component is still mounted before updating state
-        if (!isMounted) return;
-
-        if (fetchError) {
-          console.error('Error fetching company:', fetchError);
-          if (isMounted) {
-            setHasCompany(false);
-            setCompanyId(null);
-          }
-        } else if (company) {
-          const fetchedData = {
-            name: company.name || '',
-            type: company.type || (user.userType === 'manager' ? 'wspólnota' : 'contractor'),
-            phone: company.phone || '',
-            email: company.email || '',
-            address: company.address || '',
-            city: company.city || '',
-            postal_code: company.postal_code || '',
-            nip: company.nip || '',
-            description: company.description || '',
-          };
-          if (isMounted) {
-            setCompanyData(fetchedData);
-            setOriginalCompanyData(fetchedData);
-            setHasCompany(true);
-            setCompanyId(company.id);
-          }
-        } else {
-          // No company found - reset state
-          if (isMounted) {
-            setHasCompany(false);
-            setCompanyId(null);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading company:', err);
-        if (isMounted) {
-          setHasCompany(false);
-          setCompanyId(null);
-        }
-      } finally {
-        if (isMounted) {
-          setIsFetchingCompany(false);
-        }
-        // Priority 3: Reset fetch flag
-        isFetchingRef.current = false;
-      }
+  const loadCompany = useCallback(async () => {
+    // Priority 3: Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      return;
     }
+    
+    isFetchingRef.current = true;
+    setIsFetchingCompany(true);
+    try {
+      const supabase = createClient();
+      const { data: company, error: fetchError } = await fetchUserPrimaryCompany(supabase, user.id);
 
+      if (!isMounted.current) return;
+
+      if (fetchError) {
+        setHasCompany(false);
+        setCompanyId(null);
+      } else if (company) {
+        const fetchedData = {
+          name: company.name || '',
+          type: company.type || (user.userType === 'manager' ? 'wspólnota' : 'contractor'),
+          phone: company.phone || '',
+          email: company.email || '',
+          address: company.address || '',
+          city: company.city || '',
+          postal_code: company.postal_code || '',
+          nip: company.nip || '',
+          description: company.description || '',
+        };
+        setCompanyData(fetchedData);
+        setOriginalCompanyData(fetchedData);
+        setHasCompany(true);
+        setCompanyId(company.id);
+      } else {
+        // No company found - reset state
+        setHasCompany(false);
+        setCompanyId(null);
+      }
+    } catch (err) {
+      if (isMounted.current) {
+        setHasCompany(false);
+        setCompanyId(null);
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsFetchingCompany(false);
+      }
+      // Priority 3: Reset fetch flag
+      isFetchingRef.current = false;
+    }
+  }, [user.id, user.userType]);
+
+  useEffect(() => {
+    isMounted.current = true;
     loadCompany();
 
     // Cleanup function
     return () => {
-      isMounted = false;
+      isMounted.current = false;
       isFetchingRef.current = false;
     };
-  }, [user.id, user.userType]);
+  }, [loadCompany]);
 
   const handleCompanyChange = (field: string, value: string) => {
     setCompanyData(prev => ({
       ...prev,
       [field]: value
     }));
+    // Clear error for this field when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [field]: false
+      }));
+    }
+    // Clear general error when user makes changes
+    if (error) {
+      setError('');
+    }
   };
 
   const handleSaveCompany = async () => {
@@ -145,11 +149,78 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
     setSuccess('');
     setIsLoading(true);
 
+    // Validate all required fields (all except description)
+    const errors: Record<string, boolean> = {};
+    let hasErrors = false;
+    
     if (!companyData.name.trim()) {
-      setError('Nazwa firmy jest wymagana');
+      errors.name = true;
+      hasErrors = true;
+    } else {
+      errors.name = false;
+    }
+    
+    if (!companyData.type) {
+      errors.type = true;
+      hasErrors = true;
+    } else {
+      errors.type = false;
+    }
+
+    if (!companyData.nip.trim()) {
+      errors.nip = true;
+      hasErrors = true;
+    } else {
+      errors.nip = false;
+    }
+
+    if (!companyData.phone.trim()) {
+      errors.phone = true;
+      hasErrors = true;
+    } else {
+      errors.phone = false;
+    }
+
+    if (!companyData.email.trim()) {
+      errors.email = true;
+      hasErrors = true;
+    } else {
+      errors.email = false;
+    }
+
+    if (!companyData.address.trim()) {
+      errors.address = true;
+      hasErrors = true;
+    } else {
+      errors.address = false;
+    }
+
+    if (!companyData.city.trim()) {
+      errors.city = true;
+      hasErrors = true;
+    } else {
+      errors.city = false;
+    }
+
+    if (!companyData.postal_code.trim()) {
+      errors.postal_code = true;
+      hasErrors = true;
+    } else {
+      errors.postal_code = false;
+    }
+
+    setFieldErrors(errors);
+
+    if (hasErrors) {
+      setError('Proszę wypełnić wszystkie wymagane pola');
       setIsLoading(false);
+      // Scroll to top to show error
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+
+    // Clear field errors if validation passes
+    setFieldErrors({});
 
     try {
       const supabase = createClient();
@@ -160,19 +231,18 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
       );
 
       if (saveError) {
-        setError(saveError.message || 'Wystąpił błąd podczas zapisywania');
+        const errorMessage = saveError instanceof Error 
+          ? saveError.message 
+          : saveError?.message || saveError?.details || saveError?.hint || 'Wystąpił błąd podczas zapisywania';
+        setError(errorMessage);
       } else {
         setSuccess('Dane firmy zostały zapisane pomyślnie');
-        setOriginalCompanyData(companyData);
-        setHasCompany(true);
-        if (savedCompany) {
-          setCompanyId(savedCompany.id);
-        }
         setIsEditing(false);
+        // Refetch company data from database to ensure we have the latest data
+        await loadCompany();
         setTimeout(() => setSuccess(''), 3000);
       }
     } catch (err) {
-      console.error('Error saving company:', err);
       setError('Wystąpił błąd podczas zapisywania');
     } finally {
       setIsLoading(false);
@@ -183,6 +253,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
     setCompanyData(originalCompanyData);
     setIsEditing(false);
     setError('');
+    setFieldErrors({});
   };
 
   if (isFetchingCompany) {
@@ -198,9 +269,23 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
 
   return (
     <div className="space-y-4">
-      {(error || success) && (
-        <Alert variant={error ? "destructive" : "default"}>
-          <AlertDescription>{error || success}</AlertDescription>
+      {error && (
+        <Alert 
+          variant="destructive" 
+          className="border-red-500 bg-red-50 dark:bg-red-950/20 shadow-md animate-in slide-in-from-top-2"
+        >
+          <AlertCircle className="h-5 w-5 text-red-600" />
+          <AlertDescription className="text-red-800 dark:text-red-200 font-medium">
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
+      {success && (
+        <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-950/20">
+          <Check className="h-5 w-5 text-green-600" />
+          <AlertDescription className="text-green-800 dark:text-green-200 font-medium">
+            {success}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -283,7 +368,9 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="companyName">Nazwa firmy/organizacji *</Label>
+                  <Label htmlFor="companyName" className={fieldErrors.name ? 'text-red-600 dark:text-red-400' : ''}>
+                    Nazwa firmy/organizacji *
+                  </Label>
                   {isEditing ? (
                     <Input
                       id="companyName"
@@ -291,32 +378,49 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                       onChange={(e) => handleCompanyChange('name', e.target.value)}
                       placeholder="np. Wspólnota Mieszkaniowa XYZ"
                       required
+                      className={fieldErrors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
                     />
                   ) : (
                     <p className="text-sm py-2 px-3 bg-muted rounded-md font-medium">
                       {companyData.name || '—'}
                     </p>
                   )}
+                  {fieldErrors.name && (
+                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      To pole jest wymagane
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="companyType">Typ organizacji *</Label>
+                  <Label htmlFor="companyType" className={fieldErrors.type ? 'text-red-600 dark:text-red-400' : ''}>
+                    Typ organizacji *
+                  </Label>
                   {isEditing ? (
-                    <Select 
-                      value={companyData.type} 
-                      onValueChange={(value) => handleCompanyChange('type', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(user.userType === 'manager' ? MANAGER_COMPANY_TYPES : CONTRACTOR_COMPANY_TYPES).map(type => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <>
+                      <Select 
+                        value={companyData.type} 
+                        onValueChange={(value) => handleCompanyChange('type', value)}
+                      >
+                        <SelectTrigger className={fieldErrors.type ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}>
+                          <SelectValue placeholder="Wybierz typ organizacji" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(user.userType === 'manager' ? MANAGER_COMPANY_TYPES : CONTRACTOR_COMPANY_TYPES).map(type => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {fieldErrors.type && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          To pole jest wymagane
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <p className="text-sm py-2 px-3 bg-muted rounded-md">
                       {[...MANAGER_COMPANY_TYPES, ...CONTRACTOR_COMPANY_TYPES].find(t => t.value === companyData.type)?.label || companyData.type || '—'}
@@ -325,14 +429,27 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="companyNip">NIP</Label>
+                  <Label htmlFor="companyNip" className={fieldErrors.nip ? 'text-red-600 dark:text-red-400' : ''}>
+                    NIP *
+                  </Label>
                   {isEditing ? (
-                    <Input
-                      id="companyNip"
-                      value={companyData.nip}
-                      onChange={(e) => handleCompanyChange('nip', e.target.value)}
-                      placeholder="123-456-78-90"
-                    />
+                    <>
+                      <Input
+                        id="companyNip"
+                        value={companyData.nip}
+                        onChange={(e) => handleCompanyChange('nip', e.target.value)}
+                        placeholder="1234567890"
+                        type="number"
+                        required
+                        className={cn(fieldErrors.nip ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '', 'appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')}
+                      />
+                      {fieldErrors.nip && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          To pole jest wymagane
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <div className="flex items-center py-2 px-3 bg-muted rounded-md">
                       <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -345,18 +462,30 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
               {/* Contact Details */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="companyPhone">Telefon</Label>
+                  <Label htmlFor="companyPhone" className={fieldErrors.phone ? 'text-red-600 dark:text-red-400' : ''}>
+                    Telefon *
+                  </Label>
                   {isEditing ? (
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="companyPhone"
-                        value={companyData.phone}
-                        onChange={(e) => handleCompanyChange('phone', e.target.value)}
-                        className="pl-10"
-                        placeholder="+48 000 000 000"
-                      />
-                    </div>
+                    <>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="companyPhone"
+                          value={companyData.phone}
+                          onChange={(e) => handleCompanyChange('phone', e.target.value)}
+                          className={`pl-10 ${fieldErrors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                          placeholder="+48 000 000 000"
+                          type="tel"
+                          required
+                        />
+                      </div>
+                      {fieldErrors.phone && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          To pole jest wymagane
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <div className="flex items-center py-2 px-3 bg-muted rounded-md">
                       <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -366,19 +495,30 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="companyEmail">Email</Label>
+                  <Label htmlFor="companyEmail" className={fieldErrors.email ? 'text-red-600 dark:text-red-400' : ''}>
+                    Email *
+                  </Label>
                   {isEditing ? (
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="companyEmail"
-                        type="email"
-                        value={companyData.email}
-                        onChange={(e) => handleCompanyChange('email', e.target.value)}
-                        className="pl-10"
-                        placeholder="kontakt@firma.pl"
-                      />
-                    </div>
+                    <>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="companyEmail"
+                          type="email"
+                          value={companyData.email}
+                          onChange={(e) => handleCompanyChange('email', e.target.value)}
+                          className={`pl-10 ${fieldErrors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                          placeholder="kontakt@firma.pl"
+                          required
+                        />
+                      </div>
+                      {fieldErrors.email && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          To pole jest wymagane
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <div className="flex items-center py-2 px-3 bg-muted rounded-md">
                       <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -391,18 +531,29 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
               {/* Address */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-3 space-y-2">
-                  <Label htmlFor="companyAddress">Adres</Label>
+                  <Label htmlFor="companyAddress" className={fieldErrors.address ? 'text-red-600 dark:text-red-400' : ''}>
+                    Adres *
+                  </Label>
                   {isEditing ? (
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="companyAddress"
-                        value={companyData.address}
-                        onChange={(e) => handleCompanyChange('address', e.target.value)}
-                        className="pl-10"
-                        placeholder="ul. Przykładowa 123"
-                      />
-                    </div>
+                    <>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="companyAddress"
+                          value={companyData.address}
+                          onChange={(e) => handleCompanyChange('address', e.target.value)}
+                          className={`pl-10 ${fieldErrors.address ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                          placeholder="ul. Przykładowa 123"
+                          required
+                        />
+                      </div>
+                      {fieldErrors.address && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          To pole jest wymagane
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <div className="flex items-center py-2 px-3 bg-muted rounded-md">
                       <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -412,14 +563,26 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                 </div>
 
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="companyCity">Miasto</Label>
+                  <Label htmlFor="companyCity" className={fieldErrors.city ? 'text-red-600 dark:text-red-400' : ''}>
+                    Miasto *
+                  </Label>
                   {isEditing ? (
-                    <Input
-                      id="companyCity"
-                      value={companyData.city}
-                      onChange={(e) => handleCompanyChange('city', e.target.value)}
-                      placeholder="Warszawa"
-                    />
+                    <>
+                      <Input
+                        id="companyCity"
+                        value={companyData.city}
+                        onChange={(e) => handleCompanyChange('city', e.target.value)}
+                        placeholder="Warszawa"
+                        required
+                        className={fieldErrors.city ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                      />
+                      {fieldErrors.city && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          To pole jest wymagane
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <p className="text-sm py-2 px-3 bg-muted rounded-md">
                       {companyData.city || 'Nie podano'}
@@ -428,14 +591,27 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="companyPostalCode">Kod pocztowy</Label>
+                  <Label htmlFor="companyPostalCode" className={fieldErrors.postal_code ? 'text-red-600 dark:text-red-400' : ''}>
+                    Kod pocztowy *
+                  </Label>
                   {isEditing ? (
-                    <Input
-                      id="companyPostalCode"
-                      value={companyData.postal_code}
-                      onChange={(e) => handleCompanyChange('postal_code', e.target.value)}
-                      placeholder="00-000"
-                    />
+                    <>
+                      <Input
+                        id="companyPostalCode"
+                        value={companyData.postal_code}
+                        onChange={(e) => handleCompanyChange('postal_code', e.target.value)}
+                        placeholder="00-999"
+                        type="number"
+                        required
+                        className={cn(fieldErrors.postal_code ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '', 'appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none') }
+                      />
+                      {fieldErrors.postal_code && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          To pole jest wymagane
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <p className="text-sm py-2 px-3 bg-muted rounded-md">
                       {companyData.postal_code || 'Nie podano'}

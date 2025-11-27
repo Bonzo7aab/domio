@@ -11,6 +11,7 @@ type AuthContextType = {
   supabase: SupabaseClient
   user: AuthUser | null
   logout: () => Promise<void>
+  refreshSession: () => Promise<void>
   isAuthenticated: boolean
   isLoading: boolean
 }
@@ -125,7 +126,8 @@ export default function AuthProvider({
       }
     }
 
-    getInitialSession()
+    // Note: The onAuthStateChange listener below will handle SIGNED_IN events
+    // and fetch the user profile automatically, so we don't need additional checks here
 
     // Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -138,9 +140,11 @@ export default function AuthProvider({
           setSession(null)
           setUser(null)
           setIsLoading(false)
-        } else if (session) {
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || session) {
+          // Handle SIGNED_IN, TOKEN_REFRESHED, or any session update
           setSession(session)
           
+          if (session?.user) {
           // Fetch user profile immediately (not in setTimeout) so it loads faster
           setIsLoading(true)
           fetchUserProfile(session.user).then((userProfile) => {
@@ -155,6 +159,10 @@ export default function AuthProvider({
               setIsLoading(false)
             }
           })
+          } else {
+            setUser(null)
+            setIsLoading(false)
+          }
         }
       }
     )
@@ -163,10 +171,10 @@ export default function AuthProvider({
       mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase, fetchUserProfile])
+  }, [supabase, fetchUserProfile, refreshSession])
 
   return (
-    <AuthContext.Provider value={{ session, supabase, user, logout, isAuthenticated, isLoading }}>
+    <AuthContext.Provider value={{ session, supabase, user, logout, refreshSession, isAuthenticated, isLoading }}>
       <>{children}</>
     </AuthContext.Provider>
   )

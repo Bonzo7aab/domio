@@ -6,7 +6,6 @@ import {
   Camera,
   CheckCircle,
   Clock,
-  Download,
   Edit,
   Euro,
   Eye,
@@ -447,9 +446,9 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                   <CardTitle>Szybkie akcje</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button className="w-full justify-start" onClick={onBrowseJobs}>
+                  <Button className="w-full justify-start" onClick={() => router.push('/bookmarked-jobs')}>
                     <Eye className="w-4 h-4 mr-2" />
-                    Przeglądaj nowe zlecenia
+                    Przeglądaj zapisane oferty
                   </Button>
                   <Button variant="outline" className="w-full justify-start">
                     <Upload className="w-4 h-4 mr-2" />
@@ -458,10 +457,6 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                   <Button variant="outline" className="w-full justify-start" onClick={handleMessagesClick}>
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Sprawdź wiadomości
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Download className="w-4 h-4 mr-2" />
-                    Pobierz raport miesięczny
                   </Button>
                 </CardContent>
               </Card>

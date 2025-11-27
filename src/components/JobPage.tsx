@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Bookmark, HelpCircle, Image as ImageIcon, FileText, ExternalLink } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 import JobApplicationModal from './JobApplicationModal';
 import { AskQuestionModal } from './AskQuestionModal';
@@ -19,6 +21,7 @@ import { addBookmark, removeBookmark, isJobBookmarked } from '../utils/bookmarkS
 import { toast } from 'sonner';
 import { getJobById, getTenderById } from '../lib/data';
 import { incrementJobViews, incrementTenderViews, createJobApplication, createTenderBid, type JobWithCompany, type TenderWithCompany } from '../lib/database/jobs';
+import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { formatBudget, budgetFromDatabase, type Budget } from '../types/budget';
 import { type Job, type TenderInfo } from '../types/job';
 
@@ -375,10 +378,12 @@ function normalizeJobData(
 
 const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const { user, supabase } = useUserProfile();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [showAskQuestionModal, setShowAskQuestionModal] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
+  const [showCompanyRequiredDialog, setShowCompanyRequiredDialog] = useState(false);
   const [applicationForm, setApplicationForm] = useState({
     proposedPrice: '',
     estimatedCompletion: '',
@@ -502,7 +507,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
   const job = jobData;
 
-  const handleApplicationSubmit = () => {
+  const handleApplicationSubmit = async () => {
     if (!user) {
       toast.error('Musisz się zalogować aby złożyć ofertę');
       return;
@@ -513,6 +518,27 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       return;
     }
 
+    // Check if contractor has a company before showing the form
+    if (!supabase || !user.id) {
+      toast.error('Błąd połączenia. Spróbuj ponownie.');
+      return;
+    }
+
+    const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
+    
+    if (companyError) {
+      console.error('Error checking company:', companyError);
+      toast.error('Błąd podczas sprawdzania danych firmy');
+      return;
+    }
+
+    if (!company) {
+      // Show dialog instead of form
+      setShowCompanyRequiredDialog(true);
+      return;
+    }
+
+    // Company exists, show the application form
     setShowApplicationForm(true);
   };
 
@@ -538,8 +564,28 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         );
 
         if (error) {
-          console.error('Error submitting tender bid:', error);
-          toast.error(error.message || 'Wystąpił błąd podczas składania oferty w przetargu');
+          // Extract error message from various error object structures
+          const errorMessage = error instanceof Error 
+            ? error.message 
+            : error?.message || error?.details || error?.hint || String(error) || 'Wystąpił błąd podczas składania oferty w przetargu';
+          
+          console.error('Error submitting tender bid:', {
+            error,
+            errorMessage,
+            errorType: error?.constructor?.name,
+            errorCode: error?.code,
+            errorDetails: error?.details,
+            errorHint: error?.hint,
+          });
+          
+          // Check if error is about missing company
+          if (errorMessage.includes('company') || errorMessage.includes('firm') || errorMessage.includes('Contractor must have')) {
+            setShowApplicationForm(false);
+            setShowCompanyRequiredDialog(true);
+            return;
+          }
+          
+          toast.error(errorMessage);
           return;
         }
 
@@ -560,8 +606,28 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         );
 
         if (error) {
-          console.error('Error submitting application:', error);
-          toast.error(error.message || 'Wystąpił błąd podczas składania oferty');
+          // Extract error message from various error object structures
+          const errorMessage = error instanceof Error 
+            ? error.message 
+            : error?.message || error?.details || error?.hint || String(error) || 'Wystąpił błąd podczas składania oferty';
+          
+          console.error('Error submitting application:', {
+            error,
+            errorMessage,
+            errorType: error?.constructor?.name,
+            errorCode: error?.code,
+            errorDetails: error?.details,
+            errorHint: error?.hint,
+          });
+          
+          // Check if error is about missing company
+          if (errorMessage.includes('company') || errorMessage.includes('firm') || errorMessage.includes('Contractor must have')) {
+            setShowApplicationForm(false);
+            setShowCompanyRequiredDialog(true);
+            return;
+          }
+          
+          toast.error(errorMessage);
           return;
         }
 
@@ -1152,6 +1218,46 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         setApplicationForm={setApplicationForm}
         postType={job.postType}
       />
+
+      {/* Company Required Dialog */}
+      <Dialog open={showCompanyRequiredDialog} onOpenChange={setShowCompanyRequiredDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building className="h-5 w-5 text-blue-600" />
+              Wymagana firma
+            </DialogTitle>
+            <DialogDescription>
+              Aby złożyć ofertę, musisz najpierw dodać informacje o swojej firmie.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Przed złożeniem oferty na to ogłoszenie, musisz uzupełnić dane swojej firmy w profilu konta.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Po dodaniu firmy będziesz mógł składać oferty na ogłoszenia i przetargi.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCompanyRequiredDialog(false)}
+            >
+              Anuluj
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCompanyRequiredDialog(false);
+                router.push('/account?tab=company');
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Przejdź do uzupełnienia danych firmy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

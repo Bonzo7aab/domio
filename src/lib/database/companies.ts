@@ -46,31 +46,44 @@ export async function fetchUserPrimaryCompany(
   userId: string
 ): Promise<{ data: CompanyData | null; error: any }> {
   try {
-    // Type assertion needed for user_companies table
-    const result = await (supabase as any)
+    // First, get the user_companies relation
+    const relationResult = await (supabase as any)
       .from('user_companies')
-      .select(`
-        *,
-        company:companies (*)
-      `)
+      .select('company_id')
       .eq('user_id', userId)
       .eq('is_primary', true)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
     
-    const { data, error } = result;
+    const { data: relation, error: relationError } = relationResult;
 
-    if (error) {
+    if (relationError) {
       // No primary company found is not an error
-      if (error.code === 'PGRST116') {
+      if (relationError.code === 'PGRST116') {
         return { data: null, error: null };
       }
-      return { data: null, error };
+      return { data: null, error: relationError };
     }
 
-    return { data: (data as any)?.company || null, error: null };
+    if (!relation || !relation.company_id) {
+      return { data: null, error: null };
+    }
+
+    // Then fetch the company data
+    const companyResult = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', relation.company_id)
+      .single();
+
+    const { data: company, error: companyError } = companyResult;
+
+    if (companyError) {
+      return { data: null, error: companyError };
+    }
+
+    return { data: company as any, error: null };
   } catch (err) {
-    console.error('Error fetching user company:', err);
     return { data: null, error: err };
   }
 }
@@ -98,7 +111,6 @@ export async function fetchUserCompanies(
 
     return { data: data as any, error };
   } catch (err) {
-    console.error('Error fetching user companies:', err);
     return { data: null, error: err };
   }
 }
@@ -122,15 +134,23 @@ export async function upsertUserCompany(
   }
 ): Promise<{ data: CompanyData | null; error: any }> {
   try {
-    // First, check if user already has a primary company
+    // First, check if user already has a primary company (two-step fetch to avoid nested select issues)
     const existingResult = await (supabase as any)
       .from('user_companies')
-      .select('company_id, company:companies (*)')
+      .select('company_id')
       .eq('user_id', userId)
       .eq('is_primary', true)
-      .single();
+      .eq('is_active', true)
+      .maybeSingle();
     
-    const { data: existingRelation } = existingResult;
+    const { data: existingRelation, error: existingError } = existingResult;
+
+    // If error is "no rows found", that's fine - we'll create a new company
+    // Only treat other errors as actual problems
+    if (existingError && existingError.code !== 'PGRST116') {
+      console.error('[upsertUserCompany] Error checking for existing company:', existingError);
+      return { data: null, error: existingError };
+    }
 
     let companyId: string;
 
@@ -138,77 +158,153 @@ export async function upsertUserCompany(
       // Update existing company
       companyId = existingRelation.company_id;
       
+      const updateData = {
+        name: companyData.name,
+        type: companyData.type as any,
+        phone: companyData.phone || null,
+        email: companyData.email || null,
+        address: companyData.address || null,
+        city: companyData.city || null,
+        postal_code: companyData.postal_code || null,
+        nip: companyData.nip || null,
+        description: companyData.description || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log('[upsertUserCompany] Updating existing company:', companyId, updateData);
+
       const { data: updatedCompany, error: updateError } = await supabase
         .from('companies')
-        .update({
-          name: companyData.name,
-          type: companyData.type as any,
-          phone: companyData.phone || null,
-          email: companyData.email || null,
-          address: companyData.address || null,
-          city: companyData.city || null,
-          postal_code: companyData.postal_code || null,
-          nip: companyData.nip || null,
-          description: companyData.description || null,
-          updated_at: new Date().toISOString(),
-        } as any)
+        .update(updateData as any)
         .eq('id', companyId)
         .select()
         .single();
 
       if (updateError) {
+        const updateErrorDetails = updateError as any;
+        console.error('[upsertUserCompany] Error updating company:', {
+          error: updateError,
+          message: updateErrorDetails?.message,
+          details: updateErrorDetails?.details,
+          hint: updateErrorDetails?.hint,
+          code: updateErrorDetails?.code,
+          companyId,
+          updateData,
+        });
         return { data: null, error: updateError };
       }
 
+      if (!updatedCompany) {
+        console.error('[upsertUserCompany] Company was not updated but no error was returned');
+        return { data: null, error: new Error('Company was not updated but no error was returned') };
+      }
+
+      console.log('[upsertUserCompany] Company updated successfully:', updatedCompany.id);
       return { data: updatedCompany as any, error: null };
     } else {
       // Create new company
+      const insertData = {
+        name: companyData.name,
+        type: companyData.type as any,
+        phone: companyData.phone || null,
+        email: companyData.email || null,
+        address: companyData.address || null,
+        city: companyData.city || null,
+        postal_code: companyData.postal_code || null,
+        nip: companyData.nip || null,
+        description: companyData.description || null,
+        country: 'PL',
+        is_verified: false,
+        verification_level: 'none' as any,
+      };
+
+      console.log('[upsertUserCompany] Creating new company with data:', insertData);
+
       const { data: newCompany, error: createError } = await supabase
         .from('companies')
-        .insert({
-          name: companyData.name,
-          type: companyData.type as any,
-          phone: companyData.phone || null,
-          email: companyData.email || null,
-          address: companyData.address || null,
-          city: companyData.city || null,
-          postal_code: companyData.postal_code || null,
-          nip: companyData.nip || null,
-          description: companyData.description || null,
-          country: 'PL',
-          is_verified: false,
-          verification_level: 'none' as any,
-        } as any)
+        .insert(insertData as any)
         .select()
         .single();
 
-      if (createError || !newCompany) {
-        return { data: null, error: createError };
+      if (createError) {
+        const createErrorDetails = createError as any;
+        console.error('[upsertUserCompany] Error creating company:', {
+          error: createError,
+          message: createErrorDetails?.message,
+          details: createErrorDetails?.details,
+          hint: createErrorDetails?.hint,
+          code: createErrorDetails?.code,
+          insertData,
+        });
+        return { 
+          data: null, 
+          error: createError instanceof Error 
+            ? createError 
+            : new Error(createErrorDetails?.message || createErrorDetails?.details || createErrorDetails?.hint || 'Unknown database error')
+        };
       }
 
+      if (!newCompany) {
+        console.error('[upsertUserCompany] Company was not created but no error was returned');
+        return { data: null, error: new Error('Company was not created but no error was returned') };
+      }
+
+      console.log('[upsertUserCompany] Company created successfully:', newCompany.id);
       companyId = newCompany.id;
 
       // Create user-company relationship
+      const relationData = {
+        user_id: userId,
+        company_id: companyId,
+        role: 'owner',
+        is_primary: true,
+        is_active: true,
+      };
+
+      console.log('[upsertUserCompany] Creating user-company relationship:', relationData);
+
       const relationResult = await (supabase as any)
         .from('user_companies')
-        .insert({
-          user_id: userId,
-          company_id: companyId,
-          role: 'owner',
-          is_primary: true,
-          is_active: true,
-        });
+        .insert(relationData);
       
       const { error: relationError } = relationResult;
 
       if (relationError) {
-        return { data: null, error: relationError };
+        const errorDetails = relationError as any;
+        console.error('[upsertUserCompany] Error creating user-company relationship:', {
+          error: relationError,
+          message: errorDetails?.message,
+          details: errorDetails?.details,
+          hint: errorDetails?.hint,
+          code: errorDetails?.code,
+          relationData,
+        });
+        return { 
+          data: null, 
+          error: relationError instanceof Error 
+            ? relationError 
+            : new Error(relationError?.message || relationError?.details || relationError?.hint || 'Failed to create user-company relationship')
+        };
       }
 
-      return { data: newCompany as any, error: null };
+      console.log('[upsertUserCompany] User-company relationship created successfully');
+
+      // Verify the company was actually saved by fetching it back
+      const verifyResult = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', companyId)
+        .single();
+
+      if (verifyResult.error || !verifyResult.data) {
+        console.error('[upsertUserCompany] Verification failed - company not found after insert:', verifyResult.error);
+        return { data: null, error: new Error('Company was created but could not be verified') };
+      }
+
+      console.log('[upsertUserCompany] Company verified successfully:', verifyResult.data.id);
+      return { data: verifyResult.data as any, error: null };
     }
   } catch (err) {
-    console.error('Error upserting company:', err);
     return { data: null, error: err };
   }
 }
@@ -262,7 +358,6 @@ export async function deleteUserCompany(
 
     return { success: true, error: null };
   } catch (err) {
-    console.error('Error deleting company:', err);
     return { success: false, error: err };
   }
 }

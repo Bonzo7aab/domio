@@ -1589,13 +1589,18 @@ export async function createJobApplication(
     
     if (companyError) {
       console.error('Error fetching contractor company:', companyError);
-      return { data: null, error: companyError };
+      return { 
+        data: null, 
+        error: companyError instanceof Error 
+          ? companyError 
+          : new Error(companyError?.message || 'Failed to fetch contractor company')
+      };
     }
     
     if (!company) {
       return { 
         data: null, 
-        error: { message: 'Contractor must have a company to submit applications' } 
+        error: new Error('Contractor must have a company to submit applications')
       };
     }
     
@@ -1627,14 +1632,35 @@ export async function createJobApplication(
       .single();
     
     if (insertError) {
-      console.error('Error creating job application:', insertError);
-      return { data: null, error: insertError };
+      console.error('Error creating job application:', {
+        error: insertError,
+        errorMessage: insertError?.message,
+        errorDetails: insertError?.details,
+        errorHint: insertError?.hint,
+        errorCode: insertError?.code,
+        applicationData: {
+          jobId,
+          contractorId,
+          companyId: company.id,
+        }
+      });
+      return { 
+        data: null, 
+        error: insertError instanceof Error 
+          ? insertError 
+          : new Error(insertError?.message || insertError?.details || insertError?.hint || 'Unknown database error')
+      };
     }
     
     return { data: insertedApplication, error: null };
   } catch (err) {
     console.error('Error creating job application:', err);
-    return { data: null, error: err };
+    return { 
+      data: null, 
+      error: err instanceof Error 
+        ? err 
+        : new Error(err?.message || String(err) || 'Unknown error occurred')
+    };
   }
 }
 
@@ -1765,13 +1791,18 @@ export async function createTenderBid(
     
     if (companyError) {
       console.error('Error fetching contractor company:', companyError);
-      return { data: null, error: companyError };
+      return { 
+        data: null, 
+        error: companyError instanceof Error 
+          ? companyError 
+          : new Error(companyError?.message || 'Failed to fetch contractor company')
+      };
     }
     
     if (!company) {
       return { 
         data: null, 
-        error: { message: 'Contractor must have a company to submit bids' } 
+        error: new Error('Contractor must have a company to submit bids')
       };
     }
     
@@ -1803,14 +1834,35 @@ export async function createTenderBid(
       .single();
     
     if (insertError) {
-      console.error('Error creating tender bid:', insertError);
-      return { data: null, error: insertError };
+      console.error('Error creating tender bid:', {
+        error: insertError,
+        errorMessage: insertError?.message,
+        errorDetails: insertError?.details,
+        errorHint: insertError?.hint,
+        errorCode: insertError?.code,
+        bidData: {
+          tenderId,
+          contractorId,
+          companyId: company.id,
+        }
+      });
+      return { 
+        data: null, 
+        error: insertError instanceof Error 
+          ? insertError 
+          : new Error(insertError?.message || insertError?.details || insertError?.hint || 'Unknown database error')
+      };
     }
     
     return { data: insertedBid, error: null };
   } catch (err) {
     console.error('Error creating tender bid:', err);
-    return { data: null, error: err };
+    return { 
+      data: null, 
+      error: err instanceof Error 
+        ? err 
+        : new Error(err?.message || String(err) || 'Unknown error occurred')
+    };
   }
 }
 
