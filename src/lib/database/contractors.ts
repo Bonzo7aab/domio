@@ -135,7 +135,8 @@ export async function fetchContractors(filters: ContractorFilters = {}): Promise
         updated_at,
         description
       `)
-      .eq('type', 'contractor');
+      .eq('type', 'contractor')
+      .eq('is_public', true); // Only show public profiles
 
     // Apply filters
     if (city) {
@@ -383,10 +384,10 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
         id,
         job_id,
         proposed_price,
-        estimated_completion,
+        proposed_timeline,
         cover_letter,
         status,
-        created_at,
+        submitted_at,
         jobs (
           title,
           companies (
@@ -395,7 +396,27 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
         )
       `)
       .eq('contractor_id', contractorId)
-      .order('created_at', { ascending: false });
+      .order('submitted_at', { ascending: false });
+
+    // Helper function to convert days to readable format
+    const formatTimeline = (days: number | null | undefined): string | undefined => {
+      if (!days) return undefined;
+      if (days < 7) return `${days} ${days === 1 ? 'dzień' : 'dni'}`;
+      if (days < 30) {
+        const weeks = Math.floor(days / 7);
+        const remainingDays = days % 7;
+        if (remainingDays === 0) {
+          return `${weeks} ${weeks === 1 ? 'tydzień' : weeks < 5 ? 'tygodnie' : 'tygodni'}`;
+        }
+        return `${weeks} ${weeks === 1 ? 'tydzień' : 'tygodnie'} ${remainingDays} ${remainingDays === 1 ? 'dzień' : 'dni'}`;
+      }
+      const months = Math.floor(days / 30);
+      const remainingDays = days % 30;
+      if (remainingDays === 0) {
+        return `${months} ${months === 1 ? 'miesiąc' : months < 5 ? 'miesiące' : 'miesięcy'}`;
+      }
+      return `${months} ${months === 1 ? 'miesiąc' : 'miesiące'} ${remainingDays} ${remainingDays === 1 ? 'dzień' : 'dni'}`;
+    };
 
     const formattedApplications: ContractorApplication[] = applications?.map(app => ({
       id: app.id,
@@ -403,9 +424,9 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
       jobTitle: app.jobs?.title || '',
       companyName: app.jobs?.companies?.name || '',
       status: app.status || 'pending',
-      appliedAt: app.created_at,
+      appliedAt: app.submitted_at,
       proposedPrice: app.proposed_price,
-      estimatedCompletion: app.estimated_completion,
+      estimatedCompletion: formatTimeline(app.proposed_timeline),
       coverLetter: app.cover_letter
     })) || [];
 
@@ -417,7 +438,7 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
         tender_id,
         bid_amount,
         status,
-        created_at,
+        submitted_at,
         valid_until,
         tenders (
           title,
@@ -427,7 +448,7 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
         )
       `)
       .eq('contractor_id', contractorId)
-      .order('created_at', { ascending: false });
+      .order('submitted_at', { ascending: false });
 
     const formattedBids: ContractorBid[] = bids?.map(bid => ({
       id: bid.id,
@@ -436,7 +457,7 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
       companyName: bid.tenders?.companies?.name || '',
       status: bid.status || 'pending',
       bidAmount: bid.bid_amount || '',
-      submittedAt: bid.created_at,
+      submittedAt: bid.submitted_at,
       validUntil: bid.valid_until || ''
     })) || [];
 
@@ -502,19 +523,121 @@ export async function fetchCompletedProjects(supabase: any, contractorId: string
         is_featured,
         portfolio_project_images (
           file_uploads (
-            file_url,
-            title
+            file_path
           )
         )
       `)
       .eq('company_id', contractorId)
-      .eq('is_completed', true)
       .order('completion_date', { ascending: false })
       .limit(limit);
 
     return projects || [];
   } catch (error) {
     console.error('Error fetching completed projects:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch platform project history for contractor (completed jobs where application was accepted)
+ */
+export interface PlatformProject {
+  id: string;
+  applicationId: string;
+  jobId: string;
+  title: string;
+  description: string;
+  location: string;
+  clientCompany: string;
+  clientCompanyId: string;
+  budget?: number;
+  budgetMax?: number;
+  proposedPrice?: number;
+  currency: string;
+  completionDate?: string;
+  appliedAt: string;
+  decisionAt?: string;
+  duration?: string;
+  category?: string;
+}
+
+export async function fetchPlatformProjectHistory(
+  supabase: any,
+  companyId: string,
+  limit: number = 50
+): Promise<PlatformProject[]> {
+  try {
+    // Query job_applications with accepted status, join with jobs
+    const { data: applications, error } = await supabase
+      .from('job_applications')
+      .select(`
+        id,
+        job_id,
+        proposed_price,
+        currency,
+        submitted_at,
+        decision_at,
+        jobs!inner (
+          id,
+          title,
+          description,
+          location,
+          budget_min,
+          budget_max,
+          currency,
+          project_duration,
+          updated_at,
+          status,
+          companies (
+            id,
+            name
+          ),
+          job_categories (
+            name
+          )
+        )
+      `)
+      .eq('company_id', companyId)
+      .eq('status', 'accepted')
+      .order('decision_at', { ascending: false })
+      .limit(limit * 2); // Fetch more to filter for completed jobs
+
+    if (error) {
+      console.error('Error fetching platform project history:', error);
+      throw error;
+    }
+
+    if (!applications || applications.length === 0) {
+      return [];
+    }
+
+    // Transform the data to PlatformProject format, filtering for completed jobs
+    const projects: PlatformProject[] = applications
+      .filter((app: any) => app.jobs && app.jobs.status === 'completed') // Filter for completed jobs only
+      .slice(0, limit) // Limit to requested amount
+      .map((app: any) => ({
+        id: app.job_id,
+        applicationId: app.id,
+        jobId: app.job_id,
+        title: app.jobs.title || 'Bez tytułu',
+        description: app.jobs.description || '',
+        location: app.jobs.location || '',
+        clientCompany: app.jobs.companies?.name || 'Nieznana firma',
+        clientCompanyId: app.jobs.companies?.id || '',
+        budget: app.jobs.budget_min || undefined,
+        budgetMax: app.jobs.budget_max || undefined,
+        proposedPrice: app.proposed_price || undefined,
+        currency: app.currency || app.jobs.currency || 'PLN',
+        completionDate: app.jobs.updated_at || undefined, // Use updated_at as completion date approximation
+        appliedAt: app.submitted_at,
+        decisionAt: app.decision_at || undefined,
+        duration: app.jobs.project_duration || undefined,
+        category: app.jobs.job_categories?.name || undefined,
+      }));
+
+    return projects;
+  } catch (error) {
+    console.error('Error in fetchPlatformProjectHistory:', error);
     throw error;
   }
 }
@@ -688,6 +811,97 @@ export async function searchContractors(query: string): Promise<BrowseContractor
 }
 
 /**
+ * Fetch a single portfolio project by ID with full details
+ */
+export async function fetchPortfolioProjectById(
+  supabase: any,
+  projectId: string
+): Promise<{
+  id: string;
+  title: string;
+  description?: string;
+  category?: string;
+  location?: string;
+  projectType?: string;
+  budget?: string;
+  duration?: string;
+  completionDate?: string;
+  clientName?: string;
+  clientFeedback?: string;
+  isFeatured?: boolean;
+  images?: string[];
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('portfolio_projects')
+      .select(`
+        id,
+        title,
+        description,
+        location,
+        project_type,
+        budget_range,
+        duration,
+        completion_date,
+        client_name,
+        client_feedback,
+        is_featured,
+        job_categories (
+          name
+        ),
+        portfolio_project_images (
+          file_uploads (
+            file_path
+          )
+        )
+      `)
+      .eq('id', projectId)
+      .single();
+
+    if (error || !data) {
+      console.error('Error fetching portfolio project:', error);
+      return null;
+    }
+
+    // Convert file paths to public URLs
+    const imageUrls = (data.portfolio_project_images || []).map((img: any) => {
+      const filePath = img.file_uploads?.file_path;
+      if (!filePath) return null;
+      
+      if (filePath.startsWith('http')) {
+        return filePath;
+      }
+      
+      const supabaseClient = createClient();
+      const { data: urlData } = supabaseClient.storage
+        .from('job-attachments')
+        .getPublicUrl(filePath);
+      
+      return urlData.publicUrl;
+    }).filter(Boolean) as string[];
+
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description || undefined,
+      category: data.job_categories?.name || undefined,
+      location: data.location || undefined,
+      projectType: data.project_type || undefined,
+      budget: data.budget_range || undefined,
+      duration: data.duration || undefined,
+      completionDate: data.completion_date ? new Date(data.completion_date).toISOString().split('T')[0] : undefined,
+      clientName: data.client_name || undefined,
+      clientFeedback: data.client_feedback || undefined,
+      isFeatured: data.is_featured || false,
+      images: imageUrls
+    };
+  } catch (error) {
+    console.error('Error in fetchPortfolioProjectById:', error);
+    return null;
+  }
+}
+
+/**
  * Fetch portfolio projects for a contractor
  */
 export async function fetchContractorPortfolio(contractorId: string): Promise<Array<{
@@ -740,21 +954,42 @@ export async function fetchContractorPortfolio(contractorId: string): Promise<Ar
       throw new Error('Failed to fetch contractor portfolio');
     }
 
-    return (data || []).map(project => ({
-      id: project.id,
-      title: project.title,
-      description: project.description || '',
-      images: project.portfolio_project_images?.map(img => img.file_uploads?.file_path).filter(Boolean) || [],
-      budget: project.budget_range || '',
-      duration: project.duration || '',
-      year: project.completion_date ? new Date(project.completion_date).getFullYear() : new Date().getFullYear(),
-      category: project.job_categories?.name || '',
-      location: project.location || '',
-      projectType: project.project_type || '',
-      clientName: project.client_name || '',
-      clientFeedback: project.client_feedback || '',
-      isFeatured: project.is_featured
-    }));
+    return (data || []).map(project => {
+      // Convert file paths to public URLs
+      const imageUrls = (project.portfolio_project_images || []).map(img => {
+        const filePath = img.file_uploads?.file_path;
+        if (!filePath) return null;
+        
+        // If it's already a URL, return it
+        if (filePath.startsWith('http')) {
+          return filePath;
+        }
+        
+        // Otherwise, convert storage path to public URL
+        const supabase = createClient();
+        const { data: urlData } = supabase.storage
+          .from('job-attachments')
+          .getPublicUrl(filePath);
+        
+        return urlData.publicUrl;
+      }).filter(Boolean) as string[];
+
+      return {
+        id: project.id,
+        title: project.title,
+        description: project.description || '',
+        images: imageUrls,
+        budget: project.budget_range || '',
+        duration: project.duration || '',
+        year: project.completion_date ? new Date(project.completion_date).getFullYear() : new Date().getFullYear(),
+        category: project.job_categories?.name || '',
+        location: project.location || '',
+        projectType: project.project_type || '',
+        clientName: project.client_name || '',
+        clientFeedback: project.client_feedback || '',
+        isFeatured: project.is_featured
+      };
+    });
   } catch (error) {
     console.error('Error in fetchContractorPortfolio:', error);
     throw error;
@@ -815,23 +1050,237 @@ export async function fetchContractorFeaturedPortfolio(contractorId: string, lim
       throw new Error('Failed to fetch contractor featured portfolio');
     }
 
-    return (data || []).map(project => ({
-      id: project.id,
-      title: project.title,
-      description: project.description || '',
-      images: project.portfolio_project_images?.map(img => img.file_uploads?.file_path).filter(Boolean) || [],
-      budget: project.budget_range || '',
-      duration: project.duration || '',
-      year: project.completion_date ? new Date(project.completion_date).getFullYear() : new Date().getFullYear(),
-      category: project.job_categories?.name || '',
-      location: project.location || '',
-      projectType: project.project_type || '',
-      clientName: project.client_name || '',
-      clientFeedback: project.client_feedback || '',
-      isFeatured: project.is_featured
-    }));
+    return (data || []).map(project => {
+      // Convert file paths to public URLs
+      const imageUrls = (project.portfolio_project_images || []).map(img => {
+        const filePath = img.file_uploads?.file_path;
+        if (!filePath) return null;
+        
+        // If it's already a URL, return it
+        if (filePath.startsWith('http')) {
+          return filePath;
+        }
+        
+        // Otherwise, convert storage path to public URL
+        const supabase = createClient();
+        const { data: urlData } = supabase.storage
+          .from('job-attachments')
+          .getPublicUrl(filePath);
+        
+        return urlData.publicUrl;
+      }).filter(Boolean) as string[];
+
+      return {
+        id: project.id,
+        title: project.title,
+        description: project.description || '',
+        images: imageUrls,
+        budget: project.budget_range || '',
+        duration: project.duration || '',
+        year: project.completion_date ? new Date(project.completion_date).getFullYear() : new Date().getFullYear(),
+        category: project.job_categories?.name || '',
+        location: project.location || '',
+        projectType: project.project_type || '',
+        clientName: project.client_name || '',
+        clientFeedback: project.client_feedback || '',
+        isFeatured: project.is_featured
+      };
+    });
   } catch (error) {
     console.error('Error in fetchContractorFeaturedPortfolio:', error);
     throw error;
+  }
+}
+
+/**
+ * Portfolio project data for create/update
+ */
+export interface PortfolioProjectInput {
+  title: string;
+  description?: string;
+  categoryId?: string;
+  location?: string;
+  projectType?: string;
+  budgetRange?: string;
+  duration?: string;
+  completionDate?: string;
+  clientName?: string;
+  clientFeedback?: string;
+  isFeatured?: boolean;
+  sortOrder?: number;
+}
+
+/**
+ * Create a new portfolio project
+ */
+export async function createPortfolioProject(
+  supabase: ReturnType<typeof createClient>,
+  companyId: string,
+  projectData: PortfolioProjectInput
+): Promise<{ data: string | null; error: any }> {
+  try {
+    const { data, error } = await supabase
+      .from('portfolio_projects')
+      .insert({
+        company_id: companyId,
+        title: projectData.title,
+        description: projectData.description || null,
+        category_id: projectData.categoryId || null,
+        location: projectData.location || null,
+        project_type: projectData.projectType || null,
+        budget_range: projectData.budgetRange || null,
+        duration: projectData.duration || null,
+        completion_date: projectData.completionDate || null,
+        client_name: projectData.clientName || null,
+        client_feedback: projectData.clientFeedback || null,
+        is_featured: projectData.isFeatured || false,
+        sort_order: projectData.sortOrder || 0,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error creating portfolio project:', error);
+      return { data: null, error };
+    }
+
+    return { data: data.id, error: null };
+  } catch (error) {
+    console.error('Error in createPortfolioProject:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Update an existing portfolio project
+ */
+export async function updatePortfolioProject(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string,
+  projectData: Partial<PortfolioProjectInput>
+): Promise<{ data: boolean; error: any }> {
+  try {
+    const updateData: any = {};
+    
+    if (projectData.title !== undefined) updateData.title = projectData.title;
+    if (projectData.description !== undefined) updateData.description = projectData.description || null;
+    if (projectData.categoryId !== undefined) updateData.category_id = projectData.categoryId || null;
+    if (projectData.location !== undefined) updateData.location = projectData.location || null;
+    if (projectData.projectType !== undefined) updateData.project_type = projectData.projectType || null;
+    if (projectData.budgetRange !== undefined) updateData.budget_range = projectData.budgetRange || null;
+    if (projectData.duration !== undefined) updateData.duration = projectData.duration || null;
+    if (projectData.completionDate !== undefined) updateData.completion_date = projectData.completionDate || null;
+    if (projectData.clientName !== undefined) updateData.client_name = projectData.clientName || null;
+    if (projectData.clientFeedback !== undefined) updateData.client_feedback = projectData.clientFeedback || null;
+    if (projectData.isFeatured !== undefined) updateData.is_featured = projectData.isFeatured;
+    if (projectData.sortOrder !== undefined) updateData.sort_order = projectData.sortOrder;
+
+    const { error } = await supabase
+      .from('portfolio_projects')
+      .update(updateData)
+      .eq('id', projectId);
+
+    if (error) {
+      console.error('Error updating portfolio project:', error);
+      return { data: false, error };
+    }
+
+    return { data: true, error: null };
+  } catch (error) {
+    console.error('Error in updatePortfolioProject:', error);
+    return { data: false, error };
+  }
+}
+
+/**
+ * Delete a portfolio project
+ */
+export async function deletePortfolioProject(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string
+): Promise<{ data: boolean; error: any }> {
+  try {
+    // Portfolio project images will be deleted via CASCADE
+    const { error } = await supabase
+      .from('portfolio_projects')
+      .delete()
+      .eq('id', projectId);
+
+    if (error) {
+      console.error('Error deleting portfolio project:', error);
+      return { data: false, error };
+    }
+
+    return { data: true, error: null };
+  } catch (error) {
+    console.error('Error in deletePortfolioProject:', error);
+    return { data: false, error };
+  }
+}
+
+/**
+ * Add image to portfolio project
+ */
+export async function addPortfolioProjectImage(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string,
+  fileUploadId: string,
+  imageData?: {
+    title?: string;
+    description?: string;
+    altText?: string;
+    imageType?: 'before' | 'during' | 'after' | 'general' | 'detail';
+    sortOrder?: number;
+  }
+): Promise<{ data: string | null; error: any }> {
+  try {
+    const { data, error } = await supabase
+      .from('portfolio_project_images')
+      .insert({
+        project_id: projectId,
+        file_id: fileUploadId,
+        title: imageData?.title || null,
+        description: imageData?.description || null,
+        alt_text: imageData?.altText || null,
+        image_type: imageData?.imageType || 'general',
+        sort_order: imageData?.sortOrder || 0,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error adding portfolio project image:', error);
+      return { data: null, error };
+    }
+
+    return { data: data.id, error: null };
+  } catch (error) {
+    console.error('Error in addPortfolioProjectImage:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Remove image from portfolio project
+ */
+export async function removePortfolioProjectImage(
+  supabase: ReturnType<typeof createClient>,
+  imageId: string
+): Promise<{ data: boolean; error: any }> {
+  try {
+    const { error } = await supabase
+      .from('portfolio_project_images')
+      .delete()
+      .eq('id', imageId);
+
+    if (error) {
+      console.error('Error removing portfolio project image:', error);
+      return { data: false, error };
+    }
+
+    return { data: true, error: null };
+  } catch (error) {
+    console.error('Error in removePortfolioProjectImage:', error);
+    return { data: false, error };
   }
 }

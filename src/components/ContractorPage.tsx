@@ -3,7 +3,6 @@
 import {
   Award,
   BarChart3,
-  Camera,
   CheckCircle,
   Clock,
   Edit,
@@ -12,12 +11,16 @@ import {
   Loader2,
   MapPin,
   MessageSquare,
-  Save,
+  Plus,
   Send,
   Shield,
   Star,
   TrendingUp,
-  Upload
+  Trash2,
+  Briefcase,
+  FolderKanban,
+  Calendar,
+  DollarSign
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -26,29 +29,31 @@ import { createClient } from '../lib/supabase/client';
 import { 
   fetchContractorDashboardData,
   fetchCompletedProjects,
+  fetchPlatformProjectHistory,
+  fetchContractorPortfolio,
+  fetchPortfolioProjectById,
+  deletePortfolioProject,
   type ContractorProfile,
   type ContractorApplication,
   type ContractorBid,
   type ContractorStats,
-  type Certificate
+  type Certificate,
+  type PlatformProject
 } from '../lib/database/contractors';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import BidSubmissionForm from './BidSubmissionForm';
 import MessagingSystem from './MessagingSystem';
 import MyApplications from './MyApplications';
-import TenderSystem from './TenderSystem';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { Progress } from './ui/progress';
-import { Separator } from './ui/separator';
-import { Switch } from './ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Textarea } from './ui/textarea';
-import { getTenderById } from '../mocks';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import PortfolioProjectForm from './PortfolioProjectForm';
+import { toast } from 'sonner';
+import Image from 'next/image';
 
 interface ContractorPageProps {
   onBack: () => void;
@@ -58,11 +63,26 @@ interface ContractorPageProps {
 export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageProps) {
   const { user } = useUserProfile();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Persist active tab in localStorage across page refreshes
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedTab = localStorage.getItem('contractor-dashboard-tab');
+      if (savedTab && ['dashboard', 'applications', 'projects', 'analytics'].includes(savedTab)) {
+        return savedTab;
+      }
+    }
+    return 'dashboard';
+  });
+  
+  // Save tab to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('contractor-dashboard-tab', activeTab);
+    }
+  }, [activeTab]);
+  
   const [showMessaging, setShowMessaging] = useState(false);
-  const [showBidSubmission, setShowBidSubmission] = useState(false);
-  const [selectedTender, setSelectedTender] = useState<any>(null);
-  const [isEditing, setIsEditing] = useState(false);
 
   const handleMessagesClick = () => {
     router.push('/messages');
@@ -76,6 +96,16 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   const [stats, setStats] = useState<ContractorStats | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [completedProjects, setCompletedProjects] = useState<any[]>([]);
+  
+  // Projects tab state
+  const [platformProjects, setPlatformProjects] = useState<PlatformProject[]>([]);
+  const [portfolioProjects, setPortfolioProjects] = useState<any[]>([]);
+  const [loadingPlatformProjects, setLoadingPlatformProjects] = useState(false);
+  const [loadingPortfolioProjects, setLoadingPortfolioProjects] = useState(false);
+  const [showPortfolioForm, setShowPortfolioForm] = useState(false);
+  const [editingProject, setEditingProject] = useState<any | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   // Fetch contractor data from Supabase
   useEffect(() => {
@@ -101,10 +131,11 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
         }
 
         // Use company ID instead of user ID
-        const companyId = company.id;
+        const companyIdValue = company.id;
+        setCompanyId(companyIdValue);
 
         // Fetch all dashboard data using the company ID
-        const dashboardData = await fetchContractorDashboardData(supabase, companyId);
+        const dashboardData = await fetchContractorDashboardData(supabase, companyIdValue);
         
         setProfile(dashboardData.profile);
         setApplications(dashboardData.applications);
@@ -112,9 +143,33 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
         setStats(dashboardData.stats);
         setCertificates(dashboardData.certificates);
 
-        // Fetch completed projects separately using company ID
-        const projectsResult = await fetchCompletedProjects(supabase, companyId, 10);
+        // Fetch completed projects separately using company ID (legacy, for backward compatibility)
+        const projectsResult = await fetchCompletedProjects(supabase, companyIdValue, 10);
         setCompletedProjects(projectsResult || []);
+
+        // Fetch platform project history (completed jobs from platform)
+        setLoadingPlatformProjects(true);
+        try {
+          const platformHistory = await fetchPlatformProjectHistory(supabase, companyIdValue);
+          setPlatformProjects(platformHistory || []);
+        } catch (error) {
+          console.error('Error fetching platform project history:', error);
+          setPlatformProjects([]);
+        } finally {
+          setLoadingPlatformProjects(false);
+        }
+
+        // Fetch portfolio projects (external projects)
+        setLoadingPortfolioProjects(true);
+        try {
+          const portfolio = await fetchContractorPortfolio(companyIdValue);
+          setPortfolioProjects(portfolio || []);
+        } catch (error) {
+          console.error('Error fetching portfolio projects:', error);
+          setPortfolioProjects([]);
+        } finally {
+          setLoadingPortfolioProjects(false);
+        }
 
       } catch (error) {
         console.error('Error fetching contractor data:', error);
@@ -125,6 +180,7 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
 
     fetchData();
   }, [user?.id]);
+
 
   // Transform Supabase data to component format
   const contractorData = profile ? {
@@ -193,37 +249,6 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     setShowMessaging(true);
   };
 
-  const handleTenderSelect = (tenderId: string) => {
-    // In real app, this would navigate to tender details
-    console.log('View tender:', tenderId);
-  };
-
-  const handleBidSubmit = (tenderId: string) => {
-    const tender = getTenderById(tenderId) || getTenderById('tender-1');
-
-    if (!tender) {
-      console.warn('Tender not found for bid submission');
-      return;
-    }
-
-    setSelectedTender({
-      id: tender.id,
-      title: tender.title,
-      deadline: tender.submissionDeadline || new Date(),
-      value: tender.estimatedValue || '0',
-      currency: tender.currency || 'PLN',
-      evaluationCriteria: tender.evaluationCriteria || [],
-      requirements: tender.requirements || []
-    });
-    setShowBidSubmission(true);
-  };
-
-  const handleBidFormSubmit = (bid: any) => {
-    // In real app, this would submit bid to backend
-    console.log('Bid submitted:', bid);
-    setShowBidSubmission(false);
-    setSelectedTender(null);
-  };
 
   // Transform applications and bids to activeOffers format
   const activeOffers = [
@@ -292,6 +317,72 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     return <Badge className={config.color}>{config.label}</Badge>;
   };
 
+  // Portfolio management handlers
+  const handleAddPortfolioProject = () => {
+    setEditingProject(null);
+    setShowPortfolioForm(true);
+  };
+
+  const handleEditPortfolioProject = async (project: any) => {
+    // Fetch full project details for editing
+    const supabase = createClient();
+    const fullProject = await fetchPortfolioProjectById(supabase, project.id);
+    
+    if (fullProject) {
+      setEditingProject(fullProject);
+      setShowPortfolioForm(true);
+    } else {
+      toast.error('Nie udało się załadować danych projektu');
+    }
+  };
+
+  const handleDeletePortfolioProject = (projectId: string) => {
+    setDeletingProjectId(projectId);
+  };
+
+  const confirmDeletePortfolioProject = async () => {
+    if (!deletingProjectId || !companyId) return;
+
+    const supabase = createClient();
+    try {
+      const { data, error } = await deletePortfolioProject(supabase, deletingProjectId);
+      
+      if (error || !data) {
+        toast.error('Nie udało się usunąć projektu');
+        console.error('Error deleting portfolio project:', error);
+        return;
+      }
+
+      toast.success('Projekt został usunięty');
+      
+      // Refresh portfolio list
+      const portfolio = await fetchContractorPortfolio(companyId);
+      setPortfolioProjects(portfolio || []);
+    } catch (error) {
+      console.error('Error in confirmDeletePortfolioProject:', error);
+      toast.error('Wystąpił błąd podczas usuwania projektu');
+    } finally {
+      setDeletingProjectId(null);
+    }
+  };
+
+  const handlePortfolioSuccess = async () => {
+    if (!companyId) return;
+    
+    const supabase = createClient();
+    try {
+      const portfolio = await fetchContractorPortfolio(companyId);
+      setPortfolioProjects(portfolio || []);
+    } catch (error) {
+      console.error('Error refreshing portfolio:', error);
+    }
+  };
+
+  const handlePortfolioFormClose = () => {
+    setShowPortfolioForm(false);
+    setEditingProject(null);
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -358,8 +449,8 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
               </div>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={onBack}>
-                Wróć do zleceń
+              <Button variant="outline" onClick={() => router.push('/account')}>
+                Profil użytkownika
               </Button>
               <Button onClick={onBrowseJobs}>
                 Przeglądaj zlecenia
@@ -372,13 +463,10 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="applications">Moje aplikacje</TabsTrigger>
-            <TabsTrigger value="tenders">Przetargi</TabsTrigger>
-            <TabsTrigger value="offers">Moje oferty</TabsTrigger>
             <TabsTrigger value="projects">Projekty</TabsTrigger>
-            <TabsTrigger value="profile">Profil</TabsTrigger>
             <TabsTrigger value="analytics">Analityka</TabsTrigger>
           </TabsList>
 
@@ -450,9 +538,9 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                     <Eye className="w-4 h-4 mr-2" />
                     Przeglądaj zapisane oferty
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Aktualizuj portfolio
+                  <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/account?tab=company')}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edytuj profil firmy
                   </Button>
                   <Button variant="outline" className="w-full justify-start" onClick={handleMessagesClick}>
                     <MessageSquare className="w-4 h-4 mr-2" />
@@ -509,295 +597,206 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
             />
           </TabsContent>
 
-          {/* Tenders Tab */}
-          <TabsContent value="tenders" className="space-y-6">
-            <TenderSystem 
-              userRole="contractor"
-              onTenderSelect={handleTenderSelect}
-              onBidSubmit={handleBidSubmit}
-            />
-          </TabsContent>
-
-          {/* Offers Tab */}
-          <TabsContent value="offers" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Moje oferty</h2>
-              <Button onClick={onBrowseJobs}>Znajdź nowe zlecenia</Button>
-            </div>
-
-            {activeOffers.length === 0 ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Send className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-xl font-semibold mb-2">Brak złożonych ofert</h3>
-                  <p className="text-gray-600 mb-6">
-                    Rozpocznij przeglądanie dostępnych zleceń i składaj oferty, aby rozwijać swój biznes.
-                  </p>
-                  <Button onClick={onBrowseJobs}>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Przeglądaj zlecenia
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4">
-                {activeOffers.map((offer) => (
-                <Card key={offer.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-lg">{offer.title}</h3>
-                          {getStatusBadge(offer.status)}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                          <span className="font-medium">{offer.client}</span>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            <span>{offer.location}</span>
-                          </div>
-                        </div>
-                        <p className="text-gray-700 text-sm mb-3">{offer.description}</p>
-                        <div className="flex items-center gap-6 text-sm text-gray-500">
-                          <span>Złożono: {offer.submittedAt}</span>
-                          <span>Ofert: {offer.responses}</span>
-                        </div>
-                      </div>
-                      <div className="text-right ml-6">
-                        <div className="mb-2">
-                          <p className="text-sm text-gray-600">Budżet klienta</p>
-                          <p className="font-bold text-lg">{offer.budget} zł</p>
-                        </div>
-                        <div className="mb-4">
-                          <p className="text-sm text-gray-600">Twoja oferta</p>
-                          <p className="font-bold text-lg text-green-600">{offer.myOffer} zł</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Edytuj</Button>
-                          <Button size="sm">Szczegóły</Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              </div>
-            )}
-          </TabsContent>
-
           {/* Projects Tab */}
-          <TabsContent value="projects" className="space-y-6">
-            <h2 className="text-2xl font-bold">Historia projektów</h2>
-            
-            <div className="grid gap-4">
-              {recentJobs.map((job) => (
-                <Card key={job.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg mb-2">{job.title}</h3>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                          <span className="font-medium">{job.client}</span>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            <span>{job.location}</span>
+          <TabsContent value="projects" className="space-y-8">
+            {/* Section 1: Platform Project History */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Briefcase className="w-6 h-6 text-primary" />
+                  <h2 className="text-2xl font-bold">Historia projektów z platformy</h2>
+                </div>
+              </div>
+              
+              {loadingPlatformProjects ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : platformProjects.length > 0 ? (
+                <div className="grid gap-4">
+                  {platformProjects.map((project) => (
+                    <Card key={project.id}>
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between gap-6">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-lg">{project.title}</h3>
+                              {project.category && (
+                                <Badge variant="outline">{project.category}</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                              <span className="font-medium">{project.clientCompany}</span>
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-4 h-4" />
+                                <span>{project.location}</span>
+                              </div>
+                              {project.completionDate && (
+                                <span>Ukończono: {new Date(project.completionDate).toLocaleDateString('pl-PL')}</span>
+                              )}
+                            </div>
+                            {project.description && (
+                              <p className="text-sm text-gray-700 mb-3 line-clamp-2">{project.description}</p>
+                            )}
+                            <div className="flex items-center gap-6 text-sm text-gray-500">
+                              {project.proposedPrice && (
+                                <div className="flex items-center gap-1">
+                                  <Euro className="w-4 h-4" />
+                                  <span>{project.proposedPrice.toLocaleString('pl-PL')} {project.currency}</span>
+                                </div>
+                              )}
+                              {project.duration && (
+                                <span>Czas realizacji: {project.duration}</span>
+                              )}
+                            </div>
                           </div>
-                          <span>Ukończono: {job.completedAt}</span>
-                        </div>
-                        <div className="flex items-center gap-6 text-sm text-gray-500 mb-3">
-                          <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                            <span>{job.rating}/5.0</span>
-                          </div>
-                          <span>Czas realizacji: {job.duration}</span>
-                        </div>
-                        <p className="text-sm text-gray-700 italic">"{job.feedback}"</p>
-                      </div>
-                      <div className="text-right ml-6">
-                        <p className="text-2xl font-bold text-green-600">{job.earnings} zł</p>
-                        <Button variant="outline" size="sm" className="mt-2">
-                          Zobacz szczegóły
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          {/* Profile Tab */}
-          <TabsContent value="profile" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Profil firmy</h2>
-              <Button 
-                variant={isEditing ? "default" : "outline"}
-                onClick={() => setIsEditing(!isEditing)}
-              >
-                {isEditing ? (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Zapisz zmiany
-                  </>
-                ) : (
-                  <>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edytuj profil
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Podstawowe informacje</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>Nazwa firmy</Label>
-                        <Input 
-                          value={contractorData.name} 
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <Label>Specjalizacja</Label>
-                        <Input 
-                          value={contractorData.specialization} 
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <Label>Telefon</Label>
-                        <Input 
-                          value={contractorData.phone} 
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <Label>Email</Label>
-                        <Input 
-                          value={contractorData.email} 
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <Label>Strona internetowa</Label>
-                        <Input 
-                          value={contractorData.website} 
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <Label>Rok założenia</Label>
-                        <Input 
-                          value={contractorData.founded} 
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Adres</Label>
-                      <Input 
-                        value={contractorData.address} 
-                        disabled={!isEditing}
-                      />
-                    </div>
-                    <div>
-                      <Label>Opis firmy</Label>
-                      <Textarea 
-                        value={contractorData.description}
-                        disabled={!isEditing}
-                        rows={4}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Certyfikaty i licencje</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {contractorData.licenses.map((license, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Award className="w-5 h-5 text-yellow-500" />
-                            <span>{license}</span>
-                          </div>
-                          {isEditing && (
-                            <Button variant="ghost" size="sm">
-                              Usuń
+                          <div className="text-right">
+                            {(project.proposedPrice || project.budget) && (
+                              <p className="text-2xl font-bold text-green-600 mb-2">
+                                {project.proposedPrice 
+                                  ? `${project.proposedPrice.toLocaleString('pl-PL')} ${project.currency}`
+                                  : project.budget 
+                                  ? `${project.budget.toLocaleString('pl-PL')} ${project.currency}`
+                                  : ''
+                                }
+                              </p>
+                            )}
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => router.push(`/jobs/${project.jobId}`)}
+                            >
+                              Zobacz szczegóły
                             </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <Briefcase className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold mb-2">Brak ukończonych projektów z platformy</h3>
+                    <p className="text-gray-600">
+                      Projekty z platformy pojawią się tutaj, gdy Twoja aplikacja zostanie zaakceptowana i projekt zostanie ukończony.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Section 2: Own Portfolio */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FolderKanban className="w-6 h-6 text-primary" />
+                  <h2 className="text-2xl font-bold">Portfolio własne</h2>
+                </div>
+                {portfolioProjects.length > 0 && (
+                  <Button onClick={handleAddPortfolioProject}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Dodaj projekt
+                  </Button>
+                )}
+              </div>
+              
+              {loadingPortfolioProjects ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : portfolioProjects.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {portfolioProjects.map((project) => (
+                    <Card key={project.id} className="overflow-hidden">
+                      {project.images && project.images.length > 0 && (
+                        <div className="relative h-48 w-full">
+                          <Image
+                            src={project.images[0]}
+                            alt={project.title}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      )}
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="font-semibold text-lg line-clamp-2 flex-1">{project.title}</h3>
+                          {project.isFeatured && (
+                            <Badge className="bg-yellow-100 text-yellow-800">
+                              <Star className="w-3 h-3 mr-1" />
+                              Wyróżniony
+                            </Badge>
                           )}
                         </div>
-                      ))}
-                      {isEditing && (
-                        <Button variant="outline" className="w-full">
-                          Dodaj certyfikat
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="space-y-6">
+                        {project.location && (
+                          <div className="flex items-center gap-1 text-sm text-gray-600 mb-2">
+                            <MapPin className="w-4 h-4" />
+                            <span>{project.location}</span>
+                          </div>
+                        )}
+                        {project.description && (
+                          <p className="text-sm text-gray-700 mb-3 line-clamp-2">{project.description}</p>
+                        )}
+                        <div className="space-y-1 text-xs text-gray-600 mb-4">
+                          {project.year && (
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              <span>Rok ukończenia: <span className="font-medium">{project.year}</span></span>
+                            </div>
+                          )}
+                          {project.budget && (
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              <span>Budżet: <span className="font-medium">{project.budget}</span></span>
+                            </div>
+                          )}
+                          {project.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>Czas realizacji: <span className="font-medium">{project.duration}</span></span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handleEditPortfolioProject(project)}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edytuj
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeletePortfolioProject(project.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Zdjęcie profilowe</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-center">
-                    <Avatar className="w-32 h-32 mx-auto mb-4">
-                      <AvatarImage src={contractorData.avatar} />
-                      <AvatarFallback className="text-2xl">
-                        {contractorData.shortName.slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                    {isEditing && (
-                      <Button variant="outline">
-                        <Camera className="w-4 h-4 mr-2" />
-                        Zmień zdjęcie
-                      </Button>
-                    )}
+                  <CardContent className="p-12 text-center">
+                    <FolderKanban className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold mb-2">Brak projektów w portfolio</h3>
+                    <p className="text-gray-600 mb-4">
+                      Dodaj swoje ukończone projekty spoza platformy, aby pokazać klientom swoje doświadczenie.
+                    </p>
+                    <Button onClick={handleAddPortfolioProject}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Dodaj pierwszy projekt
+                    </Button>
                   </CardContent>
                 </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Ustawienia profilu</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Profil publiczny</p>
-                        <p className="text-sm text-gray-500">Widoczny dla klientów</p>
-                      </div>
-                      <Switch checked disabled={!isEditing} />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Powiadomienia email</p>
-                        <p className="text-sm text-gray-500">O nowych zleceniach</p>
-                      </div>
-                      <Switch checked disabled={!isEditing} />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Automatyczne oferty</p>
-                        <p className="text-sm text-gray-500">Dla dopasowanych zleceń</p>
-                      </div>
-                      <Switch disabled={!isEditing} />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              )}
             </div>
           </TabsContent>
 
@@ -940,23 +939,57 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
         />
       )}
 
-      {/* Bid Submission Modal */}
-      {showBidSubmission && selectedTender && (
-        <BidSubmissionForm
-          tenderId={selectedTender.id}
-          tenderTitle={selectedTender.title}
-          tenderDeadline={selectedTender.deadline}
-          tenderValue={selectedTender.value}
-          tenderCurrency={selectedTender.currency}
-          evaluationCriteria={selectedTender.evaluationCriteria}
-          tenderRequirements={selectedTender.requirements}
-          onClose={() => {
-            setShowBidSubmission(false);
-            setSelectedTender(null);
-          }}
-          onSubmit={handleBidFormSubmit}
-        />
-      )}
+      {/* Portfolio Project Form Modal */}
+      <Dialog open={showPortfolioForm} onOpenChange={setShowPortfolioForm}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingProject ? 'Edytuj projekt portfolio' : 'Dodaj nowy projekt portfolio'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingProject 
+                ? 'Zaktualizuj informacje o projekcie w swoim portfolio.' 
+                : 'Dodaj projekt ukończony poza platformą do swojego portfolio.'}
+            </DialogDescription>
+          </DialogHeader>
+          <PortfolioProjectForm
+            projectId={editingProject?.id}
+            initialData={editingProject || undefined}
+            onClose={handlePortfolioFormClose}
+            onSuccess={() => {
+              handlePortfolioSuccess();
+              handlePortfolioFormClose();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingProjectId} onOpenChange={(open) => !open && setDeletingProjectId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Usunąć projekt?</DialogTitle>
+            <DialogDescription>
+              Czy na pewno chcesz usunąć ten projekt z portfolio? Tej operacji nie można cofnąć.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setDeletingProjectId(null)}
+            >
+              Anuluj
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeletePortfolioProject}
+            >
+              Usuń
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

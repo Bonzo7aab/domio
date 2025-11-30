@@ -112,28 +112,6 @@ export function UserAccountPageClient({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center space-x-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onBack}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Powrót
-            </Button>
-            <div>
-              <h1>Ustawienia konta</h1>
-              <p className="text-sm text-muted-foreground">
-                Zarządzaj swoim profilem i ustawieniami
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="space-y-6">

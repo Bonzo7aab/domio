@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getManagerById, mockApplications } from '../mocks';
 import { createClient } from '../lib/supabase/client';
@@ -46,6 +47,7 @@ interface ManagerPageProps {
 
 export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, onTenderFormOpened }: ManagerPageProps) {
   const { user, isLoading } = useUserProfile();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedJobForApplications, setSelectedJobForApplications] = useState<string | null>(null);
   const [showTenderCreation, setShowTenderCreation] = useState(false);
@@ -431,6 +433,8 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   const handleTenderSelect = (tenderId: string) => {
     setSelectedTenderId(tenderId);
     setShowBidEvaluation(true);
+    // Switch to tender-bids tab to view bids
+    setActiveTab('tender-bids');
   };
 
   const handleAwardTender = (bidId: string, notes: string) => {
@@ -581,11 +585,12 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview">Przegląd</TabsTrigger>
             <TabsTrigger value="jobs">Zlecenia</TabsTrigger>
-            <TabsTrigger value="applications">Oferty</TabsTrigger>
+            <TabsTrigger value="applications">Otrzymane oferty</TabsTrigger>
             <TabsTrigger value="tenders">Przetargi</TabsTrigger>
+            <TabsTrigger value="tender-bids">Oferty przetargowe</TabsTrigger>
             <TabsTrigger value="properties">Nieruchomości</TabsTrigger>
             <TabsTrigger value="contractors">Wykonawcy</TabsTrigger>
             <TabsTrigger value="analytics">Analityka</TabsTrigger>
@@ -917,6 +922,71 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
             />
           </TabsContent>
 
+          {/* Tender Bids Tab */}
+          <TabsContent value="tender-bids" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Oferty przetargowe</h2>
+            </div>
+
+            {selectedTenderId && showBidEvaluation ? (
+              <div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSelectedTenderId(null);
+                    setShowBidEvaluation(false);
+                  }}
+                  className="mb-4"
+                >
+                  ← Powrót do listy przetargów
+                </Button>
+                {isLoadingTenderBids ? (
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <p className="ml-2 text-sm text-muted-foreground">Ładowanie ofert...</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <BidEvaluationPanel
+                    tenderId={selectedTenderId}
+                    tenderTitle={selectedTenderData?.title || 'Przetarg'}
+                    evaluationCriteria={[
+                      { id: 'price', name: 'Cena oferty', description: 'Łączna cena realizacji', weight: 40, type: 'price' },
+                      { id: 'quality', name: 'Jakość wykonania', description: 'Doświadczenie i referencje', weight: 30, type: 'quality' },
+                      { id: 'time', name: 'Termin realizacji', description: 'Czas wykonania prac', weight: 20, type: 'time' },
+                      { id: 'warranty', name: 'Gwarancja', description: 'Okres gwarancji i serwis', weight: 10, type: 'quality' }
+                    ]}
+                    bids={tenderBids}
+                    onClose={() => {
+                      setShowBidEvaluation(false);
+                      setSelectedTenderId(null);
+                    }}
+                    onAwardTender={handleAwardTender}
+                    onRejectBid={handleRejectBid}
+                  />
+                )}
+              </div>
+            ) : (
+              <div>
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-xl font-semibold mb-2">Wybierz przetarg</h3>
+                    <p className="text-gray-600 mb-6">
+                      Przejdź do zakładki "Przetargi" i wybierz przetarg, aby zobaczyć złożone oferty.
+                    </p>
+                    <Button onClick={() => setActiveTab('tenders')}>
+                      Przejdź do przetargów
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
+
           {/* Properties Tab */}
           <TabsContent value="properties" className="space-y-6">
             {isLoadingBuildings ? (
@@ -1014,7 +1084,12 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
 
           {/* Contractors Tab */}
           <TabsContent value="contractors" className="space-y-6">
-            <h2 className="text-2xl font-bold">Moja sieć wykonawców</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Wykonawcy</h2>
+              <Button variant="outline" onClick={() => router.push('/contractors')}>
+                Przeglądaj wszystkich wykonawców
+              </Button>
+            </div>
             
             <div className="grid gap-4">
               {contractors.map((contractor) => (
@@ -1035,10 +1110,19 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                           </div>
                           <Badge variant="outline">{contractor.currentJob}</Badge>
                         </div>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Kliknij "Zobacz profil", aby zobaczyć portfolio wykonawcy
+                        </p>
                       </div>
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm">Wyślij wiadomość</Button>
-                        <Button variant="outline" size="sm">Zobacz profil</Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => router.push(`/contractors/${contractor.id}`)}
+                        >
+                          Zobacz profil
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -1092,7 +1176,8 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         />
       )}
 
-      {showBidEvaluation && selectedTenderId && (
+      {/* Bid Evaluation Modal - Only show if not in tender-bids tab */}
+      {showBidEvaluation && selectedTenderId && activeTab !== 'tender-bids' && (
         <>
           {isLoadingTenderBids ? (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">

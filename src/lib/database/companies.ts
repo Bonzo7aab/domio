@@ -130,7 +130,13 @@ export async function upsertUserCompany(
     city?: string;
     postal_code?: string;
     nip?: string;
+    regon?: string;
+    krs?: string;
+    website?: string;
+    founded_year?: number;
+    employee_count?: string;
     description?: string;
+    is_public?: boolean;
   }
 ): Promise<{ data: CompanyData | null; error: any }> {
   try {
@@ -167,7 +173,13 @@ export async function upsertUserCompany(
         city: companyData.city || null,
         postal_code: companyData.postal_code || null,
         nip: companyData.nip || null,
+        regon: companyData.regon || null,
+        krs: companyData.krs || null,
+        website: companyData.website || null,
+        founded_year: companyData.founded_year || null,
+        employee_count: companyData.employee_count || null,
         description: companyData.description || null,
+        is_public: companyData.is_public !== undefined ? companyData.is_public : true,
         updated_at: new Date().toISOString(),
       };
 
@@ -212,7 +224,13 @@ export async function upsertUserCompany(
         city: companyData.city || null,
         postal_code: companyData.postal_code || null,
         nip: companyData.nip || null,
+        regon: companyData.regon || null,
+        krs: companyData.krs || null,
+        website: companyData.website || null,
+        founded_year: companyData.founded_year || null,
+        employee_count: companyData.employee_count || null,
         description: companyData.description || null,
+        is_public: companyData.is_public !== undefined ? companyData.is_public : true,
         country: 'PL',
         is_verified: false,
         verification_level: 'none' as any,

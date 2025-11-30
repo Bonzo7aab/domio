@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Upload, FileText, Shield, Check, AlertTriangle, Info, X } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
@@ -24,6 +25,7 @@ interface DocumentUpload {
 
 export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) => {
   const { user } = useUserProfile();
+  const router = useRouter();
   const [uploads, setUploads] = useState<Record<string, DocumentUpload>>({});
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -189,7 +191,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
             </AlertDescription>
           </Alert>
 
-          <Button onClick={onBack} className="mt-6">
+          <Button onClick={() => router.push('/account')} className="mt-6">
             Powrót do konta
           </Button>
         </div>
@@ -206,7 +208,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={onBack}
+              onClick={() => router.push('/account')}
               className="text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -422,7 +424,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
 
           {/* Submit */}
           <div className="flex justify-end space-x-4">
-            <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" onClick={() => router.push('/account')}>
               Anuluj
             </Button>
             <Button 
