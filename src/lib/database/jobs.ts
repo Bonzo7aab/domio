@@ -597,8 +597,23 @@ export async function fetchJobById(
       .eq('id', jobId)
       .single();
 
+    // Handle "not found" error (PGRST116) as a normal case, not an error
+    if (error && (error as any).code === 'PGRST116') {
+      // Job not found - this is expected, not an error
+      return { data: null, error: null };
+    }
+
+    if (error) {
+      console.error('Error fetching job:', error);
+    }
+
     return { data: data as any, error };
   } catch (err) {
+    const error = err as any;
+    // Handle "not found" error (PGRST116) as a normal case
+    if (error?.code === 'PGRST116') {
+      return { data: null, error: null };
+    }
     console.error('Error fetching job:', err);
     return { data: null, error: err };
   }
@@ -631,8 +646,23 @@ export async function fetchTenderById(
       .eq('id', tenderId)
       .single();
 
+    // Handle "not found" error (PGRST116) as a normal case, not an error
+    if (result.error && result.error.code === 'PGRST116') {
+      // Tender not found - this is expected, not an error
+      return { data: null, error: null };
+    }
+
+    if (result.error) {
+      console.error('Error fetching tender:', result.error);
+    }
+
     return { data: result.data as any, error: result.error };
   } catch (err) {
+    const error = err as any;
+    // Handle "not found" error (PGRST116) as a normal case
+    if (error?.code === 'PGRST116') {
+      return { data: null, error: null };
+    }
     console.error('Error fetching tender:', err);
     return { data: null, error: err };
   }
@@ -1607,15 +1637,35 @@ export async function createJobApplication(
     // Convert estimated completion to days
     const proposedTimeline = convertEstimatedCompletionToDays(applicationData.estimatedCompletion);
     
+    // Ensure proposed_price is a valid number
+    const proposedPrice = typeof applicationData.proposedPrice === 'number' 
+      ? applicationData.proposedPrice 
+      : parseFloat(String(applicationData.proposedPrice)) || 0;
+    
+    if (proposedPrice <= 0) {
+      return {
+        data: null,
+        error: new Error('Proposed price must be greater than 0')
+      };
+    }
+    
+    // Validate required fields
+    if (!applicationData.coverLetter || applicationData.coverLetter.trim().length === 0) {
+      return {
+        data: null,
+        error: new Error('Cover letter is required')
+      };
+    }
+    
     // Prepare insert data
     const insertData: any = {
       job_id: jobId,
       contractor_id: contractorId,
       company_id: company.id,
-      proposed_price: applicationData.proposedPrice,
+      proposed_price: proposedPrice,
       currency: 'PLN',
-      cover_letter: applicationData.coverLetter,
-      notes: applicationData.additionalNotes || null,
+      cover_letter: applicationData.coverLetter.trim(),
+      notes: applicationData.additionalNotes?.trim() || null,
       status: 'submitted',
     };
     
@@ -1624,20 +1674,33 @@ export async function createJobApplication(
       insertData.proposed_timeline = proposedTimeline;
     }
     
-    // Insert application
-    const { data: insertedApplication, error: insertError } = await supabase
+    // Log the data being inserted for debugging
+    console.log('Inserting job application with data:', {
+      job_id: jobId,
+      contractor_id: contractorId,
+      company_id: company.id,
+      proposed_price: applicationData.proposedPrice,
+      proposed_timeline: proposedTimeline,
+      cover_letter_length: applicationData.coverLetter?.length || 0,
+      status: 'submitted'
+    });
+    
+    // Insert application (using type assertion since job_applications may not be in generated types)
+    const { data: insertedApplication, error: insertError } = await (supabase as any)
       .from('job_applications')
       .insert(insertData)
       .select()
       .single();
     
     if (insertError) {
+      const error = insertError as { message?: string; details?: string; hint?: string; code?: string };
       console.error('Error creating job application:', {
         error: insertError,
-        errorMessage: insertError?.message,
-        errorDetails: insertError?.details,
-        errorHint: insertError?.hint,
-        errorCode: insertError?.code,
+        errorMessage: error?.message,
+        errorDetails: error?.details,
+        errorHint: error?.hint,
+        errorCode: error?.code,
+        insertData: insertData,
         applicationData: {
           jobId,
           contractorId,
@@ -1648,10 +1711,29 @@ export async function createJobApplication(
         data: null, 
         error: insertError instanceof Error 
           ? insertError 
-          : new Error(insertError?.message || insertError?.details || insertError?.hint || 'Unknown database error')
+          : new Error(error?.message || error?.details || error?.hint || 'Unknown database error')
       };
     }
     
+    // Verify that data was actually inserted
+    if (!insertedApplication || !insertedApplication.id) {
+      console.error('Application insert returned no data:', {
+        insertedApplication,
+        insertData
+      });
+      return {
+        data: null,
+        error: new Error('Application was not created - no data returned from database')
+      };
+    }
+    
+    console.log('Job application created successfully:', {
+      id: insertedApplication.id,
+      job_id: insertedApplication.job_id,
+      contractor_id: insertedApplication.contractor_id,
+      company_id: insertedApplication.company_id,
+      status: insertedApplication.status
+    });
     return { data: insertedApplication, error: null };
   } catch (err) {
     console.error('Error creating job application:', err);
@@ -1672,7 +1754,8 @@ export async function fetchJobApplicationsByJobId(
   jobId: string
 ): Promise<{ data: any[] | null; error: any }> {
   try {
-    const { data: applications, error } = await supabase
+    // Use type assertion since job_applications may not be in generated types
+    const { data: applications, error } = await (supabase as any)
       .from('job_applications')
       .select(`
         id,
@@ -1714,7 +1797,7 @@ export async function fetchJobApplicationsByJobId(
     
     // Transform to Application type format
     const formattedApplications = await Promise.all(
-      (applications || []).map(async (app) => {
+      ((applications || []) as any[]).map(async (app: any) => {
         // Fetch contractor profile for additional data (rating, completed jobs, location)
         const { fetchContractorById } = await import('./contractors');
         const contractorProfile = await fetchContractorById(app.company?.id || '');
@@ -1806,6 +1889,30 @@ export async function createTenderBid(
       };
     }
     
+    // Check if a non-cancelled bid already exists for this tender and company
+    const { data: existingBids, error: checkError } = await (supabase as any)
+      .from('tender_bids')
+      .select('id, status')
+      .eq('tender_id', tenderId)
+      .eq('company_id', company.id)
+      .neq('status', 'cancelled')
+      .limit(1);
+    
+    if (checkError) {
+      console.error('Error checking for existing bids:', checkError);
+      return {
+        data: null,
+        error: new Error('Failed to check for existing bids')
+      };
+    }
+    
+    if (existingBids && existingBids.length > 0) {
+      return {
+        data: null,
+        error: new Error('Już złożyłeś ofertę na ten przetarg. Nie możesz złożyć więcej niż jednej oferty na ten sam przetarg.')
+      };
+    }
+    
     // Convert estimated completion to days
     const proposedTimeline = convertEstimatedCompletionToDays(bidData.estimatedCompletion);
     
@@ -1826,20 +1933,21 @@ export async function createTenderBid(
       insertData.proposed_timeline = proposedTimeline;
     }
     
-    // Insert bid
-    const { data: insertedBid, error: insertError } = await supabase
+    // Insert bid (using type assertion since tender_bids may not be in generated types)
+    const { data: insertedBid, error: insertError } = await (supabase as any)
       .from('tender_bids')
       .insert(insertData)
       .select()
       .single();
     
     if (insertError) {
+      const error = insertError as { message?: string; details?: string; hint?: string; code?: string };
       console.error('Error creating tender bid:', {
         error: insertError,
-        errorMessage: insertError?.message,
-        errorDetails: insertError?.details,
-        errorHint: insertError?.hint,
-        errorCode: insertError?.code,
+        errorMessage: error?.message,
+        errorDetails: error?.details,
+        errorHint: error?.hint,
+        errorCode: error?.code,
         bidData: {
           tenderId,
           contractorId,
@@ -1850,7 +1958,7 @@ export async function createTenderBid(
         data: null, 
         error: insertError instanceof Error 
           ? insertError 
-          : new Error(insertError?.message || insertError?.details || insertError?.hint || 'Unknown database error')
+          : new Error(error?.message || error?.details || error?.hint || 'Unknown database error')
       };
     }
     
@@ -1874,7 +1982,8 @@ export async function fetchTenderBidsByTenderId(
   tenderId: string
 ): Promise<{ data: any[] | null; error: any }> {
   try {
-    const { data: bids, error } = await supabase
+    // Use type assertion since tender_bids may not be in generated types
+    const { data: bids, error } = await (supabase as any)
       .from('tender_bids')
       .select(`
         id,
@@ -1917,7 +2026,7 @@ export async function fetchTenderBidsByTenderId(
     
     // Transform to TenderBid type format
     const formattedBids = await Promise.all(
-      (bids || []).map(async (bid) => {
+      ((bids || []) as any[]).map(async (bid: any) => {
         // Fetch contractor profile for additional data
         const { fetchContractorById } = await import('./contractors');
         const contractorProfile = await fetchContractorById(bid.company?.id || '');
@@ -1961,6 +2070,240 @@ export async function fetchTenderBidsByTenderId(
   } catch (err) {
     console.error('Error fetching tender bids:', err);
     return { data: null, error: err };
+  }
+}
+
+/**
+ * Cancel a job application (withdraw offer)
+ * Only allows cancellation if status is not 'accepted' or 'rejected'
+ */
+export async function cancelJobApplication(
+  supabase: SupabaseClient<Database>,
+  applicationId: string,
+  contractorId: string
+): Promise<{ data: any | null; error: any }> {
+  try {
+    // Fetch contractor's primary company
+    const { fetchUserPrimaryCompany } = await import('./companies');
+    const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, contractorId);
+    
+    if (companyError || !company) {
+      return { 
+        data: null, 
+        error: new Error('Contractor must have a company to cancel applications')
+      };
+    }
+
+    // First, fetch the application to check ownership and current status
+    const { data: application, error: fetchError } = await (supabase as any)
+      .from('job_applications')
+      .select('id, company_id, status')
+      .eq('id', applicationId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching application:', fetchError);
+      return {
+        data: null,
+        error: new Error('Application not found')
+      };
+    }
+
+    if (!application) {
+      return {
+        data: null,
+        error: new Error('Application not found')
+      };
+    }
+
+    // Check that application belongs to contractor's company
+    if (application.company_id !== company.id) {
+      return {
+        data: null,
+        error: new Error('You do not have permission to cancel this application')
+      };
+    }
+
+    // Check that status is not 'accepted' or 'rejected'
+    if (application.status === 'accepted' || application.status === 'rejected') {
+      return {
+        data: null,
+        error: new Error('Cannot cancel an application that has already been accepted or rejected')
+      };
+    }
+
+    // Update status to 'cancelled'
+    // Filter by both contractor_id (for RLS policy) and company_id (for validation)
+    const { data: updateData, error: updateError } = await (supabase as any)
+      .from('job_applications')
+      .update({ 
+        status: 'cancelled',
+        reviewed_at: new Date().toISOString()
+      })
+      .eq('id', applicationId)
+      .eq('contractor_id', contractorId)
+      .eq('company_id', company.id)
+      .select();
+
+    if (updateError) {
+      console.error('Error updating application status:', {
+        updateError,
+        errorType: typeof updateError,
+        errorMessage: updateError?.message,
+        errorCode: updateError?.code,
+        errorDetails: updateError?.details,
+        errorHint: updateError?.hint,
+        applicationId,
+        companyId: company.id
+      });
+      
+      // Extract error message from various error object structures
+      const errorMessage = updateError instanceof Error 
+        ? updateError.message 
+        : updateError?.message || updateError?.details || updateError?.hint || updateError?.code || 'Failed to cancel application';
+      
+      return {
+        data: null,
+        error: new Error(errorMessage)
+      };
+    }
+
+    // Check if any rows were updated
+    if (!updateData || updateData.length === 0) {
+      return {
+        data: null,
+        error: new Error('Application not found or could not be updated. Make sure the database migration has been run to allow "cancelled" status.')
+      };
+    }
+
+    const data = updateData[0];
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Error in cancelJobApplication:', err);
+    return {
+      data: null,
+      error: err instanceof Error 
+        ? err 
+        : new Error('An unexpected error occurred while cancelling the application')
+    };
+  }
+}
+
+/**
+ * Cancel a tender bid (withdraw offer)
+ * Only allows cancellation if status is not 'accepted' or 'rejected'
+ */
+export async function cancelTenderBid(
+  supabase: SupabaseClient<Database>,
+  bidId: string,
+  contractorId: string
+): Promise<{ data: any | null; error: any }> {
+  try {
+    // Fetch contractor's primary company
+    const { fetchUserPrimaryCompany } = await import('./companies');
+    const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, contractorId);
+    
+    if (companyError || !company) {
+      return { 
+        data: null, 
+        error: new Error('Contractor must have a company to cancel bids')
+      };
+    }
+
+    // First, fetch the bid to check ownership and current status
+    const { data: bid, error: fetchError } = await (supabase as any)
+      .from('tender_bids')
+      .select('id, company_id, status')
+      .eq('id', bidId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching bid:', fetchError);
+      return {
+        data: null,
+        error: new Error('Bid not found')
+      };
+    }
+
+    if (!bid) {
+      return {
+        data: null,
+        error: new Error('Bid not found')
+      };
+    }
+
+    // Check that bid belongs to contractor's company
+    if (bid.company_id !== company.id) {
+      return {
+        data: null,
+        error: new Error('You do not have permission to cancel this bid')
+      };
+    }
+
+    // Check that status is not 'accepted' or 'rejected'
+    if (bid.status === 'accepted' || bid.status === 'rejected') {
+      return {
+        data: null,
+        error: new Error('Cannot cancel a bid that has already been accepted or rejected')
+      };
+    }
+
+    // Update status to 'cancelled'
+    // Filter by both contractor_id (for RLS policy) and company_id (for validation)
+    const { data: updateData, error: updateError } = await (supabase as any)
+      .from('tender_bids')
+      .update({ 
+        status: 'cancelled',
+        evaluated_at: new Date().toISOString()
+      })
+      .eq('id', bidId)
+      .eq('contractor_id', contractorId)
+      .eq('company_id', company.id)
+      .select();
+
+    if (updateError) {
+      console.error('Error updating bid status:', {
+        updateError,
+        errorType: typeof updateError,
+        errorMessage: updateError?.message,
+        errorCode: updateError?.code,
+        errorDetails: updateError?.details,
+        errorHint: updateError?.hint,
+        bidId,
+        companyId: company.id
+      });
+      
+      // Extract error message from various error object structures
+      const errorMessage = updateError instanceof Error 
+        ? updateError.message 
+        : updateError?.message || updateError?.details || updateError?.hint || updateError?.code || 'Failed to cancel bid';
+      
+      return {
+        data: null,
+        error: new Error(errorMessage)
+      };
+    }
+
+    // Check if any rows were updated
+    if (!updateData || updateData.length === 0) {
+      return {
+        data: null,
+        error: new Error('Bid not found or could not be updated. Make sure the database migration has been run to allow "cancelled" status.')
+      };
+    }
+
+    const data = updateData[0];
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Error in cancelTenderBid:', err);
+    return {
+      data: null,
+      error: err instanceof Error 
+        ? err 
+        : new Error('An unexpected error occurred while cancelling the bid')
+    };
   }
 }
 

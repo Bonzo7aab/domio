@@ -22,17 +22,21 @@ import {
   Calendar,
   DollarSign
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
 import { 
   fetchContractorDashboardData,
+  fetchContractorDashboardStats,
+  fetchContractorApplications,
+  fetchContractorAnalytics,
   fetchCompletedProjects,
   fetchPlatformProjectHistory,
   fetchContractorPortfolio,
   fetchPortfolioProjectById,
   deletePortfolioProject,
+  fetchContractorRatingSummary,
   type ContractorProfile,
   type ContractorApplication,
   type ContractorBid,
@@ -61,28 +65,53 @@ interface ContractorPageProps {
 }
 
 export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageProps) {
-  const { user } = useUserProfile();
+  const { user, supabase } = useUserProfile();
   const router = useRouter();
+  const searchParams = useSearchParams();
   
-  // Persist active tab in localStorage across page refreshes
-  const [activeTab, setActiveTab] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedTab = localStorage.getItem('contractor-dashboard-tab');
-      if (savedTab && ['dashboard', 'applications', 'projects', 'analytics'].includes(savedTab)) {
-        return savedTab;
-      }
-    }
-    return 'dashboard';
-  });
-  
-  // Save tab to localStorage whenever it changes
+  // URL-based tab management (similar to /account page)
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMounted, setIsMounted] = useState(false);
+  const hasInitializedTabFromUrl = useRef(false);
+
+  // Track client-side mount to prevent hydration mismatch
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('contractor-dashboard-tab', activeTab);
+    setIsMounted(true);
+    
+    // Initialize tab from URL on mount (only once)
+    if (!hasInitializedTabFromUrl.current) {
+      const tabFromUrl = searchParams.get('tab');
+      if (tabFromUrl && ['dashboard', 'applications', 'projects', 'analytics'].includes(tabFromUrl)) {
+        setActiveTab(tabFromUrl);
+      }
+      hasInitializedTabFromUrl.current = true;
     }
-  }, [activeTab]);
+  }, [searchParams]);
+
+  // Persist tab state in URL
+  useEffect(() => {
+    if (!isMounted || !hasInitializedTabFromUrl.current) return;
+    
+    const currentTab = searchParams.get('tab') || 'dashboard';
+    if (currentTab === activeTab) return; // No change needed
+    
+    const params = new URLSearchParams(searchParams);
+    if (activeTab !== 'dashboard') {
+      params.set('tab', activeTab);
+    } else {
+      params.delete('tab');
+    }
+    
+    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [activeTab, isMounted, router, searchParams]);
   
   const [showMessaging, setShowMessaging] = useState(false);
+  const [messagingContext, setMessagingContext] = useState<{
+    recipientId?: string;
+    jobId?: string;
+    jobTitle?: string;
+  } | null>(null);
 
   const handleMessagesClick = () => {
     router.push('/messages');
@@ -96,6 +125,20 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   const [stats, setStats] = useState<ContractorStats | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [completedProjects, setCompletedProjects] = useState<any[]>([]);
+  const [ratingSummary, setRatingSummary] = useState<{
+    averageRating: number;
+    totalReviews: number;
+    ratingBreakdown: { '5': number; '4': number; '3': number; '2': number; '1': number };
+    categoryRatings: { quality: number; timeliness: number; communication: number; pricing: number };
+  } | null>(null);
+  
+  // Tab-specific loading states
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [loadingApplications, setLoadingApplications] = useState(false);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  
+  // Track which tabs have been loaded
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
   
   // Projects tab state
   const [platformProjects, setPlatformProjects] = useState<PlatformProject[]>([]);
@@ -107,9 +150,9 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
-  // Fetch contractor data from Supabase
+  // Fetch company ID and profile on initial load
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       if (!user?.id) {
         setLoading(false);
         return;
@@ -134,52 +177,147 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
         const companyIdValue = company.id;
         setCompanyId(companyIdValue);
 
-        // Fetch all dashboard data using the company ID
-        const dashboardData = await fetchContractorDashboardData(supabase, companyIdValue);
-        
-        setProfile(dashboardData.profile);
-        setApplications(dashboardData.applications);
-        setBids(dashboardData.bids);
-        setStats(dashboardData.stats);
-        setCertificates(dashboardData.certificates);
-
-        // Fetch completed projects separately using company ID (legacy, for backward compatibility)
-        const projectsResult = await fetchCompletedProjects(supabase, companyIdValue, 10);
-        setCompletedProjects(projectsResult || []);
-
-        // Fetch platform project history (completed jobs from platform)
-        setLoadingPlatformProjects(true);
-        try {
-          const platformHistory = await fetchPlatformProjectHistory(supabase, companyIdValue);
-          setPlatformProjects(platformHistory || []);
-        } catch (error) {
-          console.error('Error fetching platform project history:', error);
-          setPlatformProjects([]);
-        } finally {
-          setLoadingPlatformProjects(false);
-        }
-
-        // Fetch portfolio projects (external projects)
-        setLoadingPortfolioProjects(true);
-        try {
-          const portfolio = await fetchContractorPortfolio(companyIdValue);
-          setPortfolioProjects(portfolio || []);
-        } catch (error) {
-          console.error('Error fetching portfolio projects:', error);
-          setPortfolioProjects([]);
-        } finally {
-          setLoadingPortfolioProjects(false);
+        // Fetch only profile for initial load
+        const { fetchContractorById } = await import('../lib/database/contractors');
+        const profileData = await fetchContractorById(companyIdValue);
+        if (profileData) {
+          setProfile(profileData);
         }
 
       } catch (error) {
-        console.error('Error fetching contractor data:', error);
+        console.error('Error fetching initial contractor data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchInitialData();
   }, [user?.id]);
+
+  // Fetch dashboard tab data when tab is opened
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (activeTab !== 'dashboard' || !companyId || loadedTabs.has('dashboard')) {
+        return;
+      }
+
+      const supabase = createClient();
+      
+      try {
+        setLoadingDashboard(true);
+        const dashboardData = await fetchContractorDashboardStats(supabase, companyId);
+        
+        setProfile(dashboardData.profile);
+        setStats(dashboardData.stats);
+        
+        // Fetch rating summary
+        const ratingData = await fetchContractorRatingSummary(companyId);
+        setRatingSummary(ratingData);
+        
+        setLoadedTabs(prev => new Set(prev).add('dashboard'));
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoadingDashboard(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [activeTab, companyId, loadedTabs]);
+
+  // Fetch applications tab data when tab is opened
+  useEffect(() => {
+    const fetchApplicationsData = async () => {
+      if (activeTab !== 'applications' || !companyId || loadedTabs.has('applications')) {
+        return;
+      }
+
+      const supabase = createClient();
+      
+      try {
+        setLoadingApplications(true);
+        const applicationsData = await fetchContractorApplications(supabase, companyId);
+        
+        setApplications(applicationsData.applications);
+        setBids(applicationsData.bids);
+        
+        setLoadedTabs(prev => new Set(prev).add('applications'));
+      } catch (error) {
+        console.error('Error fetching applications data:', error);
+      } finally {
+        setLoadingApplications(false);
+      }
+    };
+
+    fetchApplicationsData();
+  }, [activeTab, companyId, loadedTabs]);
+
+  // Fetch analytics tab data when tab is opened
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      if (activeTab !== 'analytics' || !companyId || loadedTabs.has('analytics')) {
+        return;
+      }
+
+      const supabase = createClient();
+      
+      try {
+        setLoadingAnalytics(true);
+        const analyticsData = await fetchContractorAnalytics(supabase, companyId);
+        
+        setStats(analyticsData.stats);
+        // Note: ratingSummary is available but not currently used in the UI
+        // You can add it to state if needed
+        
+        setLoadedTabs(prev => new Set(prev).add('analytics'));
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+      } finally {
+        setLoadingAnalytics(false);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, [activeTab, companyId, loadedTabs]);
+
+  // Fetch projects tab data when tab is opened
+  useEffect(() => {
+    const fetchProjectsData = async () => {
+      if (activeTab !== 'projects' || !companyId || loadedTabs.has('projects')) {
+        return;
+      }
+
+      const supabase = createClient();
+      
+      // Fetch platform project history (completed jobs from platform)
+      setLoadingPlatformProjects(true);
+      try {
+        const platformHistory = await fetchPlatformProjectHistory(supabase, companyId);
+        setPlatformProjects(platformHistory || []);
+      } catch (error) {
+        console.error('Error fetching platform project history:', error);
+        setPlatformProjects([]);
+      } finally {
+        setLoadingPlatformProjects(false);
+      }
+
+      // Fetch portfolio projects (external projects)
+      setLoadingPortfolioProjects(true);
+      try {
+        const portfolio = await fetchContractorPortfolio(companyId);
+        setPortfolioProjects(portfolio || []);
+      } catch (error) {
+        console.error('Error fetching portfolio projects:', error);
+        setPortfolioProjects([]);
+      } finally {
+        setLoadingPortfolioProjects(false);
+      }
+
+      setLoadedTabs(prev => new Set(prev).add('projects'));
+    };
+
+    fetchProjectsData();
+  }, [activeTab, companyId, loadedTabs]);
 
 
   // Transform Supabase data to component format
@@ -241,13 +379,233 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   };
 
   const handleJobView = (jobId: string) => {
-    // Navigate to job details - this should be implemented with proper routing
-    console.log('View job:', jobId);
+    router.push(`/jobs/${jobId}`);
   };
 
-  const handleStartConversation = (applicationId: string) => {
-    setShowMessaging(true);
+  const handleStartConversation = async (applicationId: string) => {
+    if (!user?.id || !supabase) {
+      toast.error('Musisz być zalogowany aby rozpocząć konwersację');
+      return;
+    }
+
+    // Find the application in allApplications
+    const application = allApplications.find(app => app.id === applicationId);
+    if (!application) {
+      toast.error('Nie znaleziono aplikacji');
+      return;
+    }
+
+    try {
+      // Get job data to find manager_id
+      const { getJobById, getTenderById } = await import('../lib/data');
+      const { data: dbJob, error: jobError } = await getJobById(application.jobId);
+      const { data: dbTender, error: tenderError } = await getTenderById(application.jobId);
+
+      let managerId: string | null = null;
+      if (dbJob && !jobError) {
+        managerId = (dbJob as any).manager_id || null;
+      } else if (dbTender && !tenderError) {
+        managerId = (dbTender as any).manager_id || null;
+      }
+
+      if (!managerId) {
+        toast.error('Nie można znaleźć zleceniodawcy');
+        return;
+      }
+
+      // Check if conversation already exists
+      const { findConversationByJob } = await import('../lib/database/messaging');
+      const result = await findConversationByJob(
+        supabase,
+        application.jobId,
+        user.id,
+        managerId,
+        application.postType === 'tender'
+      );
+
+      if (result.error) {
+        console.error('Error checking for existing conversation:', result.error);
+        // If error, still show messaging modal with context
+        setMessagingContext({
+          recipientId: managerId,
+          jobId: application.jobId,
+          jobTitle: application.jobTitle
+        });
+        setShowMessaging(true);
+        return;
+      }
+
+      if (result.data) {
+        // Conversation exists, navigate to messages page
+        router.push(`/messages?conversation=${result.data}`);
+      } else {
+        // No conversation exists, show messaging modal with context
+        setMessagingContext({
+          recipientId: managerId,
+          jobId: application.jobId,
+          jobTitle: application.jobTitle
+        });
+        setShowMessaging(true);
+      }
+    } catch (error) {
+      console.error('Error in handleStartConversation:', error);
+      toast.error('Wystąpił błąd podczas sprawdzania konwersacji');
+      // Fallback to showing messaging modal
+      setShowMessaging(true);
+    }
   };
+
+  const handleWithdrawApplication = async (applicationId: string, postType: 'job' | 'tender') => {
+    if (!user?.id || !companyId) {
+      toast.error('Musisz być zalogowany aby anulować ofertę');
+      return;
+    }
+
+    const supabase = createClient();
+    
+    try {
+      const { cancelJobApplication, cancelTenderBid } = await import('../lib/database/jobs');
+      
+      let result;
+      if (postType === 'job') {
+        result = await cancelJobApplication(supabase, applicationId, user.id);
+      } else {
+        result = await cancelTenderBid(supabase, applicationId, user.id);
+      }
+
+      if (result.error) {
+        const errorMessage = result.error instanceof Error 
+          ? result.error.message 
+          : result.error?.message || 'Wystąpił błąd podczas anulowania oferty';
+        toast.error(errorMessage);
+        return;
+      }
+
+      toast.success('Oferta została anulowana pomyślnie');
+      
+      // Refresh applications data
+      if (activeTab === 'applications') {
+        setLoadedTabs(prev => {
+          const newSet = new Set(prev);
+          newSet.delete('applications');
+          return newSet;
+        });
+      }
+    } catch (error) {
+      console.error('Error withdrawing application:', error);
+      toast.error('Wystąpił błąd podczas anulowania oferty');
+    }
+  };
+
+  // Map status from database format to component format
+  const statusMap: Record<string, 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'cancelled'> = {
+    'pending': 'submitted',
+    'submitted': 'submitted',
+    'under_review': 'under_review',
+    'shortlisted': 'under_review', // Map shortlisted to under_review for UI
+    'reviewing': 'under_review',
+    'accepted': 'accepted',
+    'rejected': 'rejected',
+    'cancelled': 'cancelled'
+  };
+
+  // Transform ContractorApplication to MyApplication format
+  const transformedApplications = applications.map(app => {
+    // Parse proposed price - handle both string and number
+    const proposedPrice = typeof app.proposedPrice === 'string' 
+      ? parseFloat(app.proposedPrice) || 0 
+      : app.proposedPrice || 0;
+
+    // Transform attachments to the expected format
+    const transformedAttachments = (app.attachments || []).map((attachment: any, index: number) => {
+      // Handle different attachment formats
+      if (typeof attachment === 'string') {
+        return {
+          id: `attachment-${index}`,
+          name: attachment.split('/').pop() || 'Załącznik',
+          type: 'file',
+          url: attachment
+        };
+      }
+      return {
+        id: attachment.id || `attachment-${index}`,
+        name: attachment.name || attachment.filename || 'Załącznik',
+        type: attachment.type || attachment.content_type || 'file',
+        url: attachment.url || attachment.path || attachment.file_path || ''
+      };
+    });
+
+    return {
+      id: app.id,
+      jobId: app.jobId,
+      jobTitle: app.jobTitle || 'Bez tytułu',
+      jobCompany: app.companyName || 'Nieznana firma',
+      jobLocation: app.jobLocation || 'Nieznana lokalizacja',
+      jobCategory: app.jobCategory || 'Inne usługi',
+      proposedPrice: proposedPrice,
+      proposedTimeline: app.estimatedCompletion || 'Nie określono',
+      status: statusMap[app.status] || 'submitted',
+      submittedAt: new Date(app.appliedAt),
+      lastUpdated: app.reviewedAt ? new Date(app.reviewedAt) : new Date(app.appliedAt),
+      coverLetter: app.coverLetter || '',
+      experience: app.experience || '',
+      additionalNotes: app.notes || undefined, // Map notes to additionalNotes
+      postedTime: app.postedTime || undefined, // Job posted time
+      attachments: transformedAttachments,
+      certificates: app.certificates || [],
+      reviewNotes: app.notes || undefined,
+      postType: 'job' as const // Mark as job application
+    };
+  });
+
+  // Transform ContractorBid to MyApplication format
+  const transformedBids = bids.map(bid => {
+    // Parse bid amount - handle both string and number
+    const proposedPrice = typeof bid.bidAmount === 'string' 
+      ? parseFloat(bid.bidAmount) || 0 
+      : parseFloat(String(bid.bidAmount)) || 0;
+
+    // Format timeline from days
+    let proposedTimeline = 'Nie określono';
+    if (bid.proposedTimeline) {
+      const days = bid.proposedTimeline;
+      if (days < 7) {
+        proposedTimeline = `${days} ${days === 1 ? 'dzień' : 'dni'}`;
+      } else if (days < 30) {
+        const weeks = Math.round(days / 7);
+        proposedTimeline = `${weeks} ${weeks === 1 ? 'tydzień' : weeks < 5 ? 'tygodnie' : 'tygodni'}`;
+      } else {
+        const months = Math.round(days / 30);
+        proposedTimeline = `${months} ${months === 1 ? 'miesiąc' : months < 5 ? 'miesiące' : 'miesięcy'}`;
+      }
+    }
+
+    return {
+      id: bid.id,
+      jobId: bid.tenderId, // Use tenderId as jobId for navigation
+      jobTitle: bid.tenderTitle || 'Bez tytułu',
+      jobCompany: bid.companyName || 'Nieznana firma',
+      jobLocation: bid.location || 'Nieznana lokalizacja',
+      jobCategory: bid.category || 'Przetarg',
+      proposedPrice: proposedPrice,
+      proposedTimeline: proposedTimeline,
+      status: statusMap[bid.status] || 'submitted',
+      submittedAt: new Date(bid.submittedAt),
+      lastUpdated: bid.reviewedAt ? new Date(bid.reviewedAt) : new Date(bid.submittedAt),
+      coverLetter: bid.technicalProposal || '',
+      experience: '',
+      postedTime: bid.postedTime || undefined, // Tender posted time
+      attachments: [],
+      certificates: [],
+      reviewNotes: undefined,
+      postType: 'tender' as const // Mark as tender bid
+    };
+  });
+
+  // Combine applications and bids, sorted by submission date
+  const allApplications = [...transformedApplications, ...transformedBids].sort((a, b) => 
+    b.submittedAt.getTime() - a.submittedAt.getTime()
+  );
 
 
   // Transform applications and bids to activeOffers format
@@ -472,8 +830,14 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {loadingDashboard ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Aktywne oferty</CardTitle>
@@ -526,6 +890,81 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                 </CardContent>
               </Card>
             </div>
+
+            {/* Rating Overview Section */}
+            {ratingSummary && ratingSummary.totalReviews > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-yellow-400" />
+                    Przegląd ocen
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-primary mb-2">
+                        {ratingSummary.averageRating.toFixed(1)}
+                      </div>
+                      <div className="flex justify-center mb-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star 
+                            key={star} 
+                            className={`w-6 h-6 ${
+                              star <= Math.floor(ratingSummary.averageRating)
+                                ? 'text-yellow-400 fill-yellow-400'
+                                : 'text-gray-300'
+                            }`} 
+                          />
+                        ))}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {ratingSummary.totalReviews} {ratingSummary.totalReviews === 1 ? 'opinia' : 'opinii'}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="text-sm font-semibold mb-2">Rozkład ocen:</div>
+                      {[5, 4, 3, 2, 1].map((stars) => {
+                        const count = ratingSummary.ratingBreakdown[stars.toString() as keyof typeof ratingSummary.ratingBreakdown] || 0;
+                        const percentage = ratingSummary.totalReviews > 0 
+                          ? (count / ratingSummary.totalReviews) * 100 
+                          : 0;
+                        return (
+                          <div key={stars} className="flex items-center gap-2">
+                            <span className="text-sm w-8">{stars}★</span>
+                            <Progress value={percentage} className="flex-1 h-2" />
+                            <span className="text-sm text-gray-500 w-12 text-right">{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  
+                  {Object.keys(ratingSummary.categoryRatings).length > 0 && (
+                    <div className="mt-6 pt-6 border-t">
+                      <div className="text-sm font-semibold mb-3">Oceny w kategoriach:</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        {Object.entries(ratingSummary.categoryRatings).map(([category, rating]) => (
+                          <div key={category} className="flex items-center justify-between">
+                            <span className="text-sm capitalize">{category}:</span>
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-yellow-400 h-2 rounded-full" 
+                                  style={{ width: `${(rating / 5) * 100}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium w-8">{rating.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Quick Actions & Recent Activity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -587,13 +1026,18 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                 </CardContent>
               </Card>
             </div>
+              </>
+            )}
           </TabsContent>
 
           {/* Applications Tab */}
           <TabsContent value="applications" className="space-y-6">
             <MyApplications 
+              applications={allApplications}
+              loading={loadingApplications}
               onJobView={handleJobView}
               onStartConversation={handleStartConversation}
+              onWithdraw={handleWithdrawApplication}
             />
           </TabsContent>
 
@@ -802,9 +1246,15 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
-            <h2 className="text-2xl font-bold">Analityka i statystyki</h2>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {loadingAnalytics ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold">Analityka i statystyki</h2>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -928,6 +1378,8 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                 </CardContent>
               </Card>
             </div>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -935,7 +1387,11 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
       {/* Messaging System Modal */}
       {showMessaging && (
         <MessagingSystem 
-          onClose={() => setShowMessaging(false)}
+          onClose={() => {
+            setShowMessaging(false);
+            setMessagingContext(null);
+          }}
+          initialRecipientId={messagingContext?.recipientId}
         />
       )}
 

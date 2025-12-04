@@ -13,9 +13,9 @@ import {
   Building,
   Clock,
   FileText,
-  Download
+  Download,
+  X
 } from 'lucide-react';
-import { mockApplications as applicationMocks, jobListMockData } from '../mocks';
 
 interface MyApplication {
   id: string;
@@ -26,11 +26,13 @@ interface MyApplication {
   jobCategory: string;
   proposedPrice: number;
   proposedTimeline: string;
-  status: 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'withdrawn';
+  status: 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'cancelled';
   submittedAt: Date;
   lastUpdated: Date;
   coverLetter: string;
   experience: string;
+  additionalNotes?: string; // Additional notes from the form
+  postedTime?: string; // When the job was posted
   attachments: Array<{
     id: string;
     name: string;
@@ -46,67 +48,31 @@ interface MyApplication {
     totalValue: number;
     paymentSchedule: string;
   };
+  postType?: 'job' | 'tender'; // Optional field to distinguish bids from applications
 }
 
 interface MyApplicationsProps {
+  applications?: MyApplication[];
+  loading?: boolean;
   onJobView?: (jobId: string) => void;
   onStartConversation?: (applicationId: string) => void;
+  onWithdraw?: (applicationId: string, postType: 'job' | 'tender') => void;
 }
 
-// Derive mock data for contractor's applications using centralized mocks
-const derivedMockApplications: MyApplication[] = applicationMocks.map((application, index) => {
-  const job = jobListMockData.find(jobEntry => jobEntry.id === application.jobId);
-
-  return {
-    id: application.id,
-    jobId: application.jobId,
-    jobTitle: job?.title || `Zlecenie ${application.jobId}`,
-    jobCompany: job?.company || application.contractorCompany,
-    jobLocation: job?.location || application.contractorLocation,
-    jobCategory: job?.category || 'Inne usługi',
-    proposedPrice: application.proposedPrice,
-    proposedTimeline: application.proposedTimeline,
-    status: application.status,
-    submittedAt: application.submittedAt,
-    lastUpdated: application.lastUpdated,
-    coverLetter: application.coverLetter,
-    experience: application.experience,
-    attachments: application.attachments.map(attachment => ({
-      id: attachment.id,
-      name: attachment.name,
-      type: attachment.type,
-      url: attachment.url
-    })),
-    certificates: application.certificates,
-    reviewNotes: application.reviewNotes,
-    interviewDate: undefined,
-    contractDetails: undefined,
-    // Ensure diversity in sample data for UI states
-    ...(index === 0
-      ? {
-          status: 'accepted' as const,
-          contractDetails: {
-            startDate: new Date('2024-02-01'),
-            endDate: new Date('2025-01-31'),
-            totalValue: application.proposedPrice * 12,
-            paymentSchedule: 'Miesięcznie do 10. każdego miesiąca'
-          }
-        }
-      : {}),
-    ...(index === 1 ? { status: 'under_review' as const } : {}),
-    ...(index === 2 ? { status: 'rejected' as const } : {}),
-    ...(index === 3 ? { status: 'submitted' as const } : {})
-  };
-});
-
 export const MyApplications: React.FC<MyApplicationsProps> = ({
+  applications: providedApplications,
+  loading = false,
   onJobView,
-  onStartConversation
+  onStartConversation,
+  onWithdraw
 }) => {
   const [selectedTab, setSelectedTab] = useState('all');
 
+  // Use provided applications or fallback to empty array
+  const applications = providedApplications || [];
+
   // Filter applications by status
-  const filteredApplications = derivedMockApplications.filter(app => {
+  const filteredApplications = applications.filter(app => {
     switch (selectedTab) {
       case 'pending':
         return app.status === 'submitted';
@@ -116,6 +82,8 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
         return app.status === 'accepted';
       case 'rejected':
         return app.status === 'rejected';
+      case 'cancelled':
+        return app.status === 'cancelled';
       default:
         return true;
     }
@@ -123,11 +91,12 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
 
   // Statistics
   const stats = {
-    total: derivedMockApplications.length,
-    pending: derivedMockApplications.filter(app => app.status === 'submitted').length,
-    review: derivedMockApplications.filter(app => app.status === 'under_review').length,
-    accepted: derivedMockApplications.filter(app => app.status === 'accepted').length,
-    rejected: derivedMockApplications.filter(app => app.status === 'rejected').length
+    total: applications.length,
+    pending: applications.filter(app => app.status === 'submitted').length,
+    review: applications.filter(app => app.status === 'under_review').length,
+    accepted: applications.filter(app => app.status === 'accepted').length,
+    rejected: applications.filter(app => app.status === 'rejected').length,
+    cancelled: applications.filter(app => app.status === 'cancelled').length
   };
 
   const formatPrice = (price: number) => {
@@ -146,6 +115,20 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
     }).format(date);
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold mb-2">Moje aplikacje</h2>
+          <p className="text-gray-600">Zarządzaj swoimi aplikacjami na zlecenia</p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -153,48 +136,63 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
         <p className="text-gray-600">Zarządzaj swoimi aplikacjami na zlecenia</p>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{stats.total}</div>
-            <div className="text-sm text-gray-600">Wszystkie</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{stats.pending}</div>
-            <div className="text-sm text-gray-600">Wysłane</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-orange-600">{stats.review}</div>
-            <div className="text-sm text-gray-600">W ocenie</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.accepted}</div>
-            <div className="text-sm text-gray-600">Zaakceptowane</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-            <div className="text-sm text-gray-600">Odrzucone</div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Filters */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="all">Wszystkie ({stats.total})</TabsTrigger>
-          <TabsTrigger value="pending">Wysłane ({stats.pending})</TabsTrigger>
-          <TabsTrigger value="review">W ocenie ({stats.review})</TabsTrigger>
-          <TabsTrigger value="accepted">Zaakceptowane ({stats.accepted})</TabsTrigger>
-          <TabsTrigger value="rejected">Odrzucone ({stats.rejected})</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 gap-4 p-0 bg-transparent h-auto">
+          <TabsTrigger 
+            value="all" 
+            className="h-auto p-4 border border-border rounded-lg bg-card hover:shadow-md transition-all data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:border-primary"
+          >
+            <div className="text-center w-full">
+              <div className={`text-2xl font-bold ${selectedTab === 'all' ? 'text-white' : 'text-primary'}`}>{stats.total}</div>
+              <div className={`text-sm ${selectedTab === 'all' ? 'text-white/90' : 'text-gray-600'}`}>Wszystkie</div>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="pending" 
+            className="h-auto p-4 border border-border rounded-lg bg-card hover:shadow-md transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:border-blue-600"
+          >
+            <div className="text-center w-full">
+              <div className={`text-2xl font-bold ${selectedTab === 'pending' ? 'text-white' : 'text-blue-600'}`}>{stats.pending}</div>
+              <div className={`text-sm ${selectedTab === 'pending' ? 'text-white/90' : 'text-gray-600'}`}>Wysłane</div>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="review" 
+            className="h-auto p-4 border border-border rounded-lg bg-card hover:shadow-md transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:border-orange-600"
+          >
+            <div className="text-center w-full">
+              <div className={`text-2xl font-bold ${selectedTab === 'review' ? 'text-white' : 'text-orange-600'}`}>{stats.review}</div>
+              <div className={`text-sm ${selectedTab === 'review' ? 'text-white/90' : 'text-gray-600'}`}>W ocenie</div>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="accepted" 
+            className="h-auto p-4 border border-border rounded-lg bg-card hover:shadow-md transition-all data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:border-green-600"
+          >
+            <div className="text-center w-full">
+              <div className={`text-2xl font-bold ${selectedTab === 'accepted' ? 'text-white' : 'text-green-600'}`}>{stats.accepted}</div>
+              <div className={`text-sm ${selectedTab === 'accepted' ? 'text-white/90' : 'text-gray-600'}`}>Zaakceptowane</div>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="rejected" 
+            className="h-auto p-4 border border-border rounded-lg bg-card hover:shadow-md transition-all data-[state=active]:bg-red-600 data-[state=active]:text-white data-[state=active]:border-red-600"
+          >
+            <div className="text-center w-full">
+              <div className={`text-2xl font-bold ${selectedTab === 'rejected' ? 'text-white' : 'text-red-600'}`}>{stats.rejected}</div>
+              <div className={`text-sm ${selectedTab === 'rejected' ? 'text-white/90' : 'text-gray-600'}`}>Odrzucone</div>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="cancelled" 
+            className="h-auto p-4 border border-border rounded-lg bg-card hover:shadow-md transition-all data-[state=active]:bg-gray-600 data-[state=active]:text-white data-[state=active]:border-gray-600"
+          >
+            <div className="text-center w-full">
+              <div className={`text-2xl font-bold ${selectedTab === 'cancelled' ? 'text-white' : 'text-gray-600'}`}>{stats.cancelled}</div>
+              <div className={`text-sm ${selectedTab === 'cancelled' ? 'text-white/90' : 'text-gray-600'}`}>Anulowane</div>
+            </div>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedTab} className="mt-6">
@@ -220,7 +218,19 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="text-lg font-semibold mb-2">{application.jobTitle}</h3>
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-lg font-semibold">{application.jobTitle}</h3>
+                          {application.postType === 'tender' && (
+                            <Badge variant="default" className="bg-blue-600 text-white">
+                              Przetarg
+                            </Badge>
+                          )}
+                          {application.postType === 'job' && (
+                            <Badge variant="outline" className="bg-gray-100">
+                              Zlecenie
+                            </Badge>
+                          )}
+                        </div>
                         <div className="flex items-center gap-4 text-sm text-gray-600">
                           <div className="flex items-center gap-1">
                             <Building className="h-4 w-4" />
@@ -254,7 +264,7 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                     />
 
                     {/* Application Details */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1 text-lg font-semibold text-primary">
                           <Euro className="h-5 w-5" />
@@ -269,15 +279,27 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                         </div>
                         <p className="text-sm text-gray-600">Czas realizacji</p>
                       </div>
-                      <div className="text-center">
-                        <div className="font-medium">{application.certificates.length}</div>
-                        <p className="text-sm text-gray-600">Certyfikaty</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium">{application.attachments.length}</div>
-                        <p className="text-sm text-gray-600">Załączniki</p>
-                      </div>
                     </div>
+
+                    {/* Cover Letter (Opis oferty) */}
+                    {application.coverLetter && (
+                      <div>
+                        <h4 className="font-medium mb-2">Opis oferty</h4>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{application.coverLetter}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Additional Notes (Dodatkowe uwagi) */}
+                    {application.additionalNotes && (
+                      <div>
+                        <h4 className="font-medium mb-2">Dodatkowe uwagi</h4>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{application.additionalNotes}</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Interview/Contract Details for accepted applications */}
                     {application.status === 'accepted' && application.contractDetails && (
@@ -306,27 +328,6 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                       </div>
                     )}
 
-                    {/* Attachments */}
-                    {application.attachments.length > 0 && (
-                      <div>
-                        <h4 className="font-medium mb-2">Załączniki:</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {application.attachments.map((attachment) => (
-                            <Button
-                              key={attachment.id}
-                              variant="outline"
-                              size="sm"
-                              className="h-auto p-2"
-                              onClick={() => window.open(attachment.url, '_blank')}
-                            >
-                              <Download className="h-4 w-4 mr-1" />
-                              {attachment.name}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     {/* Actions */}
                     <div className="flex justify-between items-center pt-4 border-t">
                       <Button
@@ -348,13 +349,25 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                         )}
                         
                         {(application.status === 'submitted' || application.status === 'under_review') && (
-                          <Button
-                            variant="outline"
-                            onClick={() => onStartConversation && onStartConversation(application.id)}
-                          >
-                            <MessageSquare className="h-4 w-4 mr-2" />
-                            Skontaktuj się
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              onClick={() => onStartConversation && onStartConversation(application.id)}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Skontaktuj się
+                            </Button>
+                            {onWithdraw && application.postType && (
+                              <Button
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => onWithdraw(application.id, application.postType!)}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Anuluj ofertę
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

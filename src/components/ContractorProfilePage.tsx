@@ -101,6 +101,10 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
         if (contractorData) {
           const formattedContractor = convertContractorToPageFormat(contractorData);
           setContractor(formattedContractor);
+          
+          // Load rating summary immediately
+          const ratingData = await fetchContractorRatingSummary(contractorId);
+          setRatingSummary(ratingData);
         } else {
           const fallbackContractor = mockContractorDetailsMap[contractorId];
           if (fallbackContractor) {

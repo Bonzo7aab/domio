@@ -13,6 +13,9 @@ import { useUserProfile } from '../contexts/AuthContext';
 import { getJobsAndTenders, type DBJobFilters } from '../lib/data';
 import { useLayoutContext } from '../components/ConditionalFooter';
 import { useFilterContext } from '../contexts/FilterContext';
+import { createClient } from '../lib/supabase/client';
+import { createJobApplication, createTenderBid } from '../lib/database/jobs';
+import { fetchUserPrimaryCompany } from '../lib/database/companies';
 
 // Dynamically import heavy components to reduce initial bundle size
 const EnhancedMapViewGoogleMaps = dynamic(
@@ -222,17 +225,122 @@ export default function HomePage() {
     setApplicationModalOpen(true);
   };
 
-  const handleApplicationSubmit = (applicationData: any) => {
-    toast.success('Oferta została wysłana pomyślnie!');
-    setApplicationModalOpen(false);
-    setSelectedApplicationJobId(null);
-    setSelectedApplicationJob(null);
-    setApplicationForm({
-      proposedPrice: '',
-      estimatedCompletion: '',
-      coverLetter: '',
-      additionalNotes: ''
-    });
+  const handleApplicationSubmit = async (applicationData: any) => {
+    if (!user?.id) {
+      toast.error('Musisz być zalogowany aby złożyć ofertę');
+      return;
+    }
+
+    if (!selectedApplicationJobId) {
+      toast.error('Błąd: brak ID zlecenia');
+      return;
+    }
+
+    const supabase = createClient();
+    
+    // Check if contractor has a company
+    const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
+    
+    if (companyError) {
+      console.error('Error checking company:', companyError);
+      toast.error('Błąd podczas sprawdzania danych firmy');
+      return;
+    }
+
+    if (!company) {
+      toast.error('Musisz najpierw dodać informacje o swojej firmie w profilu konta');
+      setApplicationModalOpen(false);
+      router.push('/account?tab=company');
+      return;
+    }
+
+    try {
+      const job = selectedApplicationJob || getJobForApplication(selectedApplicationJobId);
+      const isTender = job?.postType === 'tender';
+
+      if (isTender) {
+        // Handle tender bid submission
+        const { data, error } = await createTenderBid(
+          supabase,
+          selectedApplicationJobId,
+          user.id,
+          {
+            proposedPrice: applicationData.proposedPrice,
+            estimatedCompletion: applicationData.estimatedCompletion,
+            coverLetter: applicationData.coverLetter,
+            additionalNotes: applicationData.additionalNotes,
+          }
+        );
+
+        if (error) {
+          const errorMessage = error instanceof Error 
+            ? error.message 
+            : error?.message || error?.details || error?.hint || String(error) || 'Wystąpił błąd podczas składania oferty w przetargu';
+          
+          console.error('Error submitting tender bid:', error);
+          
+          if (errorMessage.includes('company') || errorMessage.includes('firm') || errorMessage.includes('Contractor must have')) {
+            toast.error('Musisz najpierw dodać informacje o swojej firmie');
+            setApplicationModalOpen(false);
+            router.push('/account?tab=company');
+            return;
+          }
+          
+          toast.error(errorMessage);
+          return;
+        }
+
+        console.log('Tender bid submitted successfully:', data);
+        toast.success('Oferta w przetargu została złożona pomyślnie!');
+      } else {
+        // Handle regular job application submission
+        const { data, error } = await createJobApplication(
+          supabase,
+          selectedApplicationJobId,
+          user.id,
+          {
+            proposedPrice: applicationData.proposedPrice,
+            estimatedCompletion: applicationData.estimatedCompletion,
+            coverLetter: applicationData.coverLetter,
+            additionalNotes: applicationData.additionalNotes,
+          }
+        );
+
+        if (error) {
+          const errorMessage = error instanceof Error 
+            ? error.message 
+            : error?.message || error?.details || error?.hint || String(error) || 'Wystąpił błąd podczas składania oferty';
+          
+          console.error('Error submitting application:', error);
+          
+          if (errorMessage.includes('company') || errorMessage.includes('firm') || errorMessage.includes('Contractor must have')) {
+            toast.error('Musisz najpierw dodać informacje o swojej firmie');
+            setApplicationModalOpen(false);
+            router.push('/account?tab=company');
+            return;
+          }
+          
+          toast.error(errorMessage);
+          return;
+        }
+
+        console.log('Application submitted successfully:', data);
+        toast.success('Oferta została złożona pomyślnie!');
+      }
+
+      setApplicationModalOpen(false);
+      setSelectedApplicationJobId(null);
+      setSelectedApplicationJob(null);
+      setApplicationForm({
+        proposedPrice: '',
+        estimatedCompletion: '',
+        coverLetter: '',
+        additionalNotes: ''
+      });
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      toast.error('Wystąpił błąd podczas składania oferty');
+    }
   };
 
   const handleApplicationModalClose = () => {

@@ -381,6 +381,37 @@ export async function findExistingConversation(
 }
 
 /**
+ * Find a conversation by job_id and participants
+ */
+export async function findConversationByJob(
+  supabase: SupabaseClient<Database>,
+  jobId: string,
+  participant1: string,
+  participant2: string,
+  isTender: boolean = false
+): Promise<{ data: string | null; error: any }> {
+  try {
+    const jobField = isTender ? 'tender_id' : 'job_id';
+    const { data: conversation, error } = await (supabase as any)
+      .from('conversations')
+      .select('id')
+      .eq(jobField, jobId)
+      .or(`and(participant_1.eq.${participant1},participant_2.eq.${participant2}),and(participant_1.eq.${participant2},participant_2.eq.${participant1})`)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error('Error finding conversation by job:', error);
+      return { data: null, error };
+    }
+
+    return { data: conversation?.id || null, error: null };
+  } catch (err) {
+    console.error('Error finding conversation by job:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
  * Fetch all conversations for a user with participant details
  */
 export async function fetchUserConversations(

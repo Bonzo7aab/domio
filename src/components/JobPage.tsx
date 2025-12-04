@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { getJobById, getTenderById } from '../lib/data';
 import { incrementJobViews, incrementTenderViews, createJobApplication, createTenderBid, type JobWithCompany, type TenderWithCompany } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { findConversationByJob } from '../lib/database/messaging';
 import { formatBudget, budgetFromDatabase, type Budget } from '../types/budget';
 import { type Job, type TenderInfo } from '../types/job';
 
@@ -393,6 +394,11 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
   const [jobData, setJobData] = useState<JobDisplayData | null>(null);
   const [isLoadingJob, setIsLoadingJob] = useState(true);
+  const [hasExistingBid, setHasExistingBid] = useState(false);
+  const [isCheckingBid, setIsCheckingBid] = useState(false);
+  const [existingConversationId, setExistingConversationId] = useState<string | null>(null);
+  const [isCheckingConversation, setIsCheckingConversation] = useState(false);
+  const [managerId, setManagerId] = useState<string | null>(null);
   const hasIncrementedViews = useRef<string | null>(null);
 
   // Fetch job data from database
@@ -412,6 +418,10 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         const normalizedJob = normalizeJobData(dbJob, 'job');
         if (normalizedJob) {
           setJobData(normalizedJob);
+          // Extract manager_id from dbJob if available
+          if ((dbJob as any).manager_id) {
+            setManagerId((dbJob as any).manager_id);
+          }
           setIsLoadingJob(false);
           
           // Increment views count (only once per job)
@@ -430,6 +440,10 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         const normalizedTender = normalizeJobData(dbTender, 'tender');
         if (normalizedTender) {
           setJobData(normalizedTender);
+          // Extract manager_id from dbTender if available
+          if ((dbTender as any).manager_id) {
+            setManagerId((dbTender as any).manager_id);
+          }
           setIsLoadingJob(false);
           
           // Increment views count (only once per tender)
@@ -471,6 +485,90 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       setIsBookmarked(isJobBookmarked(jobData.id));
     }
   }, [jobData]);
+
+  // Check if user has already submitted a bid for this tender
+  useEffect(() => {
+    const checkExistingBid = async () => {
+      if (!jobData || !user?.id || !supabase || jobData.postType !== 'tender') {
+        setHasExistingBid(false);
+        return;
+      }
+
+      setIsCheckingBid(true);
+      try {
+        // Fetch user's primary company
+        const { fetchUserPrimaryCompany } = await import('../lib/database/companies');
+        const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);
+        
+        if (!company) {
+          setHasExistingBid(false);
+          setIsCheckingBid(false);
+          return;
+        }
+
+        // Check if a non-cancelled bid exists for this tender and company
+        const { data: existingBids, error } = await (supabase as any)
+          .from('tender_bids')
+          .select('id, status')
+          .eq('tender_id', jobData.id)
+          .eq('company_id', company.id)
+          .neq('status', 'cancelled')
+          .limit(1);
+
+        if (error) {
+          console.error('Error checking for existing bid:', error);
+          setHasExistingBid(false);
+        } else {
+          // Only set hasExistingBid to true if there's a non-cancelled bid
+          const hasNonCancelledBid = existingBids && existingBids.length > 0;
+          setHasExistingBid(hasNonCancelledBid);
+        }
+      } catch (error) {
+        console.error('Error in checkExistingBid:', error);
+        setHasExistingBid(false);
+      } finally {
+        setIsCheckingBid(false);
+      }
+    };
+
+    checkExistingBid();
+  }, [jobData, user?.id, supabase]);
+
+  // Check if conversation already exists for this job
+  useEffect(() => {
+    const checkExistingConversation = async () => {
+      // Only check if user is a contractor and manager_id is available
+      if (!jobData || !user?.id || !supabase || user.userType !== 'contractor' || !managerId) {
+        setExistingConversationId(null);
+        return;
+      }
+
+      setIsCheckingConversation(true);
+      try {
+        const result = await findConversationByJob(
+          supabase,
+          jobData.id,
+          user.id,
+          managerId,
+          jobData.postType === 'tender'
+        );
+
+        if (result.error) {
+          console.error('Error checking for existing conversation:', result.error);
+          setExistingConversationId(null);
+        } else {
+          setExistingConversationId(result.data);
+        }
+      } catch (error) {
+        console.error('Error in checkExistingConversation:', error);
+        setExistingConversationId(null);
+      } finally {
+        setIsCheckingConversation(false);
+      }
+    };
+
+    checkExistingConversation();
+  }, [jobData, user?.id, user?.userType, supabase, managerId]);
 
   // Early returns AFTER all hooks
   if (isLoadingJob) {
@@ -521,6 +619,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     // Check if contractor has a company before showing the form
     if (!supabase || !user.id) {
       toast.error('Błąd połączenia. Spróbuj ponownie.');
+      return;
+    }
+
+    // For tenders, check if bid already exists
+    if (job.postType === 'tender' && hasExistingBid) {
+      toast.error('Już złożyłeś ofertę na ten przetarg. Nie możesz złożyć więcej niż jednej oferty.');
       return;
     }
 
@@ -591,6 +695,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
         console.log('Tender bid submitted successfully:', data);
         toast.success('Oferta w przetargu została złożona pomyślnie!');
+        // Update state to reflect that bid has been submitted
+        setHasExistingBid(true);
       } else {
         // Handle regular job application submission
         const { data, error } = await createJobApplication(
@@ -767,50 +873,6 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
               </CardHeader>
             </Card>
 
-            {/* Key Tender Information - only for tenders */}
-            {job.postType === 'tender' && job.tenderInfo && (
-              <Card className="border-2 border-blue-200 bg-blue-50/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
-                    <Gavel className="w-5 h-5" />
-                    Kluczowe informacje przetargu
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                    <div>
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Termin składania</div>
-                      <div className="font-bold text-foreground text-sm">
-                        {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
-                      <div className="font-bold text-warning text-sm">{job.tenderInfo.wadium}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Budżet</div>
-                      <div className="font-bold text-success text-sm">{formatBudget(job.budget)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Czas realizacji</div>
-                      <div className="font-bold text-foreground text-sm">{job.tenderInfo.projectDuration}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Złożone oferty</div>
-                      <div className="font-bold text-primary text-sm">{job.applications}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Status</div>
-                      <Badge variant="default" className="bg-primary text-xs">
-                        {job.tenderInfo.currentPhase}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Job Images */}
             {job.images && job.images.length > 0 && (
               <Card>
@@ -843,9 +905,53 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
             {/* Job Details Tabs */}
             <Card>
+              {/* Key Tender Information - only for tenders, merged into tabs card */}
+              {job.postType === 'tender' && job.tenderInfo && (
+                <div className="bg-muted/30">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2">
+                      <Gavel className="w-5 h-5" />
+                      Kluczowe informacje przetargu
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      <div className="bg-background/80 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Termin składania</div>
+                        <div className="font-bold text-foreground text-sm">
+                          {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
+                        </div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
+                        <div className="font-bold text-foreground text-sm">{job.tenderInfo.wadium}</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Budżet</div>
+                        <div className="font-bold text-foreground text-sm">{formatBudget(job.budget)}</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Czas realizacji</div>
+                        <div className="font-bold text-foreground text-sm">{job.tenderInfo.projectDuration}</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Złożone oferty</div>
+                        <div className="font-bold text-foreground text-sm">{job.applications}</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Status</div>
+                        <Badge variant="secondary" className="text-xs">
+                          {job.tenderInfo.currentPhase}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </div>
+              )}
+              
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 {job.postType === 'tender' ? (
-                  <TabsList className="grid grid-cols-5 w-full">
+                  <TabsList className="grid grid-cols-5 w-full rounded-none">
                     <TabsTrigger value="overview">Przegląd</TabsTrigger>
                     <TabsTrigger value="requirements">Wymagania</TabsTrigger>
                     <TabsTrigger value="procedure">Procedura</TabsTrigger>
@@ -881,14 +987,14 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     </div>
                   )}
 
-                  {job.postType === 'tender' && job.tenderInfo && job.tenderInfo.evaluationCriteria && job.tenderInfo.evaluationCriteria.length > 0 && (
+                    {job.postType === 'tender' && job.tenderInfo && job.tenderInfo.evaluationCriteria && job.tenderInfo.evaluationCriteria.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold mb-3">Kryteria oceny ofert</h3>
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="bg-muted/50 border border-border rounded-lg p-4">
                         <ul className="space-y-2">
                           {job.tenderInfo.evaluationCriteria.map((criterion, index) => (
                             <li key={index} className="flex items-center gap-2">
-                              <Star className="w-4 h-4 text-green-600 shrink-0" />
+                              <Star className="w-4 h-4 text-foreground shrink-0" />
                               <span>
                                 {typeof criterion === 'string' 
                                   ? criterion 
@@ -910,7 +1016,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       {/* Podstawowe warunki - Always visible, not collapsible */}
                       <div>
                         <h4 className="text-base font-medium mb-3">Podstawowe warunki</h4>
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="bg-muted/50 border border-border rounded-lg p-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <div className="text-sm text-muted-foreground">Typ umowy</div>
@@ -1004,12 +1110,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   )}
 
                   {job.postType === 'tender' && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <AlertCircle className="w-5 h-5 text-foreground mt-0.5 flex-shrink-0" />
                         <div>
-                          <h4 className="font-medium text-amber-800 mb-2">Uwaga dla przetargu</h4>
-                          <p className="text-sm text-amber-700">
+                          <h4 className="font-medium mb-2">Uwaga dla przetargu</h4>
+                          <p className="text-sm text-muted-foreground">
                             Wszystkie wymagania są obowiązkowe. Brak spełnienia któregokolwiek z wymagań 
                             skutkuje odrzuceniem oferty na etapie weryfikacji formalnej.
                           </p>
@@ -1026,11 +1132,11 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     {job.tenderInfo?.phases && job.tenderInfo.phases.length > 0 ? (
                       <div className="space-y-4">
                         {job.tenderInfo.phases.map((phase, index) => (
-                          <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 border border-border rounded-lg">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                              phase.status === 'completed' ? 'bg-green-500 text-white' :
-                              phase.status === 'active' ? 'bg-blue-500 text-white' :
-                              'bg-gray-300 text-gray-600'
+                              phase.status === 'completed' ? 'bg-green-600 text-white' :
+                              phase.status === 'active' ? 'bg-primary text-primary-foreground' :
+                              'bg-muted text-muted-foreground'
                             }`}>
                               {phase.status === 'completed' ? '✓' : index + 1}
                             </div>
@@ -1058,8 +1164,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         <h4 className="font-medium mb-3">Wymagane dokumenty</h4>
                         <div className="space-y-2">
                           {job.tenderInfo.documentsRequired.map((doc, index) => (
-                            <div key={index} className="flex items-start gap-2 p-3 bg-white border rounded-lg">
-                              <FileText className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                            <div key={index} className="flex items-start gap-2 p-3 bg-muted/50 border border-border rounded-lg">
+                              <FileText className="w-4 h-4 text-foreground mt-0.5 shrink-0" />
                               <span className="text-sm">{doc}</span>
                             </div>
                           ))}
@@ -1077,8 +1183,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   
                   <div className="space-y-4">
                     {(job.buildingType || job.buildingYear || job.surface || job.address) && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="font-medium text-blue-900 mb-3">Dane podstawowe</h4>
+                      <div className="bg-muted/50 border border-border rounded-lg p-4">
+                        <h4 className="font-medium mb-3">Dane podstawowe</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {job.buildingType && (
                             <div>
@@ -1145,9 +1251,22 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     onClick={handleApplicationSubmit}
                     className="w-full bg-blue-800 hover:bg-blue-900 text-white"
                     size="lg"
+                    disabled={job.postType === 'tender' && (hasExistingBid || isCheckingBid)}
                   >
-                    {job.postType === 'tender' ? 'Złóż ofertę' : 'Złóż ofertę'}
+                    {isCheckingBid 
+                      ? 'Sprawdzanie...' 
+                      : hasExistingBid && job.postType === 'tender'
+                      ? 'Oferta już złożona'
+                      : job.postType === 'tender' 
+                      ? 'Złóż ofertę' 
+                      : 'Złóż ofertę'
+                    }
                   </Button>
+                  {hasExistingBid && job.postType === 'tender' && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Już złożyłeś ofertę na ten przetarg
+                    </p>
+                  )}
                   
                   <div className="grid grid-cols-2 gap-3">
                     <Button 
@@ -1161,14 +1280,28 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       </span>
                     </Button>
                     
-                    <Button 
-                      variant="outline"
-                      onClick={handleAskQuestion}
-                      className="flex items-center gap-2"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                      <span className="truncate">Pytanie</span>
-                    </Button>
+                    {existingConversationId ? (
+                      <Button 
+                        variant="outline"
+                        onClick={() => router.push(`/messages?conversation=${existingConversationId}`)}
+                        className="flex items-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span className="truncate">Konwersacja</span>
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline"
+                        onClick={handleAskQuestion}
+                        className="flex items-center gap-2"
+                        disabled={isCheckingConversation}
+                      >
+                        <HelpCircle className="w-4 h-4" />
+                        <span className="truncate">
+                          {isCheckingConversation ? 'Sprawdzanie...' : 'Pytanie'}
+                        </span>
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>

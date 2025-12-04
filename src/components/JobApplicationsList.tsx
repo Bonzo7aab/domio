@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Application as JobApplication } from '../types';
+import ContractorReviewForm from './ContractorReviewForm';
 
 // JobApplication type now imported from centralized types folder
 
@@ -48,6 +49,12 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
   const [selectedTab, setSelectedTab] = useState('all');
   const [reviewingApplicationId, setReviewingApplicationId] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [selectedContractorForReview, setSelectedContractorForReview] = useState<{
+    id: string;
+    name: string;
+    jobId: string;
+  } | null>(null);
 
   // Filtrowanie aplikacji według statusu
   const filteredApplications = applications.filter(app => {
@@ -60,6 +67,8 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
         return app.status === 'accepted';
       case 'rejected':
         return app.status === 'rejected';
+      case 'cancelled':
+        return app.status === 'cancelled';
       default:
         return true;
     }
@@ -71,7 +80,8 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
     pending: applications.filter(app => app.status === 'submitted').length,
     under_review: applications.filter(app => app.status === 'under_review').length,
     accepted: applications.filter(app => app.status === 'accepted').length,
-    rejected: applications.filter(app => app.status === 'rejected').length
+    rejected: applications.filter(app => app.status === 'rejected').length,
+    cancelled: applications.filter(app => app.status === 'cancelled').length
   };
 
   const handleStatusChange = async (applicationId: string, newStatus: string) => {
@@ -131,7 +141,7 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
       </div>
 
       {/* Statystyki */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-primary">{stats.total}</div>
@@ -162,16 +172,23 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
             <div className="text-sm text-gray-600">Odrzucone</div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-gray-600">{stats.cancelled}</div>
+            <div className="text-sm text-gray-600">Anulowane</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filtry */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="all">Wszystkie ({stats.total})</TabsTrigger>
           <TabsTrigger value="pending">Nowe ({stats.pending})</TabsTrigger>
           <TabsTrigger value="under_review">W ocenie ({stats.under_review})</TabsTrigger>
           <TabsTrigger value="accepted">Zaakceptowane ({stats.accepted})</TabsTrigger>
           <TabsTrigger value="rejected">Odrzucone ({stats.rejected})</TabsTrigger>
+          <TabsTrigger value="cancelled">Anulowane ({stats.cancelled})</TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedTab} className="mt-6">
@@ -371,6 +388,23 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                             </Button>
                           </>
                         )}
+                        
+                        {application.status === 'accepted' && (
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedContractorForReview({
+                                id: application.contractorId,
+                                name: application.contractorName,
+                                jobId: application.jobId
+                              });
+                              setShowReviewForm(true);
+                            }}
+                          >
+                            <Star className="h-4 w-4 mr-2" />
+                            Oceń wykonawcę
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -425,6 +459,23 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Review Form Modal */}
+      {showReviewForm && selectedContractorForReview && (
+        <ContractorReviewForm
+          contractorId={selectedContractorForReview.id}
+          contractorName={selectedContractorForReview.name}
+          jobId={selectedContractorForReview.jobId}
+          onClose={() => {
+            setShowReviewForm(false);
+            setSelectedContractorForReview(null);
+          }}
+          onSuccess={() => {
+            // Optionally refresh data or show success message
+            toast.success('Opinia została dodana pomyślnie');
+          }}
+        />
       )}
     </div>
   );

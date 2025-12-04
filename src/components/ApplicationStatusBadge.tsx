@@ -9,7 +9,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'withdrawn';
+type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'cancelled';
 
 interface ApplicationStatusBadgeProps {
   status: ApplicationStatus;
@@ -49,8 +49,8 @@ const statusConfig = {
     icon: XCircle,
     color: 'text-red-600'
   },
-  withdrawn: {
-    label: 'Wycofana',
+  cancelled: {
+    label: 'Anulowana',
     variant: 'outline' as const,
     icon: AlertCircle,
     color: 'text-gray-500'
@@ -89,7 +89,7 @@ export const ApplicationStatusBadge: React.FC<ApplicationStatusBadgeProps> = ({
         return 'bg-green-50 text-green-700 border-green-200';
       case 'rejected':
         return 'bg-red-50 text-red-700 border-red-200';
-      case 'withdrawn':
+      case 'cancelled':
         return 'bg-gray-50 text-gray-600 border-gray-200';
       default:
         return 'bg-gray-50 text-gray-600 border-gray-200';
@@ -152,8 +152,8 @@ export const ApplicationStatusCard: React.FC<ApplicationStatusCardProps> = ({
         return 'Gratulacje! Twoja aplikacja została zaakceptowana. Zarządca skontaktuje się z Tobą w sprawie dalszych kroków.';
       case 'rejected':
         return 'Niestety, Twoja aplikacja nie została zaakceptowana tym razem. Zachęcamy do aplikowania na inne zlecenia.';
-      case 'withdrawn':
-        return 'Aplikacja została wycofana na Twoją prośbę.';
+      case 'cancelled':
+        return 'Aplikacja została anulowana na Twoją prośbę.';
       default:
         return 'Status aplikacji jest nieokreślony.';
     }

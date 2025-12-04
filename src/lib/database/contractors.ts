@@ -10,11 +10,19 @@ export interface ContractorApplication {
   jobId: string;
   jobTitle: string;
   companyName: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'submitted' | 'under_review' | 'shortlisted' | 'accepted' | 'rejected' | 'cancelled' | 'pending';
   appliedAt: string;
   proposedPrice?: string;
   estimatedCompletion?: string;
   coverLetter?: string;
+  experience?: string;
+  attachments?: any[];
+  certificates?: string[];
+  notes?: string;
+  reviewedAt?: string;
+  jobLocation?: string;
+  jobCategory?: string;
+  postedTime?: string; // When the job was posted (calculated from published_at or created_at)
 }
 
 export interface ContractorBid {
@@ -22,10 +30,17 @@ export interface ContractorBid {
   tenderId: string;
   tenderTitle: string;
   companyName: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'submitted' | 'under_review' | 'shortlisted' | 'accepted' | 'rejected' | 'cancelled' | 'pending'; // pending is legacy, use submitted
   bidAmount: string;
   submittedAt: string;
   validUntil: string;
+  // Additional fields for applications view
+  location?: string;
+  category?: string;
+  proposedTimeline?: number; // in days
+  technicalProposal?: string;
+  reviewedAt?: string;
+  postedTime?: string; // When the tender was posted (calculated from published_at or created_at)
 }
 
 export interface ContractorStats {
@@ -377,7 +392,7 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
       throw new Error('Contractor not found');
     }
 
-    // Fetch applications
+    // Fetch applications with complete job details
     const { data: applications } = await supabase
       .from('job_applications')
       .select(`
@@ -386,16 +401,25 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
         proposed_price,
         proposed_timeline,
         cover_letter,
+        experience,
+        attachments,
+        certificates,
+        notes,
+        reviewed_at,
         status,
         submitted_at,
         jobs (
           title,
+          location,
           companies (
+            name
+          ),
+          job_categories (
             name
           )
         )
       `)
-      .eq('contractor_id', contractorId)
+      .eq('company_id', contractorId)
       .order('submitted_at', { ascending: false });
 
     // Helper function to convert days to readable format
@@ -427,27 +451,43 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
       appliedAt: app.submitted_at,
       proposedPrice: app.proposed_price,
       estimatedCompletion: formatTimeline(app.proposed_timeline),
-      coverLetter: app.cover_letter
+      coverLetter: app.cover_letter,
+      experience: app.experience || '',
+      attachments: app.attachments || [],
+      certificates: app.certificates || [],
+      notes: app.notes || undefined,
+      reviewedAt: app.reviewed_at || undefined,
+      jobLocation: typeof app.jobs?.location === 'string' 
+        ? app.jobs.location 
+        : app.jobs?.location?.city || 'Nieznana lokalizacja',
+      jobCategory: app.jobs?.job_categories?.name || 'Inne usługi'
     })) || [];
 
-    // Fetch bids
+    // Fetch bids with more details for applications view
     const { data: bids } = await supabase
       .from('tender_bids')
       .select(`
         id,
         tender_id,
         bid_amount,
+        proposed_timeline,
+        technical_proposal,
         status,
         submitted_at,
+        evaluated_at,
         valid_until,
         tenders (
           title,
+          location,
+          job_categories (
+            name
+          ),
           companies (
             name
           )
         )
       `)
-      .eq('contractor_id', contractorId)
+      .eq('company_id', contractorId)
       .order('submitted_at', { ascending: false });
 
     const formattedBids: ContractorBid[] = bids?.map(bid => ({
@@ -458,7 +498,14 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
       status: bid.status || 'pending',
       bidAmount: bid.bid_amount || '',
       submittedAt: bid.submitted_at,
-      validUntil: bid.valid_until || ''
+      validUntil: bid.valid_until || '',
+      location: typeof bid.tenders?.location === 'string' 
+        ? bid.tenders.location 
+        : bid.tenders?.location?.city || 'Nieznana lokalizacja',
+      category: bid.tenders?.job_categories?.name || 'Przetarg',
+      proposedTimeline: bid.proposed_timeline || undefined,
+      technicalProposal: bid.technical_proposal || undefined,
+      reviewedAt: bid.evaluated_at || undefined // Use evaluated_at for tender_bids
     })) || [];
 
     // Fetch certificates
@@ -500,6 +547,280 @@ export async function fetchContractorDashboardData(supabase: any, contractorId: 
     };
   } catch (error) {
     console.error('Error fetching contractor dashboard data:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch contractor dashboard stats (for dashboard tab)
+ */
+export async function fetchContractorDashboardStats(
+  supabase: any,
+  contractorId: string
+): Promise<{ profile: ContractorProfile; stats: ContractorStats }> {
+  try {
+    // Fetch contractor profile
+    const profile = await fetchContractorById(contractorId);
+    if (!profile) {
+      throw new Error('Contractor not found');
+    }
+
+    // Fetch applications count for stats
+    const { count: applicationsCount } = await supabase
+      .from('job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', contractorId);
+
+    const { count: acceptedApplicationsCount } = await supabase
+      .from('job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', contractorId)
+      .eq('status', 'accepted');
+
+    // Fetch bids count for stats
+    const { count: bidsCount } = await supabase
+      .from('tender_bids')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', contractorId);
+
+    const { count: acceptedBidsCount } = await supabase
+      .from('tender_bids')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', contractorId)
+      .eq('status', 'accepted');
+
+    // Calculate stats
+    const stats: ContractorStats = {
+      totalApplications: applicationsCount || 0,
+      acceptedApplications: acceptedApplicationsCount || 0,
+      totalBids: bidsCount || 0,
+      acceptedBids: acceptedBidsCount || 0,
+      completedProjects: profile.experience.completedProjects,
+      averageRating: profile.rating.overall,
+      totalEarnings: 0, // Would need to calculate from completed projects
+      responseTime: profile.stats.responseTime,
+      onTimeCompletion: profile.stats.onTimeCompletion
+    };
+
+    return { profile, stats };
+  } catch (error) {
+    console.error('Error fetching contractor dashboard stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch contractor applications and bids (for applications tab)
+ */
+export async function fetchContractorApplications(
+  supabase: any,
+  contractorId: string
+): Promise<{ applications: ContractorApplication[]; bids: ContractorBid[] }> {
+  try {
+    // Helper function to convert days to readable format
+    const formatTimeline = (days: number | null | undefined): string | undefined => {
+      if (!days) return undefined;
+      if (days < 7) return `${days} ${days === 1 ? 'dzień' : 'dni'}`;
+      if (days < 30) {
+        const weeks = Math.floor(days / 7);
+        const remainingDays = days % 7;
+        if (remainingDays === 0) {
+          return `${weeks} ${weeks === 1 ? 'tydzień' : weeks < 5 ? 'tygodnie' : 'tygodni'}`;
+        }
+        return `${weeks} ${weeks === 1 ? 'tydzień' : 'tygodnie'} ${remainingDays} ${remainingDays === 1 ? 'dzień' : 'dni'}`;
+      }
+      const months = Math.floor(days / 30);
+      const remainingDays = days % 30;
+      if (remainingDays === 0) {
+        return `${months} ${months === 1 ? 'miesiąc' : months < 5 ? 'miesiące' : 'miesięcy'}`;
+      }
+      return `${months} ${months === 1 ? 'miesiąc' : 'miesiące'} ${remainingDays} ${remainingDays === 1 ? 'dzień' : 'dni'}`;
+    };
+
+    // Helper function to convert date to "time ago" format
+    const getTimeAgo = (date: string | null | undefined): string | undefined => {
+      if (!date) return undefined;
+      const now = new Date();
+      const past = new Date(date);
+      const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
+
+      if (diffInSeconds < 60) return 'Przed chwilą';
+      if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min temu`;
+      if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} godz. temu`;
+      if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} dni temu`;
+      
+      return past.toLocaleDateString('pl-PL');
+    };
+
+    // Fetch applications with complete job details
+    const { data: applications } = await supabase
+      .from('job_applications')
+      .select(`
+        id,
+        job_id,
+        proposed_price,
+        proposed_timeline,
+        cover_letter,
+        experience,
+        attachments,
+        certificates,
+        notes,
+        reviewed_at,
+        status,
+        submitted_at,
+        jobs (
+          title,
+          location,
+          published_at,
+          created_at,
+          companies (
+            name
+          ),
+          job_categories (
+            name
+          )
+        )
+      `)
+      .eq('company_id', contractorId)
+      .order('submitted_at', { ascending: false });
+
+    const formattedApplications: ContractorApplication[] = applications?.map(app => ({
+      id: app.id,
+      jobId: app.job_id,
+      jobTitle: app.jobs?.title || '',
+      companyName: app.jobs?.companies?.name || '',
+      status: app.status || 'pending',
+      appliedAt: app.submitted_at,
+      proposedPrice: app.proposed_price,
+      estimatedCompletion: formatTimeline(app.proposed_timeline),
+      coverLetter: app.cover_letter,
+      experience: app.experience || '',
+      attachments: app.attachments || [],
+      certificates: app.certificates || [],
+      notes: app.notes || undefined,
+      reviewedAt: app.reviewed_at || undefined,
+      jobLocation: typeof app.jobs?.location === 'string' 
+        ? app.jobs.location 
+        : app.jobs?.location?.city || 'Nieznana lokalizacja',
+      jobCategory: app.jobs?.job_categories?.name || 'Inne usługi',
+      postedTime: getTimeAgo(app.jobs?.published_at || app.jobs?.created_at)
+    })) || [];
+
+    // Fetch bids with more details for applications view
+    const { data: bids } = await supabase
+      .from('tender_bids')
+      .select(`
+        id,
+        tender_id,
+        bid_amount,
+        proposed_timeline,
+        technical_proposal,
+        status,
+        submitted_at,
+        evaluated_at,
+        valid_until,
+        tenders (
+          title,
+          location,
+          published_at,
+          created_at,
+          job_categories (
+            name
+          ),
+          companies (
+            name
+          )
+        )
+      `)
+      .eq('company_id', contractorId)
+      .order('submitted_at', { ascending: false });
+
+    const formattedBids: ContractorBid[] = bids?.map(bid => ({
+      id: bid.id,
+      tenderId: bid.tender_id,
+      tenderTitle: bid.tenders?.title || '',
+      companyName: bid.tenders?.companies?.name || '',
+      status: bid.status || 'pending',
+      bidAmount: bid.bid_amount || '',
+      submittedAt: bid.submitted_at,
+      validUntil: bid.valid_until || '',
+      location: typeof bid.tenders?.location === 'string' 
+        ? bid.tenders.location 
+        : bid.tenders?.location?.city || 'Nieznana lokalizacja',
+      category: bid.tenders?.job_categories?.name || 'Przetarg',
+      proposedTimeline: bid.proposed_timeline || undefined,
+      technicalProposal: bid.technical_proposal || undefined,
+      reviewedAt: bid.evaluated_at || undefined,
+      postedTime: getTimeAgo(bid.tenders?.published_at || bid.tenders?.created_at)
+    })) || [];
+
+    return {
+      applications: formattedApplications,
+      bids: formattedBids
+    };
+  } catch (error) {
+    console.error('Error fetching contractor applications:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch contractor analytics data (for analytics tab)
+ */
+export async function fetchContractorAnalytics(
+  supabase: any,
+  contractorId: string
+): Promise<{ stats: ContractorStats; ratingSummary: Awaited<ReturnType<typeof fetchContractorRatingSummary>> }> {
+  try {
+    // Fetch contractor profile for stats
+    const profile = await fetchContractorById(contractorId);
+    if (!profile) {
+      throw new Error('Contractor not found');
+    }
+
+    // Fetch applications count for stats
+    const { count: applicationsCount } = await supabase
+      .from('job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', contractorId);
+
+    const { count: acceptedApplicationsCount } = await supabase
+      .from('job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', contractorId)
+      .eq('status', 'accepted');
+
+    // Fetch bids count for stats
+    const { count: bidsCount } = await supabase
+      .from('tender_bids')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', contractorId);
+
+    const { count: acceptedBidsCount } = await supabase
+      .from('tender_bids')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', contractorId)
+      .eq('status', 'accepted');
+
+    // Calculate stats
+    const stats: ContractorStats = {
+      totalApplications: applicationsCount || 0,
+      acceptedApplications: acceptedApplicationsCount || 0,
+      totalBids: bidsCount || 0,
+      acceptedBids: acceptedBidsCount || 0,
+      completedProjects: profile.experience.completedProjects,
+      averageRating: profile.rating.overall,
+      totalEarnings: 0,
+      responseTime: profile.stats.responseTime,
+      onTimeCompletion: profile.stats.onTimeCompletion
+    };
+
+    // Fetch rating summary
+    const ratingSummary = await fetchContractorRatingSummary(contractorId);
+
+    return { stats, ratingSummary };
+  } catch (error) {
+    console.error('Error fetching contractor analytics:', error);
     throw error;
   }
 }
@@ -779,6 +1100,78 @@ export async function fetchContractorRatingSummary(contractorId: string): Promis
   } catch (error) {
     console.error('Error in fetchContractorRatingSummary:', error);
     throw error;
+  }
+}
+
+/**
+ * Create a review for a contractor
+ */
+export async function createContractorReview(
+  supabase: any,
+  contractorId: string,
+  reviewerId: string,
+  reviewData: {
+    rating: number;
+    title?: string;
+    comment?: string;
+    categories?: {
+      quality?: number;
+      timeliness?: number;
+      communication?: number;
+      pricing?: number;
+    };
+    jobId?: string;
+    tenderId?: string;
+  }
+): Promise<{ data: any; error: Error | null }> {
+  try {
+    // Validate rating
+    if (reviewData.rating < 1 || reviewData.rating > 5) {
+      return { data: null, error: new Error('Rating must be between 1 and 5') };
+    }
+
+    // Check if reviewer already reviewed this contractor
+    const { data: existingReview } = await supabase
+      .from('company_reviews')
+      .select('id')
+      .eq('company_id', contractorId)
+      .eq('reviewer_id', reviewerId)
+      .maybeSingle();
+
+    if (existingReview) {
+      return { data: null, error: new Error('You have already reviewed this contractor') };
+    }
+
+    // Insert review
+    const { data, error } = await supabase
+      .from('company_reviews')
+      .insert({
+        company_id: contractorId,
+        reviewer_id: reviewerId,
+        rating: reviewData.rating,
+        title: reviewData.title || null,
+        comment: reviewData.comment || null,
+        categories: reviewData.categories || null,
+        job_id: reviewData.jobId || null,
+        tender_id: reviewData.tenderId || null,
+        is_public: true,
+        is_verified: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating review:', error);
+      return { data: null, error: new Error('Failed to create review') };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error in createContractorReview:', error);
+    return { 
+      data: null, 
+      error: error instanceof Error ? error : new Error('Unknown error occurred') 
+    };
   }
 }
 
