@@ -35,6 +35,7 @@ export interface Conversation {
   unreadCount: number;
   jobId?: string;
   jobTitle?: string;
+  subject?: string;
   createdAt: Date;
   updatedAt: Date;
 }

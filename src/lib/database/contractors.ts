@@ -1,8 +1,8 @@
 import { createClient } from '../supabase/client';
-import { ContractorProfile } from '../../types/contractor';
+import { ContractorProfile, ServicePricing } from '../../types/contractor';
 
 // Re-export ContractorProfile for convenience
-export type { ContractorProfile };
+export type { ContractorProfile, ServicePricing };
 
 // Additional types for contractor dashboard
 export interface ContractorApplication {
@@ -87,6 +87,7 @@ export interface BrowseContractor {
   verification_level: string;
   founded_year?: number;
   employee_count?: string;
+  description?: string; // Real description from companies table
   primary_services: string[];
   specializations: string[];
   service_area: string[];
@@ -123,8 +124,24 @@ export interface ContractorFilters {
 /**
  * Fetch contractors for the browse page with optional filtering
  */
-export async function fetchContractors(filters: ContractorFilters = {}): Promise<BrowseContractor[]> {
-  const supabase = createClient();
+export async function fetchContractors(
+  supabaseOrFilters?: any,
+  filtersOrUndefined?: ContractorFilters
+): Promise<BrowseContractor[]> {
+  // Handle both signatures: (filters) and (supabase, filters)
+  let supabase: any;
+  let filters: ContractorFilters;
+  
+  // Check if first param is a Supabase client (has 'from' method)
+  if (supabaseOrFilters && typeof supabaseOrFilters === 'object' && typeof supabaseOrFilters.from === 'function') {
+    // First param is supabase (new signature from data adapter)
+    supabase = supabaseOrFilters;
+    filters = filtersOrUndefined || {};
+  } else {
+    // First param is filters (old signature for direct calls)
+    filters = (supabaseOrFilters || {}) as ContractorFilters;
+    supabase = createClient();
+  }
   
   const {
     city,
@@ -148,7 +165,13 @@ export async function fetchContractors(filters: ContractorFilters = {}): Promise
         founded_year,
         employee_count,
         updated_at,
-        description
+        description,
+        plan_type,
+        last_active,
+        profile_data,
+        experience_data,
+        insurance_data,
+        stats_data
       `)
       .eq('type', 'contractor')
       .eq('is_public', true); // Only show public profiles
@@ -194,42 +217,97 @@ export async function fetchContractors(filters: ContractorFilters = {}): Promise
       }
     }
 
+    // Helper function to safely parse JSONB fields
+    const parseJsonbField = (value: any, defaultValue: any = null): any => {
+      if (!value) return defaultValue;
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return defaultValue;
+        }
+      }
+      return value;
+    };
+
+    const getJsonbString = (value: any, defaultValue: string = ''): string => {
+      if (!value) return defaultValue;
+      if (typeof value === 'string') return value;
+      return String(value) || defaultValue;
+    };
+
+    const getJsonbNumber = (value: any, defaultValue: number = 0): number => {
+      if (value === null || value === undefined) return defaultValue;
+      const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+      return isNaN(num) ? defaultValue : num;
+    };
+
+    const getJsonbBoolean = (value: any, defaultValue: boolean = false): boolean => {
+      if (value === null || value === undefined) return defaultValue;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') {
+        return value.toLowerCase() === 'true' || value === '1';
+      }
+      return Boolean(value) || defaultValue;
+    };
+
     // Transform data to BrowseContractor format
     let contractors: BrowseContractor[] = (data || []).map(company => {
       const ratings = ratingsMap[company.id];
       
+      // Parse JSONB columns
+      const profileData = company.profile_data || {};
+      const experienceData = company.experience_data || {};
+      const insuranceData = company.insurance_data || {};
+      const statsData = company.stats_data || {};
+
+      // Parse array fields from JSONB
+      const primaryServices = parseJsonbField(profileData.primary_services, []);
+      const specializations = parseJsonbField(profileData.specializations, []);
+      const serviceArea = parseJsonbField(profileData.service_area, []);
+      const certifications = parseJsonbField(experienceData.certifications, []);
+
+      // Calculate years_in_business from founded_year if not in experience_data
+      const yearsInBusinessFromData = getJsonbNumber(experienceData.years_in_business);
+      const yearsInBusiness = yearsInBusinessFromData > 0 
+        ? yearsInBusinessFromData 
+        : (company.founded_year ? new Date().getFullYear() - company.founded_year : 0);
+
       return {
         id: company.id,
         name: company.name,
         short_name: company.name.split(' ')[0],
-        city: company.city,
-        avatar_url: company.logo_url,
-        plan_type: 'basic',
-        last_active: company.updated_at || new Date().toISOString(),
-        is_verified: company.is_verified,
+        city: company.city || '',
+        avatar_url: company.logo_url || undefined,
+        plan_type: (company.plan_type as 'basic' | 'pro' | 'premium') || 'basic',
+        last_active: company.last_active || company.updated_at || new Date().toISOString(),
+        is_verified: company.is_verified || false,
         verification_level: company.verification_level || 'basic',
-        founded_year: company.founded_year,
+        founded_year: company.founded_year || undefined,
         employee_count: company.employee_count || '1-5',
-        primary_services: ['Budownictwo', 'Remonty'],
-        specializations: ['Elewacje', 'Termomodernizacja'],
-        service_area: [company.city || 'Warszawa'],
-        working_hours: '8:00-16:00',
-        availability_status: 'dostępny',
-        next_available: new Date().toISOString(),
-        years_in_business: company.founded_year ? new Date().getFullYear() - company.founded_year : 0,
-        completed_projects: Math.floor(Math.random() * 200) + 10, // 10 to 210
-        certifications: [],
-        hourly_rate_min: '50',
-        hourly_rate_max: '150',
-        price_range: '50-150 PLN/h',
-        has_oc: Math.random() > 0.5,
-        has_ac: Math.random() > 0.7,
-        oc_amount: '100000',
-        ac_amount: '50000',
-        response_time: '24h',
-        on_time_completion: Math.floor(Math.random() * 20) + 80, // 80 to 100
-        budget_accuracy: Math.floor(Math.random() * 20) + 80, // 80 to 100
-        rehire_rate: Math.floor(Math.random() * 30) + 70, // 70 to 100
+        description: company.description || undefined, // Real description from database
+        primary_services: Array.isArray(primaryServices) ? primaryServices : [],
+        specializations: Array.isArray(specializations) ? specializations : [],
+        service_area: Array.isArray(serviceArea) && serviceArea.length > 0 
+          ? serviceArea 
+          : (company.city ? [company.city] : []),
+        working_hours: getJsonbString(profileData.working_hours, '8:00-16:00'),
+        availability_status: getJsonbString(profileData.availability_status, 'dostępny'),
+        next_available: getJsonbString(profileData.next_available, new Date().toISOString()),
+        years_in_business: yearsInBusiness,
+        completed_projects: getJsonbNumber(experienceData.completed_projects, 0),
+        certifications: Array.isArray(certifications) ? certifications : [],
+        hourly_rate_min: getJsonbString(profileData.hourly_rate_min, '0'),
+        hourly_rate_max: getJsonbString(profileData.hourly_rate_max, '0'),
+        price_range: getJsonbString(profileData.price_range, 'Wycena indywidualna'),
+        has_oc: getJsonbBoolean(insuranceData.has_oc, false),
+        has_ac: getJsonbBoolean(insuranceData.has_ac, false),
+        oc_amount: getJsonbString(insuranceData.oc_amount, ''),
+        ac_amount: getJsonbString(insuranceData.ac_amount, ''),
+        response_time: getJsonbString(statsData.response_time, '24h'),
+        on_time_completion: getJsonbNumber(statsData.on_time_completion, 0),
+        budget_accuracy: getJsonbNumber(statsData.budget_accuracy, 0),
+        rehire_rate: getJsonbNumber(statsData.rehire_rate, 0),
         rating: ratings?.average_rating || 0,
         review_count: ratings?.total_reviews || 0
       };
@@ -285,6 +363,54 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
       .eq('company_id', id)
       .maybeSingle();
 
+    // Parse JSONB fields
+    const profileData = company.profile_data || {};
+    const experienceData = company.experience_data || {};
+    const insuranceData = company.insurance_data || {};
+    const statsData = company.stats_data || {};
+
+    // Helper functions for parsing JSONB
+    const parseJsonbField = (value: any, defaultValue: any = null): any => {
+      if (!value) return defaultValue;
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return defaultValue;
+        }
+      }
+      return value;
+    };
+
+    const getJsonbString = (value: any, defaultValue: string = ''): string => {
+      if (!value) return defaultValue;
+      if (typeof value === 'string') return value;
+      return String(value) || defaultValue;
+    };
+
+    const getJsonbNumber = (value: any, defaultValue: number = 0): number => {
+      if (value === null || value === undefined) return defaultValue;
+      const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+      return isNaN(num) ? defaultValue : num;
+    };
+
+    const getJsonbBoolean = (value: any, defaultValue: boolean = false): boolean => {
+      if (value === null || value === undefined) return defaultValue;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') {
+        return value.toLowerCase() === 'true' || value === '1';
+      }
+      return Boolean(value) || defaultValue;
+    };
+
+    // Parse services from profile_data
+    const primaryServices = parseJsonbField(profileData.primary_services, []);
+    const secondaryServices = parseJsonbField(profileData.secondary_services, []);
+    const specializations = parseJsonbField(profileData.specializations, []);
+
+    // Parse service pricing from profile_data
+    const servicePricing = parseJsonbField(profileData.service_pricing, {});
+
     // Transform to ContractorProfile format with real data
     const contractor: ContractorProfile = {
       id: company.id,
@@ -328,45 +454,49 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
         lastVerified: company.updated_at
       },
       services: {
-        primary: ['Budownictwo', 'Remonty'],
-        secondary: [],
-        specializations: ['Elewacje', 'Termomodernizacja']
+        primary: Array.isArray(primaryServices) ? primaryServices : [],
+        secondary: Array.isArray(secondaryServices) ? secondaryServices : [],
+        specializations: Array.isArray(specializations) ? specializations : []
       },
       experience: {
-        yearsInBusiness: company.founded_year ? new Date().getFullYear() - company.founded_year : 5,
-        completedProjects: 0,
-        projectTypes: {},
-        certifications: []
+        yearsInBusiness: getJsonbNumber(experienceData.years_in_business, company.founded_year ? new Date().getFullYear() - company.founded_year : 5),
+        completedProjects: getJsonbNumber(experienceData.completed_projects, 0),
+        projectTypes: parseJsonbField(experienceData.project_types, {}),
+        certifications: parseJsonbField(experienceData.certifications, [])
       },
       portfolio: {
         images: ['/api/placeholder/400/300'],
         featuredProjects: []
       },
       pricing: {
-        hourlyRate: { min: 50, max: 150 },
-        projectBased: true,
-        negotiable: true,
-        paymentTerms: ['Zaliczka', 'Płatność etapowa', 'Faktura VAT']
+        hourlyRate: {
+          min: getJsonbNumber(profileData.hourly_rate_min, 50),
+          max: getJsonbNumber(profileData.hourly_rate_max, 150)
+        },
+        projectBased: getJsonbBoolean(profileData.project_based, true),
+        negotiable: getJsonbBoolean(profileData.negotiable, true),
+        paymentTerms: parseJsonbField(profileData.payment_terms, ['Zaliczka', 'Płatność etapowa', 'Faktura VAT']),
+        servicePricing: servicePricing && typeof servicePricing === 'object' ? servicePricing as Record<string, ServicePricing> : undefined
       },
       availability: {
-        status: 'dostępny',
-        nextAvailable: new Date().toISOString(),
-        workingHours: '8:00-16:00',
-        serviceArea: [company.city || 'Warszawa']
+        status: getJsonbString(profileData.availability_status, 'dostępny') as 'dostępny' | 'ograniczona_dostępność' | 'zajęty',
+        nextAvailable: getJsonbString(profileData.next_available, new Date().toISOString()),
+        workingHours: getJsonbString(profileData.working_hours, '8:00-16:00'),
+        serviceArea: parseJsonbField(profileData.service_area, [company.city || 'Warszawa'])
       },
       insurance: {
-        hasOC: false,
-        ocAmount: '0',
-        hasAC: false,
-        acAmount: '0',
-        validUntil: undefined
+        hasOC: getJsonbBoolean(insuranceData.has_oc, false),
+        ocAmount: getJsonbString(insuranceData.oc_amount, '0'),
+        hasAC: getJsonbBoolean(insuranceData.has_ac, false),
+        acAmount: getJsonbString(insuranceData.ac_amount, '0'),
+        validUntil: getJsonbString(insuranceData.valid_until, undefined)
       },
       reviews: [],
       stats: {
-        responseTime: '24h',
-        onTimeCompletion: 0,
-        budgetAccuracy: 0,
-        rehireRate: 0
+        responseTime: getJsonbString(statsData.response_time, '24h'),
+        onTimeCompletion: getJsonbNumber(statsData.on_time_completion, 0),
+        budgetAccuracy: getJsonbNumber(statsData.budget_accuracy, 0),
+        rehireRate: getJsonbNumber(statsData.rehire_rate, 0)
       },
       plan: 'basic',
       joinedDate: company.created_at,
@@ -1197,6 +1327,253 @@ export async function getContractorsByService(service: string): Promise<BrowseCo
 }
 
 /**
+ * Activity type for recent activities
+ */
+export interface ContractorActivity {
+  id: string;
+  type: 'application_accepted' | 'application_rejected' | 'bid_accepted' | 'bid_rejected' | 'review_received' | 'message_received' | 'status_update';
+  title: string;
+  description: string;
+  timestamp: Date;
+  color: string; // for UI indicator
+  icon: string; // icon name
+  linkUrl?: string; // optional navigation link
+}
+
+/**
+ * Fetch recent activities for a contractor
+ */
+export async function fetchContractorRecentActivities(
+  supabase: any,
+  contractorId: string,
+  userId: string,
+  limit: number = 10
+): Promise<ContractorActivity[]> {
+  try {
+    const activities: ContractorActivity[] = [];
+
+    // 1. Fetch recent job applications with status changes
+    const { data: applications } = await supabase
+      .from('job_applications')
+      .select(`
+        id,
+        job_id,
+        status,
+        submitted_at,
+        reviewed_at,
+        decision_at,
+        jobs (
+          id,
+          title
+        )
+      `)
+      .eq('company_id', contractorId)
+      .in('status', ['accepted', 'rejected', 'under_review', 'shortlisted'])
+      .order('decision_at', { ascending: false, nullsFirst: false })
+      .order('reviewed_at', { ascending: false, nullsFirst: false })
+      .order('submitted_at', { ascending: false })
+      .limit(limit * 2); // Get more to filter later
+
+    if (applications) {
+      applications.forEach((app: any) => {
+        const timestamp = app.decision_at || app.reviewed_at || app.submitted_at;
+        if (!timestamp) return;
+
+        const jobTitle = app.jobs?.title || 'zlecenie';
+        const jobId = app.jobs?.id || app.job_id;
+        let activity: ContractorActivity | null = null;
+
+        if (app.status === 'accepted') {
+          activity = {
+            id: `app-accepted-${app.id}`,
+            type: 'application_accepted',
+            title: `Wygrałeś ofertę na ${jobTitle}`,
+            description: `Twoja aplikacja została zaakceptowana`,
+            timestamp: new Date(timestamp),
+            color: 'bg-green-500',
+            icon: 'CheckCircle',
+            linkUrl: jobId ? `/jobs/${jobId}` : undefined
+          };
+        } else if (app.status === 'rejected') {
+          activity = {
+            id: `app-rejected-${app.id}`,
+            type: 'application_rejected',
+            title: `Oferta na ${jobTitle} została odrzucona`,
+            description: `Niestety, Twoja aplikacja nie została zaakceptowana`,
+            timestamp: new Date(timestamp),
+            color: 'bg-red-500',
+            icon: 'XCircle',
+            linkUrl: jobId ? `/jobs/${jobId}` : undefined
+          };
+        } else if (app.status === 'under_review' || app.status === 'shortlisted') {
+          activity = {
+            id: `app-review-${app.id}`,
+            type: 'status_update',
+            title: `Status oferty na ${jobTitle} został zaktualizowany`,
+            description: `Twoja aplikacja jest w trakcie przeglądu`,
+            timestamp: new Date(timestamp),
+            color: 'bg-blue-500',
+            icon: 'Clock',
+            linkUrl: jobId ? `/jobs/${jobId}` : undefined
+          };
+        }
+
+        if (activity) {
+          activities.push(activity);
+        }
+      });
+    }
+
+    // 2. Fetch recent tender bids with status changes
+    const { data: bids } = await supabase
+      .from('tender_bids')
+      .select(`
+        id,
+        tender_id,
+        status,
+        submitted_at,
+        evaluated_at,
+        tenders (
+          id,
+          title
+        )
+      `)
+      .eq('company_id', contractorId)
+      .in('status', ['accepted', 'rejected', 'under_review', 'shortlisted'])
+      .order('evaluated_at', { ascending: false, nullsFirst: false })
+      .order('submitted_at', { ascending: false })
+      .limit(limit * 2);
+
+    if (bids) {
+      bids.forEach((bid: any) => {
+        const timestamp = bid.evaluated_at || bid.submitted_at;
+        if (!timestamp) return;
+
+        const tenderTitle = bid.tenders?.title || 'przetarg';
+        const tenderId = bid.tenders?.id || bid.tender_id;
+        let activity: ContractorActivity | null = null;
+
+        if (bid.status === 'accepted') {
+          activity = {
+            id: `bid-accepted-${bid.id}`,
+            type: 'bid_accepted',
+            title: `Wygrana oferta na przetarg ${tenderTitle}`,
+            description: `Twoja oferta została zaakceptowana`,
+            timestamp: new Date(timestamp),
+            color: 'bg-green-500',
+            icon: 'CheckCircle',
+            linkUrl: tenderId ? `/jobs/${tenderId}` : undefined
+          };
+        } else if (bid.status === 'rejected') {
+          activity = {
+            id: `bid-rejected-${bid.id}`,
+            type: 'bid_rejected',
+            title: `Oferta na przetarg ${tenderTitle} została odrzucona`,
+            description: `Niestety, Twoja oferta nie została zaakceptowana`,
+            timestamp: new Date(timestamp),
+            color: 'bg-red-500',
+            icon: 'XCircle',
+            linkUrl: tenderId ? `/jobs/${tenderId}` : undefined
+          };
+        } else if (bid.status === 'under_review' || bid.status === 'shortlisted') {
+          activity = {
+            id: `bid-review-${bid.id}`,
+            type: 'status_update',
+            title: `Status oferty na przetarg ${tenderTitle} został zaktualizowany`,
+            description: `Twoja oferta jest w trakcie przeglądu`,
+            timestamp: new Date(timestamp),
+            color: 'bg-blue-500',
+            icon: 'Clock',
+            linkUrl: tenderId ? `/jobs/${tenderId}` : undefined
+          };
+        }
+
+        if (activity) {
+          activities.push(activity);
+        }
+      });
+    }
+
+    // 3. Fetch recent reviews received
+    const { data: reviews } = await supabase
+      .from('company_reviews')
+      .select(`
+        id,
+        rating,
+        created_at
+      `)
+      .eq('company_id', contractorId)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (reviews) {
+      reviews.forEach((review: any) => {
+        activities.push({
+          id: `review-${review.id}`,
+          type: 'review_received',
+          title: `Otrzymałeś nową recenzję (${review.rating} ${review.rating === 1 ? 'gwiazdka' : review.rating < 5 ? 'gwiazdki' : 'gwiazdek'})`,
+          description: `Nowa opinia została dodana do Twojego profilu`,
+          timestamp: new Date(review.created_at),
+          color: 'bg-yellow-500',
+          icon: 'Star',
+          linkUrl: undefined // Could link to reviews section
+        });
+      });
+    }
+
+    // 4. Fetch recent messages in conversations
+    const { data: conversations } = await supabase
+      .from('conversations')
+      .select(`
+        id,
+        last_message_at,
+        participant_1,
+        participant_2
+      `)
+      .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
+      .order('last_message_at', { ascending: false })
+      .limit(limit);
+
+    if (conversations) {
+      // Get the most recent message for each conversation
+      for (const conv of conversations) {
+        if (!conv.last_message_at) continue;
+
+        // Check if the last message was from someone else (not the contractor)
+        const { data: lastMessage } = await supabase
+          .from('messages')
+          .select('id, sender_id, created_at')
+          .eq('conversation_id', conv.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (lastMessage && lastMessage.sender_id !== userId) {
+          activities.push({
+            id: `message-${conv.id}-${lastMessage.id}`,
+            type: 'message_received',
+            title: 'Nowa wiadomość w konwersacji',
+            description: `Otrzymałeś nową wiadomość`,
+            timestamp: new Date(lastMessage.created_at || conv.last_message_at),
+            color: 'bg-blue-500',
+            icon: 'MessageSquare',
+            linkUrl: `/messages?conversation=${conv.id}`
+          });
+        }
+      }
+    }
+
+    // Sort all activities by timestamp (most recent first) and limit
+    activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return activities.slice(0, limit);
+  } catch (error) {
+    console.error('Error fetching contractor recent activities:', error);
+    return [];
+  }
+}
+
+/**
  * Search contractors by query with enhanced data
  */
 export async function searchContractors(query: string): Promise<BrowseContractor[]> {
@@ -1675,5 +2052,144 @@ export async function removePortfolioProjectImage(
   } catch (error) {
     console.error('Error in removePortfolioProjectImage:', error);
     return { data: false, error };
+  }
+}
+
+/**
+ * Fetch service pricing for a contractor
+ */
+export async function fetchContractorServicePricing(
+  companyId: string
+): Promise<Record<string, ServicePricing>> {
+  const supabase = createClient();
+
+  try {
+    const { data: company, error } = await supabase
+      .from('companies')
+      .select('profile_data')
+      .eq('id', companyId)
+      .single();
+
+    if (error || !company) {
+      console.error('Error fetching contractor service pricing:', error);
+      return {};
+    }
+
+    const profileData = company.profile_data || {};
+    const servicePricing = profileData.service_pricing || {};
+
+    // Validate and return service pricing
+    if (typeof servicePricing === 'object' && servicePricing !== null && !Array.isArray(servicePricing)) {
+      return servicePricing as Record<string, ServicePricing>;
+    }
+
+    return {};
+  } catch (error) {
+    console.error('Error in fetchContractorServicePricing:', error);
+    return {};
+  }
+}
+
+/**
+ * Update service pricing for a contractor
+ */
+export async function updateContractorServicePricing(
+  companyId: string,
+  servicePricing: Record<string, ServicePricing>
+): Promise<{ data: boolean; error: Error | null }> {
+  const supabase = createClient();
+
+  try {
+    // Fetch current profile_data
+    const { data: company, error: fetchError } = await supabase
+      .from('companies')
+      .select('profile_data')
+      .eq('id', companyId)
+      .single();
+
+    if (fetchError || !company) {
+      return { data: false, error: new Error('Failed to fetch company data') };
+    }
+
+    // Merge service pricing into profile_data
+    const profileData = company.profile_data || {};
+    const updatedProfileData = {
+      ...profileData,
+      service_pricing: servicePricing
+    };
+
+    // Update the company record
+    const { error: updateError } = await supabase
+      .from('companies')
+      .update({ profile_data: updatedProfileData })
+      .eq('id', companyId);
+
+    if (updateError) {
+      console.error('Error updating contractor service pricing:', updateError);
+      return { data: false, error: new Error('Failed to update service pricing') };
+    }
+
+    return { data: true, error: null };
+  } catch (error) {
+    console.error('Error in updateContractorServicePricing:', error);
+    return {
+      data: false,
+      error: error instanceof Error ? error : new Error('Unknown error occurred')
+    };
+  }
+}
+
+/**
+ * Update contractor services (primary, secondary, specializations)
+ */
+export async function updateContractorServices(
+  companyId: string,
+  services: {
+    primary: string[];
+    secondary: string[];
+    specializations: string[];
+  }
+): Promise<{ data: boolean; error: Error | null }> {
+  const supabase = createClient();
+
+  try {
+    // Fetch current profile_data
+    const { data: company, error: fetchError } = await supabase
+      .from('companies')
+      .select('profile_data')
+      .eq('id', companyId)
+      .single();
+
+    if (fetchError || !company) {
+      return { data: false, error: new Error('Failed to fetch company data') };
+    }
+
+    // Merge services into profile_data
+    const profileData = company.profile_data || {};
+    const updatedProfileData = {
+      ...profileData,
+      primary_services: services.primary,
+      secondary_services: services.secondary,
+      specializations: services.specializations
+    };
+
+    // Update the company record
+    const { error: updateError } = await supabase
+      .from('companies')
+      .update({ profile_data: updatedProfileData })
+      .eq('id', companyId);
+
+    if (updateError) {
+      console.error('Error updating contractor services:', updateError);
+      return { data: false, error: new Error('Failed to update services') };
+    }
+
+    return { data: true, error: null };
+  } catch (error) {
+    console.error('Error in updateContractorServices:', error);
+    return {
+      data: false,
+      error: error instanceof Error ? error : new Error('Unknown error occurred')
+    };
   }
 }

@@ -1,3 +1,11 @@
+export interface ServicePricing {
+  type: 'hourly' | 'fixed' | 'range';
+  min?: number;
+  max?: number;
+  currency: string;
+  unit?: string; // e.g., "per m²", "per project"
+}
+
 export interface ContractorProfile {
   id: string;
   name: string;
@@ -68,6 +76,7 @@ export interface ContractorProfile {
     projectBased: boolean;
     negotiable: boolean;
     paymentTerms: string[];
+    servicePricing?: Record<string, ServicePricing>;
   };
   availability: {
     status: 'dostępny' | 'ograniczona_dostępność' | 'zajęty';

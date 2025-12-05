@@ -496,6 +496,7 @@ export async function fetchUserConversations(
         unreadCount: 0, // Will be calculated separately
         jobId: conv.job_id || conv.tender_id, // Support both jobs and tenders
         jobTitle: conv.job?.title || conv.tender?.title, // Support both jobs and tenders
+        subject: conv.subject || undefined,
         createdAt: new Date(conv.created_at),
         updatedAt: new Date(conv.updated_at)
       };

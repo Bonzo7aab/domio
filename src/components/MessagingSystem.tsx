@@ -5,7 +5,11 @@ import {
   Phone,
   Search,
   Send,
-  X
+  X,
+  MapPin,
+  Clock,
+  ExternalLink,
+  Gavel
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -19,6 +23,9 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Textarea } from './ui/textarea';
+import { Card, CardContent } from './ui/card';
+import { getJobById, getTenderById } from '../lib/data';
+import { useRouter } from 'next/navigation';
 
 // Types now imported from centralized types folder
 
@@ -63,8 +70,11 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
   const [newMessage, setNewMessage] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [jobData, setJobData] = useState<any>(null);
+  const [isLoadingJob, setIsLoadingJob] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   // Auto scroll to bottom when new message arrives
   useEffect(() => {
@@ -73,6 +83,44 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
 
   const currentConversation = conversations.find(conv => conv.id === selectedConversation);
   const currentMessages = selectedConversation ? messages[selectedConversation] || [] : [];
+
+  // Fetch job details when conversation with jobId is selected
+  useEffect(() => {
+    const fetchJobDetails = async () => {
+      if (!currentConversation?.jobId) {
+        setJobData(null);
+        return;
+      }
+
+      setIsLoadingJob(true);
+      try {
+        // Try to fetch as job first
+        const { data: job, error: jobError } = await getJobById(currentConversation.jobId);
+        if (job && !jobError) {
+          setJobData({ ...job, postType: 'job' });
+          setIsLoadingJob(false);
+          return;
+        }
+
+        // If not found as job, try as tender
+        const { data: tender, error: tenderError } = await getTenderById(currentConversation.jobId);
+        if (tender && !tenderError) {
+          setJobData({ ...tender, postType: 'tender' });
+          setIsLoadingJob(false);
+          return;
+        }
+
+        setJobData(null);
+      } catch (error) {
+        console.error('Error fetching job details:', error);
+        setJobData(null);
+      } finally {
+        setIsLoadingJob(false);
+      }
+    };
+
+    fetchJobDetails();
+  }, [currentConversation?.jobId]);
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedConversation || !user) return;
@@ -324,11 +372,50 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                       )}
                     </div>
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <h3 className="font-semibold">{otherParticipant.name}</h3>
                       <p className="text-sm text-gray-600">{otherParticipant.company}</p>
                       {currentConversation.jobTitle && (
-                        <p className="text-xs text-blue-600">📋 {currentConversation.jobTitle}</p>
+                        <p className="text-xs text-blue-600 mb-1">📋 {currentConversation.jobTitle}</p>
+                      )}
+                      {/* Compact Job Details */}
+                      {jobData && !isLoadingJob && (
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                          {jobData.company && (
+                            <span className="truncate">
+                              {typeof jobData.company === 'string' 
+                                ? jobData.company 
+                                : jobData.company?.name || 'Unknown'}
+                            </span>
+                          )}
+                          {jobData.location && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate">
+                                {typeof jobData.location === 'string' 
+                                  ? jobData.location 
+                                  : jobData.location.city || 'Nieznana lokalizacja'}
+                              </span>
+                            </div>
+                          )}
+                          {jobData.salary && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{jobData.salary}</span>
+                            </div>
+                          )}
+                          {currentConversation.jobId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => router.push(`/jobs/${currentConversation.jobId}`)}
+                              className="h-5 px-2 text-xs"
+                            >
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              Szczegóły
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

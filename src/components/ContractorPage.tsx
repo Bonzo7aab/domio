@@ -37,6 +37,8 @@ import {
   fetchPortfolioProjectById,
   deletePortfolioProject,
   fetchContractorRatingSummary,
+  fetchContractorRecentActivities,
+  fetchContractorReviews,
   type ContractorProfile,
   type ContractorApplication,
   type ContractorBid,
@@ -56,6 +58,7 @@ import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import PortfolioProjectForm from './PortfolioProjectForm';
+import ServicePricingManager from './ServicePricingManager';
 import { toast } from 'sonner';
 import Image from 'next/image';
 
@@ -81,7 +84,7 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     // Initialize tab from URL on mount (only once)
     if (!hasInitializedTabFromUrl.current) {
       const tabFromUrl = searchParams.get('tab');
-      if (tabFromUrl && ['dashboard', 'applications', 'projects', 'analytics'].includes(tabFromUrl)) {
+      if (tabFromUrl && ['dashboard', 'applications', 'projects', 'analytics', 'ratings', 'pricing'].includes(tabFromUrl)) {
         setActiveTab(tabFromUrl);
       }
       hasInitializedTabFromUrl.current = true;
@@ -131,14 +134,44 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     ratingBreakdown: { '5': number; '4': number; '3': number; '2': number; '1': number };
     categoryRatings: { quality: number; timeliness: number; communication: number; pricing: number };
   } | null>(null);
+  const [recentActivities, setRecentActivities] = useState<Array<{
+    id: string;
+    type: 'application_accepted' | 'application_rejected' | 'bid_accepted' | 'bid_rejected' | 'review_received' | 'message_received' | 'status_update';
+    title: string;
+    description: string;
+    timestamp: Date;
+    color: string;
+    icon: string;
+    linkUrl?: string;
+  }>>([]);
   
   // Tab-specific loading states
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [loadingApplications, setLoadingApplications] = useState(false);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [loadingRatings, setLoadingRatings] = useState(false);
+  const [loadingPricing, setLoadingPricing] = useState(false);
   
   // Track which tabs have been loaded
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
+  
+  // Reviews state
+  const [reviews, setReviews] = useState<Array<{
+    id: string;
+    reviewerName: string;
+    reviewerType: string;
+    rating: number;
+    title: string;
+    comment: string;
+    categories: {
+      quality: number;
+      timeliness: number;
+      communication: number;
+      pricing: number;
+    };
+    createdAt: string;
+    helpfulCount: number;
+  }>>([]);
   
   // Projects tab state
   const [platformProjects, setPlatformProjects] = useState<PlatformProject[]>([]);
@@ -214,6 +247,12 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
         const ratingData = await fetchContractorRatingSummary(companyId);
         setRatingSummary(ratingData);
         
+        // Fetch recent activities
+        if (user?.id) {
+          const activities = await fetchContractorRecentActivities(supabase, companyId, user.id, 10);
+          setRecentActivities(activities);
+        }
+        
         setLoadedTabs(prev => new Set(prev).add('dashboard'));
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -223,7 +262,7 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     };
 
     fetchDashboardData();
-  }, [activeTab, companyId, loadedTabs]);
+  }, [activeTab, companyId, loadedTabs, user?.id]);
 
   // Fetch applications tab data when tab is opened
   useEffect(() => {
@@ -317,6 +356,59 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     };
 
     fetchProjectsData();
+  }, [activeTab, companyId, loadedTabs]);
+
+  // Fetch ratings tab data when tab is opened
+  useEffect(() => {
+    const fetchRatingsData = async () => {
+      if (activeTab !== 'ratings' || !companyId || loadedTabs.has('ratings')) {
+        return;
+      }
+
+      try {
+        setLoadingRatings(true);
+        
+        // Fetch rating summary if not already loaded
+        const currentRatingSummary = ratingSummary;
+        if (!currentRatingSummary) {
+          const ratingData = await fetchContractorRatingSummary(companyId);
+          setRatingSummary(ratingData);
+        }
+        
+        // Fetch reviews
+        const reviewsData = await fetchContractorReviews(companyId, 20);
+        setReviews(reviewsData || []);
+        
+        setLoadedTabs(prev => new Set(prev).add('ratings'));
+      } catch (error) {
+        console.error('Error fetching ratings data:', error);
+      } finally {
+        setLoadingRatings(false);
+      }
+    };
+
+    fetchRatingsData();
+  }, [activeTab, companyId, loadedTabs]);
+
+  // Fetch pricing tab data when tab is opened
+  useEffect(() => {
+    const fetchPricingData = async () => {
+      if (activeTab !== 'pricing' || !companyId || loadedTabs.has('pricing')) {
+        return;
+      }
+
+      try {
+        setLoadingPricing(true);
+        // Pricing data is loaded by ServicePricingManager component itself
+        setLoadedTabs(prev => new Set(prev).add('pricing'));
+      } catch (error) {
+        console.error('Error fetching pricing data:', error);
+      } finally {
+        setLoadingPricing(false);
+      }
+    };
+
+    fetchPricingData();
   }, [activeTab, companyId, loadedTabs]);
 
 
@@ -741,6 +833,22 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     setEditingProject(null);
   };
 
+  // Helper function to translate category names to Polish
+  const getCategoryLabel = (category: string): string => {
+    const categoryMap: Record<string, string> = {
+      // Contractor categories
+      'quality': 'Jakość wykonania',
+      'timeliness': 'Terminowość',
+      'communication': 'Komunikacja',
+      'pricing': 'Cena',
+      // Manager categories
+      'payment_timeliness': 'Terminowość płatności',
+      'project_clarity': 'Przejrzystość projektu',
+      'professionalism': 'Profesjonalizm',
+    };
+    return categoryMap[category.toLowerCase()] || category;
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -795,7 +903,10 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                     <MapPin className="w-4 h-4" />
                     <span>{contractorData.address}</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div 
+                    className="flex items-center gap-1 cursor-pointer hover:text-yellow-600 transition-colors"
+                    onClick={() => setActiveTab('ratings')}
+                  >
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     <span>{contractorData.rating} ({contractorData.completedJobs} projektów)</span>
                   </div>
@@ -821,11 +932,13 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="applications">Moje aplikacje</TabsTrigger>
             <TabsTrigger value="projects">Projekty</TabsTrigger>
             <TabsTrigger value="analytics">Analityka</TabsTrigger>
+            <TabsTrigger value="ratings">Oceny</TabsTrigger>
+            <TabsTrigger value="pricing">Cennik</TabsTrigger>
           </TabsList>
 
           {/* Dashboard Tab */}
@@ -893,7 +1006,10 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
 
             {/* Rating Overview Section */}
             {ratingSummary && ratingSummary.totalReviews > 0 && (
-              <Card>
+              <Card 
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setActiveTab('ratings')}
+              >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Star className="w-5 h-5 text-yellow-400" />
@@ -947,7 +1063,7 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                       <div className="grid grid-cols-2 gap-4">
                         {Object.entries(ratingSummary.categoryRatings).map(([category, rating]) => (
                           <div key={category} className="flex items-center justify-between">
-                            <span className="text-sm capitalize">{category}:</span>
+                            <span className="text-sm">{getCategoryLabel(category)}:</span>
                             <div className="flex items-center gap-2">
                               <div className="w-24 bg-gray-200 rounded-full h-2">
                                 <div 
@@ -993,36 +1109,56 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                   <CardTitle>Ostatnie aktywności</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm">Wygrałeś ofertę na wymianę okien</p>
-                        <p className="text-xs text-gray-500">2 godziny temu</p>
-                      </div>
+                  {recentActivities.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentActivities.map((activity) => {
+                        // Format time ago in Polish
+                        const formatTimeAgo = (date: Date): string => {
+                          const now = new Date();
+                          const past = date;
+                          const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
+
+                          if (diffInSeconds < 60) return 'Przed chwilą';
+                          if (diffInSeconds < 3600) {
+                            const minutes = Math.floor(diffInSeconds / 60);
+                            return `${minutes} ${minutes === 1 ? 'minutę' : minutes < 5 ? 'minuty' : 'minut'} temu`;
+                          }
+                          if (diffInSeconds < 86400) {
+                            const hours = Math.floor(diffInSeconds / 3600);
+                            return `${hours} ${hours === 1 ? 'godzinę' : hours < 5 ? 'godziny' : 'godzin'} temu`;
+                          }
+                          if (diffInSeconds < 604800) {
+                            const days = Math.floor(diffInSeconds / 86400);
+                            if (days === 1) return 'wczoraj';
+                            return `${days} ${days < 5 ? 'dni' : 'dni'} temu`;
+                          }
+                          return past.toLocaleDateString('pl-PL');
+                        };
+
+                        return (
+                          <div
+                            key={activity.id}
+                            className={`flex items-center gap-3 ${activity.linkUrl ? 'cursor-pointer hover:bg-gray-50 rounded p-2 -m-2 transition-colors' : ''}`}
+                            onClick={() => {
+                              if (activity.linkUrl) {
+                                router.push(activity.linkUrl);
+                              }
+                            }}
+                          >
+                            <div className={`w-2 h-2 ${activity.color} rounded-full`}></div>
+                            <div className="flex-1">
+                              <p className="text-sm">{activity.title}</p>
+                              <p className="text-xs text-gray-500">{formatTimeAgo(activity.timestamp)}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm">Nowe zlecenie pasuje do Twojego profilu</p>
-                        <p className="text-xs text-gray-500">4 godziny temu</p>
-                      </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-gray-500">Brak ostatnich aktywności</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm">Otrzymałeś nową recenzję (5 gwiazdek)</p>
-                        <p className="text-xs text-gray-500">wczoraj</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm">Twój profil był przeglądany 23 razy</p>
-                        <p className="text-xs text-gray-500">wczoraj</p>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1378,6 +1514,199 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                 </CardContent>
               </Card>
             </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Ratings Tab */}
+          <TabsContent value="ratings" className="space-y-6">
+            {loadingRatings ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                {/* Rating Summary */}
+                {ratingSummary && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Star className="w-5 h-5 text-yellow-400" />
+                        Podsumowanie ocen
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="text-center">
+                          <div className="text-4xl font-bold text-primary mb-2">
+                            {ratingSummary.averageRating.toFixed(1)}
+                          </div>
+                          <div className="flex justify-center mb-2">
+                            {[...Array(5)].map((_, i) => (
+                              <Star 
+                                key={i} 
+                                className={`w-6 h-6 ${
+                                  i < Math.floor(ratingSummary.averageRating)
+                                    ? 'text-yellow-400 fill-yellow-400'
+                                    : 'text-gray-300'
+                                }`} 
+                              />
+                            ))}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {ratingSummary.totalReviews} {ratingSummary.totalReviews === 1 ? 'opinia' : 'opinii'}
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {Object.entries(ratingSummary.categoryRatings || {}).map(([category, rating]) => (
+                            <div key={category} className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{getCategoryLabel(category)}:</span>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-20 bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-yellow-400 h-2 rounded-full" 
+                                    style={{ width: `${(Number(rating) / 5) * 100}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium">{Number(rating).toFixed(1)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {Object.keys(ratingSummary.ratingBreakdown).length > 0 && (
+                        <div className="mt-6 pt-6 border-t">
+                          <div className="text-sm font-semibold mb-3">Rozkład ocen:</div>
+                          <div className="space-y-2">
+                            {[5, 4, 3, 2, 1].map((stars) => {
+                              const count = ratingSummary.ratingBreakdown[stars.toString() as keyof typeof ratingSummary.ratingBreakdown] || 0;
+                              const percentage = ratingSummary.totalReviews > 0 
+                                ? (count / ratingSummary.totalReviews) * 100 
+                                : 0;
+                              return (
+                                <div key={stars} className="flex items-center gap-2">
+                                  <span className="text-sm w-8">{stars}★</span>
+                                  <Progress value={percentage} className="flex-1 h-2" />
+                                  <span className="text-sm text-gray-500 w-12 text-right">{count}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Reviews List */}
+                <div className="space-y-4">
+                  {reviews.length > 0 ? (
+                    reviews.map((review) => (
+                      <Card key={review.id}>
+                        <CardContent className="pt-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h4 className="font-medium">{review.reviewerName}</h4>
+                              <p className="text-sm text-gray-600">
+                                {review.reviewerType === 'manager' ? 'Zarządca' : 'Klient prywatny'}
+                              </p>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star 
+                                  key={i} 
+                                  className={`w-4 h-4 ${
+                                    i < review.rating 
+                                      ? 'text-yellow-400 fill-yellow-400' 
+                                      : 'text-gray-300'
+                                  }`} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {review.title && (
+                            <h5 className="font-medium text-gray-900 mb-2">{review.title}</h5>
+                          )}
+                          
+                          <p className="text-gray-700 mb-3">{review.comment}</p>
+                          
+                          {/* Category Ratings */}
+                          {review.categories && Object.keys(review.categories).length > 0 && (
+                            <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                              <div className="text-sm font-medium mb-2">Szczegółowe oceny:</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {Object.entries(review.categories).map(([category, rating]) => (
+                                  <div key={category} className="flex items-center justify-between text-xs">
+                                    <span>{getCategoryLabel(category)}:</span>
+                                    <div className="flex items-center space-x-1">
+                                      <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                      <span>{Number(rating).toFixed(1)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center justify-between text-sm text-gray-500">
+                            <span>{new Date(review.createdAt).toLocaleDateString('pl-PL')}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <Card>
+                      <CardContent className="pt-6 text-center">
+                        <div className="text-gray-500 mb-4">
+                          <Star className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                          <h3 className="text-lg font-medium mb-2">Brak opinii</h3>
+                          <p>Twoja firma nie ma jeszcze żadnych opinii od klientów.</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Pricing Tab */}
+          <TabsContent value="pricing" className="space-y-6">
+            {loadingPricing ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                {companyId && profile?.services ? (
+                  <ServicePricingManager
+                    companyId={companyId}
+                    services={profile.services}
+                    onServicesUpdate={async () => {
+                      // Refresh profile data when services are updated
+                      if (companyId) {
+                        const { fetchContractorById } = await import('../lib/database/contractors');
+                        const updatedProfile = await fetchContractorById(companyId);
+                        if (updatedProfile) {
+                          setProfile(updatedProfile);
+                        }
+                      }
+                    }}
+                  />
+                ) : (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Loader2 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                      <h3 className="text-lg font-semibold mb-2">Ładowanie danych</h3>
+                      <p className="text-gray-600">
+                        Trwa ładowanie informacji o usługach...
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
           </TabsContent>

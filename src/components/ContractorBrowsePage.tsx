@@ -84,18 +84,20 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
           category: selectedCategory === 'Wszystkie kategorie' ? undefined : selectedCategory,
           searchQuery: searchTerm || undefined,
           sortBy: sortBy as 'rating' | 'jobs' | 'reviews' | 'name',
-          limit: 6, // Load only 6 initially
+          limit: 7, // Fetch 7 to check if there are more (we'll use first 6)
           offset: 0
         };
 
         const data = await getContractors(filters);
-        setContractors(data);
+        // Deduplicate contractors by ID to prevent duplicate keys
+        const uniqueContractors = Array.from(
+          new Map(data.map(c => [c.id, c])).values()
+        );
         
-        // Check if there are more contractors available
-        // We fetch one extra to check if there are more
-        const checkMoreFilters = { ...filters, limit: 7 };
-        const checkData = await getContractors(checkMoreFilters);
-        setHasMoreContractors(checkData.length > 6);
+        // Use first 6 items, check if there are more
+        const contractorsToShow = uniqueContractors.slice(0, 6);
+        setContractors(contractorsToShow);
+        setHasMoreContractors(uniqueContractors.length > 6);
       } catch (err) {
         console.error('Error loading contractors:', err);
         setError('Nie udało się załadować wykonawców. Spróbuj ponownie.');
@@ -117,51 +119,86 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
         category: selectedCategory === 'Wszystkie kategorie' ? undefined : selectedCategory,
         searchQuery: searchTerm || undefined,
         sortBy: sortBy as 'rating' | 'jobs' | 'reviews' | 'name',
-        limit: 6, // Load 6 more
+        limit: 7, // Fetch 7 to check if there are more (we'll use first 6)
         offset: currentLimit
       };
 
-        const moreData = await getContractors(filters);
+      const moreData = await getContractors(filters);
       
       if (moreData.length > 0) {
-        setContractors(prev => [...prev, ...moreData]);
-        setCurrentLimit(prev => prev + 6);
+        // Deduplicate: filter out contractors that already exist in the current list
+        // Calculate the actual count before state update to ensure accurate pagination
+        // Use functional update to get current contractors and calculate what to add
+        let actualAddedCount = 0;
+        setContractors(prev => {
+          const existingIds = new Set(prev.map(c => c.id));
+          const newContractors = moreData.filter(c => !existingIds.has(c.id));
+          // Use first 6 new contractors
+          const contractorsToAdd = newContractors.slice(0, 6);
+          actualAddedCount = contractorsToAdd.length;
+          return [...prev, ...contractorsToAdd];
+        });
         
-        // Check if there are still more contractors
-        const checkMoreFilters = { ...filters, limit: 7 };
-        const checkData = await getContractors(checkMoreFilters);
-        setHasMoreContractors(checkData.length > 6);
+        // Update currentLimit based on actual number added (not always 6)
+        // This ensures pagination offset stays in sync with displayed items
+        setCurrentLimit(prev => prev + actualAddedCount);
+        
+        // Check if there are still more contractors (if we got 7, there might be more)
+        setHasMoreContractors(moreData.length > 6);
       } else {
         setHasMoreContractors(false);
       }
     } catch (err) {
       console.error('Error loading more contractors:', err);
+      setHasMoreContractors(false);
     } finally {
       setLoadingMore(false);
     }
   };
 
-  // Transform contractors for display
-  const displayContractors = contractors.map(contractor => ({
-    id: contractor.id,
-    name: contractor.name,
-    specialties: contractor.primary_services.slice(0, 3),
-    description: `${contractor.specializations.join(', ')}. ${contractor.years_in_business} lat doświadczenia w branży.`,
-    logo: contractor.avatar_url || '/api/placeholder/80/80',
-    location: contractor.city,
-    rating: contractor.rating,
-    reviewCount: contractor.review_count,
-    completedJobs: contractor.completed_projects,
-    verified: contractor.is_verified,
-    hasInsurance: contractor.has_oc,
-    isPremium: contractor.plan_type === 'pro',
-    certificates: contractor.certifications.slice(0, 2),
-    priceRange: contractor.price_range,
-    responseTime: contractor.response_time,
-    foundedYear: contractor.founded_year,
-    employeeCount: contractor.employee_count,
-    categories: [contractor.primary_services[0]] // Map to simplified categories
-  }));
+  // Transform contractors for display - using real data from database
+  const displayContractors = contractors.map(contractor => {
+    const primaryServices = Array.isArray(contractor.primary_services) ? contractor.primary_services : [];
+    const specializations = Array.isArray(contractor.specializations) ? contractor.specializations : [];
+    const certifications = Array.isArray(contractor.certifications) ? contractor.certifications : [];
+    
+    // Use real description from database if available, otherwise build from real data fields
+    let description = contractor.description;
+    // Check if description exists and is a string before calling trim()
+    if (!description || typeof description !== 'string' || description.trim() === '') {
+      // Fallback: build description from real data (specializations and years_in_business)
+      const specializationText = specializations.length > 0 
+        ? specializations.join(', ') 
+        : (primaryServices.length > 0 ? primaryServices.join(', ') : '');
+      const yearsText = contractor.years_in_business > 0 
+        ? `${contractor.years_in_business} lat doświadczenia w branży`
+        : '';
+      description = specializationText && yearsText
+        ? `${specializationText}. ${yearsText}.`
+        : (specializationText || yearsText || 'Profesjonalne usługi budowlane');
+    }
+    
+    return {
+      id: contractor.id,
+      name: contractor.name,
+      specialties: primaryServices.slice(0, 3),
+      description,
+      logo: contractor.avatar_url || '/api/placeholder/80/80',
+      location: contractor.city || 'Nieznana lokalizacja',
+      rating: contractor.rating || 0,
+      reviewCount: contractor.review_count || 0,
+      completedJobs: contractor.completed_projects || 0,
+      verified: contractor.is_verified,
+      hasInsurance: contractor.has_oc,
+      isPremium: contractor.plan_type === 'pro',
+      certificates: certifications.slice(0, 2),
+      priceRange: contractor.price_range || 'Wycena indywidualna',
+      responseTime: contractor.response_time || '24h',
+      foundedYear: contractor.founded_year,
+      employeeCount: contractor.employee_count || '1-5',
+      categories: primaryServices.length > 0 ? [primaryServices[0]] : [] // Map to simplified categories
+    };
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -312,7 +349,7 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
               const ratings = contractorRatings[contractor.id];
               
               return (
-                <Card key={contractor.id} className="hover:shadow-lg transition-shadow duration-200">
+                <Card key={contractor.id} className="hover:shadow-lg transition-shadow duration-200 flex flex-col">
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-4">
@@ -347,7 +384,7 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
                     </div>
                   </CardHeader>
 
-                  <CardContent className="pt-0">
+                  <CardContent className="pt-0 flex flex-col flex-1">
                     <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                       {contractor.description}
                     </p>
@@ -443,7 +480,7 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
                     )}
 
                     {/* Action Buttons */}
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 mt-auto pt-4">
                       <Button 
                         className="flex-1" 
                         size="sm"

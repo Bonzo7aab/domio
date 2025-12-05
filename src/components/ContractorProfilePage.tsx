@@ -11,45 +11,94 @@ import { Separator } from './ui/separator';
 import { fetchContractorById, fetchContractorReviews, fetchContractorRatingSummary, fetchContractorPortfolio } from '../lib/database/contractors';
 import { createClient } from '../lib/supabase/client';
 import { QuoteRequestModal } from './QuoteRequestModal';
-import { mockContractorDetailsMap } from '../mocks';
+import { ServicePricing } from '../types/contractor';
 
 interface ContractorProfilePageProps {
   contractorId: string;
   onBack?: () => void;
 }
 
+// Helper function to format service pricing
+const formatServicePrice = (pricing: ServicePricing | undefined): string => {
+  if (!pricing) return 'Wycena indywidualna';
+
+  const currency = pricing.currency || 'PLN';
+  const unit = pricing.unit ? ` ${pricing.unit}` : '';
+
+  switch (pricing.type) {
+    case 'hourly':
+      if (pricing.min && pricing.max && pricing.min !== pricing.max) {
+        return `${pricing.min} - ${pricing.max} ${currency}/h${unit}`;
+      }
+      return `${pricing.min || 0} ${currency}/h${unit}`;
+    case 'fixed':
+      return `${pricing.min || 0} ${currency}${unit}`;
+    case 'range':
+      return `${pricing.min || 0} - ${pricing.max || 0} ${currency}${unit}`;
+    default:
+      return 'Wycena indywidualna';
+  }
+};
+
 // Convert detailed contractor profile to page format
 const convertContractorToPageFormat = (contractor: any) => {
   if (!contractor) return null;
+
+  // Get all unique services from all categories
+  const allServices = [
+    ...new Set([
+      ...(contractor.services?.primary || []),
+      ...(contractor.services?.secondary || []),
+      ...(contractor.services?.specializations || [])
+    ])
+  ];
+
+  // Get service pricing from contractor profile
+  const servicePricing = contractor.pricing?.servicePricing || {};
+
+  // Helper to determine service category
+  const getServiceCategory = (serviceName: string): 'primary' | 'secondary' | 'specialization' | null => {
+    if (contractor.services?.primary?.includes(serviceName)) return 'primary';
+    if (contractor.services?.secondary?.includes(serviceName)) return 'secondary';
+    if (contractor.services?.specializations?.includes(serviceName)) return 'specialization';
+    return null;
+  };
+
+  // Map services with their pricing and additional info
+  const servicesWithPricing = allServices.map((serviceName: string) => {
+    const pricing = servicePricing[serviceName];
+    const category = getServiceCategory(serviceName);
+    return {
+      name: serviceName,
+      description: `Profesjonalne ${serviceName.toLowerCase()} z gwarancją jakości`,
+      price: formatServicePrice(pricing),
+      pricing: pricing, // Full pricing object for detailed display
+      category: category
+    };
+  });
 
   return {
     name: contractor.companyName,
     logo: contractor.avatar || '/api/placeholder/150/150',
     coverImage: contractor.coverImage || '/api/placeholder/800/300',
-    slogan: contractor.services.specializations[0] || 'Profesjonalne usługi budowlane',
-    description: `${contractor.companyName} działa na rynku od ${contractor.businessInfo.yearEstablished} roku. Specjalizujemy się w ${contractor.services.primary.join(', ').toLowerCase()}. Posiadamy ${contractor.experience.completedProjects} zakończonych projektów i średnią ocenę ${contractor.rating.overall} gwiazdek.`,
-    location: contractor.location.city,
-    rating: contractor.rating.overall,
-    reviewCount: contractor.rating.reviewsCount,
-    completedJobs: contractor.experience.completedProjects,
-    verified: contractor.verification.status === 'verified',
-    hasInsurance: contractor.insurance.hasOC,
+    slogan: contractor.services?.specializations?.[0] || contractor.services?.primary?.[0] || 'Profesjonalne usługi budowlane',
+    description: `${contractor.companyName} działa na rynku od ${contractor.businessInfo?.yearEstablished || new Date().getFullYear()} roku. ${contractor.services?.primary?.length > 0 ? `Specjalizujemy się w ${contractor.services.primary.join(', ').toLowerCase()}.` : ''} Posiadamy ${contractor.experience?.completedProjects || 0} zakończonych projektów i średnią ocenę ${contractor.rating?.overall || 0} gwiazdek.`,
+    location: contractor.location?.city || 'Warszawa',
+    rating: contractor.rating?.overall || 0,
+    reviewCount: contractor.rating?.reviewsCount || 0,
+    completedJobs: contractor.experience?.completedProjects || 0,
+    verified: contractor.verification?.status === 'verified',
+    hasInsurance: contractor.insurance?.hasOC || false,
     isPremium: contractor.plan === 'pro',
-    founded: contractor.businessInfo.yearEstablished,
-    employees: contractor.businessInfo.employeeCount,
-    website: contractor.contactInfo.website || 'www.example.com',
-    phone: contractor.contactInfo.phone,
-    email: contractor.contactInfo.email,
-    address: contractor.contactInfo.address,
-    specialties: [...contractor.services.primary, ...contractor.services.secondary].slice(0, 5),
-    certificates: contractor.experience.certifications,
-    services: contractor.services.primary.map((service, index) => ({
-      name: service,
-      description: `Profesjonalne ${service.toLowerCase()} z gwarancją jakości`,
-      price: contractor.pricing.hourlyRate ? 
-        `${contractor.pricing.hourlyRate.min}-${contractor.pricing.hourlyRate.max} zł/h` : 
-        'Wycena indywidualna'
-    })),
+    founded: contractor.businessInfo?.yearEstablished || new Date().getFullYear(),
+    employees: contractor.businessInfo?.employeeCount || '1-5',
+    website: contractor.contactInfo?.website || '',
+    phone: contractor.contactInfo?.phone || '',
+    email: contractor.contactInfo?.email || '',
+    address: contractor.contactInfo?.address || '',
+    specialties: [...(contractor.services?.primary || []), ...(contractor.services?.secondary || [])].slice(0, 5),
+    certificates: contractor.experience?.certifications || [],
+    services: servicesWithPricing,
     portfolio: contractor.portfolio.featuredProjects.map(project => ({
       title: project.title,
       image: project.images[0] || '/api/placeholder/400/300',
@@ -105,90 +154,9 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
           // Load rating summary immediately
           const ratingData = await fetchContractorRatingSummary(contractorId);
           setRatingSummary(ratingData);
-        } else {
-          const fallbackContractor = mockContractorDetailsMap[contractorId];
-          if (fallbackContractor) {
-            setContractor(fallbackContractor);
-            setReviews(
-              fallbackContractor.reviews.map(review => ({
-                reviewerName: review.author,
-                reviewerType: 'manager',
-                rating: review.rating,
-                title: review.project,
-                comment: review.text,
-                categories: {},
-                createdAt: review.date
-              }))
-            );
-            setRatingSummary({
-              averageRating: fallbackContractor.rating,
-              totalReviews: fallbackContractor.reviewCount,
-              categoryRatings: {
-                profesjonalizm: fallbackContractor.rating,
-                terminowość: fallbackContractor.rating,
-                komunikacja: fallbackContractor.rating
-              }
-            });
-            setPortfolio(
-              fallbackContractor.portfolio.map((project, index) => ({
-                id: `mock-portfolio-${index}`,
-                title: project.title,
-                description: project.description,
-                images: [project.image],
-                year: project.date,
-                category: undefined,
-                isFeatured: index === 0,
-                location: fallbackContractor.address,
-                budget: undefined,
-                duration: undefined,
-                clientFeedback: undefined,
-                clientName: undefined
-              }))
-            );
-          }
         }
       } catch (error) {
         console.error('Error loading contractor:', error);
-        const fallbackContractor = mockContractorDetailsMap[contractorId];
-        if (fallbackContractor) {
-          setContractor(fallbackContractor);
-          setReviews(
-            fallbackContractor.reviews.map(review => ({
-              reviewerName: review.author,
-              reviewerType: 'manager',
-              rating: review.rating,
-              title: review.project,
-              comment: review.text,
-              categories: {},
-              createdAt: review.date
-            }))
-          );
-          setRatingSummary({
-            averageRating: fallbackContractor.rating,
-            totalReviews: fallbackContractor.reviewCount,
-            categoryRatings: {
-              profesjonalizm: fallbackContractor.rating,
-              terminowość: fallbackContractor.rating,
-              komunikacja: fallbackContractor.rating
-            }
-          });
-          setPortfolio(
-            fallbackContractor.portfolio.map((project, index) => ({
-              id: `mock-portfolio-${index}`,
-              title: project.title,
-              description: project.description,
-              images: [project.image],
-              year: project.date,
-              category: undefined,
-              isFeatured: index === 0,
-              location: fallbackContractor.address,
-              budget: undefined,
-              duration: undefined,
-              clientFeedback: undefined,
-              clientName: undefined
-            }))
-          );
-        }
       } finally {
         setIsLoading(false);
       }
@@ -529,22 +497,88 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
           </TabsContent>
 
           <TabsContent value="services" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {contractor.services.map((service, index) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <CardTitle>{service.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600 mb-4">{service.description}</p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold text-green-600">{service.price}</span>
-                      <Button size="sm">Zapytaj</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            {contractor.services && contractor.services.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {contractor.services.map((service: any, index: number) => (
+                  <Card key={index} className="flex flex-col h-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg mb-2">{service.name}</CardTitle>
+                          {service.category && (
+                            <Badge 
+                              variant={
+                                service.category === 'primary' ? 'default' : 
+                                service.category === 'secondary' ? 'outline' : 
+                                'secondary'
+                              }
+                              className="text-xs"
+                            >
+                              {service.category === 'primary' ? 'Usługa podstawowa' : 
+                               service.category === 'secondary' ? 'Usługa dodatkowa' : 
+                               'Specjalizacja'}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex flex-col flex-1 space-y-4">
+                      <div className="space-y-3 flex-1">
+                        <p className="text-gray-600 text-sm">{service.description}</p>
+                        
+                        {service.pricing && (
+                          <div className="space-y-2 text-xs text-gray-600 border-t pt-3">
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Typ ceny:</span>
+                              <span className="font-medium">
+                                {service.pricing.type === 'hourly' ? 'Stawka godzinowa' :
+                                 service.pricing.type === 'fixed' ? 'Cena stała' :
+                                 'Zakres cen'}
+                              </span>
+                            </div>
+                            {service.pricing.min !== undefined && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Cena min:</span>
+                                <span className="font-medium">{service.pricing.min} {service.pricing.currency || 'PLN'}</span>
+                              </div>
+                            )}
+                            {service.pricing.max !== undefined && service.pricing.max !== service.pricing.min && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Cena max:</span>
+                                <span className="font-medium">{service.pricing.max} {service.pricing.currency || 'PLN'}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Waluta:</span>
+                              <span className="font-medium">{service.pricing.currency || 'PLN'}</span>
+                            </div>
+                            {service.pricing.unit && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Jednostka:</span>
+                                <span className="font-medium">{service.pricing.unit}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="pt-4 mt-auto border-t">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Cena:</span>
+                          <span className="text-lg font-bold text-green-600">{service.price}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <p className="text-gray-600">Ten wykonawca nie ma jeszcze dodanych usług.</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="portfolio" className="space-y-6">
