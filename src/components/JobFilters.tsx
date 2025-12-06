@@ -22,6 +22,7 @@ export interface FilterState {
   clientTypes: string[];
   postTypes: string[]; // Zlecenia vs Przetargi
   urgency: string[]; // ['low', 'medium', 'high']
+  urgent?: boolean; // High priority jobs (urgent flag)
   searchQuery?: string; // Search by title
   endingSoon?: boolean; // Tenders ending in less than 7 days
   dateAdded: string[]; // ['today', 'last-week', 'last-month', 'last-3-months', 'last-6-months', 'last-year']
@@ -327,18 +328,20 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
   const getAppliedFilters = () => {
     const applied: Array<{ label: string; value: string; onRemove: () => void }> = [];
 
-    // Post types
-    if (selectedPostTypes.length < 2) {
-      selectedPostTypes.forEach(type => {
-        applied.push({
-          label: type === 'job' ? 'Zlecenia' : 'Przetargi',
-          value: type,
-          onRemove: () => {
-            setSelectedPostTypes(prev => prev.filter(t => t !== type));
-          }
-        });
+    // Post types - always show when selected
+    selectedPostTypes.forEach(type => {
+      applied.push({
+        label: type === 'job' ? 'Zlecenia' : 'Przetargi',
+        value: `postType-${type}`,
+        onRemove: () => {
+          setSelectedPostTypes(prev => {
+            const newPostTypes = prev.filter(t => t !== type);
+            // Ensure at least one postType is selected
+            return newPostTypes.length > 0 ? newPostTypes : (type === 'job' ? ['tender'] : ['job']);
+          });
+        }
       });
-    }
+    });
 
     // Categories
     selectedCategories.forEach(category => {

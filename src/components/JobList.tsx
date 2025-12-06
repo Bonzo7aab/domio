@@ -13,7 +13,8 @@ import type { Job } from '../types/job';
 interface JobListProps {
   jobs?: Job[];
   filters?: FilterState;
-  onFilterChange?: (filters: FilterState) => void;
+  // Supports both direct values and functional updates (like React's setState)
+  onFilterChange?: (filters: FilterState | ((prev: FilterState) => FilterState)) => void;
   onJobSelect?: (jobId: string) => void;
   onToggleMap?: () => void;
   isMapVisible?: boolean;
@@ -194,6 +195,13 @@ export default function JobList({
       // Filter by urgency (only if job has urgency field)
       if (filters.urgency && filters.urgency.length > 0) {
         if ('urgency' in job && job.urgency && !filters.urgency.includes(job.urgency)) {
+          return false;
+        }
+      }
+
+      // Filter by urgent flag (high priority)
+      if (filters.urgent === true) {
+        if (!('urgent' in job) || !job.urgent) {
           return false;
         }
       }
@@ -435,80 +443,60 @@ export default function JobList({
         </div>
       </div>
 
-      {/* Quick Filters */}
+      {/* Quick Filters - Using functional updates to prevent stale closure issues */}
       <div className="flex flex-wrap items-center gap-2 mb-4 overflow-x-auto">
         <Badge 
           variant={filters?.urgency?.includes('high') ? "default" : "secondary"} 
-          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
-          onClick={() => {
-            if (filters?.urgency?.includes('high')) {
-              // Remove high urgency filter
-              onFilterChange?.({ ...filters, urgency: filters.urgency.filter(u => u !== 'high') });
-            } else {
-              // Add high urgency filter
-              onFilterChange?.({ ...filters, urgency: [...(filters?.urgency || []), 'high'] });
-            }
+          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors select-none"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Use functional update to always get latest state
+            onFilterChange?.((prev) => {
+              const currentUrgency = prev.urgency || [];
+              if (currentUrgency.includes('high')) {
+                return { ...prev, urgency: currentUrgency.filter(u => u !== 'high') };
+              } else {
+                return { ...prev, urgency: [...currentUrgency, 'high'] };
+              }
+            });
           }}
         >
           🔥 Pilne zlecenia
         </Badge>
         <Badge 
-          variant={filters?.postTypes?.includes('tender') && filters.postTypes.length === 1 ? "default" : "secondary"}
-          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
-          onClick={() => {
-            if (filters?.postTypes?.includes('tender') && filters.postTypes.length === 1) {
-              // Show all
-              onFilterChange?.({ ...filters, postTypes: ['job', 'tender'] });
-            } else {
-              // Show only tenders
-              onFilterChange?.({ ...filters, postTypes: ['tender'] });
-            }
-          }}
-        >
-          📋 Tylko przetargi
-        </Badge>
-        <Badge 
           variant={filters?.endingSoon ? "default" : "secondary"}
-          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
-          onClick={() => {
-            onFilterChange?.({ 
-              ...filters, 
-              endingSoon: !filters?.endingSoon,
-              postTypes: filters?.endingSoon ? filters.postTypes : ['tender'] // Auto-select tenders when enabling
-            });
+          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors select-none"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Use functional update to always get latest state
+            onFilterChange?.((prev) => ({
+              ...prev,
+              endingSoon: prev.endingSoon ? false : true
+            }));
           }}
         >
           ⏰ Kończące się wkrótce
         </Badge>
         <Badge 
           variant={filters?.budgetRanges?.includes('20000+') ? "default" : "secondary"}
-          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
-          onClick={() => {
-            if (filters?.budgetRanges?.includes('20000+')) {
-              // Remove high budget filter
-              onFilterChange?.({ ...filters, budgetRanges: filters.budgetRanges.filter(r => r !== '20000+') });
-            } else {
-              // Add high budget filter
-              onFilterChange?.({ ...filters, budgetRanges: [...(filters?.budgetRanges || []), '20000+'] });
-            }
+          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors select-none"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Use functional update to always get latest state
+            onFilterChange?.((prev) => {
+              const currentBudgetRanges = prev.budgetRanges || [];
+              if (currentBudgetRanges.includes('20000+')) {
+                return { ...prev, budgetRanges: currentBudgetRanges.filter(r => r !== '20000+') };
+              } else {
+                return { ...prev, budgetRanges: [...currentBudgetRanges, '20000+'] };
+              }
+            });
           }}
         >
           💰 Wysokobudżetowe (20k+)
-        </Badge>
-        <Badge 
-          variant={filters?.postTypes?.includes('job') && filters.postTypes.length === 1 ? "default" : "secondary"}
-          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors"
-          onClick={() => {
-            if (filters?.postTypes?.includes('job') && filters.postTypes.length === 1) {
-              // Show all
-              onFilterChange?.({ ...filters, postTypes: ['job', 'tender'] });
-            } else {
-              // Show only jobs
-              onFilterChange?.({ ...filters, postTypes: ['job'] });
-            }
-          }}
-        >
-          🔧 Tylko zlecenia
         </Badge>
       </div>
 

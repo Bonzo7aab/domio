@@ -287,33 +287,53 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4">
                   <div>
                     <h1 className="text-3xl font-bold mb-2">{contractor.name}</h1>
-                    <p className="text-xl text-gray-600 mb-4">{contractor.slogan}</p>
+                    <p className="text-xl text-gray-600 mb-4">
+                      {contractor.slogan || 'Profesjonalne usługi budowlane'}
+                    </p>
                     
                     <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
                       <div className="flex items-center space-x-1">
                         <MapPin className="w-4 h-4" />
-                        <span>{contractor.location}</span>
+                        <span>{contractor.location || 'Nie określono lokalizacji'}</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Calendar className="w-4 h-4" />
-                        <span>Działa od {contractor.founded}</span>
+                        <span>
+                          {contractor.founded 
+                            ? `Działa od ${contractor.founded}`
+                            : 'Rok założenia nie określony'}
+                        </span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Users className="w-4 h-4" />
-                        <span>{contractor.employees} pracowników</span>
+                        <span>
+                          {contractor.employees 
+                            ? `${contractor.employees} pracowników`
+                            : 'Liczba pracowników nie określona'}
+                        </span>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-4 mb-4">
                       <div className="flex items-center space-x-1">
                         <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                        <span className="font-bold text-lg">{contractor.rating}</span>
-                        <span className="text-gray-500">({contractor.reviewCount} opinii)</span>
+                        {contractor.rating > 0 ? (
+                          <>
+                            <span className="font-bold text-lg">{contractor.rating}</span>
+                            <span className="text-gray-500">({contractor.reviewCount} opinii)</span>
+                          </>
+                        ) : (
+                          <span className="text-gray-500">Brak ocen</span>
+                        )}
                       </div>
                       <Separator orientation="vertical" className="h-6" />
                       <div className="flex items-center space-x-1">
                         <Briefcase className="w-5 h-5 text-green-600" />
-                        <span className="font-medium">{contractor.completedJobs} zleceń</span>
+                        <span className="font-medium">
+                          {contractor.completedJobs > 0 
+                            ? `${contractor.completedJobs} zleceń`
+                            : 'Brak ukończonych zleceń'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -337,13 +357,19 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                     </Button>
                     {showPhoneNumber && (
                       <div className="text-center p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <a 
-                          href={`tel:${contractor.phone}`}
-                          className="text-lg font-semibold text-green-800 hover:text-green-900 hover:underline block"
-                        >
-                          {contractor.phone}
-                        </a>
-                        <div className="text-sm text-green-600 mt-1">Kliknij numer, aby zadzwonić</div>
+                        {contractor.phone ? (
+                          <>
+                            <a 
+                              href={`tel:${contractor.phone}`}
+                              className="text-lg font-semibold text-green-800 hover:text-green-900 hover:underline block"
+                            >
+                              {contractor.phone}
+                            </a>
+                            <div className="text-sm text-green-600 mt-1">Kliknij numer, aby zadzwonić</div>
+                          </>
+                        ) : (
+                          <div className="text-gray-500">Numer telefonu nie jest dostępny</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -370,11 +396,15 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
 
                 {/* Specialties */}
                 <div className="flex flex-wrap gap-2">
-                  {contractor.specialties.map((specialty, index) => (
-                    <Badge key={index} variant="outline">
-                      {specialty}
-                    </Badge>
-                  ))}
+                  {contractor.specialties && contractor.specialties.length > 0 ? (
+                    contractor.specialties.map((specialty, index) => (
+                      <Badge key={index} variant="outline">
+                        {specialty}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500">Brak określonych specjalizacji</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -400,24 +430,32 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 leading-relaxed mb-6">
-                    {contractor.description}
+                    {contractor.description || 'Brak opisu firmy. Wykonawca nie dodał jeszcze informacji o swojej działalności.'}
                   </p>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">{contractor.stats.projectsCompleted}</div>
+                      <div className="text-2xl font-bold text-primary">
+                        {contractor.stats.projectsCompleted > 0 ? contractor.stats.projectsCompleted : '—'}
+                      </div>
                       <div className="text-sm text-gray-600">Zrealizowanych projektów</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">{contractor.stats.clientSatisfaction}%</div>
+                      <div className="text-2xl font-bold text-primary">
+                        {contractor.stats.clientSatisfaction > 0 ? `${contractor.stats.clientSatisfaction}%` : '—'}
+                      </div>
                       <div className="text-sm text-gray-600">Zadowolonych klientów</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">{contractor.stats.repeatClients}%</div>
+                      <div className="text-2xl font-bold text-primary">
+                        {contractor.stats.repeatClients > 0 ? `${contractor.stats.repeatClients}%` : '—'}
+                      </div>
                       <div className="text-sm text-gray-600">Powracających klientów</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">{contractor.stats.avgResponseTime}</div>
+                      <div className="text-2xl font-bold text-primary">
+                        {contractor.stats.avgResponseTime ? contractor.stats.avgResponseTime : '—'}
+                      </div>
                       <div className="text-sm text-gray-600">Średni czas odpowiedzi</div>
                     </div>
                   </div>
@@ -425,12 +463,16 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                   <div>
                     <h4 className="font-medium mb-3">Certyfikaty i uprawnienia</h4>
                     <div className="flex flex-wrap gap-2">
-                      {contractor.certificates.map((cert, index) => (
-                        <Badge key={index} variant="secondary" className="bg-yellow-100 text-yellow-800">
-                          <Award className="w-3 h-3 mr-1" />
-                          {cert}
-                        </Badge>
-                      ))}
+                      {contractor.certificates && contractor.certificates.length > 0 ? (
+                        contractor.certificates.map((cert, index) => (
+                          <Badge key={index} variant="secondary" className="bg-yellow-100 text-yellow-800">
+                            <Award className="w-3 h-3 mr-1" />
+                            {cert}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-500">Brak certyfikatów i uprawnień</span>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -447,12 +489,16 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                     <div>
                       <div className="font-medium">
                         {showPhoneNumber ? (
-                          <a 
-                            href={`tel:${contractor.phone}`}
-                            className="text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            {contractor.phone}
-                          </a>
+                          contractor.phone ? (
+                            <a 
+                              href={`tel:${contractor.phone}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {contractor.phone}
+                            </a>
+                          ) : (
+                            <span className="text-gray-500">Numer telefonu nie jest dostępny</span>
+                          )
                         ) : (
                           <span className="text-gray-500">Kliknij "Zadzwoń" aby zobaczyć numer</span>
                         )}
@@ -464,7 +510,18 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                   <div className="flex items-center space-x-3">
                     <Mail className="w-5 h-5 text-gray-400" />
                     <div>
-                      <div className="font-medium">{contractor.email}</div>
+                      <div className="font-medium">
+                        {contractor.email ? (
+                          <a 
+                            href={`mailto:${contractor.email}`}
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {contractor.email}
+                          </a>
+                        ) : (
+                          <span className="text-gray-500">Brak adresu email</span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-500">Email</div>
                     </div>
                   </div>
@@ -472,7 +529,13 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                   <div className="flex items-center space-x-3">
                     <MapPin className="w-5 h-5 text-gray-400" />
                     <div>
-                      <div className="font-medium">{contractor.address}</div>
+                      <div className="font-medium">
+                        {contractor.address ? (
+                          contractor.address
+                        ) : (
+                          <span className="text-gray-500">Brak adresu</span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-500">Adres</div>
                     </div>
                   </div>
@@ -480,7 +543,20 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                   <div className="flex items-center space-x-3">
                     <ExternalLink className="w-5 h-5 text-gray-400" />
                     <div>
-                      <div className="font-medium">{contractor.website}</div>
+                      <div className="font-medium">
+                        {contractor.website ? (
+                          <a 
+                            href={contractor.website.startsWith('http') ? contractor.website : `https://${contractor.website}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {contractor.website}
+                          </a>
+                        ) : (
+                          <span className="text-gray-500">Brak strony internetowej</span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-500">Strona internetowa</div>
                     </div>
                   </div>

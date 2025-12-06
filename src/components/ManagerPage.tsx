@@ -585,7 +585,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Przegląd</TabsTrigger>
             <TabsTrigger value="jobs">Zlecenia</TabsTrigger>
             <TabsTrigger value="applications">Otrzymane oferty</TabsTrigger>
@@ -593,7 +593,6 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
             <TabsTrigger value="tender-bids">Oferty przetargowe</TabsTrigger>
             <TabsTrigger value="properties">Nieruchomości</TabsTrigger>
             <TabsTrigger value="contractors">Wykonawcy</TabsTrigger>
-            <TabsTrigger value="analytics">Analityka</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -1128,35 +1127,6 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                   </CardContent>
                 </Card>
               ))}
-            </div>
-          </TabsContent>
-
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-6">
-            <h2 className="text-2xl font-bold">Analityka i raporty</h2>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Wydatki miesięczne</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64 flex items-center justify-center text-gray-500">
-                    Wykres wydatków
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Efektywność wykonawców</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64 flex items-center justify-center text-gray-500">
-                    Wykres efektywności
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
         </Tabs>

@@ -2,7 +2,6 @@
 
 import {
   Award,
-  BarChart3,
   CheckCircle,
   Clock,
   Edit,
@@ -15,7 +14,6 @@ import {
   Send,
   Shield,
   Star,
-  TrendingUp,
   Trash2,
   Briefcase,
   FolderKanban,
@@ -30,7 +28,6 @@ import {
   fetchContractorDashboardData,
   fetchContractorDashboardStats,
   fetchContractorApplications,
-  fetchContractorAnalytics,
   fetchCompletedProjects,
   fetchPlatformProjectHistory,
   fetchContractorPortfolio,
@@ -84,7 +81,7 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     // Initialize tab from URL on mount (only once)
     if (!hasInitializedTabFromUrl.current) {
       const tabFromUrl = searchParams.get('tab');
-      if (tabFromUrl && ['dashboard', 'applications', 'projects', 'analytics', 'ratings', 'pricing'].includes(tabFromUrl)) {
+      if (tabFromUrl && ['dashboard', 'applications', 'projects', 'ratings', 'pricing'].includes(tabFromUrl)) {
         setActiveTab(tabFromUrl);
       }
       hasInitializedTabFromUrl.current = true;
@@ -148,7 +145,6 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   // Tab-specific loading states
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [loadingApplications, setLoadingApplications] = useState(false);
-  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [loadingRatings, setLoadingRatings] = useState(false);
   const [loadingPricing, setLoadingPricing] = useState(false);
   
@@ -289,34 +285,6 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     };
 
     fetchApplicationsData();
-  }, [activeTab, companyId, loadedTabs]);
-
-  // Fetch analytics tab data when tab is opened
-  useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      if (activeTab !== 'analytics' || !companyId || loadedTabs.has('analytics')) {
-        return;
-      }
-
-      const supabase = createClient();
-      
-      try {
-        setLoadingAnalytics(true);
-        const analyticsData = await fetchContractorAnalytics(supabase, companyId);
-        
-        setStats(analyticsData.stats);
-        // Note: ratingSummary is available but not currently used in the UI
-        // You can add it to state if needed
-        
-        setLoadedTabs(prev => new Set(prev).add('analytics'));
-      } catch (error) {
-        console.error('Error fetching analytics data:', error);
-      } finally {
-        setLoadingAnalytics(false);
-      }
-    };
-
-    fetchAnalyticsData();
   }, [activeTab, companyId, loadedTabs]);
 
   // Fetch projects tab data when tab is opened
@@ -897,7 +865,9 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                     </Badge>
                   )}
                 </div>
-                <p className="text-gray-600 mb-1">{contractorData.specialization}</p>
+                <p className="text-gray-600 mb-1">
+                  {contractorData.specialization || 'Nie określono specjalizacji'}
+                </p>
                 <div className="flex items-center gap-6 text-sm text-gray-500">
                   <div className="flex items-center gap-1">
                     <MapPin className="w-4 h-4" />
@@ -908,11 +878,19 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                     onClick={() => setActiveTab('ratings')}
                   >
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span>{contractorData.rating} ({contractorData.completedJobs} projektów)</span>
+                    <span>
+                      {contractorData.rating > 0 
+                        ? `${contractorData.rating} (${contractorData.completedJobs} projektów)`
+                        : 'Brak ocen'}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="w-4 h-4" />
-                    <span>Odpowiada w ciągu {contractorData.responseTime}</span>
+                    <span>
+                      {contractorData.responseTime && contractorData.responseTime !== 'Brak danych'
+                        ? `Odpowiada w ciągu ${contractorData.responseTime}`
+                        : 'Brak danych o czasie odpowiedzi'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -932,11 +910,10 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="applications">Moje aplikacje</TabsTrigger>
             <TabsTrigger value="projects">Projekty</TabsTrigger>
-            <TabsTrigger value="analytics">Analityka</TabsTrigger>
             <TabsTrigger value="ratings">Oceny</TabsTrigger>
             <TabsTrigger value="pricing">Cennik</TabsTrigger>
           </TabsList>
@@ -957,10 +934,59 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                   <Send className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{contractorData.stats.activeOffers}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {contractorData.stats.pendingJobs} oczekujące na decyzję
-                  </p>
+                  {(() => {
+                    // Filter out cancelled applications
+                    const activeApplications = allApplications.filter(app => app.status !== 'cancelled');
+                    const statusCounts = {
+                      wyslane: activeApplications.filter(app => app.status === 'submitted').length,
+                      wOcenie: activeApplications.filter(app => app.status === 'under_review').length,
+                      zaakceptowane: activeApplications.filter(app => app.status === 'accepted').length,
+                      odrzucone: activeApplications.filter(app => app.status === 'rejected').length
+                    };
+                    const totalActive = activeApplications.length;
+                    
+                    return (
+                      <>
+                        <div className="text-2xl font-bold mb-3">
+                          {totalActive > 0 ? totalActive : '—'}
+                        </div>
+                        {totalActive > 0 ? (
+                          <div className="space-y-2">
+                            {statusCounts.wyslane > 0 && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Wysłane:</span>
+                                <span className="font-medium">{statusCounts.wyslane}</span>
+                              </div>
+                            )}
+                            {statusCounts.wOcenie > 0 && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">W ocenie:</span>
+                                <span className="font-medium text-yellow-600">{statusCounts.wOcenie}</span>
+                              </div>
+                            )}
+                            {statusCounts.zaakceptowane > 0 && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Zaakceptowane:</span>
+                                <span className="font-medium text-green-600">{statusCounts.zaakceptowane}</span>
+                              </div>
+                            )}
+                            {statusCounts.odrzucone > 0 && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Odrzucone:</span>
+                                <span className="font-medium text-red-600">{statusCounts.odrzucone}</span>
+                              </div>
+                            )}
+                            {statusCounts.wyslane === 0 && statusCounts.wOcenie === 0 && 
+                             statusCounts.zaakceptowane === 0 && statusCounts.odrzucone === 0 && (
+                              <p className="text-xs text-muted-foreground">Brak aktywnych ofert</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Brak aktywnych ofert</p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
@@ -970,9 +996,15 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                   <Euro className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{contractorData.stats.monthlyEarnings.toLocaleString()} zł</div>
+                  <div className="text-2xl font-bold">
+                    {contractorData.stats.monthlyEarnings > 0 
+                      ? `${contractorData.stats.monthlyEarnings.toLocaleString()} zł`
+                      : '— zł'}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Średnia wartość zlecenia: {contractorData.stats.avgJobValue.toLocaleString()} zł
+                    {contractorData.stats.avgJobValue > 0
+                      ? `Średnia wartość zlecenia: ${contractorData.stats.avgJobValue.toLocaleString()} zł`
+                      : 'Brak danych o średniej wartości'}
                   </p>
                 </CardContent>
               </Card>
@@ -983,9 +1015,15 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                   <Star className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{contractorData.stats.clientSatisfaction}%</div>
+                  <div className="text-2xl font-bold">
+                    {contractorData.stats.clientSatisfaction > 0 
+                      ? `${contractorData.stats.clientSatisfaction}%`
+                      : '—'}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Ocena: {contractorData.rating}/5.0
+                    {contractorData.rating > 0
+                      ? `Ocena: ${contractorData.rating}/5.0`
+                      : 'Brak ocen'}
                   </p>
                 </CardContent>
               </Card>
@@ -996,91 +1034,19 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                   <CheckCircle className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{contractorData.stats.completionRate}%</div>
+                  <div className="text-2xl font-bold">
+                    {contractorData.stats.completionRate > 0 
+                      ? `${contractorData.stats.completionRate}%`
+                      : '—'}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {contractorData.completedJobs} ukończonych projektów
+                    {contractorData.completedJobs > 0
+                      ? `${contractorData.completedJobs} ukończonych projektów`
+                      : 'Brak ukończonych projektów'}
                   </p>
                 </CardContent>
               </Card>
             </div>
-
-            {/* Rating Overview Section */}
-            {ratingSummary && ratingSummary.totalReviews > 0 && (
-              <Card 
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setActiveTab('ratings')}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="w-5 h-5 text-yellow-400" />
-                    Przegląd ocen
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="text-center">
-                      <div className="text-4xl font-bold text-primary mb-2">
-                        {ratingSummary.averageRating.toFixed(1)}
-                      </div>
-                      <div className="flex justify-center mb-2">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star 
-                            key={star} 
-                            className={`w-6 h-6 ${
-                              star <= Math.floor(ratingSummary.averageRating)
-                                ? 'text-yellow-400 fill-yellow-400'
-                                : 'text-gray-300'
-                            }`} 
-                          />
-                        ))}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {ratingSummary.totalReviews} {ratingSummary.totalReviews === 1 ? 'opinia' : 'opinii'}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <div className="text-sm font-semibold mb-2">Rozkład ocen:</div>
-                      {[5, 4, 3, 2, 1].map((stars) => {
-                        const count = ratingSummary.ratingBreakdown[stars.toString() as keyof typeof ratingSummary.ratingBreakdown] || 0;
-                        const percentage = ratingSummary.totalReviews > 0 
-                          ? (count / ratingSummary.totalReviews) * 100 
-                          : 0;
-                        return (
-                          <div key={stars} className="flex items-center gap-2">
-                            <span className="text-sm w-8">{stars}★</span>
-                            <Progress value={percentage} className="flex-1 h-2" />
-                            <span className="text-sm text-gray-500 w-12 text-right">{count}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  
-                  {Object.keys(ratingSummary.categoryRatings).length > 0 && (
-                    <div className="mt-6 pt-6 border-t">
-                      <div className="text-sm font-semibold mb-3">Oceny w kategoriach:</div>
-                      <div className="grid grid-cols-2 gap-4">
-                        {Object.entries(ratingSummary.categoryRatings).map(([category, rating]) => (
-                          <div key={category} className="flex items-center justify-between">
-                            <span className="text-sm">{getCategoryLabel(category)}:</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-24 bg-gray-200 rounded-full h-2">
-                                <div 
-                                  className="bg-yellow-400 h-2 rounded-full" 
-                                  style={{ width: `${(rating / 5) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-sm font-medium w-8">{rating.toFixed(1)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
 
             {/* Quick Actions & Recent Activity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1378,144 +1344,6 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
                 </Card>
               )}
             </div>
-          </TabsContent>
-
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-6">
-            {loadingAnalytics ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : (
-              <>
-                <h2 className="text-2xl font-bold">Analityka i statystyki</h2>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5" />
-                    Skuteczność ofert
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Wygrane oferty</span>
-                        <span>35%</span>
-                      </div>
-                      <Progress value={35} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Shortlista</span>
-                      <span>45%</span>
-                      </div>
-                      <Progress value={45} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Odrzucone</span>
-                        <span>20%</span>
-                      </div>
-                      <Progress value={20} className="h-2" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5" />
-                    Miesięczne zarobki
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">45,000 zł</div>
-                      <p className="text-sm text-gray-600">Luty 2024</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">38,500 zł</div>
-                      <p className="text-sm text-gray-600">Styczeń 2024</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">+17%</div>
-                      <p className="text-sm text-gray-600">Wzrost m/m</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">8,750 zł</div>
-                      <p className="text-sm text-gray-600">Średnie zlecenie</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Kategorie zleceń</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Remonty mieszkań</span>
-                        <span>60%</span>
-                      </div>
-                      <Progress value={60} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Roboty budowlane</span>
-                        <span>25%</span>
-                      </div>
-                      <Progress value={25} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Instalacje</span>
-                        <span>15%</span>
-                      </div>
-                      <Progress value={15} className="h-2" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Oceny klientów</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center mb-4">
-                    <div className="text-4xl font-bold text-yellow-500">{contractorData.rating}</div>
-                    <div className="flex justify-center gap-1 mb-2">
-                      {[1,2,3,4,5].map((star) => (
-                        <Star 
-                          key={star} 
-                          className={`w-5 h-5 ${star <= Math.floor(contractorData.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
-                        />
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-600">Na podstawie {contractorData.completedJobs} opinii</p>
-                  </div>
-                  <div className="space-y-2">
-                    {[5,4,3,2,1].map((stars) => (
-                      <div key={stars} className="flex items-center gap-2">
-                        <span className="text-sm w-8">{stars}★</span>
-                        <Progress value={stars === 5 ? 70 : stars === 4 ? 25 : 5} className="flex-1 h-2" />
-                        <span className="text-sm text-gray-500 w-8">{stars === 5 ? '70%' : stars === 4 ? '25%' : '5%'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-              </>
-            )}
           </TabsContent>
 
           {/* Ratings Tab */}

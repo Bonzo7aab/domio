@@ -65,6 +65,9 @@ export function filtersToSearchParams(filters: FilterState): URLSearchParams {
   if (filters.endingSoon) {
     params.set('endingSoon', 'true');
   }
+  if (filters.urgent) {
+    params.set('urgent', 'true');
+  }
 
   // Legacy locations support (for backward compatibility)
   if (filters.locations && filters.locations.length > 0) {
@@ -164,6 +167,10 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
   if (endingSoon === 'true') {
     filters.endingSoon = true;
   }
+  const urgent = searchParams.get('urgent');
+  if (urgent === 'true') {
+    filters.urgent = true;
+  }
 
   // Legacy locations support
   const locations = searchParams.get('locations');
@@ -205,7 +212,8 @@ export function hasActiveFilters(filters: FilterState): boolean {
     (filters.urgency && filters.urgency.length > 0) ||
     (filters.dateAdded && filters.dateAdded.length > 0) ||
     (filters.locations && filters.locations.length > 0) ||
-    filters.endingSoon
+    filters.endingSoon ||
+    filters.urgent
   );
 }
 

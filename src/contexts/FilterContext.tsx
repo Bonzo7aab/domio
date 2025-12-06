@@ -62,8 +62,14 @@ export function FilterProvider({
   const [filters, setFiltersState] = useState<FilterState>(
     initialFilters || defaultFilters
   );
+  const filtersRef = useRef<FilterState>(filters);
   const [primaryLocation, setPrimaryLocation] = useState<string>(initialLocation);
   const locationChangeHandlerRef = useRef<(() => void) | undefined>(undefined);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
 
   // Initialize filters from URL params on client side only (after mount)
   useEffect(() => {
@@ -112,13 +118,13 @@ export function FilterProvider({
         : ['job', 'tender']
     };
 
-    // Only update if filters actually changed
-    const filtersChanged = JSON.stringify(filters) !== JSON.stringify(mergedFilters);
+    // Only update if filters actually changed (use ref to avoid dependency on filters)
+    const filtersChanged = JSON.stringify(filtersRef.current) !== JSON.stringify(mergedFilters);
     if (filtersChanged) {
       lastUrlUpdate.current = currentSearch;
       setFiltersState(mergedFilters);
     }
-  }, [searchParams, filters]);
+  }, [searchParams]); // Removed filters from dependencies to prevent infinite loop
 
   // Update URL when filters change (but not on initial mount)
   useEffect(() => {
