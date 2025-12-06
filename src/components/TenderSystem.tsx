@@ -33,6 +33,7 @@ interface TenderSystemProps {
   onTenderSelect?: (tenderId: string) => void;
   onBidSubmit?: (tenderId: string) => void;
   onTenderEdit?: (tenderId: string) => void;
+  onViewBids?: (tenderId: string) => void;
   onBack?: () => void;
 }
 
@@ -58,6 +59,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
   onTenderSelect,
   onBidSubmit,
   onTenderEdit,
+  onViewBids,
   onBack
 }) => {
   const { user } = useUserProfile();
@@ -84,6 +86,16 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
         
         if (error) {
           console.error('Error fetching tenders:', error);
+          // Log error details for debugging
+          if (error && typeof error === 'object') {
+            console.error('Error details:', {
+              message: (error as any)?.message,
+              code: (error as any)?.code,
+              details: (error as any)?.details,
+              hint: (error as any)?.hint,
+              originalError: (error as any)?.originalError
+            });
+          }
           setTenders([]);
         } else if (data) {
           // Convert database format to component format
@@ -366,6 +378,23 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
                         <Users className="h-4 w-4 text-gray-500" />
                         <span>{tender.bidCount} ofert</span>
                       </div>
+                      
+                      {userRole === 'manager' && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onViewBids) {
+                              onViewBids(tender.id);
+                            }
+                          }}
+                          disabled={tender.bidCount === 0}
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          Zobacz oferty {tender.bidCount > 0 && `(${tender.bidCount})`}
+                        </Button>
+                      )}
                       
                       {tender.status === 'active' && (
                         <div className="flex items-center gap-2 text-orange-600">

@@ -119,15 +119,23 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
   const calculateAutomaticScore = (bid: TenderBid, criterion: EvaluationCriterion): number => {
     switch (criterion.type) {
       case 'price':
-        const lowestPrice = Math.min(...bids.map(b => b.totalPrice));
+        const validPrices = bids.map(b => b.totalPrice).filter(p => p != null && p > 0);
+        if (validPrices.length === 0 || !bid.totalPrice || bid.totalPrice <= 0) {
+          return 50; // Default score if no valid prices
+        }
+        const lowestPrice = Math.min(...validPrices);
         const priceScore = (lowestPrice / bid.totalPrice) * 100;
         return Math.min(100, Math.max(0, priceScore));
-      
+
       case 'time':
-        const shortestTime = Math.min(...bids.map(b => b.proposedTimeline));
+        const validTimelines = bids.map(b => b.proposedTimeline).filter(t => t != null && t > 0);
+        if (validTimelines.length === 0 || !bid.proposedTimeline || bid.proposedTimeline <= 0) {
+          return 50; // Default score if no valid timelines
+        }
+        const shortestTime = Math.min(...validTimelines);
         const timeScore = (shortestTime / bid.proposedTimeline) * 100;
         return Math.min(100, Math.max(0, timeScore));
-      
+
       default:
         return 75; // Default score for quality/experience criteria
     }
@@ -139,10 +147,13 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
     
     evaluationCriteria.forEach(criterion => {
       const score = bid.evaluation?.criteriaScores[criterion.id] || calculateAutomaticScore(bid, criterion);
-      totalScore += (score * criterion.weight) / 100;
+      const scoreValue = typeof score === 'number' && !isNaN(score) ? score : 0;
+      const weight = typeof criterion.weight === 'number' && !isNaN(criterion.weight) ? criterion.weight : 0;
+      totalScore += (scoreValue * weight) / 100;
     });
     
-    return Math.round(totalScore);
+    const finalScore = Math.round(totalScore);
+    return isNaN(finalScore) ? 0 : finalScore;
   };
 
   // Update evaluation score
@@ -198,49 +209,52 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
   };
 
   const getStatusBadge = (status: TenderBid['status']) => {
-    const configs = {
+    const configs: Record<string, { color: string; label: string }> = {
       submitted: { color: 'bg-blue-100 text-blue-700', label: 'Złożona' },
       under_review: { color: 'bg-yellow-100 text-yellow-700', label: 'W ocenie' },
       shortlisted: { color: 'bg-green-100 text-green-700', label: 'Preselekacja' },
       rejected: { color: 'bg-red-100 text-red-700', label: 'Odrzucona' },
-      awarded: { color: 'bg-purple-100 text-purple-700', label: 'Wybrana' }
+      awarded: { color: 'bg-purple-100 text-purple-700', label: 'Wybrana' },
+      pending: { color: 'bg-gray-100 text-gray-700', label: 'Oczekująca' }
     };
     
-    const config = configs[status];
+    // Default to 'submitted' if status is undefined/null or not in configs
+    const normalizedStatus = status || 'submitted';
+    const config = configs[normalizedStatus] || configs.submitted;
+    
     return <Badge className={`${config.color} border-0`}>{config.label}</Badge>;
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
-            <div>
-              <h2 className="text-2xl font-bold">Ocena ofert w przetargu</h2>
-              <p className="text-gray-600">{tenderTitle}</p>
-              <div className="flex items-center gap-4 mt-2">
-                <span className="text-sm text-gray-500">{bids.length} ofert złożonych</span>
-              </div>
+      <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full h-[90vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
+          <div>
+            <h2 className="text-2xl font-bold">Ocena ofert w przetargu</h2>
+            <p className="text-gray-600">{tenderTitle}</p>
+            <div className="flex items-center gap-4 mt-2">
+              <span className="text-sm text-gray-500">{bids.length} ofert złożonych</span>
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
           </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-          {/* Navigation */}
-          <div className="border-b">
-            <Tabs value={evaluationMode} onValueChange={(value) => setEvaluationMode(value as any)}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="overview">Przegląd ofert</TabsTrigger>
-                <TabsTrigger value="detailed">Szczegółowa ocena</TabsTrigger>
-                <TabsTrigger value="compare">Porównanie</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+        {/* Navigation */}
+        <div className="border-b flex-shrink-0">
+          <Tabs value={evaluationMode} onValueChange={(value) => setEvaluationMode(value as any)}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="overview">Przegląd ofert</TabsTrigger>
+              <TabsTrigger value="detailed">Szczegółowa ocena</TabsTrigger>
+              <TabsTrigger value="compare">Porównanie</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 min-h-0">
             {/* Empty State */}
             {bids.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16">
@@ -384,10 +398,10 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                               
                               <div className="text-right min-w-[100px]">
                                 <div className="flex items-center justify-end gap-2 mb-1">
-                                  <p className="font-bold text-lg text-gray-900">{totalScore}</p>
+                                  <p className="font-bold text-lg text-gray-900">{isNaN(totalScore) ? 0 : totalScore}</p>
                                   <span className="text-sm text-gray-500">/100</span>
                                 </div>
-                                <Progress value={totalScore} className="w-24 h-2" />
+                                <Progress value={isNaN(totalScore) ? 0 : totalScore} className="w-24 h-2" />
                               </div>
                               
                               <div className="flex items-center gap-2">
@@ -538,7 +552,10 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                             <div className="border-t-2 border-gray-200 pt-4 mt-6">
                               <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                                 <span className="text-lg font-semibold text-gray-900">Łączna ocena:</span>
-                                <span className="text-2xl font-bold text-blue-600">{calculateTotalScore(selectedBid)}/100 punktów</span>
+                                {(() => {
+                                  const score = calculateTotalScore(selectedBid);
+                                  return <span className="text-2xl font-bold text-blue-600">{isNaN(score) ? 0 : score}/100 punktów</span>;
+                                })()}
                               </div>
                             </div>
                           </>
@@ -774,11 +791,14 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                               </tr>
                               <tr className="border-b-2 border-gray-300 bg-gradient-to-r from-blue-50 to-indigo-50">
                                 <td className="p-3 font-bold text-gray-900">Łączna ocena</td>
-                                {bids.slice(0, 3).map(bid => (
-                                  <td key={bid.id} className="text-center p-3">
-                                    <span className="text-xl font-bold text-blue-600">{calculateTotalScore(bid)}/100</span>
-                                  </td>
-                                ))}
+                                {bids.slice(0, 3).map(bid => {
+                                  const score = calculateTotalScore(bid);
+                                  return (
+                                    <td key={bid.id} className="text-center p-3">
+                                      <span className="text-xl font-bold text-blue-600">{isNaN(score) ? 0 : score}/100</span>
+                                    </td>
+                                  );
+                                })}
                               </tr>
                             </tbody>
                           </table>
@@ -796,34 +816,33 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
             )}
               </>
             )}
-          </div>
-
-          {/* Bid Selection */}
-          {evaluationMode === 'detailed' && (
-            <div className="border-t p-4 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                  {bids.map((bid, index) => (
-                    <Button
-                      key={bid.id}
-                      variant={selectedBidId === bid.id ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSelectedBidId(bid.id)}
-                    >
-                      {bid.contractorName}
-                    </Button>
-                  ))}
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  Oferta {bids.findIndex(b => b.id === selectedBidId) + 1} z {bids.length}
+            
+            {/* Bid Selection */}
+            {evaluationMode === 'detailed' && (
+              <div className="border-t p-4 bg-gray-50 mt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    {bids.map((bid, index) => (
+                      <Button
+                        key={bid.id}
+                        variant={selectedBidId === bid.id ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedBidId(bid.id)}
+                      >
+                        {bid.contractorName}
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  <div className="text-sm text-gray-600">
+                    Oferta {bids.findIndex(b => b.id === selectedBidId) + 1} z {bids.length}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
   );
 };
 

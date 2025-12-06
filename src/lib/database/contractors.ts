@@ -338,6 +338,257 @@ export async function fetchContractors(
 }
 
 /**
+ * Fetch contractors that have worked with a specific company
+ * (contractors with accepted job applications or accepted tender bids)
+ */
+export async function fetchContractorsByWorkHistory(
+  supabase: any,
+  managerCompanyId: string
+): Promise<Array<{
+  id: string;
+  name: string;
+  specialization: string;
+  rating: number;
+  completedJobs: number;
+  currentJob: string;
+  avatar: string;
+}>> {
+  try {
+    if (!managerCompanyId) {
+      return [];
+    }
+
+    // Step 1: Get all job IDs for this company
+    const { data: companyJobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('id, title')
+      .eq('company_id', managerCompanyId);
+
+    // Step 2: Get all tender IDs for this company
+    const { data: companyTenders, error: tendersError } = await (supabase as any)
+      .from('tenders')
+      .select('id, title')
+      .eq('company_id', managerCompanyId);
+
+    if (jobsError) {
+      console.error('Error fetching company jobs:', jobsError);
+    }
+    if (tendersError) {
+      console.error('Error fetching company tenders:', tendersError);
+    }
+
+    const jobIds = (companyJobs || []).map((job: any) => job.id);
+    const tenderIds = (companyTenders || []).map((tender: any) => tender.id);
+
+    // Step 3: Get accepted applications for these jobs
+    let acceptedApplications: any[] = [];
+    if (jobIds.length > 0) {
+      const { data: applications, error: appsError } = await (supabase as any)
+        .from('job_applications')
+        .select(`
+          company_id,
+          job_id,
+          submitted_at,
+          jobs (
+            title
+          )
+        `)
+        .in('job_id', jobIds)
+        .eq('status', 'accepted');
+
+      if (appsError) {
+        console.error('Error fetching accepted applications:', appsError);
+      } else {
+        acceptedApplications = applications || [];
+      }
+    }
+
+    // Step 4: Get accepted bids for these tenders
+    let acceptedBids: any[] = [];
+    if (tenderIds.length > 0) {
+      const { data: bids, error: bidsError } = await (supabase as any)
+        .from('tender_bids')
+        .select(`
+          company_id,
+          tender_id,
+          submitted_at,
+          tenders (
+            title
+          )
+        `)
+        .in('tender_id', tenderIds)
+        .eq('status', 'accepted');
+
+      if (bidsError) {
+        console.error('Error fetching accepted bids:', bidsError);
+      } else {
+        acceptedBids = bids || [];
+      }
+    }
+
+    // Collect unique contractor company IDs and their most recent job/tender titles
+    const contractorMap = new Map<string, { companyId: string; latestJobTitle: string; latestDate: string }>();
+
+    // Process applications
+    for (const app of acceptedApplications) {
+      const companyId = app.company_id;
+      if (!companyId) continue;
+
+      const jobTitle = app.jobs?.title || '';
+      const submittedAt = app.submitted_at || '';
+
+      if (!contractorMap.has(companyId)) {
+        contractorMap.set(companyId, { 
+          companyId, 
+          latestJobTitle: jobTitle,
+          latestDate: submittedAt
+        });
+      } else {
+        const existing = contractorMap.get(companyId);
+        if (existing && submittedAt > existing.latestDate) {
+          existing.latestJobTitle = jobTitle;
+          existing.latestDate = submittedAt;
+        }
+      }
+    }
+
+    // Process bids
+    for (const bid of acceptedBids) {
+      const companyId = bid.company_id;
+      if (!companyId) continue;
+
+      const tenderTitle = bid.tenders?.title || '';
+      const submittedAt = bid.submitted_at || '';
+
+      if (!contractorMap.has(companyId)) {
+        contractorMap.set(companyId, { 
+          companyId, 
+          latestJobTitle: tenderTitle,
+          latestDate: submittedAt
+        });
+      } else {
+        const existing = contractorMap.get(companyId);
+        if (existing && submittedAt > existing.latestDate) {
+          existing.latestJobTitle = tenderTitle;
+          existing.latestDate = submittedAt;
+        }
+      }
+    }
+
+    const contractorCompanyIds = Array.from(contractorMap.keys());
+
+    if (contractorCompanyIds.length === 0) {
+      return [];
+    }
+
+    // Step 5: Fetch contractor company details
+    const { data: companies, error: companiesError } = await supabase
+      .from('companies')
+      .select(`
+        id,
+        name,
+        logo_url,
+        profile_data,
+        experience_data
+      `)
+      .in('id', contractorCompanyIds)
+      .eq('type', 'contractor');
+
+    if (companiesError) {
+      console.error('Error fetching contractor companies:', companiesError);
+      return [];
+    }
+
+    if (!companies || companies.length === 0) {
+      return [];
+    }
+
+    // Step 6: Fetch ratings for all contractors
+    const { data: ratingsData } = await (supabase as any)
+      .from('company_ratings')
+      .select('company_id, average_rating, total_reviews')
+      .in('company_id', contractorCompanyIds);
+
+    const ratingsMap: { [key: string]: any } = {};
+    if (ratingsData) {
+      ratingsData.forEach((rating: any) => {
+        ratingsMap[rating.company_id] = rating;
+      });
+    }
+
+    // Count completed jobs (accepted applications + accepted bids) for each contractor with this company
+    const completedJobsMap: { [key: string]: number } = {};
+    
+    // Count from applications
+    for (const app of acceptedApplications) {
+      const companyId = app.company_id;
+      if (companyId) {
+        completedJobsMap[companyId] = (completedJobsMap[companyId] || 0) + 1;
+      }
+    }
+
+    // Count from bids
+    for (const bid of acceptedBids) {
+      const companyId = bid.company_id;
+      if (companyId) {
+        completedJobsMap[companyId] = (completedJobsMap[companyId] || 0) + 1;
+      }
+    }
+
+    // Helper functions for parsing JSONB
+    const parseJsonbField = (value: any, defaultValue: any = null): any => {
+      if (!value) return defaultValue;
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return defaultValue;
+        }
+      }
+      return value;
+    };
+
+    // Format contractors for display
+    const contractors = companies.map((company: any) => {
+      const ratings = ratingsMap[company.id] || {};
+      const profileData = company.profile_data || {};
+      const specializations = parseJsonbField(profileData.specializations, []);
+      
+      // Get specialization (first one from specializations array, or use primary_services, or default)
+      const primaryServices = parseJsonbField(profileData.primary_services, []);
+      let specialization = 'Usługi ogólne';
+      if (specializations && specializations.length > 0) {
+        specialization = specializations[0];
+      } else if (primaryServices && primaryServices.length > 0) {
+        specialization = primaryServices[0];
+      }
+
+      const contractorInfo = contractorMap.get(company.id);
+      const currentJob = contractorInfo?.latestJobTitle || 'Brak aktualnych projektów';
+      const completedJobs = completedJobsMap[company.id] || 0;
+
+      return {
+        id: company.id,
+        name: company.name,
+        specialization: specialization,
+        rating: ratings.average_rating || 0,
+        completedJobs: completedJobs,
+        currentJob: currentJob,
+        avatar: company.logo_url || ''
+      };
+    });
+
+    // Sort by rating (highest first)
+    contractors.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+
+    return contractors;
+  } catch (error) {
+    console.error('Error in fetchContractorsByWorkHistory:', error);
+    return [];
+  }
+}
+
+/**
  * Fetch a single contractor by ID with full profile data
  */
 export async function fetchContractorById(id: string): Promise<ContractorProfile | null> {

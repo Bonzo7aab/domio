@@ -12,19 +12,20 @@ import {
   Star,
   UserCheck
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getManagerById, mockApplications } from '../mocks';
 import { createClient } from '../lib/supabase/client';
 import { createTender, updateTender, fetchTenderById, fetchJobApplicationsByJobId, fetchJobById, fetchTenderBidsByTenderId } from '../lib/database/jobs';
-import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { fetchUserPrimaryCompany, type CompanyData } from '../lib/database/companies';
 import { fetchCompanyBuildings } from '../lib/database/buildings';
+import { fetchContractorsByWorkHistory } from '../lib/database/contractors';
 import type { Building } from '../types/building';
 import { BUILDING_TYPE_OPTIONS } from '../types/building';
 import { toast } from 'sonner';
-import { formatBudget } from '../types/budget';
+import { formatBudget, budgetFromDatabase } from '../types/budget';
 import type { Budget } from '../types/budget';
 import BidEvaluationPanel from './BidEvaluationPanel';
 import JobApplicationsList from './JobApplicationsList';
@@ -35,7 +36,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { TenderWithCompany } from '../lib/database/jobs';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { TenderWithCompany, type JobWithCompany } from '../lib/database/jobs';
 import Image from 'next/image';
 
 interface ManagerPageProps {
@@ -48,7 +50,11 @@ interface ManagerPageProps {
 export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, onTenderFormOpened }: ManagerPageProps) {
   const { user, isLoading } = useUserProfile();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // URL-based tab management (similar to ContractorPage)
   const [activeTab, setActiveTab] = useState('overview');
+  const hasInitializedTabFromUrl = useRef(false);
   const [selectedJobForApplications, setSelectedJobForApplications] = useState<string | null>(null);
   const [showTenderCreation, setShowTenderCreation] = useState(false);
   const [showBidEvaluation, setShowBidEvaluation] = useState(false);
@@ -58,6 +64,8 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [company, setCompany] = useState<CompanyData | null>(null);
+  const [isLoadingCompany, setIsLoadingCompany] = useState(false);
   // Priority 3: Prevent concurrent fetches
   const isFetchingRef = React.useRef(false);
   // Track client-side mount to prevent hydration mismatch
@@ -70,6 +78,48 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   const [tenderBids, setTenderBids] = useState<any[]>([]);
   const [isLoadingTenderBids, setIsLoadingTenderBids] = useState(false);
   const [selectedTenderData, setSelectedTenderData] = useState<{ title: string } | null>(null);
+  // Job details dialog state
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
+  const [jobDetailsData, setJobDetailsData] = useState<JobWithCompany | null>(null);
+  const [isLoadingJobDetails, setIsLoadingJobDetails] = useState(false);
+  const [showJobDetailsDialog, setShowJobDetailsDialog] = useState(false);
+  
+  // Tab-specific loading states
+  const [loadingOverview, setLoadingOverview] = useState(false);
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  const [loadingContractors, setLoadingContractors] = useState(false);
+  
+  // Track which tabs have been loaded
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
+  
+  // Tab-specific data state
+  const [recentJobs, setRecentJobs] = useState<Array<{
+    id: string;
+    title: string;
+    category: string;
+    status: string;
+    budget: string;
+    applications: number;
+    deadline: string;
+    address: string;
+  }>>([]);
+  const [contractors, setContractors] = useState<Array<{
+    id: string;
+    name: string;
+    specialization: string;
+    rating: number;
+    completedJobs: number;
+    currentJob: string;
+    avatar: string;
+  }>>([]);
+  const [dashboardStats, setDashboardStats] = useState<{
+    totalProperties: number;
+    totalUnits: number;
+    activeJobs: number;
+    completedJobs: number;
+    avgRating: number;
+    monthlyBudget: number;
+  } | null>(null);
 
   // Helper function to get public URL for building images
   const getBuildingImageUrl = React.useCallback((imagePath: string | null | undefined): string | null => {
@@ -88,6 +138,30 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     
     return data.publicUrl;
   }, []);
+
+  // Helper function to map company type to Polish display name
+  const getCompanyTypeDisplayName = (type: string | null): string => {
+    const typeMap: { [key: string]: string } = {
+      'wspólnota': 'Wspólnota Mieszkaniowa',
+      'spółdzielnia': 'Spółdzielnia Mieszkaniowa',
+      'property_management': 'Firma zarządzająca nieruchomościami',
+      'housing_association': 'Stowarzyszenie Mieszkaniowe',
+      'cooperative': 'Spółdzielnia',
+      'condo_management': 'Zarządca Nieruchomości',
+    };
+    return typeMap[type || ''] || 'Organizacja zarządzająca';
+  };
+
+  // Format full address from company data
+  const getCompanyAddress = (company: CompanyData | null): string => {
+    if (!company) return '';
+    const parts = [
+      company.address,
+      company.postal_code,
+      company.city
+    ].filter(Boolean);
+    return parts.join(', ') || '';
+  };
 
   // Pobierz dane zarządcy na podstawie profileId z konta użytkownika
   const managerProfile = user?.id ? getManagerById(user.id) : null;
@@ -151,20 +225,47 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   // Track client-side mount to prevent hydration mismatch
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    
+    // Initialize tab from URL on mount (only once)
+    if (!hasInitializedTabFromUrl.current) {
+      const tabFromUrl = searchParams.get('tab');
+      if (tabFromUrl && ['overview', 'jobs', 'tenders', 'properties', 'contractors'].includes(tabFromUrl)) {
+        setActiveTab(tabFromUrl);
+      }
+      hasInitializedTabFromUrl.current = true;
+    }
+  }, [searchParams]);
+
+  // Persist tab state in URL
+  useEffect(() => {
+    if (!isMounted || !hasInitializedTabFromUrl.current) return;
+    
+    const currentTab = searchParams.get('tab') || 'overview';
+    if (currentTab === activeTab) return; // No change needed
+    
+    const params = new URLSearchParams(searchParams);
+    if (activeTab !== 'overview') {
+      params.set('tab', activeTab);
+    } else {
+      params.delete('tab');
+    }
+    
+    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [activeTab, isMounted, router, searchParams]);
 
   // Auto-open tender form if requested from main page
   useEffect(() => {
-    if (shouldOpenTenderForm) {
+    if (shouldOpenTenderForm && isMounted && hasInitializedTabFromUrl.current) {
       setActiveTab('tenders');
       setShowTenderCreation(true);
       onTenderFormOpened?.();
     }
-  }, [shouldOpenTenderForm, onTenderFormOpened]);
+  }, [shouldOpenTenderForm, onTenderFormOpened, isMounted]);
 
-  // Fetch company and buildings
+  // Fetch company on initial load (needed for header)
   useEffect(() => {
-    async function loadBuildings() {
+    async function loadCompany() {
       if (!user?.id) return;
 
       // Priority 3: Prevent concurrent fetches
@@ -173,39 +274,33 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       }
 
       isFetchingRef.current = true;
-      setIsLoadingBuildings(true);
+      setIsLoadingCompany(true);
       try {
         const supabase = createClient();
-        const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
+        const { data: companyData, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
         
-        if (companyError || !company) {
-          setBuildings([]);
+        if (companyError || !companyData) {
+          setCompany(null);
           setCompanyId(null);
+          setIsLoadingCompany(false);
+          isFetchingRef.current = false;
           return;
         }
 
-        setCompanyId(company.id);
-
-        // Fetch buildings from database
-        const { data: buildingsData, error: buildingsError } = await fetchCompanyBuildings(supabase, company.id);
-        
-        if (buildingsError) {
-          console.error('Error fetching buildings:', buildingsError);
-          setBuildings([]);
-        } else {
-          setBuildings(buildingsData || []);
-        }
+        setCompany(companyData);
+        setCompanyId(companyData.id);
       } catch (err) {
-        console.error('Error loading buildings:', err);
-        setBuildings([]);
+        console.error('Error loading company:', err);
+        setCompany(null);
+        setCompanyId(null);
       } finally {
-        setIsLoadingBuildings(false);
+        setIsLoadingCompany(false);
         // Priority 3: Reset fetch flag
         isFetchingRef.current = false;
       }
     }
 
-    loadBuildings();
+    loadCompany();
 
     // Cleanup function
     return () => {
@@ -284,6 +379,37 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     loadApplications();
   }, [selectedJobForApplications]);
 
+  // Fetch job details when a job is selected for details dialog
+  useEffect(() => {
+    async function loadJobDetails() {
+      if (!selectedJobForDetails || !showJobDetailsDialog) {
+        return;
+      }
+
+      setIsLoadingJobDetails(true);
+      try {
+        const supabase = createClient();
+        const { data: jobData, error: jobError } = await fetchJobById(supabase, selectedJobForDetails);
+        
+        if (jobError || !jobData) {
+          console.error('Error fetching job details:', jobError);
+          toast.error('Nie udało się załadować szczegółów zlecenia');
+          setJobDetailsData(null);
+        } else {
+          setJobDetailsData(jobData);
+        }
+      } catch (err) {
+        console.error('Error loading job details:', err);
+        toast.error('Wystąpił błąd podczas ładowania szczegółów zlecenia');
+        setJobDetailsData(null);
+      } finally {
+        setIsLoadingJobDetails(false);
+      }
+    }
+
+    loadJobDetails();
+  }, [selectedJobForDetails, showJobDetailsDialog]);
+
   // Fetch tender bids when a tender is selected for evaluation
   useEffect(() => {
     async function loadTenderBids() {
@@ -334,6 +460,294 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
 
     loadTenderBids();
   }, [selectedTenderId, showBidEvaluation]);
+
+  // Fetch overview tab data when tab is opened
+  useEffect(() => {
+    const fetchOverviewData = async () => {
+      if (activeTab !== 'overview' || !companyId || loadedTabs.has('overview')) {
+        return;
+      }
+
+      const supabase = createClient();
+      
+      try {
+        setLoadingOverview(true);
+        
+        // Fetch buildings count for stats
+        const { data: buildingsData, error: buildingsError } = await fetchCompanyBuildings(supabase, companyId);
+        const buildingsCount = buildingsData?.length || 0;
+        const totalUnits = buildingsData?.reduce((sum, b) => sum + (b.units_count || 0), 0) || 0;
+        
+        // Fetch jobs count for stats (active jobs)
+        const { count: activeJobsCount } = await supabase
+          .from('jobs')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .eq('status', 'active');
+        
+        const { count: completedJobsCount } = await supabase
+          .from('jobs')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .eq('status', 'completed');
+        
+        // Fetch recent jobs (limit 5 for overview)
+        const { data: jobsData } = await supabase
+          .from('jobs')
+          .select(`
+            id,
+            title,
+            budget_min,
+            budget_max,
+            budget_type,
+            currency,
+            deadline,
+            status,
+            job_categories (name),
+            location
+          `)
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        // Format jobs for display
+        const formattedJobs = (jobsData || []).map((job: any) => {
+          const location = typeof job.location === 'string' 
+            ? job.location 
+            : job.location?.city || 'Nieznana lokalizacja';
+          
+          return {
+            id: job.id,
+            title: job.title,
+            category: job.job_categories?.name || 'Inne',
+            status: job.status || 'active',
+            budget: job.budget_min?.toString() || '0',
+            applications: 0, // Would need to fetch separately
+            deadline: job.deadline || '',
+            address: location
+          };
+        });
+        
+        // Fetch recent contractors (limit 5 for overview)
+        // For now, use mock data - can be replaced with actual query later
+        const mockContractors = [
+          {
+            id: '1',
+            name: 'Firma Malarze Sp. z o.o.',
+            specialization: 'Roboty malarskie',
+            rating: 4.8,
+            completedJobs: 23,
+            currentJob: 'Malowanie klatki schodowej',
+            avatar: ''
+          },
+          {
+            id: '2',
+            name: 'TechService Windy',
+            specialization: 'Konserwacja wind',
+            rating: 4.9,
+            completedJobs: 15,
+            currentJob: 'Przegląd roczny wind',
+            avatar: ''
+          },
+          {
+            id: '3',
+            name: 'Zielona Firma',
+            specialization: 'Utrzymanie zieleni',
+            rating: 4.5,
+            completedJobs: 31,
+            currentJob: 'Przycinanie krzewów',
+            avatar: ''
+          }
+        ];
+        
+        // Set stats
+        setDashboardStats({
+          totalProperties: buildingsCount,
+          totalUnits: totalUnits,
+          activeJobs: activeJobsCount || 0,
+          completedJobs: completedJobsCount || 0,
+          avgRating: managerData.stats.avgRating,
+          monthlyBudget: managerData.stats.monthlyBudget
+        });
+        
+        setRecentJobs(formattedJobs);
+        setContractors(mockContractors.slice(0, 3));
+        
+        setLoadedTabs(prev => new Set(prev).add('overview'));
+      } catch (error) {
+        console.error('Error fetching overview data:', error);
+      } finally {
+        setLoadingOverview(false);
+      }
+    };
+
+    fetchOverviewData();
+  }, [activeTab, companyId, loadedTabs, managerData.stats.avgRating, managerData.stats.monthlyBudget]);
+
+  // Fetch jobs tab data when tab is opened
+  useEffect(() => {
+    const fetchJobsData = async () => {
+      if (activeTab !== 'jobs' || !companyId || loadedTabs.has('jobs')) {
+        return;
+      }
+
+      const supabase = createClient();
+      
+      try {
+        setLoadingJobs(true);
+        
+        // Fetch all jobs for the company (similar to tenders tab)
+        const { data: jobsData, error: jobsError } = await supabase
+          .from('jobs')
+          .select(`
+            id,
+            title,
+            budget_min,
+            budget_max,
+            budget_type,
+            currency,
+            deadline,
+            status,
+            job_categories (name),
+            location
+          `)
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false });
+
+        if (jobsError) {
+          console.error('Error fetching jobs:', jobsError);
+          toast.error('Nie udało się załadować zleceń');
+          setRecentJobs([]);
+          return;
+        }
+
+        // Get all job IDs to count applications
+        const jobIds = (jobsData || []).map((job: any) => job.id);
+
+        // Count applications for each job (all statuses)
+        const applicationCounts: { [key: string]: number } = {};
+        if (jobIds.length > 0) {
+          const { data: applicationsData } = await (supabase as any)
+            .from('job_applications')
+            .select('job_id')
+            .in('job_id', jobIds);
+
+          if (applicationsData) {
+            for (const app of applicationsData) {
+              const jobId = app.job_id;
+              if (jobId) {
+                applicationCounts[jobId] = (applicationCounts[jobId] || 0) + 1;
+              }
+            }
+          }
+        }
+
+        // Import budget helper
+        const { budgetFromDatabase } = await import('../types/budget');
+
+        // Format jobs for display
+        const formattedJobs = (jobsData || []).map((job: any) => {
+          const location = typeof job.location === 'string' 
+            ? job.location 
+            : job.location?.city || 'Nieznana lokalizacja';
+
+          // Format budget
+          const budget = budgetFromDatabase({
+            budget_min: job.budget_min ?? null,
+            budget_max: job.budget_max ?? null,
+            budget_type: (job.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
+            currency: job.currency || 'PLN',
+          });
+          const budgetStr = formatBudget(budget);
+
+          return {
+            id: job.id,
+            title: job.title,
+            category: job.job_categories?.name || 'Inne',
+            status: job.status || 'active',
+            budget: budgetStr,
+            applications: applicationCounts[job.id] || 0,
+            deadline: job.deadline || '',
+            address: location
+          };
+        });
+        
+        setRecentJobs(formattedJobs);
+        
+        setLoadedTabs(prev => new Set(prev).add('jobs'));
+      } catch (error) {
+        console.error('Error fetching jobs data:', error);
+        toast.error('Nie udało się załadować zleceń');
+        setRecentJobs([]);
+      } finally {
+        setLoadingJobs(false);
+      }
+    };
+
+    fetchJobsData();
+  }, [activeTab, companyId, loadedTabs]);
+
+  // Fetch properties tab data when tab is opened
+  useEffect(() => {
+    const fetchPropertiesData = async () => {
+      if (activeTab !== 'properties' || !companyId || loadedTabs.has('properties')) {
+        return;
+      }
+
+      const supabase = createClient();
+      
+      try {
+        setIsLoadingBuildings(true);
+        
+        // Fetch buildings from database
+        const { data: buildingsData, error: buildingsError } = await fetchCompanyBuildings(supabase, companyId);
+        
+        if (buildingsError) {
+          console.error('Error fetching buildings:', buildingsError);
+          setBuildings([]);
+        } else {
+          setBuildings(buildingsData || []);
+        }
+        
+        setLoadedTabs(prev => new Set(prev).add('properties'));
+      } catch (error) {
+        console.error('Error fetching properties data:', error);
+        setBuildings([]);
+      } finally {
+        setIsLoadingBuildings(false);
+      }
+    };
+
+    fetchPropertiesData();
+  }, [activeTab, companyId, loadedTabs]);
+
+  // Fetch contractors tab data when tab is opened
+  useEffect(() => {
+    const fetchContractorsData = async () => {
+      if (activeTab !== 'contractors' || loadedTabs.has('contractors') || !companyId) {
+        return;
+      }
+
+      try {
+        setLoadingContractors(true);
+        
+        const supabase = createClient();
+        const contractorsData = await fetchContractorsByWorkHistory(supabase, companyId);
+        
+        setContractors(contractorsData);
+        
+        setLoadedTabs(prev => new Set(prev).add('contractors'));
+      } catch (error) {
+        console.error('Error fetching contractors data:', error);
+        toast.error('Nie udało się załadować wykonawców');
+        setContractors([]);
+      } finally {
+        setLoadingContractors(false);
+      }
+    };
+
+    fetchContractorsData();
+  }, [activeTab, loadedTabs, companyId]);
 
   const handleTenderCreate = () => {
     setEditingTenderId(null);
@@ -433,8 +847,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   const handleTenderSelect = (tenderId: string) => {
     setSelectedTenderId(tenderId);
     setShowBidEvaluation(true);
-    // Switch to tender-bids tab to view bids
-    setActiveTab('tender-bids');
+    // Stay in tenders tab to view bids
   };
 
   const handleAwardTender = (bidId: string, notes: string) => {
@@ -445,70 +858,6 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   const handleRejectBid = (bidId: string, reason: string) => {
     // In real app, this would reject the bid
   };
-
-  // Mockowe dane - w przyszłości z backendu
-  const recentJobs = [
-    {
-      id: '1',
-      title: 'Malowanie klatki schodowej - budynek A',
-      category: 'Roboty Remontowo-Budowlane',
-      status: 'active',
-      budget: '12000',
-      applications: 7,
-      deadline: '2024-02-15',
-      address: managerData.managedProperties[0]?.name || 'ul. Kwiatowa 15A'
-    },
-    {
-      id: '2', 
-      title: 'Konserwacja wind w budynku B',
-      category: 'Utrzymanie techniczne i konserwacja',
-      status: 'completed',
-      budget: '8500',
-      applications: 3,
-      deadline: '2024-01-30',
-      address: managerData.managedProperties[1]?.name || 'ul. Kwiatowa 15B'
-    },
-    {
-      id: '3',
-      title: 'Odśnieżanie parkingu',
-      category: 'Utrzymanie Czystości i Zieleni',
-      status: 'pending',
-      budget: '3000',
-      applications: 12,
-      deadline: '2024-02-01',
-      address: 'Parking - ' + (managerData.managedProperties[0]?.name || 'ul. Kwiatowa 15')
-    }
-  ];
-
-  const contractors = [
-    {
-      id: '1',
-      name: 'Firma Malarze Sp. z o.o.',
-      specialization: 'Roboty malarskie',
-      rating: 4.8,
-      completedJobs: 23,
-      currentJob: 'Malowanie klatki schodowej',
-      avatar: ''
-    },
-    {
-      id: '2',
-      name: 'TechService Windy',
-      specialization: 'Konserwacja wind',
-      rating: 4.9,
-      completedJobs: 15,
-      currentJob: 'Przegląd roczny wind',
-      avatar: ''
-    },
-    {
-      id: '3',
-      name: 'Zielona Firma',
-      specialization: 'Utrzymanie zieleni',
-      rating: 4.5,
-      completedJobs: 31,
-      currentJob: 'Przycinanie krzewów',
-      avatar: ''
-    }
-  ];
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -543,27 +892,33 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <Avatar className="w-16 h-16">
-                <AvatarImage src={managerData.avatar} />
+                <AvatarImage src={company?.logo_url || ''} />
                 <AvatarFallback className="bg-primary text-white">
-                  {managerData.name.split(' ').map(word => word[0]).join('')}
+                  {(company?.name || user?.company || 'N').split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-3xl font-bold">{managerData.name}</h1>
-                <p className="text-gray-600">{managerData.type}</p>
+                <h1 className="text-3xl font-bold">{company?.name || user?.company || 'Nowa organizacja'}</h1>
+                <p className="text-gray-600">{getCompanyTypeDisplayName(company?.type || null)}</p>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-2">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>{managerData.address}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Phone className="w-4 h-4" />
-                    <span>{managerData.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Mail className="w-4 h-4" />
-                    <span>{managerData.email}</span>
-                  </div>
+                  {getCompanyAddress(company) && (
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      <span>{getCompanyAddress(company)}</span>
+                    </div>
+                  )}
+                  {company?.phone && (
+                    <div className="flex items-center gap-1">
+                      <Phone className="w-4 h-4" />
+                      <span>{company.phone}</span>
+                    </div>
+                  )}
+                  {(company?.email || user?.email) && (
+                    <div className="flex items-center gap-1">
+                      <Mail className="w-4 h-4" />
+                      <span>{company?.email || user?.email}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -585,81 +940,90 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Przegląd</TabsTrigger>
             <TabsTrigger value="jobs">Zlecenia</TabsTrigger>
-            <TabsTrigger value="applications">Otrzymane oferty</TabsTrigger>
             <TabsTrigger value="tenders">Przetargi</TabsTrigger>
-            <TabsTrigger value="tender-bids">Oferty przetargowe</TabsTrigger>
             <TabsTrigger value="properties">Nieruchomości</TabsTrigger>
             <TabsTrigger value="contractors">Wykonawcy</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {loadingOverview ? (
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Nieruchomości</CardTitle>
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{buildings.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {buildings.reduce((sum, b) => sum + (b.units_count || 0), 0)} lokali mieszkalnych
-                  </p>
+                <CardContent className="pt-6 text-center">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie danych...</p>
+                  </div>
                 </CardContent>
               </Card>
+            ) : (
+              <>
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Nieruchomości</CardTitle>
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{dashboardStats?.totalProperties || 0}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {dashboardStats?.totalUnits || 0} lokali mieszkalnych
+                      </p>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Aktywne zlecenia</CardTitle>
-                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{managerData.stats.activeJobs}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {managerData.stats.completedJobs} zakończonych w tym roku
-                  </p>
-                </CardContent>
-              </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Aktywne zlecenia</CardTitle>
+                      <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{dashboardStats?.activeJobs || 0}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {dashboardStats?.completedJobs || 0} zakończonych w tym roku
+                      </p>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Ocena wykonawców</CardTitle>
-                  <Star className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{managerData.stats.avgRating}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Średnia ocena z ostatnich projektów
-                  </p>
-                </CardContent>
-              </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Ocena wykonawców</CardTitle>
+                      <Star className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{dashboardStats?.avgRating || 0}</div>
+                      <p className="text-xs text-muted-foreground">
+                        Średnia ocena z ostatnich projektów
+                      </p>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Budżet miesięczny</CardTitle>
-                  <Euro className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{managerData.stats.monthlyBudget.toLocaleString()} zł</div>
-                  <p className="text-xs text-muted-foreground">
-                    Planowany na luty 2024
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Budżet miesięczny</CardTitle>
+                      <Euro className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{(dashboardStats?.monthlyBudget || 0).toLocaleString()} zł</div>
+                      <p className="text-xs text-muted-foreground">
+                        Planowany na luty 2024
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
 
-            {/* Recent Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Najnowsze zlecenia</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {recentJobs.slice(0, 3).map((job) => (
+                {/* Recent Activity */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Najnowsze zlecenia</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {recentJobs.length > 0 ? recentJobs.slice(0, 3).map((job) => (
                     <div key={job.id} className="flex items-center justify-between border-b pb-3">
                       <div className="flex-1">
                         <h4 className="font-medium">{job.title}</h4>
@@ -685,7 +1049,9 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                         <p className="text-xs text-gray-500">{job.deadline}</p>
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">Brak zleceń</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -694,7 +1060,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                   <CardTitle>Sprawdzeni wykonawcy</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {contractors.slice(0, 3).map((contractor) => (
+                  {contractors.length > 0 ? contractors.slice(0, 3).map((contractor) => (
                     <div key={contractor.id} className="flex items-center gap-3 border-b pb-3">
                       <Avatar className="w-10 h-10">
                         <AvatarImage src={contractor.avatar} />
@@ -712,10 +1078,14 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">Brak wykonawców</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
+              </>
+            )}
           </TabsContent>
 
           {/* Jobs Tab */}
@@ -732,8 +1102,18 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
               </div>
             </div>
 
-            <div className="grid gap-4">
-              {recentJobs.map((job) => (
+            {loadingJobs ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie zleceń...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {recentJobs.length > 0 ? recentJobs.map((job) => (
                 <Card key={job.id}>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -772,7 +1152,16 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                           )}
                         </p>
                         <div className="flex gap-2 mt-2">
-                          <Button variant="outline" size="sm">Szczegóły</Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedJobForDetails(job.id);
+                              setShowJobDetailsDialog(true);
+                            }}
+                          >
+                            Szczegóły
+                          </Button>
                           <Button 
                             size="sm"
                             onClick={() => setSelectedJobForApplications(job.id)}
@@ -784,149 +1173,19 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              )) : (
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <p className="text-muted-foreground">Brak zleceń</p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
-          </TabsContent>
-
-          {/* Applications Tab */}
-          <TabsContent value="applications" className="space-y-6">
-            {selectedJobForApplications ? (
-              <div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSelectedJobForApplications(null)}
-                  className="mb-4"
-                >
-                  ← Powrót do listy ofert
-                </Button>
-                {isLoadingApplications ? (
-                  <Card>
-                    <CardContent className="p-8 text-center">
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        <p className="ml-2 text-sm text-muted-foreground">Ładowanie ofert...</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <JobApplicationsList
-                    jobId={selectedJobForApplications}
-                    jobTitle={selectedJobData?.title || 'Zlecenie'}
-                    jobBudget={selectedJobData?.budget}
-                    applications={applications}
-                    onStatusChange={handleStatusChange}
-                    onStartConversation={handleStartConversation}
-                  />
-                )}
-              </div>
-            ) : (
-              <div>
-                <h2 className="text-2xl font-bold mb-6">Zarządzanie ofertami</h2>
-                
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-blue-600">23</div>
-                      <div className="text-sm text-gray-600">Nowe oferty</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-orange-600">12</div>
-                      <div className="text-sm text-gray-600">W trakcie oceny</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-green-600">8</div>
-                      <div className="text-sm text-gray-600">Zaakceptowane</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-red-600">5</div>
-                      <div className="text-sm text-gray-600">Odrzucone</div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Jobs with Applications */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Zlecenia z ofertami</h3>
-                  {recentJobs.map((job) => (
-                    <Card key={job.id}>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold text-lg">{job.title}</h3>
-                              {getStatusBadge(job.status)}
-                            </div>
-                            <p className="text-gray-600 mb-2">{job.category}</p>
-                            <div className="flex items-center gap-4 text-sm text-gray-500">
-                              <div className="flex items-center gap-1">
-                                <MapPin className="w-4 h-4" />
-                                <span>{job.address}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <UserCheck className="w-4 h-4" />
-                                <span>{job.applications} ofert</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Calendar className="w-4 h-4" />
-                                <span>Termin: {job.deadline}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-green-600">
-                          {formatBudget(
-                            typeof job.budget === 'string' 
-                              ? {
-                                  min: parseFloat(job.budget) || null,
-                                  max: parseFloat(job.budget) || null,
-                                  type: 'fixed',
-                                  currency: 'PLN',
-                                }
-                              : job.budget
-                          )}
-                        </p>
-                            <div className="flex gap-2 mt-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => setSelectedJobForApplications(job.id)}
-                              >
-                                Zobacz oferty ({job.applications})
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
             )}
           </TabsContent>
 
           {/* Tenders Tab */}
           <TabsContent value="tenders" className="space-y-6">
-            <TenderSystem 
-              userRole="manager"
-              onTenderCreate={handleTenderCreate}
-              onTenderSelect={handleTenderSelect}
-              onTenderEdit={handleTenderEdit}
-            />
-          </TabsContent>
-
-          {/* Tender Bids Tab */}
-          <TabsContent value="tender-bids" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Oferty przetargowe</h2>
-            </div>
-
             {selectedTenderId && showBidEvaluation ? (
               <div>
                 <Button 
@@ -969,20 +1228,16 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                 )}
               </div>
             ) : (
-              <div>
-                <Card>
-                  <CardContent className="p-8 text-center">
-                    <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-xl font-semibold mb-2">Wybierz przetarg</h3>
-                    <p className="text-gray-600 mb-6">
-                      Przejdź do zakładki "Przetargi" i wybierz przetarg, aby zobaczyć złożone oferty.
-                    </p>
-                    <Button onClick={() => setActiveTab('tenders')}>
-                      Przejdź do przetargów
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+              <TenderSystem 
+                userRole="manager"
+                onTenderCreate={handleTenderCreate}
+                onTenderSelect={handleTenderSelect}
+                onTenderEdit={handleTenderEdit}
+                onViewBids={(tenderId) => {
+                  setSelectedTenderId(tenderId);
+                  setShowBidEvaluation(true);
+                }}
+              />
             )}
           </TabsContent>
 
@@ -1085,49 +1340,65 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
           <TabsContent value="contractors" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Wykonawcy</h2>
-              <Button variant="outline" onClick={() => router.push('/contractors')}>
-                Przeglądaj wszystkich wykonawców
-              </Button>
             </div>
             
-            <div className="grid gap-4">
-              {contractors.map((contractor) => (
-                <Card key={contractor.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="w-16 h-16">
-                        <AvatarImage src={contractor.avatar} />
-                        <AvatarFallback>{contractor.name.split(' ')[0][0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">{contractor.name}</h3>
-                        <p className="text-gray-600 mb-2">{contractor.specialization}</p>
+            {loadingContractors ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie wykonawców...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {contractors.length > 0 ? (
+                  contractors.map((contractor) => (
+                    <Card key={contractor.id}>
+                      <CardContent className="p-6">
                         <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                            <span>{contractor.rating} • {contractor.completedJobs} projektów</span>
+                          <Avatar className="w-16 h-16">
+                            <AvatarImage src={contractor.avatar} />
+                            <AvatarFallback>{contractor.name.split(' ')[0][0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg">{contractor.name}</h3>
+                            <p className="text-gray-600 mb-2">{contractor.specialization}</p>
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-1">
+                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                <span>{contractor.rating} • {contractor.completedJobs} projektów</span>
+                              </div>
+                              <Badge variant="outline">{contractor.currentJob}</Badge>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-2">
+                              Kliknij "Zobacz profil", aby zobaczyć portfolio wykonawcy
+                            </p>
                           </div>
-                          <Badge variant="outline">{contractor.currentJob}</Badge>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">Wyślij wiadomość</Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => router.push(`/contractors/${contractor.id}`)}
+                            >
+                              Zobacz profil
+                            </Button>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Kliknij "Zobacz profil", aby zobaczyć portfolio wykonawcy
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">Wyślij wiadomość</Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => router.push(`/contractors/${contractor.id}`)}
-                        >
-                          Zobacz profil
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <p className="text-muted-foreground">Brak wykonawców</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -1146,39 +1417,172 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         />
       )}
 
-      {/* Bid Evaluation Modal - Only show if not in tender-bids tab */}
-      {showBidEvaluation && selectedTenderId && activeTab !== 'tender-bids' && (
-        <>
-          {isLoadingTenderBids ? (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg shadow-xl p-6">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  <p className="text-sm text-muted-foreground">Ładowanie ofert...</p>
+      {/* Job Details Dialog */}
+      <Dialog open={showJobDetailsDialog} onOpenChange={(open) => {
+        setShowJobDetailsDialog(open);
+        if (!open) {
+          setSelectedJobForDetails(null);
+          setJobDetailsData(null);
+        }
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Szczegóły zlecenia</DialogTitle>
+            <DialogDescription>
+              Pełne informacje o zleceniu
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isLoadingJobDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="ml-2 text-sm text-muted-foreground">Ładowanie szczegółów...</p>
+            </div>
+          ) : jobDetailsData ? (
+            <div className="space-y-4">
+              {/* Title and Status */}
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold">{jobDetailsData.title}</h2>
+                  <div className="flex items-center gap-3 mt-2">
+                    {getStatusBadge(jobDetailsData.status)}
+                    <span className="text-sm text-gray-600">
+                      {jobDetailsData.category?.name || 'Inne'}
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* Budget */}
+              <div className="flex items-center gap-2">
+                <Euro className="w-4 h-4 text-gray-500" />
+                <span className="font-semibold text-lg">
+                  {jobDetailsData.budget 
+                    ? formatBudget(jobDetailsData.budget)
+                    : formatBudget(budgetFromDatabase({
+                        budget_min: jobDetailsData.budget_min ?? null,
+                        budget_max: jobDetailsData.budget_max ?? null,
+                        budget_type: (jobDetailsData.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
+                        currency: jobDetailsData.currency || 'PLN',
+                      }))}
+                </span>
+              </div>
+
+              {/* Location */}
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-gray-500" />
+                <span className="text-gray-700">
+                  {typeof jobDetailsData.location === 'string' 
+                    ? jobDetailsData.location 
+                    : jobDetailsData.location?.city || 'Nieznana lokalizacja'}
+                </span>
+              </div>
+
+              {/* Deadline */}
+              {jobDetailsData.deadline && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-500" />
+                  <span className="text-gray-700">
+                    Termin: {new Date(jobDetailsData.deadline).toLocaleDateString('pl-PL')}
+                  </span>
+                </div>
+              )}
+
+              {/* Description */}
+              {jobDetailsData.description && (
+                <div>
+                  <h3 className="font-semibold mb-2">Opis zlecenia</h3>
+                  <p className="text-gray-700 whitespace-pre-wrap">{jobDetailsData.description}</p>
+                </div>
+              )}
+
+              {/* Requirements */}
+              {jobDetailsData.requirements && jobDetailsData.requirements.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Wymagania</h3>
+                  <ul className="space-y-1">
+                    {jobDetailsData.requirements.map((req, index) => (
+                      <li key={index} className="flex items-start space-x-2">
+                        <span className="text-primary mt-1">•</span>
+                        <span className="text-gray-700">{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Responsibilities */}
+              {jobDetailsData.responsibilities && jobDetailsData.responsibilities.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Zakres prac</h3>
+                  <ul className="space-y-1">
+                    {jobDetailsData.responsibilities.map((resp, index) => (
+                      <li key={index} className="flex items-start space-x-2">
+                        <span className="text-primary mt-1">•</span>
+                        <span className="text-gray-700">{resp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Skills Required */}
+              {jobDetailsData.skills_required && jobDetailsData.skills_required.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Wymagane umiejętności</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {jobDetailsData.skills_required.map((skill, index) => (
+                      <Badge key={index} variant="secondary">{skill}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Contact Information */}
+              {(jobDetailsData.contact_person || jobDetailsData.contact_phone || jobDetailsData.contact_email) && (
+                <div>
+                  <h3 className="font-semibold mb-2">Informacje kontaktowe</h3>
+                  <div className="space-y-1 text-sm">
+                    {jobDetailsData.contact_person && (
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-700">{jobDetailsData.contact_person}</span>
+                      </div>
+                    )}
+                    {jobDetailsData.contact_phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-700">{jobDetailsData.contact_phone}</span>
+                      </div>
+                    )}
+                    {jobDetailsData.contact_email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-700">{jobDetailsData.contact_email}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Building Information */}
+              {jobDetailsData.building_type && (
+                <div>
+                  <h3 className="font-semibold mb-2">Informacje o budynku</h3>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    <div>Typ budynku: {jobDetailsData.building_type}</div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <BidEvaluationPanel
-              tenderId={selectedTenderId}
-              tenderTitle={selectedTenderData?.title || 'Przetarg'}
-              evaluationCriteria={[
-                { id: 'price', name: 'Cena oferty', description: 'Łączna cena realizacji', weight: 40, type: 'price' },
-                { id: 'quality', name: 'Jakość wykonania', description: 'Doświadczenie i referencje', weight: 30, type: 'quality' },
-                { id: 'time', name: 'Termin realizacji', description: 'Czas wykonania prac', weight: 20, type: 'time' },
-                { id: 'warranty', name: 'Gwarancja', description: 'Okres gwarancji i serwis', weight: 10, type: 'quality' }
-              ]}
-              bids={tenderBids}
-              onClose={() => {
-                setShowBidEvaluation(false);
-                setSelectedTenderId(null);
-              }}
-              onAwardTender={handleAwardTender}
-              onRejectBid={handleRejectBid}
-            />
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Nie udało się załadować szczegółów zlecenia</p>
+            </div>
           )}
-        </>
-      )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

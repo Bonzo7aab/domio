@@ -305,10 +305,8 @@ export async function fetchTenders(
     // For managers viewing their own tenders, show all (including drafts)
     if (managerId) {
       // Manager can see their own tenders regardless of public status
-      // Use a more complex filter: show manager's tenders OR public tenders
-      // We'll filter after fetching if needed, or use a better query structure
-      // For now, fetch all tenders and filter client-side for manager's own tenders
-      // This is simpler and works with RLS policies
+      // Filter by manager_id to get manager's tenders (RLS will handle permissions)
+      query = query.eq('manager_id', managerId);
     } else {
       // Public view - only show public tenders
       query = query.eq('is_public', true);
@@ -406,7 +404,7 @@ export async function fetchTenders(
       case 'deadline':
         query = query.order('submission_deadline', { ascending: true });
         break;
-        default:
+      default:
         query = query.order('created_at', { ascending: false });
     }
 
@@ -421,10 +419,21 @@ export async function fetchTenders(
 
     const { data, error } = await query;
 
+    if (error) {
+      console.error('Supabase error fetching tenders:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        error: error
+      });
+    }
+
     return { data: data as any, error };
   } catch (err) {
-    console.error('Error fetching tenders:', err);
-    return { data: null, error: err };
+    console.error('Exception fetching tenders:', err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { data: null, error: { message: errorMessage, originalError: err } };
   }
 }
 
@@ -2304,6 +2313,139 @@ export async function cancelTenderBid(
         ? err 
         : new Error('An unexpected error occurred while cancelling the bid')
     };
+  }
+}
+
+/**
+ * Fetch jobs that have been worked on by contractors
+ * (jobs with accepted applications)
+ */
+export async function fetchJobsByWorkHistory(
+  supabase: SupabaseClient<Database>,
+  managerCompanyId: string
+): Promise<Array<{
+  id: string;
+  title: string;
+  category: string;
+  status: string;
+  budget: string;
+  applications: number;
+  deadline: string;
+  address: string;
+}>> {
+  try {
+    if (!managerCompanyId) {
+      return [];
+    }
+
+    // Step 1: Get all job IDs for this company
+    const { data: companyJobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('company_id', managerCompanyId);
+
+    if (jobsError) {
+      console.error('Error fetching company jobs:', jobsError);
+      return [];
+    }
+
+    const jobIds = (companyJobs || []).map((job: any) => job.id);
+
+    if (jobIds.length === 0) {
+      return [];
+    }
+
+    // Step 2: Get accepted applications for these jobs
+    const { data: acceptedApplications, error: appsError } = await (supabase as any)
+      .from('job_applications')
+      .select('job_id')
+      .in('job_id', jobIds)
+      .eq('status', 'accepted');
+
+    if (appsError) {
+      console.error('Error fetching accepted applications:', appsError);
+      return [];
+    }
+
+    if (!acceptedApplications || acceptedApplications.length === 0) {
+      return [];
+    }
+
+    // Step 3: Get distinct job IDs that have accepted applications
+    const jobIdsWithApplications = [...new Set(acceptedApplications.map((app: any) => app.job_id))];
+
+    if (jobIdsWithApplications.length === 0) {
+      return [];
+    }
+
+    // Step 4: Fetch job details for these jobs
+    const { data: jobsData, error: jobsDataError } = await supabase
+      .from('jobs')
+      .select(`
+        id,
+        title,
+        budget_min,
+        budget_max,
+        budget_type,
+        currency,
+        deadline,
+        status,
+        location,
+        created_at,
+        job_categories (name)
+      `)
+      .in('id', jobIdsWithApplications)
+      .order('created_at', { ascending: false });
+
+    if (jobsDataError) {
+      console.error('Error fetching jobs data:', jobsDataError);
+      return [];
+    }
+
+    if (!jobsData || jobsData.length === 0) {
+      return [];
+    }
+
+    // Step 5: Count accepted applications for each job
+    const applicationCounts: { [key: string]: number } = {};
+    for (const app of acceptedApplications) {
+      const jobId = app.job_id;
+      if (jobId) {
+        applicationCounts[jobId] = (applicationCounts[jobId] || 0) + 1;
+      }
+    }
+
+    // Step 6: Format jobs for display
+    const formattedJobs = jobsData.map((job: any) => {
+      const location = typeof job.location === 'string' 
+        ? job.location 
+        : job.location?.city || 'Nieznana lokalizacja';
+
+      // Format budget
+      const budget = budgetFromDatabase({
+        budget_min: job.budget_min ?? null,
+        budget_max: job.budget_max ?? null,
+        budget_type: (job.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
+        currency: job.currency || 'PLN',
+      });
+      const budgetStr = formatBudget(budget);
+
+      return {
+        id: job.id,
+        title: job.title,
+        category: job.job_categories?.name || 'Inne',
+        status: job.status || 'active',
+        budget: budgetStr,
+        applications: applicationCounts[job.id] || 0,
+        deadline: job.deadline || '',
+        address: location
+      };
+    });
+
+    return formattedJobs;
+  } catch (error) {
+    console.error('Error in fetchJobsByWorkHistory:', error);
+    return [];
   }
 }
 
