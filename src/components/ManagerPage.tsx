@@ -923,9 +923,6 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
               </div>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={onBack}>
-                Powrót do listy zleceń
-              </Button>
               <Button variant="outline" onClick={handleTenderCreate}>
                 Utwórz przetarg
               </Button>

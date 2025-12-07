@@ -30,6 +30,7 @@ import {
   Plus
 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { toast } from 'sonner';
 import { mockTenderBids, mockEvaluationCriteria } from '../mocks';
 
@@ -226,21 +227,12 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
-          <div>
-            <h2 className="text-2xl font-bold">Ocena ofert w przetargu</h2>
-            <p className="text-gray-600">{tenderTitle}</p>
-            <div className="flex items-center gap-4 mt-2">
-              <span className="text-sm text-gray-500">{bids.length} ofert złożonych</span>
-            </div>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="!max-w-[95vw] w-[95vw] !h-[95vh] max-h-[95vh] flex flex-col p-0 gap-0 overflow-hidden [&>button]:hidden sm:!max-w-[95vw]">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
+          <DialogTitle className="text-2xl">Ocena ofert w przetargu</DialogTitle>
+          <DialogDescription className="text-base">{tenderTitle}</DialogDescription>
+        </DialogHeader>
 
         {/* Navigation */}
         <div className="border-b flex-shrink-0">
@@ -253,7 +245,6 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
           </Tabs>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 min-h-0">
             {/* Empty State */}
             {bids.length === 0 ? (
@@ -351,22 +342,16 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                         return (
                           <div
                             key={bid.id}
-                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                            className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${
+                              index === 0 ? 'border-yellow-500 border-2' : ''
+                            }`}
                             onClick={() => {
                               setSelectedBidId(bid.id);
                               setEvaluationMode('detailed');
                             }}
                           >
                             <div className="flex items-center gap-4 flex-1">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
-                                index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white shadow-lg' :
-                                index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white' :
-                                index === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white' :
-                                'bg-gray-100 text-gray-600'
-                              }`}>
-                                {index === 0 && <Crown className="h-5 w-5" />}
-                                {index !== 0 && (index + 1)}
-                              </div>
+
                               
                               <Avatar className="h-10 w-10">
                                 <AvatarImage src={bid.contractorAvatar} />
@@ -376,7 +361,14 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                               </Avatar>
                               
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-gray-900 truncate">{bid.contractorName}</h4>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-semibold text-gray-900 truncate">{bid.contractorName}</h4>
+                                  {index === 0 && (
+                                    <Badge className="bg-yellow-500 text-white">
+                                      Polecane
+                                    </Badge>
+                                  )}
+                                </div>
                                 <p className="text-sm text-gray-600 truncate">{bid.contractorCompany}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
@@ -600,14 +592,6 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                               <p className="font-medium text-gray-900">{selectedBid.proposedStartDate.toLocaleDateString('pl-PL')}</p>
                             </div>
                           </div>
-                          
-                          <div>
-                            <Label className="text-sm text-gray-500">Gwarancja</Label>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Shield className="h-4 w-4 text-gray-400" />
-                              <p className="font-medium text-gray-900">{selectedBid.guaranteePeriod} miesięcy</p>
-                            </div>
-                          </div>
                         </div>
                         
                         <Separator />
@@ -640,19 +624,6 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                         <CardContent>
                           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
                             {selectedBid.description}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {selectedBid.technicalProposal && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base">Propozycja techniczna</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                            {selectedBid.technicalProposal}
                           </p>
                         </CardContent>
                       </Card>
@@ -840,9 +811,9 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                 </div>
               </div>
             )}
-          </div>
         </div>
-      </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

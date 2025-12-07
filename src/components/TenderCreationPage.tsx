@@ -88,8 +88,8 @@ export default function TenderCreationPage({ onBack }: TenderCreationPageProps) 
 
       toast.success(tender.status === 'draft' ? 'Przetarg zapisany jako szkic' : 'Przetarg został opublikowany');
       
-      // Redirect to manager dashboard to see the new tender
-      router.push('/manager-dashboard');
+      // Redirect to manager dashboard tenders tab to see the new tender
+      router.push('/manager-dashboard/tenders');
     } catch (error) {
       toast.error('Wystąpił błąd podczas zapisywania przetargu');
       console.error('Error in handleTenderSubmit:', error);
