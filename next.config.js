@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['localhost'],
     remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
       {
         protocol: 'https',
         hostname: '**.supabase.co',
@@ -53,7 +56,9 @@ const nextConfig = {
       'recharts',
     ],
   },
-  // Webpack config is only used for production builds
+  // Turbopack config - empty to allow webpack config for production builds
+  turbopack: {},
+  // Webpack config is only used for production builds when --webpack flag is used
   // In dev mode with --turbopack, this config is ignored (warning is harmless)
   webpack: (config, { dev, isServer }) => {
     // Optimize bundle size (only applies in production builds, not with Turbopack)
