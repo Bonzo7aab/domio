@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "dependencies": {
     "@googlemaps/react-wrapper": "^1.2.0",
@@ -48,10 +48,10 @@
     "framer-motion": "^12.23.24",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.544.0",
-    "next": "^15.5.4",
-    "react": "^19.1.1",
+    "next": "16.0.7",
+    "react": "19.2.1",
     "react-day-picker": "^9.11.0",
-    "react-dom": "^19.1.1",
+    "react-dom": "19.2.1",
     "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.63.0",
     "react-medium-image-zoom": "^5.4.0",
@@ -65,14 +65,18 @@
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
     "autoprefixer": "^10.0.1",
     "baseline-browser-mapping": "^2.8.30",
-    "eslint": "^8",
-    "eslint-config-next": "^15.5.4",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.7",
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3"
   }
 }
