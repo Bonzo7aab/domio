@@ -200,7 +200,7 @@ export async function fetchContractors(
     }
 
     // Fetch ratings for all contractors
-    const contractorIds = (data || []).map(company => company.id);
+    const contractorIds = (data || []).map((company: any) => company.id);
     let ratingsMap: { [key: string]: any } = {};
     
     if (contractorIds.length > 0) {
@@ -252,7 +252,7 @@ export async function fetchContractors(
     };
 
     // Transform data to BrowseContractor format
-    let contractors: BrowseContractor[] = (data || []).map(company => {
+    let contractors: BrowseContractor[] = (data || []).map((company: any) => {
       const ratings = ratingsMap[company.id];
       
       // Parse JSONB columns
@@ -598,7 +598,13 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
     // Fetch company data (don't filter by type to be more flexible)
     const { data: company, error: companyError } = await supabase
       .from('companies')
-      .select('*')
+      .select(`
+        *,
+        profile_data,
+        experience_data,
+        insurance_data,
+        stats_data
+      `)
       .eq('id', id)
       .single();
 
@@ -614,11 +620,12 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
       .eq('company_id', id)
       .maybeSingle();
 
-    // Parse JSONB fields
-    const profileData = company.profile_data || {};
-    const experienceData = company.experience_data || {};
-    const insuranceData = company.insurance_data || {};
-    const statsData = company.stats_data || {};
+    // Parse JSONB fields (cast to any to access JSONB fields that TypeScript doesn't infer from select('*'))
+    const companyWithJsonb = company as any;
+    const profileData = companyWithJsonb.profile_data || {};
+    const experienceData = companyWithJsonb.experience_data || {};
+    const insuranceData = companyWithJsonb.insurance_data || {};
+    const statsData = companyWithJsonb.stats_data || {};
 
     // Helper functions for parsing JSONB
     const parseJsonbField = (value: any, defaultValue: any = null): any => {
@@ -664,29 +671,29 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
 
     // Transform to ContractorProfile format with real data
     const contractor: ContractorProfile = {
-      id: company.id,
-      name: company.name,
-      companyName: company.name,
+      id: companyWithJsonb.id,
+      name: companyWithJsonb.name,
+      companyName: companyWithJsonb.name,
       companyType: 'sp_z_oo',
-      avatar: company.logo_url,
+      avatar: companyWithJsonb.logo_url,
       coverImage: '/api/placeholder/800/300',
       location: {
-        city: company.city || 'Warszawa',
-        district: company.city || 'Warszawa',
+        city: companyWithJsonb.city || 'Warszawa',
+        district: companyWithJsonb.city || 'Warszawa',
         coordinates: { lat: 52.2297, lng: 21.0122 }
       },
       contactInfo: {
-        phone: company.phone || '',
-        email: company.email || '',
-        website: company.website,
-        address: company.address || ''
+        phone: companyWithJsonb.phone || '',
+        email: companyWithJsonb.email || '',
+        website: companyWithJsonb.website,
+        address: companyWithJsonb.address || ''
       },
       businessInfo: {
-        nip: company.nip || '',
-        regon: company.regon || '',
-        krs: company.krs,
-        yearEstablished: company.founded_year || 2020,
-        employeeCount: company.employee_count || '1-5'
+        nip: companyWithJsonb.nip || '',
+        regon: companyWithJsonb.regon || '',
+        krs: companyWithJsonb.krs,
+        yearEstablished: companyWithJsonb.founded_year || 2020,
+        employeeCount: companyWithJsonb.employee_count || '1-5'
       },
       rating: {
         overall: ratingsData?.average_rating || 0,
@@ -699,10 +706,10 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
         }
       },
       verification: {
-        status: company.is_verified ? 'verified' : 'unverified',
-        badges: company.verification_level ? [company.verification_level] : [],
+        status: companyWithJsonb.is_verified ? 'verified' : 'unverified',
+        badges: companyWithJsonb.verification_level ? [companyWithJsonb.verification_level] : [],
         documents: [],
-        lastVerified: company.updated_at
+        lastVerified: companyWithJsonb.updated_at
       },
       services: {
         primary: Array.isArray(primaryServices) ? primaryServices : [],
@@ -710,7 +717,7 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
         specializations: Array.isArray(specializations) ? specializations : []
       },
       experience: {
-        yearsInBusiness: getJsonbNumber(experienceData.years_in_business, company.founded_year ? new Date().getFullYear() - company.founded_year : 5),
+        yearsInBusiness: getJsonbNumber(experienceData.years_in_business, companyWithJsonb.founded_year ? new Date().getFullYear() - companyWithJsonb.founded_year : 5),
         completedProjects: getJsonbNumber(experienceData.completed_projects, 0),
         projectTypes: parseJsonbField(experienceData.project_types, {}),
         certifications: parseJsonbField(experienceData.certifications, [])
@@ -733,7 +740,7 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
         status: getJsonbString(profileData.availability_status, 'dostępny') as 'dostępny' | 'ograniczona_dostępność' | 'zajęty',
         nextAvailable: getJsonbString(profileData.next_available, new Date().toISOString()),
         workingHours: getJsonbString(profileData.working_hours, '8:00-16:00'),
-        serviceArea: parseJsonbField(profileData.service_area, [company.city || 'Warszawa'])
+        serviceArea: parseJsonbField(profileData.service_area, [companyWithJsonb.city || 'Warszawa'])
       },
       insurance: {
         hasOC: getJsonbBoolean(insuranceData.has_oc, false),
@@ -750,8 +757,8 @@ export async function fetchContractorById(id: string): Promise<ContractorProfile
         rehireRate: getJsonbNumber(statsData.rehire_rate, 0)
       },
       plan: 'basic',
-      joinedDate: company.created_at,
-      lastActive: company.updated_at
+      joinedDate: companyWithJsonb.created_at,
+      lastActive: companyWithJsonb.updated_at
     };
 
     return contractor;
@@ -2326,7 +2333,8 @@ export async function fetchContractorServicePricing(
       return {};
     }
 
-    const profileData = company.profile_data || {};
+    const companyWithJsonb = company as any;
+    const profileData = companyWithJsonb.profile_data || {};
     const servicePricing = profileData.service_pricing || {};
 
     // Validate and return service pricing
@@ -2363,14 +2371,15 @@ export async function updateContractorServicePricing(
     }
 
     // Merge service pricing into profile_data
-    const profileData = company.profile_data || {};
+    const companyWithJsonb = company as any;
+    const profileData = companyWithJsonb.profile_data || {};
     const updatedProfileData = {
       ...profileData,
       service_pricing: servicePricing
     };
 
     // Update the company record
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from('companies')
       .update({ profile_data: updatedProfileData })
       .eq('id', companyId);
@@ -2416,7 +2425,8 @@ export async function updateContractorServices(
     }
 
     // Merge services into profile_data
-    const profileData = company.profile_data || {};
+    const companyWithJsonb = company as any;
+    const profileData = companyWithJsonb.profile_data || {};
     const updatedProfileData = {
       ...profileData,
       primary_services: services.primary,
@@ -2425,7 +2435,7 @@ export async function updateContractorServices(
     };
 
     // Update the company record
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from('companies')
       .update({ profile_data: updatedProfileData })
       .eq('id', companyId);

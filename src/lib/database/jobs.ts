@@ -2372,7 +2372,7 @@ export async function fetchJobsByWorkHistory(
     }
 
     // Step 3: Get distinct job IDs that have accepted applications
-    const jobIdsWithApplications = [...new Set(acceptedApplications.map((app: any) => app.job_id))];
+    const jobIdsWithApplications: string[] = Array.from(new Set<string>(acceptedApplications.map((app: any) => app.job_id as string)));
 
     if (jobIdsWithApplications.length === 0) {
       return [];

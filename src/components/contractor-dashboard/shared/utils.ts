@@ -5,12 +5,15 @@ import type { ContractorProfile } from '../../../lib/database/contractors';
  */
 export function getContractorAddress(profile: ContractorProfile | null): string {
   if (!profile?.contactInfo?.address) return '';
-  const parts = [
-    profile.contactInfo.address,
-    profile.contactInfo.city,
-    profile.contactInfo.postalCode
-  ].filter(Boolean);
-  return parts.join(', ') || '';
+  
+  const parts = [profile.contactInfo.address];
+  
+  // Add city from location if available
+  if (profile.location?.city) {
+    parts.push(profile.location.city);
+  }
+  
+  return parts.filter(Boolean).join(', ') || '';
 }
 
 /**
