@@ -1,4 +1,5 @@
 import { createClient } from '../supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { ManagerProfile } from '../../types/manager';
 
 // Re-export ManagerProfile for convenience
@@ -186,30 +187,57 @@ export async function fetchManagers(filters: ManagerFilters = {}): Promise<Brows
 
 /**
  * Fetch a single manager by ID with full profile data
+ * @param id - Manager company ID
+ * @param supabaseClient - Optional Supabase client (for server-side usage)
  */
-export async function fetchManagerById(id: string): Promise<ManagerProfile | null> {
-  const supabase = createClient();
+export async function fetchManagerById(
+  id: string, 
+  supabaseClient?: SupabaseClient
+): Promise<ManagerProfile | null> {
+  const supabase = supabaseClient || createClient();
 
   try {
-    // Fetch company data
+    // Fetch company data - use maybeSingle to avoid throwing errors when no row found
+    // Explicitly select JSONB columns to ensure they're properly parsed
     const { data: company, error: companyError } = await supabase
       .from('companies')
-      .select('*')
+      .select(`
+        *,
+        manager_data,
+        experience_data,
+        stats_data,
+        portfolio_data
+      `)
       .eq('id', id)
       .in('type', ['property_management', 'housing_association', 'cooperative', 'condo_management', 'spółdzielnia', 'wspólnota'])
-      .single();
+      .maybeSingle();
 
-    if (companyError || !company) {
-      console.error('Error fetching manager:', companyError);
+    // Check for meaningful errors (not just empty objects)
+    if (companyError && (companyError.message || companyError.code || companyError.details)) {
+      // Log more details about the error
+      console.error('Error fetching manager:', {
+        error: companyError,
+        message: companyError.message,
+        details: companyError.details,
+        hint: companyError.hint,
+        code: companyError.code,
+        id
+      });
       return null;
     }
 
-    // Fetch real ratings data
+    if (!company) {
+      // Company not found or doesn't match type filter
+      console.log(`Manager not found for ID: ${id} (may not match manager type filter)`);
+      return null;
+    }
+
+    // Fetch real ratings data - use maybeSingle since ratings might not exist
     const { data: ratingsData } = await (supabase as any)
       .from('company_ratings')
       .select('average_rating, total_reviews, rating_breakdown, category_ratings')
       .eq('company_id', id)
-      .single();
+      .maybeSingle();
 
     // Fetch reviews
     const { data: reviewsData } = await (supabase as any)
@@ -232,9 +260,21 @@ export async function fetchManagerById(id: string): Promise<ManagerProfile | nul
       .order('created_at', { ascending: false })
       .limit(10);
 
-    const managerData = (company as any).manager_data || {};
-    const experienceData = (company as any).experience_data || {};
-    const statsData = (company as any).stats_data || {};
+    // Parse JSONB fields - they might be strings or already parsed objects
+    const managerDataRaw = (company as any).manager_data;
+    const managerData = typeof managerDataRaw === 'string' 
+      ? JSON.parse(managerDataRaw) 
+      : (managerDataRaw || {});
+    
+    const experienceDataRaw = (company as any).experience_data;
+    const experienceData = typeof experienceDataRaw === 'string'
+      ? JSON.parse(experienceDataRaw)
+      : (experienceDataRaw || {});
+    
+    const statsDataRaw = (company as any).stats_data;
+    const statsData = typeof statsDataRaw === 'string'
+      ? JSON.parse(statsDataRaw)
+      : (statsDataRaw || {});
 
     // Transform to ManagerProfile format with real data
     const manager: ManagerProfile = {
@@ -266,6 +306,13 @@ export async function fetchManagerById(id: string): Promise<ManagerProfile | nul
       rating: {
         overall: ratingsData?.average_rating || 0,
         reviewsCount: ratingsData?.total_reviews || 0,
+        ratingBreakdown: ratingsData?.rating_breakdown || {
+          '5': 0,
+          '4': 0,
+          '3': 0,
+          '2': 0,
+          '1': 0
+        },
         categories: {
           paymentTimeliness: ratingsData?.category_ratings?.payment_timeliness || 0,
           communication: ratingsData?.category_ratings?.communication || 0,
@@ -323,9 +370,11 @@ export async function fetchManagerById(id: string): Promise<ManagerProfile | nul
           'Anonimowy użytkownik',
         authorCompany: review.user_profiles?.user_type === 'manager' ? 'Wspólnota mieszkaniowa' : 'Firma wykonawcza',
         rating: review.rating,
+        title: review.title || '',
         date: review.created_at,
         project: review.job_id ? 'Projekt remontowy' : 'Współpraca',
         comment: review.comment || '',
+        categories: review.categories || {},
         response: undefined,
         helpful: 0
       })),

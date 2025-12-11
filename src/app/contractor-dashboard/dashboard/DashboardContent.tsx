@@ -48,115 +48,185 @@ export function DashboardContent({ data }: DashboardContentProps) {
   const totalActive = activeApplications.length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-6">
+        {/* Aktywne oferty */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aktywne oferty</CardTitle>
-            <Send className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold mb-3">
-              {totalActive > 0 ? totalActive : '—'}
-            </div>
-            {totalActive > 0 ? (
-              <div className="space-y-2">
-                {statusCounts.wyslane > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Wysłane:</span>
-                    <span className="font-medium">{statusCounts.wyslane}</span>
-                  </div>
-                )}
-                {statusCounts.wOcenie > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">W ocenie:</span>
-                    <span className="font-medium text-yellow-600">{statusCounts.wOcenie}</span>
-                  </div>
-                )}
-                {statusCounts.zaakceptowane > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Zaakceptowane:</span>
-                    <span className="font-medium text-green-600">{statusCounts.zaakceptowane}</span>
-                  </div>
-                )}
-                {statusCounts.odrzucone > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Odrzucone:</span>
-                    <span className="font-medium text-red-600">{statusCounts.odrzucone}</span>
-                  </div>
-                )}
-                {statusCounts.wyslane === 0 && statusCounts.wOcenie === 0 && 
-                 statusCounts.zaakceptowane === 0 && statusCounts.odrzucone === 0 && (
-                  <p className="text-xs text-muted-foreground">Brak aktywnych ofert</p>
-                )}
+          {/* Mobile: Single line layout */}
+          <div className="md:hidden p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Send className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs font-medium truncate">Aktywne oferty</span>
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Brak aktywnych ofert</p>
-            )}
-          </CardContent>
+              <div className="text-lg font-bold flex-shrink-0">
+                {totalActive > 0 ? totalActive : '—'}
+              </div>
+            </div>
+          </div>
+          {/* Desktop: Original layout */}
+          <div className="hidden md:block">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Aktywne oferty</CardTitle>
+              <Send className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold mb-3">
+                {totalActive > 0 ? totalActive : '—'}
+              </div>
+              {totalActive > 0 ? (
+                <div className="space-y-2">
+                  {statusCounts.wyslane > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Wysłane:</span>
+                      <span className="font-medium">{statusCounts.wyslane}</span>
+                    </div>
+                  )}
+                  {statusCounts.wOcenie > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">W ocenie:</span>
+                      <span className="font-medium text-yellow-600">{statusCounts.wOcenie}</span>
+                    </div>
+                  )}
+                  {statusCounts.zaakceptowane > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Zaakceptowane:</span>
+                      <span className="font-medium text-green-600">{statusCounts.zaakceptowane}</span>
+                    </div>
+                  )}
+                  {statusCounts.odrzucone > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Odrzucone:</span>
+                      <span className="font-medium text-red-600">{statusCounts.odrzucone}</span>
+                    </div>
+                  )}
+                  {statusCounts.wyslane === 0 && statusCounts.wOcenie === 0 && 
+                   statusCounts.zaakceptowane === 0 && statusCounts.odrzucone === 0 && (
+                    <p className="text-xs text-muted-foreground">Brak aktywnych ofert</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Brak aktywnych ofert</p>
+              )}
+            </CardContent>
+          </div>
         </Card>
 
+        {/* Miesięczne zarobki */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Miesięczne zarobki</CardTitle>
-            <Euro className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.totalEarnings > 0 
-                ? `${stats.totalEarnings.toLocaleString('pl-PL')} zł`
-                : '— zł'}
+          {/* Mobile: Single line layout */}
+          <div className="md:hidden p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Euro className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs font-medium truncate">Miesięczne zarobki</span>
+              </div>
+              <div className="text-lg font-bold flex-shrink-0 text-right">
+                {stats.totalEarnings > 0 
+                  ? `${stats.totalEarnings.toLocaleString('pl-PL')} zł`
+                  : '— zł'}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.completedProjects > 0
-                ? `${stats.completedProjects} ukończonych projektów`
-                : 'Brak danych o średniej wartości'}
-            </p>
-          </CardContent>
+          </div>
+          {/* Desktop: Original layout */}
+          <div className="hidden md:block">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Miesięczne zarobki</CardTitle>
+              <Euro className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {stats.totalEarnings > 0 
+                  ? `${stats.totalEarnings.toLocaleString('pl-PL')} zł`
+                  : '— zł'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.completedProjects > 0
+                  ? `${stats.completedProjects} ukończonych projektów`
+                  : 'Brak danych o średniej wartości'}
+              </p>
+            </CardContent>
+          </div>
         </Card>
 
+        {/* Satysfakcja klientów */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Satysfakcja klientów</CardTitle>
-            <Star className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.averageRating > 0 
-                ? `${((stats.averageRating / 5) * 100).toFixed(0)}%`
-                : '—'}
+          {/* Mobile: Single line layout */}
+          <div className="md:hidden p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Star className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs font-medium truncate">Satysfakcja klientów</span>
+              </div>
+              <div className="text-lg font-bold flex-shrink-0">
+                {stats.averageRating > 0 
+                  ? `${((stats.averageRating / 5) * 100).toFixed(0)}%`
+                  : '—'}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.averageRating > 0
-                ? `Ocena: ${stats.averageRating.toFixed(1)}/5.0`
-                : 'Brak ocen'}
-            </p>
-          </CardContent>
+          </div>
+          {/* Desktop: Original layout */}
+          <div className="hidden md:block">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Satysfakcja klientów</CardTitle>
+              <Star className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {stats.averageRating > 0 
+                  ? `${((stats.averageRating / 5) * 100).toFixed(0)}%`
+                  : '—'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.averageRating > 0
+                  ? `Ocena: ${stats.averageRating.toFixed(1)}/5.0`
+                  : 'Brak ocen'}
+              </p>
+            </CardContent>
+          </div>
         </Card>
 
+        {/* Realizacja na czas */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Realizacja na czas</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.onTimeCompletion > 0 
-                ? `${stats.onTimeCompletion}%`
-                : '—'}
+          {/* Mobile: Single line layout */}
+          <div className="md:hidden p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <CheckCircle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs font-medium truncate">Realizacja na czas</span>
+              </div>
+              <div className="text-lg font-bold flex-shrink-0">
+                {stats.onTimeCompletion > 0 
+                  ? `${stats.onTimeCompletion}%`
+                  : '—'}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.completedProjects > 0
-                ? `${stats.completedProjects} ukończonych projektów`
-                : 'Brak ukończonych projektów'}
-            </p>
-          </CardContent>
+          </div>
+          {/* Desktop: Original layout */}
+          <div className="hidden md:block">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Realizacja na czas</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {stats.onTimeCompletion > 0 
+                  ? `${stats.onTimeCompletion}%`
+                  : '—'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.completedProjects > 0
+                  ? `${stats.completedProjects} ukończonych projektów`
+                  : 'Brak ukończonych projektów'}
+              </p>
+            </CardContent>
+          </div>
         </Card>
       </div>
 
       {/* Quick Actions & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Szybkie akcje</CardTitle>

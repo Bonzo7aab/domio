@@ -261,6 +261,61 @@ export async function getContractorUserId(
 }
 
 /**
+ * Get the user profile ID that represents a manager company
+ */
+export async function getManagerUserId(
+  supabase: SupabaseClient<Database>,
+  managerCompanyId: string
+): Promise<{ data: string | null; error: any }> {
+  try {
+    console.log('Looking for manager user for company ID:', managerCompanyId);
+    
+    // First, try to find any active user for this company
+    const { data: userCompanies, error } = await (supabase as any)
+      .from('user_companies')
+      .select('user_id')
+      .eq('company_id', managerCompanyId)
+      .eq('is_active', true);
+
+    console.log('Query result:', { userCompanies, error });
+
+    if (error) {
+      console.error('Error querying user_companies table:', error);
+      return { data: null, error };
+    }
+
+    if (!userCompanies || userCompanies.length === 0) {
+      console.warn('No active users found for manager company:', managerCompanyId);
+      
+      // Try to find the manager company details for debugging
+      const { data: company, error: companyError } = await (supabase as any)
+        .from('companies')
+        .select('id, name, type, email, phone')
+        .eq('id', managerCompanyId)
+        .single();
+      
+      console.log('Manager company info:', { company, companyError });
+      
+      // Return null data but no error - calling function will handle this
+      return { 
+        data: null, 
+        error: null
+      };
+    }
+
+    // Find primary user or use the first one
+    const primaryUser = userCompanies.find((uc: any) => uc.is_primary);
+    const userId = primaryUser?.user_id || userCompanies[0]?.user_id;
+    
+    console.log('Found manager user:', userId);
+    return { data: userId || null, error: null };
+  } catch (err) {
+    console.error('Error finding manager user:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
  * Complete workflow: Create conversation, send quote request, and notify contractor
  */
 export async function submitQuoteRequest(

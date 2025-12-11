@@ -263,7 +263,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
             {evaluationMode === 'overview' && (
               <div className="space-y-6">
                 {/* Statistics */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
@@ -342,7 +342,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                         return (
                           <div
                             key={bid.id}
-                            className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${
+                            className={`flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${
                               index === 0 ? 'border-yellow-500 border-2' : ''
                             }`}
                             onClick={() => {
@@ -350,10 +350,8 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                               setEvaluationMode('detailed');
                             }}
                           >
-                            <div className="flex items-center gap-4 flex-1">
-
-                              
-                              <Avatar className="h-10 w-10">
+                            <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                              <Avatar className="h-10 w-10 flex-shrink-0">
                                 <AvatarImage src={bid.contractorAvatar} />
                                 <AvatarFallback className="bg-blue-100 text-blue-700">
                                   {bid.contractorName.split(' ').map(n => n[0]).join('').toUpperCase()}
@@ -361,17 +359,17 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                               </Avatar>
                               
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-semibold text-gray-900 truncate">{bid.contractorName}</h4>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h4 className="font-semibold text-sm md:text-base text-gray-900 break-words">{bid.contractorName}</h4>
                                   {index === 0 && (
-                                    <Badge className="bg-yellow-500 text-white">
+                                    <Badge className="bg-yellow-500 text-white text-xs">
                                       Polecane
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-sm text-gray-600 truncate">{bid.contractorCompany}</p>
+                                <p className="text-xs md:text-sm text-gray-600 truncate">{bid.contractorCompany}</p>
                                 <div className="flex items-center gap-2 mt-1">
-                                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 flex-shrink-0" />
                                   <span className="text-xs text-gray-600">{bid.contractorRating.toFixed(1)}</span>
                                   <span className="text-xs text-gray-500">•</span>
                                   <span className="text-xs text-gray-600">{bid.contractorCompletedJobs} projektów</span>
@@ -379,21 +377,21 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-6">
-                              <div className="text-right min-w-[120px]">
-                                <p className="font-semibold text-gray-900">{formatCurrency(bid.totalPrice, bid.currency)}</p>
-                                <p className="text-sm text-gray-600 flex items-center justify-end gap-1 mt-1">
-                                  <Clock className="h-3 w-3" />
+                            <div className="flex flex-col sm:flex-row md:items-center gap-3 md:gap-6">
+                              <div className="text-left md:text-right min-w-0 sm:min-w-[120px]">
+                                <p className="font-semibold text-sm md:text-base text-gray-900">{formatCurrency(bid.totalPrice, bid.currency)}</p>
+                                <p className="text-xs md:text-sm text-gray-600 flex items-center md:justify-end gap-1 mt-1">
+                                  <Clock className="h-3 w-3 flex-shrink-0" />
                                   {bid.proposedTimeline} dni
                                 </p>
                               </div>
                               
-                              <div className="text-right min-w-[100px]">
-                                <div className="flex items-center justify-end gap-2 mb-1">
-                                  <p className="font-bold text-lg text-gray-900">{isNaN(totalScore) ? 0 : totalScore}</p>
-                                  <span className="text-sm text-gray-500">/100</span>
+                              <div className="text-left md:text-right min-w-0 sm:min-w-[100px]">
+                                <div className="flex items-center md:justify-end gap-2 mb-1">
+                                  <p className="font-bold text-base md:text-lg text-gray-900">{isNaN(totalScore) ? 0 : totalScore}</p>
+                                  <span className="text-xs md:text-sm text-gray-500">/100</span>
                                 </div>
-                                <Progress value={isNaN(totalScore) ? 0 : totalScore} className="w-24 h-2" />
+                                <Progress value={isNaN(totalScore) ? 0 : totalScore} className="w-full md:w-24 h-2" />
                               </div>
                               
                               <div className="flex items-center gap-2">
@@ -406,6 +404,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                                     setSelectedBidId(bid.id);
                                     setEvaluationMode('detailed');
                                   }}
+                                  className="flex-shrink-0"
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
@@ -470,9 +469,9 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
                   </CardContent>
                 </Card>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Evaluation Criteria */}
-                  <div className="lg:col-span-2 space-y-4">
+                  <div className="md:col-span-2 lg:col-span-2 space-y-4">
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">

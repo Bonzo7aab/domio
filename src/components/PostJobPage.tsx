@@ -592,7 +592,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
             <Button
               variant="ghost"
               onClick={onBack}
-              className="flex items-center gap-2"
+              className="hidden md:flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
               Powrót do listy zleceń

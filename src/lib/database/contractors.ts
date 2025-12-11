@@ -1,4 +1,5 @@
 import { createClient } from '../supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { ContractorProfile, ServicePricing } from '../../types/contractor';
 
 // Re-export ContractorProfile for convenience
@@ -590,9 +591,14 @@ export async function fetchContractorsByWorkHistory(
 
 /**
  * Fetch a single contractor by ID with full profile data
+ * @param id - Contractor company ID
+ * @param supabaseClient - Optional Supabase client (for server-side usage)
  */
-export async function fetchContractorById(id: string): Promise<ContractorProfile | null> {
-  const supabase = createClient();
+export async function fetchContractorById(
+  id: string,
+  supabaseClient?: SupabaseClient
+): Promise<ContractorProfile | null> {
+  const supabase = supabaseClient || createClient();
 
   try {
     // Fetch company data (don't filter by type to be more flexible)

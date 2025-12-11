@@ -50,6 +50,24 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Helper function to format location (string or object)
+  const formatLocation = (location: string | { city: string; sublocality_level_1?: string } | undefined): string => {
+    if (!location) return 'Nieznana lokalizacja';
+    
+    if (typeof location === 'string') {
+      return location;
+    }
+    
+    if (typeof location === 'object' && location !== null && 'city' in location) {
+      if (location.sublocality_level_1) {
+        return `${location.city || 'Nieznana'}, ${location.sublocality_level_1}`;
+      }
+      return location.city || 'Nieznana lokalizacja';
+    }
+    
+    return 'Nieznana lokalizacja';
+  };
+
   if (!isOpen) return null;
 
   const handleInputChange = (field: string, value: string) => {
@@ -115,7 +133,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="min-w-[800px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
+      <DialogContent className="min-w-full lg:min-w-[800px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-xl font-semibold">
             {postType === 'tender' ? 'Złóż ofertę w przetargu' : 'Złóż ofertę'}
@@ -153,7 +171,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                   {jobData?.location && (
                     <div className="flex items-center gap-2 text-gray-600">
                       <MapPin className="w-4 h-4 text-gray-400" />
-                      <span>{jobData.location}</span>
+                      <span>{formatLocation(jobData.location)}</span>
                     </div>
                   )}
                   

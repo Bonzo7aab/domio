@@ -513,10 +513,10 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
 
   return (
     <div 
-      className="w-80 overflow-hidden h-full"
+      className="w-full lg:w-80 overflow-hidden h-full"
       style={{ backgroundColor: '#ffffff' }}
     >
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full relative">
         {/* Fixed Header */}
         <div className={`flex-shrink-0 px-6 ${isMapView ? 'pt-6' : ''}`}>
           <div className="flex items-center justify-between mb-4">
@@ -1130,8 +1130,19 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
 
           {/* Scroll Indicator */}
           {showScrollIndicator && (
-            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-10">
-              <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full p-2 shadow-lg">
+              <div className="sticky bottom-2 z-10 flex justify-center -mb-2">
+                <div 
+                  className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full p-2 shadow-lg cursor-pointer hover:bg-white transition-colors"
+                  onClick={() => {
+                    const scrollContainer = scrollContainerRef.current;
+                    if (scrollContainer) {
+                      scrollContainer.scrollBy({
+                        top: scrollContainer.clientHeight * 0.8,
+                        behavior: 'smooth'
+                      });
+                    }
+                  }}
+                >
                 <ArrowDown className="w-4 h-4 text-gray-600 animate-pulse" />
               </div>
             </div>

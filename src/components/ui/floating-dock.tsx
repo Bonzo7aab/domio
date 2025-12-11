@@ -10,6 +10,7 @@ export interface FloatingDockItem {
   icon: React.ReactNode;
   href?: string;
   onClick?: () => void;
+  isActive?: boolean;
 }
 
 interface FloatingDockProps {
@@ -51,7 +52,7 @@ function FloatingDockDesktop({
       onMouseMove={(e) => mouseX.set(e.pageX)}
       onMouseLeave={() => mouseX.set(Infinity)}
       className={cn(
-        "fixed bottom-8 left-1/2 z-50 flex h-16 items-end gap-4 rounded-2xl bg-muted/80 backdrop-blur-xl border border-border px-4 pb-3 -translate-x-1/2 hidden md:flex",
+        "fixed bottom-8 left-1/2 z-50 h-16 items-end gap-4 rounded-2xl bg-muted/80 backdrop-blur-xl border border-border px-4 pb-3 -translate-x-1/2 hidden md:flex",
         className
       )}
     >
@@ -72,16 +73,35 @@ function FloatingDockMobile({
   return (
     <div
       className={cn(
-        "fixed bottom-4 left-1/2 z-50 flex h-16 items-end gap-2 rounded-2xl bg-muted/80 backdrop-blur-xl border border-border px-2 pb-3 -translate-x-1/2 md:hidden overflow-x-auto max-w-[calc(100vw-2rem)]",
+        "fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-white border-t border-gray-200 rounded-t-2xl px-4 py-2 md:hidden",
         className
       )}
     >
       {items.map((item, i) => {
+        const isActive = item.isActive ?? false;
         const content = (
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-background/50 hover:bg-accent transition-colors">
-            <div className="flex items-center justify-center text-foreground">
-              {item.icon}
+          <div className="flex flex-col items-center justify-center gap-1 min-h-[60px]">
+            {/* Icon with active state background blob */}
+            <div className={cn(
+              "flex items-center justify-center rounded-full transition-colors",
+              isActive ? "bg-primary/10 p-2" : "p-2"
+            )}>
+              <div className={cn(
+                "flex items-center justify-center w-6 h-6",
+                isActive ? "text-primary" : "text-gray-700"
+              )}>
+                {item.icon}
+              </div>
             </div>
+            {/* Text label with active state styling */}
+            <span className={cn(
+              "text-xs text-center",
+              isActive 
+                ? "text-primary ring-1 ring-primary/20 rounded px-1.5 py-0.5" 
+                : "text-gray-700"
+            )}>
+              {item.title}
+            </span>
           </div>
         );
 
@@ -96,6 +116,7 @@ function FloatingDockMobile({
                   item.onClick();
                 }
               }}
+              className="flex-1"
             >
               {content}
             </Link>
@@ -106,7 +127,7 @@ function FloatingDockMobile({
           <div
             key={i}
             onClick={item.onClick}
-            className="cursor-pointer"
+            className="flex-1 cursor-pointer"
           >
             {content}
           </div>

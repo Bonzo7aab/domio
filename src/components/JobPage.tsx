@@ -8,9 +8,10 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsContent } from './ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { cn } from './ui/utils';
 
 import JobApplicationModal from './JobApplicationModal';
 import { AskQuestionModal } from './AskQuestionModal';
@@ -788,190 +789,203 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={onBack} className="flex items-center gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Powrót do listy
-            </Button>
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
+              <div className="relative flex-shrink-0">
+                <Avatar className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20">
+                  <AvatarImage src={job.companyInfo?.logo_url || undefined} alt={job.company} />
+                  <AvatarFallback className="bg-primary text-white text-sm sm:text-lg md:text-xl">
+                    {job.company?.charAt(0).toUpperCase() || '?'}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3 mb-1.5 sm:mb-2">
+                  <h1 className="text-lg sm:text-2xl md:text-3xl font-bold break-words">
+                    {job.title}
+                  </h1>
+                  {job.status && (
+                    <Badge variant={getStatusBadgeVariant(job.status)} className="shrink-0 text-[10px] sm:text-xs md:text-sm">
+                      {getStatusLabel(job.status)}
+                    </Badge>
+                  )}
+                  {job.verified && (
+                    <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
+                      <CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
+                      Zweryfikowany
+                    </Badge>
+                  )}
+                  {job.urgent && (
+                    <Badge variant="destructive" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
+                      <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
+                      Pilne
+                    </Badge>
+                  )}
+                  {job.isPremium && (
+                    <Badge variant="default" className="shrink-0 text-[10px] sm:text-xs md:text-sm bg-yellow-500">
+                      <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
+                      Premium
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-gray-600 mb-1.5 sm:mb-2 md:mb-1 text-xs sm:text-sm md:text-base break-words">
+                  {job.company}
+                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                    <span className="truncate">{formatLocation(job.location)}</span>
+                    {job.address && (
+                      <span className="text-xs text-gray-400">({job.address})</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                      <span>{job.postedTime}</span>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
+                      {typeof job.category === 'string' ? job.category : job.category?.name || 'Inne'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      {/* Tabs Navigation */}
+      <nav className="border-b bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-1 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={cn(
+                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                activeTab === 'overview'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              )}
+            >
+              Przegląd
+            </button>
+            <button
+              onClick={() => setActiveTab('requirements')}
+              className={cn(
+                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                activeTab === 'requirements'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              )}
+            >
+              Wymagania
+            </button>
+            {job.postType === 'tender' && (
+              <>
+                <button
+                  onClick={() => setActiveTab('procedure')}
+                  className={cn(
+                    "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                    activeTab === 'procedure'
+                      ? "border-primary text-primary"
+                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                  )}
+                >
+                  Procedura
+                </button>
+                <button
+                  onClick={() => setActiveTab('documents')}
+                  className={cn(
+                    "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                    activeTab === 'documents'
+                      ? "border-primary text-primary"
+                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                  )}
+                >
+                  Dokumenty
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setActiveTab('object')}
+              className={cn(
+                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                activeTab === 'object'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              )}
+            >
+              Obiekt
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Job Header */}
-            <Card>
-              <CardHeader className="pb-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4 flex-1">
-                    <Avatar className="w-16 h-16 bg-gray-100 border-2 border-border">
-                      <AvatarImage src={job.companyInfo?.logo_url || undefined} alt={job.company} />
-                      <AvatarFallback className="text-lg font-semibold">
-                        {job.company?.charAt(0).toUpperCase() || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start gap-2 mb-2">
-                        <h1 className="text-2xl md:text-3xl font-bold leading-tight">
-                          {job.title}
-                        </h1>
-                        {job.status && (
-                          <Badge variant={getStatusBadgeVariant(job.status)} className="shrink-0">
-                            {getStatusLabel(job.status)}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-4 text-muted-foreground text-sm mb-3">
-                        <div className="flex items-center gap-1.5">
-                          <Building className="w-4 h-4 shrink-0" />
-                          <span className="truncate">{job.company}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-4 h-4 shrink-0" />
-                          <span className="truncate">{formatLocation(job.location)}</span>
-                          {job.address && (
-                            <span className="text-xs text-muted-foreground/70">({job.address})</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-4 h-4 shrink-0" />
-                          <span>{job.postedTime}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {job.verified && (
-                          <Badge variant="outline" className="text-xs">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Zweryfikowany
-                          </Badge>
-                        )}
-                        {job.urgent && (
-                          <Badge variant="destructive" className="text-xs">
-                            <AlertTriangle className="w-3 h-3 mr-1" />
-                            Pilne
-                          </Badge>
-                        )}
-                        {job.isPremium && (
-                          <Badge variant="default" className="text-xs bg-yellow-500">
-                            <Star className="w-3 h-3 mr-1" />
-                            Premium
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="text-xs">
-                          {typeof job.category === 'string' ? job.category : job.category?.name || 'Inne'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
 
-            {/* Job Images */}
-            {job.images && job.images.length > 0 && (
+            {/* Key Tender Information - only for tenders */}
+            {job.postType === 'tender' && job.tenderInfo && (
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
-                    <ImageIcon className="w-5 h-5" />
-                    Zdjęcia zlecenia
+                    <Gavel className="w-5 h-5" />
+                    Kluczowe informacje przetargu
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {job.images.map((imageUrl, index) => (
-                      <div key={index} className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted">
-                        <ImageZoom>
-                          <img
-                            src={imageUrl}
-                            alt={`Zdjęcie ${index + 1} zlecenia ${job.title}`}
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-200 cursor-zoom-in"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/api/placeholder/800/600';
-                            }}
-                          />
-                        </ImageZoom>
+                <CardContent className="pb-6">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div className="bg-background/80 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Termin składania</div>
+                      <div className="font-bold text-foreground text-sm">
+                        {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
                       </div>
-                    ))}
+                    </div>
+                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
+                      <div className="font-bold text-foreground text-sm">{job.tenderInfo.wadium}</div>
+                    </div>
+                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Budżet</div>
+                      <div className="font-bold text-foreground text-sm">{formatBudget(job.budget)}</div>
+                    </div>
+                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Czas realizacji</div>
+                      <div className="font-bold text-foreground text-sm">{job.tenderInfo.projectDuration}</div>
+                    </div>
+                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Złożone oferty</div>
+                      <div className="font-bold text-foreground text-sm">{job.applications}</div>
+                    </div>
+                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                      <div className="text-xs text-muted-foreground font-medium mb-1">Status</div>
+                      <Badge variant="secondary" className="text-xs">
+                        {job.tenderInfo.currentPhase}
+                      </Badge>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {/* Job Details Tabs */}
-            <Card>
-              {/* Key Tender Information - only for tenders, merged into tabs card */}
-              {job.postType === 'tender' && job.tenderInfo && (
-                <div className="bg-muted/30">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2">
-                      <Gavel className="w-5 h-5" />
-                      Kluczowe informacje przetargu
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pb-6">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                      <div className="bg-background/80 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">Termin składania</div>
-                        <div className="font-bold text-foreground text-sm">
-                          {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
-                        </div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
-                        <div className="font-bold text-foreground text-sm">{job.tenderInfo.wadium}</div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">Budżet</div>
-                        <div className="font-bold text-foreground text-sm">{formatBudget(job.budget)}</div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">Czas realizacji</div>
-                        <div className="font-bold text-foreground text-sm">{job.tenderInfo.projectDuration}</div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">Złożone oferty</div>
-                        <div className="font-bold text-foreground text-sm">{job.applications}</div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">Status</div>
-                        <Badge variant="secondary" className="text-xs">
-                          {job.tenderInfo.currentPhase}
-                        </Badge>
-                      </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              {/* Overview Tab */}
+              <TabsContent value="overview">
+                <Card>
+                  <CardContent className="p-6 space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Opis {job.postType === 'tender' ? 'przetargu' : 'zlecenia'}</h3>
+                      <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{job.description}</p>
                     </div>
-                  </CardContent>
-                </div>
-              )}
-              
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                {job.postType === 'tender' ? (
-                  <TabsList className="grid grid-cols-5 w-full rounded-none">
-                    <TabsTrigger value="overview">Przegląd</TabsTrigger>
-                    <TabsTrigger value="requirements">Wymagania</TabsTrigger>
-                    <TabsTrigger value="procedure">Procedura</TabsTrigger>
-                    <TabsTrigger value="documents">Dokumenty</TabsTrigger>
-                    <TabsTrigger value="object">Obiekt</TabsTrigger>
-                  </TabsList>
-                ) : (
-                  <TabsList className="grid grid-cols-3 w-full">
-                    <TabsTrigger value="overview">Przegląd</TabsTrigger>
-                    <TabsTrigger value="requirements">Wymagania</TabsTrigger>
-                    <TabsTrigger value="object">Obiekt</TabsTrigger>
-                  </TabsList>
-                )}
-
-                {/* Overview Tab */}
-                <TabsContent value="overview" className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">Opis {job.postType === 'tender' ? 'przetargu' : 'zlecenia'}</h3>
-                    <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{job.description}</p>
-                  </div>
 
                   {job.responsibilities && job.responsibilities.length > 0 && (
                     <div>
@@ -1066,11 +1080,15 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
                     </div>
                   )}
-                </TabsContent>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                {/* Requirements Tab */}
-                <TabsContent value="requirements" className="p-6 space-y-6">
-                  {job.requirements && job.requirements.length > 0 && (
+              {/* Requirements Tab */}
+              <TabsContent value="requirements">
+                <Card>
+                  <CardContent className="p-6 space-y-6">
+                    {job.requirements && job.requirements.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold mb-3">Wymagania wobec wykonawców</h3>
                       <ul className="space-y-3">
@@ -1123,12 +1141,24 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       </div>
                     </div>
                   )}
-                </TabsContent>
 
-                {/* Procedure Tab - Only for tenders */}
-                {job.postType === 'tender' && (
-                  <TabsContent value="procedure" className="p-6 space-y-6">
-                    <h3 className="text-lg font-semibold mb-3">Harmonogram przetargu</h3>
+                  {(!job.requirements || job.requirements.length === 0) && 
+                   (!job.skills || job.skills.length === 0) && 
+                   (!job.certificates || job.certificates.length === 0) && (
+                    <div className="text-muted-foreground text-sm text-center py-8">
+                      Informacje o wymaganiach nie są dostępne.
+                    </div>
+                  )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Procedure Tab - Only for tenders */}
+              {job.postType === 'tender' && (
+                <TabsContent value="procedure">
+                  <Card>
+                    <CardContent className="p-6 space-y-6">
+                      <h3 className="text-lg font-semibold mb-3">Harmonogram przetargu</h3>
                     {job.tenderInfo?.phases && job.tenderInfo.phases.length > 0 ? (
                       <div className="space-y-4">
                         {job.tenderInfo.phases.map((phase, index) => (
@@ -1152,13 +1182,17 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     ) : (
                       <div className="text-muted-foreground text-sm">Harmonogram przetargu nie jest dostępny.</div>
                     )}
-                  </TabsContent>
-                )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
 
-                {/* Documents Tab - Only for tenders */}
-                {job.postType === 'tender' && (
-                  <TabsContent value="documents" className="p-6 space-y-6">
-                    <h3 className="text-lg font-semibold mb-3">Dokumentacja przetargowa</h3>
+              {/* Documents Tab - Only for tenders */}
+              {job.postType === 'tender' && (
+                <TabsContent value="documents">
+                  <Card>
+                    <CardContent className="p-6 space-y-6">
+                      <h3 className="text-lg font-semibold mb-3">Dokumentacja przetargowa</h3>
                     {job.tenderInfo?.documentsRequired && job.tenderInfo.documentsRequired.length > 0 ? (
                       <div className="space-y-3">
                         <h4 className="font-medium mb-3">Wymagane dokumenty</h4>
@@ -1174,14 +1208,18 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     ) : (
                       <div className="text-muted-foreground text-sm">Dokumentacja przetargowa nie jest dostępna.</div>
                     )}
-                  </TabsContent>
-                )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
 
-                {/* Object Tab */}
-                <TabsContent value="object" className="p-6 space-y-6">
-                  <h3 className="text-lg font-semibold mb-3">Informacje o obiekcie</h3>
-                  
-                  <div className="space-y-4">
+              {/* Object Tab */}
+              <TabsContent value="object">
+                <Card>
+                  <CardContent className="p-6 space-y-6">
+                    <h3 className="text-lg font-semibold mb-3">Informacje o obiekcie</h3>
+                    
+                    <div className="space-y-4">
                     {(job.buildingType || job.buildingYear || job.surface || job.address) && (
                       <div className="bg-muted/50 border border-border rounded-lg p-4">
                         <h4 className="font-medium mb-3">Dane podstawowe</h4>
@@ -1226,11 +1264,11 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         Informacje o obiekcie nie są dostępne.
                       </div>
                     )}
-                  </div>
-                </TabsContent>
-
-              </Tabs>
-            </Card>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
 
             {/* Similar Jobs Widget */}
             <SimilarJobs 
@@ -1243,6 +1281,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
+
             {/* Action Buttons */}
             <Card>
               <CardContent className="p-6">
@@ -1306,6 +1345,36 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Job Images */}
+            {job.images && job.images.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5" />
+                    Zdjęcia zlecenia
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-4">
+                    {job.images.map((imageUrl, index) => (
+                      <div key={index} className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted">
+                        <ImageZoom>
+                          <img
+                            src={imageUrl}
+                            alt={`Zdjęcie ${index + 1} zlecenia ${job.title}`}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-200 cursor-zoom-in"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/api/placeholder/800/600';
+                            }}
+                          />
+                        </ImageZoom>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Job Stats */}
             <Card>

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ApplicationStatusCard } from './ApplicationStatusBadge';
 import { 
   Eye, 
@@ -130,15 +131,35 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold mb-2">Moje aplikacje</h2>
-        <p className="text-gray-600">Zarządzaj swoimi aplikacjami na zlecenia</p>
-      </div>
-
+    <div className="space-y-3 sm:space-y-4">
       {/* Filters */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 gap-4 p-0 bg-transparent h-auto">
+        {/* Mobile Dropdown */}
+        <div className="md:hidden mb-2 sm:mb-3">
+          <Select value={selectedTab} onValueChange={setSelectedTab}>
+            <SelectTrigger className="w-full h-12 text-sm font-semibold border shadow-sm bg-white border-gray-200">
+              <SelectValue>
+                {selectedTab === 'all' && `Wszystkie (${stats.total})`}
+                {selectedTab === 'pending' && `Wysłane (${stats.pending})`}
+                {selectedTab === 'review' && `W ocenie (${stats.review})`}
+                {selectedTab === 'accepted' && `Zaakceptowane (${stats.accepted})`}
+                {selectedTab === 'rejected' && `Odrzucone (${stats.rejected})`}
+                {selectedTab === 'cancelled' && `Anulowane (${stats.cancelled})`}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Wszystkie ({stats.total})</SelectItem>
+              <SelectItem value="pending">Wysłane ({stats.pending})</SelectItem>
+              <SelectItem value="review">W ocenie ({stats.review})</SelectItem>
+              <SelectItem value="accepted">Zaakceptowane ({stats.accepted})</SelectItem>
+              <SelectItem value="rejected">Odrzucone ({stats.rejected})</SelectItem>
+              <SelectItem value="cancelled">Anulowane ({stats.cancelled})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop Tabs */}
+        <TabsList className="hidden md:grid w-full grid-cols-6 gap-4 p-0 bg-transparent h-auto">
           <TabsTrigger 
             value="all" 
             className="h-auto p-4 border border-border rounded-lg bg-card hover:shadow-md transition-all data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:border-primary"
@@ -195,15 +216,15 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={selectedTab} className="mt-6">
+        <TabsContent value={selectedTab} className="mt-2 sm:mt-4">
           {filteredApplications.length === 0 ? (
             <Card>
-              <CardContent className="p-8 text-center">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-600 mb-2">
+              <CardContent className="p-4 sm:p-6 text-center">
+                <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400 mx-auto mb-2 sm:mb-3" />
+                <h3 className="text-sm sm:text-base font-medium text-gray-600 mb-1 sm:mb-2">
                   Brak aplikacji w tej kategorii
                 </h3>
-                <p className="text-gray-500">
+                <p className="text-xs sm:text-sm text-gray-500">
                   {selectedTab === 'all' 
                     ? 'Nie masz jeszcze żadnych aplikacji. Przeglądaj zlecenia i aplikuj!'
                     : `Brak aplikacji o statusie "${selectedTab}".`
@@ -212,49 +233,49 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-3 sm:space-y-4">
               {filteredApplications.map((application) => (
                 <Card key={application.id} className="overflow-hidden">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-lg font-semibold">{application.jobTitle}</h3>
+                  <CardHeader className="pb-2 sm:pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <h3 className="text-base sm:text-lg font-semibold">{application.jobTitle}</h3>
                           {application.postType === 'tender' && (
-                            <Badge variant="default" className="bg-blue-600 text-white">
+                            <Badge variant="default" className="bg-blue-600 text-white text-xs">
                               Przetarg
                             </Badge>
                           )}
                           {application.postType === 'job' && (
-                            <Badge variant="outline" className="bg-gray-100">
+                            <Badge variant="outline" className="bg-gray-100 text-xs">
                               Zlecenie
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                           <div className="flex items-center gap-1">
-                            <Building className="h-4 w-4" />
-                            <span>{application.jobCompany}</span>
+                            <Building className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{application.jobCompany}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            <span>{application.jobLocation}</span>
+                            <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{application.jobLocation}</span>
                           </div>
-                          <Badge variant="outline">{application.jobCategory}</Badge>
+                          <Badge variant="outline" className="text-xs">{application.jobCategory}</Badge>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-lg font-semibold text-green-600">
+                      <div className="text-left sm:text-right flex-shrink-0">
+                        <div className="text-base sm:text-lg font-semibold text-green-600">
                           {formatPrice(application.proposedPrice)}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-xs sm:text-sm text-gray-500">
                           Wysłano {formatDate(application.submittedAt)}
                         </div>
                       </div>
                     </div>
                   </CardHeader>
 
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-3 sm:space-y-4">
                     {/* Application Status */}
                     <ApplicationStatusCard
                       status={application.status}
@@ -264,29 +285,29 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                     />
 
                     {/* Application Details */}
-                    <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
                       <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 text-lg font-semibold text-primary">
-                          <Euro className="h-5 w-5" />
+                        <div className="flex items-center justify-center gap-1 text-base sm:text-lg font-semibold text-primary">
+                          <Euro className="h-4 w-4 sm:h-5 sm:w-5" />
                           {formatPrice(application.proposedPrice)}
                         </div>
-                        <p className="text-sm text-gray-600">Proponowana cena</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Proponowana cena</p>
                       </div>
                       <div className="text-center">
-                        <div className="flex items-center justify-center gap-1 font-medium">
-                          <Clock className="h-4 w-4" />
+                        <div className="flex items-center justify-center gap-1 text-sm sm:text-base font-medium">
+                          <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
                           {application.proposedTimeline}
                         </div>
-                        <p className="text-sm text-gray-600">Czas realizacji</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Czas realizacji</p>
                       </div>
                     </div>
 
                     {/* Cover Letter (Opis oferty) */}
                     {application.coverLetter && (
                       <div>
-                        <h4 className="font-medium mb-2">Opis oferty</h4>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{application.coverLetter}</p>
+                        <h4 className="text-sm sm:text-base font-medium mb-1.5 sm:mb-2">Opis oferty</h4>
+                        <div className="p-2.5 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap">{application.coverLetter}</p>
                         </div>
                       </div>
                     )}
@@ -294,18 +315,18 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                     {/* Additional Notes (Dodatkowe uwagi) */}
                     {application.additionalNotes && (
                       <div>
-                        <h4 className="font-medium mb-2">Dodatkowe uwagi</h4>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{application.additionalNotes}</p>
+                        <h4 className="text-sm sm:text-base font-medium mb-1.5 sm:mb-2">Dodatkowe uwagi</h4>
+                        <div className="p-2.5 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap">{application.additionalNotes}</p>
                         </div>
                       </div>
                     )}
 
                     {/* Interview/Contract Details for accepted applications */}
                     {application.status === 'accepted' && application.contractDetails && (
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <h4 className="font-semibold text-green-800 mb-3">Szczegóły kontraktu</h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="p-2.5 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <h4 className="text-sm sm:text-base font-semibold text-green-800 mb-2 sm:mb-2.5">Szczegóły kontraktu</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                           <div>
                             <span className="text-gray-600">Data rozpoczęcia:</span>
                             <div className="font-medium">{formatDate(application.contractDetails.startDate)}</div>
@@ -329,21 +350,25 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                     )}
 
                     {/* Actions */}
-                    <div className="flex justify-between items-center pt-4 border-t">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0 pt-2 sm:pt-3 border-t">
                       <Button
                         variant="outline"
                         onClick={() => onJobView && onJobView(application.jobId)}
+                        className="w-full sm:w-auto text-sm"
+                        size="sm"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
+                        <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                         Zobacz zlecenie
                       </Button>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         {application.status === 'accepted' && (
                           <Button
                             onClick={() => onStartConversation && onStartConversation(application.id)}
+                            className="w-full sm:w-auto text-sm"
+                            size="sm"
                           >
-                            <MessageSquare className="h-4 w-4 mr-2" />
+                            <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                             Napisz do zleceniodawcy
                           </Button>
                         )}
@@ -353,17 +378,20 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                             <Button
                               variant="outline"
                               onClick={() => onStartConversation && onStartConversation(application.id)}
+                              className="w-full sm:w-auto text-sm"
+                              size="sm"
                             >
-                              <MessageSquare className="h-4 w-4 mr-2" />
+                              <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                               Skontaktuj się
                             </Button>
                             {onWithdraw && application.postType && (
                               <Button
                                 variant="outline"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 w-full sm:w-auto text-sm"
+                                size="sm"
                                 onClick={() => onWithdraw(application.id, application.postType!)}
                               >
-                                <X className="h-4 w-4 mr-2" />
+                                <X className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                                 Anuluj ofertę
                               </Button>
                             )}

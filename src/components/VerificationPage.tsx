@@ -209,7 +209,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
               variant="ghost" 
               size="sm" 
               onClick={() => router.push('/account')}
-              className="text-muted-foreground hover:text-foreground"
+              className="hidden md:flex text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Powrót

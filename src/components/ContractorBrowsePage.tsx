@@ -205,14 +205,14 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+          <div className="flex items-center justify-between h-12 md:h-16">
+            <div className="flex items-center space-x-2 md:space-x-4">
               {onBack && (
-                <Button variant="ghost" size="icon" onClick={onBack}>
-                  <ArrowLeft className="w-5 h-5" />
+                <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 md:h-10 md:w-10">
+                  <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
                 </Button>
               )}
-              <nav className="flex space-x-2 text-sm text-gray-500">
+              <nav className="flex space-x-1 md:space-x-2 text-xs md:text-sm text-gray-500">
                 <span>Strona główna</span>
                 <span>/</span>
                 <span className="text-gray-900 font-medium">Wykonawcy</span>
@@ -222,30 +222,30 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
         {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Zweryfikowani Wykonawcy</h1>
-          <p className="text-xl text-gray-600 mb-8">
+        <div className="text-center mb-6 md:mb-12">
+          <h1 className="hidden md:block text-2xl md:text-4xl font-bold mb-2 md:mb-4">Zweryfikowani Wykonawcy</h1>
+          <p className="hidden md:block text-sm md:text-xl text-gray-600 mb-4 md:mb-8">
             Znajdź najlepszych specjalistów dla swojej wspólnoty mieszkaniowej
           </p>
           
           {/* Search and Filters */}
           <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4 mb-4 md:mb-6">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
                 <Input
                   placeholder="Szukaj wykonawców, usług, specjalizacji..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-12 bg-gray-100 border-gray-300"
+                  className="pl-9 md:pl-10 h-10 md:h-12 bg-gray-100 border-gray-300 text-sm md:text-base"
                 />
               </div>
               <Button 
                 variant="outline" 
                 onClick={() => setShowFilters(!showFilters)}
-                className="h-12 px-6"
+                className="h-10 md:h-12 px-4 md:px-6 text-sm md:text-base"
               >
                 <SlidersHorizontal className="w-4 h-4 mr-2" />
                 Filtry
@@ -490,21 +490,6 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
                         }}
                       >
                         Zobacz profil
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!isExpanded) {
-                            loadContractorReviews(contractor.id);
-                            setExpandedContractor(contractor.id);
-                          } else {
-                            setExpandedContractor(null);
-                          }
-                        }}
-                      >
-                        {isExpanded ? 'Zwiń' : 'Opinie'}
                       </Button>
                     </div>
                   </CardContent>

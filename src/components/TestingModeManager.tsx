@@ -16,7 +16,8 @@ import {
   EyeOff,
   AlertTriangle,
   Info,
-  CheckCircle
+  CheckCircle,
+  ArrowLeft
 } from 'lucide-react';
 import { getDataSourceConfig } from '../lib/config/data-source';
 
@@ -142,8 +143,9 @@ export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <Button variant="ghost" onClick={onBack} className="mb-2">
-                ← Powrót
+              <Button variant="ghost" onClick={onBack} className="mb-2 hidden md:flex items-center gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                Powrót
               </Button>
               <h1 className="text-2xl font-semibold flex items-center gap-2">
                 <Settings className="h-6 w-6 text-primary" />

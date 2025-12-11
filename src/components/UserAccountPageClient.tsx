@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, Camera, Shield, User } from 'lucide-react';
+import { Shield, User } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -13,9 +13,8 @@ import { DeleteAccountSection } from './DeleteAccountSection';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader } from './ui/card';
-import { Separator } from './ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsContent } from './ui/tabs';
+import { cn } from './ui/utils';
 
 export function UserAccountPageClient({ 
   onBack, 
@@ -111,117 +110,153 @@ export function UserAccountPageClient({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="space-y-6">
-          {/* Profile Header */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <Avatar className="h-20 w-20">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                      {user.firstName?.[0]}{user.lastName?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button 
-                    size="sm" 
-                    variant="secondary" 
-                    className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full"
-                  >
-                    <Camera className="h-4 w-4" />
-                  </Button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
+              <div className="relative flex-shrink-0">
+                <Avatar className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20">
+                  <AvatarFallback className="bg-primary text-white text-sm sm:text-lg md:text-xl">
+                    {user.firstName?.[0]}{user.lastName?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3 mb-1.5 sm:mb-2">
+                  <h1 className="text-lg sm:text-2xl md:text-3xl font-bold break-words">{user.firstName} {user.lastName}</h1>
+                  {!user.isVerified && (
+                    <Badge variant="destructive" className="text-[10px] sm:text-xs md:text-sm">
+                      Ważne
+                    </Badge>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold">{user.firstName} {user.lastName}</h2>
-                  <p className="text-muted-foreground">{user.email}</p>
-                  <div className="flex items-center mt-2 space-x-4">
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-1 text-muted-foreground" />
-                      <span className="text-sm capitalize">
-                        {user.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <Shield className="h-4 w-4 mr-1 text-muted-foreground" />
-                      <span className="text-sm">
-                        {user.isVerified ? 'Zweryfikowany' : 'Niezweryfikowany'}
-                      </span>
-                      {!user.isVerified && (
-                        <Badge variant="destructive" className="ml-2">
-                          Ważne
-                        </Badge>
-                      )}
-                    </div>
+                <p className="text-gray-600 mb-1.5 sm:mb-2 md:mb-1 text-xs sm:text-sm md:text-base break-words">{user.email}</p>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-500">
+                  <div className="flex items-center">
+                    <User className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                    <span className="capitalize">
+                      {user.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}
+                    </span>
+                  </div>
+                  <div className="flex items-center">
+                    <Shield className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                    <span>
+                      {user.isVerified ? 'Zweryfikowany' : 'Niezweryfikowany'}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-col space-y-2">
-                  {!user.isVerified && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={onVerificationClick}
-                    >
-                      Zweryfikuj konto
-                    </Button>
-                  )}
-                  {user.userType === 'manager' && (
-                    <Button 
-                      variant="default" 
-                      size="sm"
-                      onClick={onManagerDashboardClick}
-                    >
-                      Panel Zarządcy
-                    </Button>
-                  )}
-                  {user.userType === 'contractor' && (
-                    <Button 
-                      variant="default" 
-                      size="sm"
-                      onClick={onContractorDashboardClick}
-                    >
-                      Panel Wykonawcy
-                    </Button>
-                  )}
-                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Account Settings Tabs */}
-          <Card>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <CardHeader>
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="profile">Profil</TabsTrigger>
-                  <TabsTrigger value="company">Firma</TabsTrigger>
-                  <TabsTrigger value="security">Bezpieczeństwo</TabsTrigger>
-                  <TabsTrigger value="notifications">Powiadomienia</TabsTrigger>
-                </TabsList>
-              </CardHeader>
-              
-              <CardContent className="space-y-6">
-                <TabsContent value="profile" className="space-y-6">
-                  <ProfileForm user={user} />
-                </TabsContent>
-
-                <TabsContent value="company" className="space-y-6">
-                  <CompanyManagementForm user={user} />
-                </TabsContent>
-
-                <TabsContent value="security" className="space-y-6">
-                  <PasswordForm />
-                  <DeleteAccountSection />
-                </TabsContent>
-
-                <TabsContent value="notifications" className="space-y-6">
-                  <NotificationSettings />
-                </TabsContent>
-              </CardContent>
-            </Tabs>
-          </Card>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+              {!user.isVerified && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={onVerificationClick}
+                  className="w-full sm:w-auto"
+                >
+                  Zweryfikuj konto
+                </Button>
+              )}
+              {user.userType === 'manager' && (
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  onClick={onManagerDashboardClick}
+                  className="w-full sm:w-auto"
+                >
+                  Panel Zarządcy
+                </Button>
+              )}
+              {user.userType === 'contractor' && (
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  onClick={onContractorDashboardClick}
+                  className="w-full sm:w-auto"
+                >
+                  Panel Wykonawcy
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Tabs Navigation */}
+      <nav className="border-b bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-1 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={cn(
+                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                activeTab === 'profile'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              )}
+            >
+              Profil
+            </button>
+            <button
+              onClick={() => setActiveTab('company')}
+              className={cn(
+                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                activeTab === 'company'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              )}
+            >
+              Firma
+            </button>
+            <button
+              onClick={() => setActiveTab('security')}
+              className={cn(
+                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                activeTab === 'security'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              )}
+            >
+              Bezpieczeństwo
+            </button>
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className={cn(
+                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                activeTab === 'notifications'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              )}
+            >
+              Powiadomienia
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsContent value="profile" className="space-y-6">
+            <ProfileForm user={user} />
+          </TabsContent>
+
+          <TabsContent value="company" className="space-y-6">
+            <CompanyManagementForm user={user} />
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-6">
+            <PasswordForm />
+            <DeleteAccountSection />
+          </TabsContent>
+
+          <TabsContent value="notifications" className="space-y-6">
+            <NotificationSettings />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

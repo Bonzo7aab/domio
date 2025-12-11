@@ -63,7 +63,8 @@ export function MobileMenuDock() {
     return titleToPath[title] || '';
   };
 
-  const menuItems: FloatingDockItem[] = [
+  // Full menu items for drawer
+  const allMenuItems: FloatingDockItem[] = [
     {
       title: 'Strona główna',
       icon: <Home className="size-6" />,
@@ -157,6 +158,63 @@ export function MobileMenuDock() {
         ]),
   ];
 
+  // Filtered menu items for bottom dock (only 4 main items)
+  const mainMenuItems: FloatingDockItem[] = [
+    {
+      title: 'Strona główna',
+      icon: <Home className="size-6" />,
+      href: '/',
+      isActive: isActive('/'),
+      onClick: () => {
+        setMenuDrawerOpen(false);
+        setTimeout(() => {
+          router.push('/');
+        }, 150);
+      },
+    },
+    {
+      title: 'Szukaj',
+      icon: <Search className="size-6" />,
+      isActive: false, // Search doesn't have a specific path
+      onClick: () => {
+        setMenuDrawerOpen(false);
+        setTimeout(() => {
+          // Trigger command palette
+          const event = new KeyboardEvent('keydown', {
+            key: 'k',
+            metaKey: true,
+            ctrlKey: navigator.platform.includes('Mac') ? false : true,
+          });
+          document.dispatchEvent(event);
+        }, 150);
+      },
+    },
+    {
+      title: 'Wykonawcy',
+      icon: <Briefcase className="size-6" />,
+      href: '/contractors',
+      isActive: isActive('/contractors'),
+      onClick: () => {
+        setMenuDrawerOpen(false);
+        setTimeout(() => {
+          router.push('/contractors');
+        }, 150);
+      },
+    },
+    {
+      title: 'Wiadomości',
+      icon: <MessageCircle className="size-6" />,
+      href: isAuthenticated ? '/messages' : '/user-type-selection',
+      isActive: isAuthenticated ? isActive('/messages') : isActive('/user-type-selection'),
+      onClick: () => {
+        setMenuDrawerOpen(false);
+        setTimeout(() => {
+          router.push(isAuthenticated ? '/messages' : '/user-type-selection');
+        }, 150);
+      },
+    },
+  ];
+
   const compactDockItems: FloatingDockItem[] = [
     {
       title: isMapExpanded ? 'Ukryj mapę' : 'Pokaż mapę',
@@ -210,7 +268,7 @@ export function MobileMenuDock() {
             </DrawerHeader>
             <div className="overflow-y-auto flex-1 p-4">
               <div className="space-y-1">
-                {menuItems.map((item, index) => {
+                {allMenuItems.map((item, index) => {
                   const itemPath = getPathForLabel(item.title || '');
                   const active = itemPath ? isActive(itemPath) : false;
                   return (
@@ -243,11 +301,11 @@ export function MobileMenuDock() {
     );
   }
 
-  // Normal mode: Show all menu items - visible on mobile and tablet
+  // Normal mode: Show filtered 4 main menu items - visible on mobile and tablet
   return (
     <div className="lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
       <FloatingDock
-        items={menuItems}
+        items={mainMenuItems}
         mobileClassName="lg:hidden"
       />
     </div>

@@ -446,10 +446,10 @@ export default function HomePage() {
       
       {/* Main Layout - Hidden when map is expanded, wrapped in max-w-7xl container */}
       {!isMapExpanded && (
-        <div className="max-w-7xl mx-auto">
-          <div className="flex min-h-[calc(100vh-12rem)]">
+        <div className="max-w-7xl mx-auto sm:px-4 md:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row min-h-0 lg:min-h-[calc(100vh-12rem)]">
             {/* Filters Sidebar - Visible only on laptop and above */}
-            <div className="hidden lg:flex flex-col">
+            <div className="hidden lg:flex flex-col lg:w-80 xl:w-96 flex-shrink-0">
               {/* Map Placeholder */}
               <div className="mb-4">
                 <MapPlaceholder 
@@ -467,7 +467,7 @@ export default function HomePage() {
             </div>
             
             {/* Main Content - JobList */}
-            <div className="flex-1">
+            <div className="flex-1 min-w-0 lg:ml-6">
               <JobList 
                 jobs={loadedJobs}
                 filters={filters}
@@ -476,6 +476,7 @@ export default function HomePage() {
                 onToggleMap={handleToggleMap}
                 isMapVisible={false}
                 isLoadingJobs={isLoadingJobs}
+                onApplyClick={handleApplyClick}
               />
             </div>
           </div>

@@ -19,6 +19,7 @@ interface JobListProps {
   onToggleMap?: () => void;
   isMapVisible?: boolean;
   isLoadingJobs?: boolean;
+  onApplyClick?: (jobId: string, jobData?: any) => void;
 }
 
 export default function JobList({ 
@@ -28,7 +29,8 @@ export default function JobList({
   onJobSelect, 
   onToggleMap, 
   isMapVisible = true,
-  isLoadingJobs = false
+  isLoadingJobs = false,
+  onApplyClick
 }: JobListProps) {
   const [sortBy, setSortBy] = useState('newest');
   const [bookmarkedJobs, setBookmarkedJobs] = useState<string[]>([]);
@@ -536,6 +538,7 @@ export default function JobList({
               onClick={() => onJobSelect?.(job.id)}
               onBookmark={handleBookmark}
               isBookmarked={bookmarkedJobs.includes(job.id)}
+              onApplyClick={onApplyClick}
             />
           ))}
         </div>

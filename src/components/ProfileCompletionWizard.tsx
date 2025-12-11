@@ -724,7 +724,7 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
       <div className="w-full max-w-2xl space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={onBack}>
+          <Button variant="ghost" onClick={onBack} className="hidden md:flex">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Powrót
           </Button>

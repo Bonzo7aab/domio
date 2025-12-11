@@ -54,7 +54,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
               variant="ghost" 
               size="sm" 
               onClick={onBack}
-              className="text-muted-foreground hover:text-foreground"
+              className="hidden md:flex text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Powrót

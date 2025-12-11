@@ -141,7 +141,7 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
       </div>
 
       {/* Statystyki */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-primary">{stats.total}</div>
@@ -182,14 +182,16 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
 
       {/* Filtry */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="all">Wszystkie ({stats.total})</TabsTrigger>
-          <TabsTrigger value="pending">Nowe ({stats.pending})</TabsTrigger>
-          <TabsTrigger value="under_review">W ocenie ({stats.under_review})</TabsTrigger>
-          <TabsTrigger value="accepted">Zaakceptowane ({stats.accepted})</TabsTrigger>
-          <TabsTrigger value="rejected">Odrzucone ({stats.rejected})</TabsTrigger>
-          <TabsTrigger value="cancelled">Anulowane ({stats.cancelled})</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+          <TabsList className="grid w-full grid-cols-6 min-w-[600px] md:min-w-0">
+            <TabsTrigger value="all" className="text-xs md:text-sm whitespace-nowrap">Wszystkie ({stats.total})</TabsTrigger>
+            <TabsTrigger value="pending" className="text-xs md:text-sm whitespace-nowrap">Nowe ({stats.pending})</TabsTrigger>
+            <TabsTrigger value="under_review" className="text-xs md:text-sm whitespace-nowrap">W ocenie ({stats.under_review})</TabsTrigger>
+            <TabsTrigger value="accepted" className="text-xs md:text-sm whitespace-nowrap">Zaakceptowane ({stats.accepted})</TabsTrigger>
+            <TabsTrigger value="rejected" className="text-xs md:text-sm whitespace-nowrap">Odrzucone ({stats.rejected})</TabsTrigger>
+            <TabsTrigger value="cancelled" className="text-xs md:text-sm whitespace-nowrap">Anulowane ({stats.cancelled})</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value={selectedTab} className="mt-6">
           {filteredApplications.length === 0 ? (
@@ -212,8 +214,8 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
               {filteredApplications.map((application) => (
                 <Card key={application.id} className="overflow-hidden">
                   <CardHeader className="pb-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <Avatar className="h-12 w-12">
                           <AvatarImage src={application.contractorAvatar} />
                           <AvatarFallback>
@@ -239,9 +241,9 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-left md:text-right flex-shrink-0">
                         <ApplicationStatusBadge status={application.status} />
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-xs md:text-sm text-gray-500 mt-1">
                           {formatDate(application.submittedAt)}
                         </p>
                       </div>
@@ -347,16 +349,17 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                     )}
 
                     {/* Akcje */}
-                    <div className="flex justify-between items-center pt-4 border-t">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pt-4 border-t">
                       <Button
                         variant="outline"
                         onClick={() => onStartConversation(application.contractorId)}
+                        className="w-full sm:w-auto"
                       >
                         <MessageSquare className="h-4 w-4 mr-2" />
                         Napisz wiadomość
                       </Button>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                         {application.status === 'submitted' && (
                           <>
                             <Button

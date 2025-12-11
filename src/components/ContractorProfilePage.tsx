@@ -1,17 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Star, Shield, CheckCircle, Users, Briefcase, Phone, Mail, Calendar, Award, Eye, Heart, Share2, ExternalLink, ThumbsUp } from 'lucide-react';
+import { MapPin, Star, Users, Briefcase, Phone, Mail, Calendar, Award, ExternalLink, ThumbsUp, FileText, TrendingUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Separator } from './ui/separator';
+import { Progress } from './ui/progress';
 import { fetchContractorById, fetchContractorReviews, fetchContractorRatingSummary, fetchContractorPortfolio } from '../lib/database/contractors';
 import { createClient } from '../lib/supabase/client';
 import { QuoteRequestModal } from './QuoteRequestModal';
 import { ServicePricing } from '../types/contractor';
+import { getCategoryLabel } from './contractor-dashboard/shared/utils';
 
 interface ContractorProfilePageProps {
   contractorId: string;
@@ -138,7 +137,6 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
   const [isLoading, setIsLoading] = useState(true);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
-  const [showPhoneNumber, setShowPhoneNumber] = useState(false);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
 
   useEffect(() => {
@@ -164,6 +162,38 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
 
     loadContractor();
   }, [contractorId]);
+
+  // Sync active tab with hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#overview' || hash === '') {
+        setActiveTab('overview');
+      } else if (hash === '#services') {
+        setActiveTab('services');
+      } else if (hash === '#portfolio') {
+        setActiveTab('portfolio');
+      } else if (hash === '#team') {
+        setActiveTab('team');
+      } else if (hash === '#reviews') {
+        setActiveTab('reviews');
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Listen for custom event from header to open quote modal
+  useEffect(() => {
+    const handleOpenQuoteModal = () => {
+      setShowQuoteModal(true);
+    };
+
+    window.addEventListener('openQuoteModal', handleOpenQuoteModal);
+    return () => window.removeEventListener('openQuoteModal', handleOpenQuoteModal);
+  }, []);
 
   // Load reviews when reviews tab is selected
   useEffect(() => {
@@ -209,455 +239,210 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Ładowanie profilu...</h2>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="ml-2 text-sm text-muted-foreground">Ładowanie profilu...</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (!contractor) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Wykonawca nie znaleziony</h2>
-          <Button onClick={onBack}>Powrót do listy</Button>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <h2 className="text-2xl font-bold mb-4">Wykonawca nie znaleziony</h2>
+            {onBack && <Button onClick={onBack}>Powrót do listy</Button>}
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              {onBack && (
-                <Button variant="ghost" size="icon" onClick={onBack}>
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              )}
-              <nav className="flex space-x-2 text-sm text-gray-500">
-                <span>Wykonawcy</span>
-                <span>/</span>
-                <span className="text-gray-900 font-medium">{contractor.name}</span>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm">
-                <Heart className="w-4 h-4 mr-2" />
-                Obserwuj
-              </Button>
-              <Button variant="outline" size="sm">
-                <Share2 className="w-4 h-4 mr-2" />
-                Udostępnij
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Cover Image */}
-      <div className="relative h-64 bg-gradient-to-r from-blue-600 to-blue-800">
-        <div 
-          className="absolute inset-0 bg-cover bg-center opacity-30"
-          style={{ backgroundImage: `url(${contractor.coverImage})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-      </div>
-
-      {/* Profile Header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative -mt-24 mb-8">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="flex flex-col md:flex-row md:items-start md:space-x-8">
-              {/* Logo */}
-              <div className="flex-shrink-0 mb-6 md:mb-0">
-                <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                  <AvatarImage src={contractor.logo} alt={contractor.name} />
-                  <AvatarFallback className="text-3xl">{contractor.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-              </div>
-
-              {/* Basic Info */}
-              <div className="flex-1">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4">
-                  <div>
-                    <h1 className="text-3xl font-bold mb-2">{contractor.name}</h1>
-                    <p className="text-xl text-gray-600 mb-4">
-                      {contractor.slogan || 'Profesjonalne usługi budowlane'}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div id="overview" className="scroll-mt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* About */}
+              <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+                {/* Company Description */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">O firmie</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+                      {contractor.description || 'Brak opisu firmy. Wykonawca nie dodał jeszcze informacji o swojej działalności.'}
                     </p>
-                    
-                    <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="w-4 h-4" />
-                        <span>{contractor.location || 'Nie określono lokalizacji'}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>
-                          {contractor.founded 
-                            ? `Działa od ${contractor.founded}`
-                            : 'Rok założenia nie określony'}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Users className="w-4 h-4" />
-                        <span>
-                          {contractor.employees 
-                            ? `${contractor.employees} pracowników`
-                            : 'Liczba pracowników nie określona'}
-                        </span>
-                      </div>
-                    </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="flex items-center space-x-4 mb-4">
-                      <div className="flex items-center space-x-1">
-                        <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                        {contractor.rating > 0 ? (
-                          <>
-                            <span className="font-bold text-lg">{contractor.rating}</span>
-                            <span className="text-gray-500">({contractor.reviewCount} opinii)</span>
-                          </>
-                        ) : (
-                          <span className="text-gray-500">Brak ocen</span>
-                        )}
-                      </div>
-                      <Separator orientation="vertical" className="h-6" />
-                      <div className="flex items-center space-x-1">
-                        <Briefcase className="w-5 h-5 text-green-600" />
-                        <span className="font-medium">
-                          {contractor.completedJobs > 0 
-                            ? `${contractor.completedJobs} zleceń`
-                            : 'Brak ukończonych zleceń'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                {/* Key Statistics */}
+                <div>
+                  <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Kluczowe statystyki</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    {/* Projects Completed Stat */}
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-xs sm:text-sm font-medium">Zrealizowanych projektów</CardTitle>
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl sm:text-3xl font-bold text-primary">{contractor.stats.projectsCompleted > 0 ? contractor.stats.projectsCompleted : '—'}</div>
+                      </CardContent>
+                    </Card>
 
-                  <div className="flex flex-col space-y-3">
-                    <Button 
-                      size="lg" 
-                      className="w-full md:w-auto"
-                      onClick={() => setShowQuoteModal(true)}
-                    >
-                      Zapytaj o wycenę
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="lg" 
-                      className="w-full md:w-auto"
-                      onClick={() => setShowPhoneNumber(!showPhoneNumber)}
-                    >
-                      <Phone className="w-4 h-4 mr-2" />
-                      {showPhoneNumber ? 'Ukryj numer' : 'Zadzwoń'}
-                    </Button>
-                    {showPhoneNumber && (
-                      <div className="text-center p-3 bg-green-50 border border-green-200 rounded-lg">
-                        {contractor.phone ? (
-                          <>
-                            <a 
-                              href={`tel:${contractor.phone}`}
-                              className="text-lg font-semibold text-green-800 hover:text-green-900 hover:underline block"
-                            >
-                              {contractor.phone}
-                            </a>
-                            <div className="text-sm text-green-600 mt-1">Kliknij numer, aby zadzwonić</div>
-                          </>
-                        ) : (
-                          <div className="text-gray-500">Numer telefonu nie jest dostępny</div>
-                        )}
-                      </div>
+                    {/* Client Satisfaction Stat */}
+                    <Card className="hover:shadow-md transition-shadow bg-green-50/50 border-green-200">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-xs sm:text-sm font-medium">Zadowolonych klientów</CardTitle>
+                        <Star className="h-4 w-4 text-green-600 fill-green-600" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl sm:text-3xl font-bold text-green-700">{contractor.stats.clientSatisfaction > 0 ? `${contractor.stats.clientSatisfaction}%` : '—'}</div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Repeat Clients Stat */}
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-xs sm:text-sm font-medium">Powracających klientów</CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl sm:text-3xl font-bold text-primary">{contractor.stats.repeatClients > 0 ? `${contractor.stats.repeatClients}%` : '—'}</div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Response Time Stat */}
+                    {contractor.stats.avgResponseTime && (
+                      <Card className="hover:shadow-md transition-shadow">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-xs sm:text-sm font-medium">Średni czas odpowiedzi</CardTitle>
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-lg sm:text-xl font-bold text-primary">{contractor.stats.avgResponseTime}</div>
+                        </CardContent>
+                      </Card>
                     )}
                   </div>
                 </div>
 
-                {/* Trust Indicators */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {contractor.verified && (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Zweryfikowany
-                    </Badge>
-                  )}
-                  {contractor.hasInsurance && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                      <Shield className="w-3 h-3 mr-1" />
-                      Ubezpieczenie OC
-                    </Badge>
-                  )}
-                  {contractor.isPremium && (
-                    <Badge variant="default">Premium</Badge>
-                  )}
-                </div>
-
-                {/* Specialties */}
-                <div className="flex flex-wrap gap-2">
-                  {contractor.specialties && contractor.specialties.length > 0 ? (
-                    contractor.specialties.map((specialty, index) => (
-                      <Badge key={index} variant="outline">
-                        {specialty}
-                      </Badge>
-                    ))
-                  ) : (
-                    <span className="text-sm text-gray-500">Brak określonych specjalizacji</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Przegląd</TabsTrigger>
-            <TabsTrigger value="services">Usługi</TabsTrigger>
-            <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
-            <TabsTrigger value="team">Zespół</TabsTrigger>
-            <TabsTrigger value="reviews">Opinie</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* About */}
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>O firmie</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 leading-relaxed mb-6">
-                    {contractor.description || 'Brak opisu firmy. Wykonawca nie dodał jeszcze informacji o swojej działalności.'}
-                  </p>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">
-                        {contractor.stats.projectsCompleted > 0 ? contractor.stats.projectsCompleted : '—'}
-                      </div>
-                      <div className="text-sm text-gray-600">Zrealizowanych projektów</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">
-                        {contractor.stats.clientSatisfaction > 0 ? `${contractor.stats.clientSatisfaction}%` : '—'}
-                      </div>
-                      <div className="text-sm text-gray-600">Zadowolonych klientów</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">
-                        {contractor.stats.repeatClients > 0 ? `${contractor.stats.repeatClients}%` : '—'}
-                      </div>
-                      <div className="text-sm text-gray-600">Powracających klientów</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">
-                        {contractor.stats.avgResponseTime ? contractor.stats.avgResponseTime : '—'}
-                      </div>
-                      <div className="text-sm text-gray-600">Średni czas odpowiedzi</div>
-                    </div>
-                  </div>
-
+                {/* Certificates */}
+                {contractor.certificates && contractor.certificates.length > 0 && (
                   <div>
-                    <h4 className="font-medium mb-3">Certyfikaty i uprawnienia</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {contractor.certificates && contractor.certificates.length > 0 ? (
-                        contractor.certificates.map((cert, index) => (
-                          <Badge key={index} variant="secondary" className="bg-yellow-100 text-yellow-800">
-                            <Award className="w-3 h-3 mr-1" />
-                            {cert}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-sm text-gray-500">Brak certyfikatów i uprawnień</span>
-                      )}
-                    </div>
+                    <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Certyfikaty i uprawnienia</h3>
+                    <Card>
+                      <CardContent className="pt-4 sm:pt-6">
+                        <div className="flex flex-wrap gap-2">
+                          {contractor.certificates.map((cert: string, index: number) => (
+                            <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 text-xs py-1.5 px-3">
+                              <Award className="w-3 h-3 mr-1.5" />
+                              {cert}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              </div>
 
               {/* Contact Info */}
-              <Card>
+              <Card className="h-fit self-start">
                 <CardHeader>
-                  <CardTitle>Kontakt</CardTitle>
+                  <CardTitle className="text-base sm:text-lg">Kontakt</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <Phone className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <div className="font-medium">
-                        {showPhoneNumber ? (
-                          contractor.phone ? (
-                            <a 
-                              href={`tel:${contractor.phone}`}
-                              className="text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {contractor.phone}
-                            </a>
-                          ) : (
-                            <span className="text-gray-500">Numer telefonu nie jest dostępny</span>
-                          )
-                        ) : (
-                          <span className="text-gray-500">Kliknij "Zadzwoń" aby zobaczyć numer</span>
-                        )}
+                <CardContent className="space-y-3 sm:space-y-4">
+                  {contractor.phone && (
+                    <div className="flex items-center space-x-2 sm:space-x-3">
+                      <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm sm:text-base truncate">{contractor.phone}</div>
+                        <div className="text-xs sm:text-sm text-gray-500">Telefon</div>
                       </div>
-                      <div className="text-sm text-gray-500">Telefon</div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="flex items-center space-x-3">
-                    <Mail className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <div className="font-medium">
-                        {contractor.email ? (
-                          <a 
-                            href={`mailto:${contractor.email}`}
-                            className="text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            {contractor.email}
-                          </a>
-                        ) : (
-                          <span className="text-gray-500">Brak adresu email</span>
-                        )}
+                  {contractor.email && (
+                    <div className="flex items-center space-x-2 sm:space-x-3">
+                      <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm sm:text-base truncate">{contractor.email}</div>
+                        <div className="text-xs sm:text-sm text-gray-500">Email</div>
                       </div>
-                      <div className="text-sm text-gray-500">Email</div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <div className="font-medium">
-                        {contractor.address ? (
-                          contractor.address
-                        ) : (
-                          <span className="text-gray-500">Brak adresu</span>
-                        )}
+                  {contractor.address && (
+                    <div className="flex items-center space-x-2 sm:space-x-3">
+                      <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm sm:text-base truncate">{contractor.address}</div>
+                        <div className="text-xs sm:text-sm text-gray-500">Adres</div>
                       </div>
-                      <div className="text-sm text-gray-500">Adres</div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="flex items-center space-x-3">
-                    <ExternalLink className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <div className="font-medium">
-                        {contractor.website ? (
-                          <a 
-                            href={contractor.website.startsWith('http') ? contractor.website : `https://${contractor.website}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            {contractor.website}
-                          </a>
-                        ) : (
-                          <span className="text-gray-500">Brak strony internetowej</span>
-                        )}
+                  {contractor.website && (
+                    <div className="flex items-center space-x-2 sm:space-x-3">
+                      <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm sm:text-base truncate">{contractor.website}</div>
+                        <div className="text-xs sm:text-sm text-gray-500">Strona internetowa</div>
                       </div>
-                      <div className="text-sm text-gray-500">Strona internetowa</div>
                     </div>
-                  </div>
+                  )}
 
-                  <Button 
-                    className="w-full mt-4"
-                    onClick={() => setShowQuoteModal(true)}
-                  >
+                  <Button className="w-full mt-3 sm:mt-4 text-sm sm:text-base" onClick={() => setShowQuoteModal(true)}>
                     Zapytaj o wycenę
                   </Button>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="services" className="space-y-6">
-            {contractor.services && contractor.services.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {contractor.services.map((service: any, index: number) => (
-                  <Card key={index} className="flex flex-col h-full">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg mb-2">{service.name}</CardTitle>
-                          {service.category && (
-                            <Badge 
-                              variant={
-                                service.category === 'primary' ? 'default' : 
-                                service.category === 'secondary' ? 'outline' : 
-                                'secondary'
-                              }
-                              className="text-xs"
-                            >
-                              {service.category === 'primary' ? 'Usługa podstawowa' : 
-                               service.category === 'secondary' ? 'Usługa dodatkowa' : 
-                               'Specjalizacja'}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="flex flex-col flex-1 space-y-4">
-                      <div className="space-y-3 flex-1">
-                        <p className="text-gray-600 text-sm">{service.description}</p>
-                        
-                        {service.pricing && (
-                          <div className="space-y-2 text-xs text-gray-600 border-t pt-3">
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Typ ceny:</span>
-                              <span className="font-medium">
-                                {service.pricing.type === 'hourly' ? 'Stawka godzinowa' :
-                                 service.pricing.type === 'fixed' ? 'Cena stała' :
-                                 'Zakres cen'}
-                              </span>
-                            </div>
-                            {service.pricing.min !== undefined && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Cena min:</span>
-                                <span className="font-medium">{service.pricing.min} {service.pricing.currency || 'PLN'}</span>
-                              </div>
-                            )}
-                            {service.pricing.max !== undefined && service.pricing.max !== service.pricing.min && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Cena max:</span>
-                                <span className="font-medium">{service.pricing.max} {service.pricing.currency || 'PLN'}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Waluta:</span>
-                              <span className="font-medium">{service.pricing.currency || 'PLN'}</span>
-                            </div>
-                            {service.pricing.unit && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Jednostka:</span>
-                                <span className="font-medium">{service.pricing.unit}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="pt-4 mt-auto border-t">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">Cena:</span>
-                          <span className="text-lg font-bold text-green-600">{service.price}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-600">Ten wykonawca nie ma jeszcze dodanych usług.</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
+        {/* Services Tab */}
+        {activeTab === 'services' && (
+          <div id="services" className="scroll-mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {contractor.services.map((service: any, index: number) => (
+                <Card key={index}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-sm sm:text-base">
+                      {index === 0 && <Briefcase className="w-4 h-4 sm:w-5 sm:h-5" />}
+                      {index === 1 && <FileText className="w-4 h-4 sm:w-5 sm:h-5" />}
+                      {index === 2 && <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />}
+                      <span>{service.name}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 mb-3 sm:mb-4 text-sm">{service.description}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-base sm:text-lg font-bold text-green-600">{service.price}</span>
+                      <Button size="sm" className="text-xs sm:text-sm" onClick={() => setShowQuoteModal(true)}>Zapytaj</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
-          <TabsContent value="portfolio" className="space-y-6">
+        {/* Portfolio Tab */}
+        {activeTab === 'portfolio' && (
+          <div id="portfolio" className="scroll-mt-4">
             {portfolioLoading ? (
               <div className="text-center py-8">
                 <div className="text-lg">Ładowanie portfolio...</div>
@@ -665,7 +450,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
             ) : (
               <>
                 {portfolio.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     {portfolio.map((project) => (
                       <Card key={project.id} className="overflow-hidden">
                         <div className="aspect-video bg-gray-200 rounded-t-lg overflow-hidden">
@@ -682,7 +467,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                           )}
                         </div>
                         <CardHeader>
-                          <CardTitle className="text-lg">{project.title}</CardTitle>
+                          <CardTitle className="text-sm sm:text-base">{project.title}</CardTitle>
                           <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{project.year}</Badge>
                             {project.category && (
@@ -727,72 +512,79 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                 ) : (
                   <Card>
                     <CardContent className="pt-6 text-center">
-                      <div className="text-gray-500 mb-4">
-                        <Briefcase className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                        <h3 className="text-lg font-medium mb-2">Brak projektów w portfolio</h3>
-                        <p>Ten wykonawca nie ma jeszcze żadnych projektów w swoim portfolio.</p>
-                      </div>
+                      <Briefcase className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                      <h3 className="text-base sm:text-lg font-medium mb-2">Brak projektów w portfolio</h3>
+                      <p className="text-sm sm:text-base text-gray-600">Ten wykonawca nie ma jeszcze żadnych projektów w swoim portfolio.</p>
                     </CardContent>
                   </Card>
                 )}
               </>
             )}
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="team" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {contractor.team.map((member, index) => (
+        {/* Team Tab */}
+        {activeTab === 'team' && (
+          <div id="team" className="scroll-mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {contractor.team.map((member: any, index: number) => (
                 <Card key={index}>
-                  <CardContent className="pt-6 text-center">
-                    <Avatar className="w-20 h-20 mx-auto mb-4">
-                      <AvatarImage src={member.image} alt={member.name} />
-                      <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <h3 className="font-medium mb-1">{member.name}</h3>
-                    <p className="text-sm text-gray-600 mb-2">{member.position}</p>
-                    <Badge variant="secondary">{member.experience}</Badge>
+                  <CardContent className="pt-4 sm:pt-6 text-center">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-2xl sm:text-3xl font-bold text-primary">{member.name.charAt(0)}</span>
+                    </div>
+                    <h3 className="font-medium mb-1 text-sm sm:text-base">{member.name}</h3>
+                    <p className="text-xs sm:text-sm text-gray-600 mb-2">{member.position}</p>
+                    <Badge variant="secondary" className="text-xs">{member.experience}</Badge>
                   </CardContent>
                 </Card>
               ))}
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="reviews" className="space-y-6">
-            {reviewsLoading ? (
-              <div className="text-center py-8">
-                <div className="text-lg">Ładowanie opinii...</div>
-              </div>
-            ) : (
-              <>
-                {/* Rating Summary */}
-                {ratingSummary && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Podsumowanie ocen</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="text-center">
-                          <div className="text-4xl font-bold text-primary mb-2">
-                            {ratingSummary.averageRating.toFixed(1)}
-                          </div>
-                          <div className="flex justify-center mb-2">
-                            {[...Array(5)].map((_, i) => (
-                              <Star 
-                                key={i} 
-                                className={`w-6 h-6 ${i < Math.floor(ratingSummary.averageRating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                              />
-                            ))}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {ratingSummary.totalReviews} opinii
-                          </div>
+        {/* Reviews Tab */}
+        {activeTab === 'reviews' && (
+          <div id="reviews" className="scroll-mt-4">
+            <div className="space-y-4 sm:space-y-6">
+              {/* Rating Summary */}
+              {ratingSummary && ratingSummary.totalReviews > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                      Podsumowanie ocen
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-primary mb-2">
+                          {ratingSummary.averageRating.toFixed(1)}
                         </div>
-                        
-                        <div className="space-y-2">
-                          {Object.entries(ratingSummary.categoryRatings || {}).map(([category, rating]) => (
+                        <div className="flex justify-center mb-2">
+                          {[...Array(5)].map((_, i) => (
+                            <Star 
+                              key={i} 
+                              className={`w-6 h-6 ${
+                                i < Math.floor(ratingSummary.averageRating)
+                                  ? 'text-yellow-400 fill-yellow-400'
+                                  : 'text-gray-300'
+                              }`} 
+                            />
+                          ))}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {ratingSummary.totalReviews} {ratingSummary.totalReviews === 1 ? 'opinia' : 'opinii'}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {Object.entries(ratingSummary.categoryRatings || {}).map(([category, rating]) => {
+                          if (Number(rating) === 0) return null;
+                          return (
                             <div key={category} className="flex items-center justify-between">
-                              <span className="text-sm font-medium capitalize">{category}:</span>
+                              <span className="text-sm font-medium">{getCategoryLabel(category)}:</span>
                               <div className="flex items-center space-x-2">
                                 <div className="w-20 bg-gray-200 rounded-full h-2">
                                   <div 
@@ -803,18 +595,45 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                                 <span className="text-sm font-medium">{Number(rating).toFixed(1)}</span>
                               </div>
                             </div>
-                          ))}
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {Object.keys(ratingSummary.ratingBreakdown || {}).length > 0 && (
+                      <div className="mt-6 pt-6 border-t">
+                        <div className="text-sm font-semibold mb-3">Rozkład ocen:</div>
+                        <div className="space-y-2">
+                          {[5, 4, 3, 2, 1].map((stars) => {
+                            const count = ratingSummary.ratingBreakdown[stars.toString() as keyof typeof ratingSummary.ratingBreakdown] || 0;
+                            const percentage = ratingSummary.totalReviews > 0 
+                              ? (count / ratingSummary.totalReviews) * 100 
+                              : 0;
+                            return (
+                              <div key={stars} className="flex items-center gap-2">
+                                <span className="text-sm w-8">{stars}★</span>
+                                <Progress value={percentage} className="flex-1 h-2" />
+                                <span className="text-sm text-gray-500 w-12 text-right">{count}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
-                {/* Reviews List */}
+              {/* Reviews List */}
+              {reviewsLoading ? (
+                <div className="text-center py-8">
+                  <div className="text-lg">Ładowanie opinii...</div>
+                </div>
+              ) : (
                 <div className="space-y-4">
                   {reviews.length > 0 ? (
-                    reviews.map((review, index) => (
-                      <Card key={index}>
+                    reviews.map((review: any, index: number) => (
+                      <Card key={review.id || index}>
                         <CardContent className="pt-6">
                           <div className="flex items-start justify-between mb-4">
                             <div>
@@ -827,7 +646,11 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                               {[...Array(5)].map((_, i) => (
                                 <Star 
                                   key={i} 
-                                  className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
+                                  className={`w-4 h-4 ${
+                                    i < review.rating 
+                                      ? 'text-yellow-400 fill-yellow-400' 
+                                      : 'text-gray-300'
+                                  }`} 
                                 />
                               ))}
                             </div>
@@ -846,9 +669,9 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                               <div className="grid grid-cols-2 gap-2">
                                 {Object.entries(review.categories).map(([category, rating]) => (
                                   <div key={category} className="flex items-center justify-between text-xs">
-                                    <span className="capitalize">{category}:</span>
+                                    <span>{getCategoryLabel(category)}:</span>
                                     <div className="flex items-center space-x-1">
-                                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                                      <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
                                       <span>{Number(rating).toFixed(1)}</span>
                                     </div>
                                   </div>
@@ -862,7 +685,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                             <div className="flex items-center space-x-2">
                               <Button variant="ghost" size="sm" className="h-8 px-2">
                                 <ThumbsUp className="w-3 h-3 mr-1" />
-                                {review.helpfulCount}
+                                {review.helpfulCount || 0}
                               </Button>
                             </div>
                           </div>
@@ -881,10 +704,10 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                     </Card>
                   )}
                 </div>
-              </>
-            )}
-          </TabsContent>
-        </Tabs>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quote Request Modal */}

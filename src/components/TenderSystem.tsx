@@ -189,10 +189,10 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
   return (
     <div className="space-y-6">
       {/* Header with statistics */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">System przetargów</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl md:text-3xl font-bold">System przetargów</h1>
+          <p className="text-sm md:text-base text-gray-600">
             {userRole === 'manager' 
               ? 'Zarządzaj przetargami i oceniaj oferty wykonawców'
               : 'Przeglądaj i składaj oferty w przetargach'
@@ -200,23 +200,25 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
           </p>
         </div>
         
-        {userRole === 'manager' && (
-          <Button onClick={onTenderCreate} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Nowy przetarg
-          </Button>
-        )}
-        
-        {onBack && (
-          <Button onClick={onBack} variant="outline" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Wróć do listy
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {userRole === 'manager' && (
+            <Button onClick={onTenderCreate} className="flex items-center gap-2 flex-1 md:flex-initial">
+              <Plus className="h-4 w-4" />
+              Nowy przetarg
+            </Button>
+          )}
+          
+          {onBack && (
+            <Button onClick={onBack} variant="outline" className="flex items-center gap-2 flex-1 md:flex-initial">
+              <ArrowLeft className="h-4 w-4" />
+              Wróć do listy
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -347,35 +349,35 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
               className="cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => handleTenderClick(tender.id)}
             >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-lg">{tender.title}</h3>
+              <CardContent className="p-4 md:p-6">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+                      <h3 className="font-semibold text-base md:text-lg break-words">{tender.title}</h3>
                       <TenderStatusBadge status={tender.status} />
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                    <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-600 mb-3">
                       <span className="font-medium">{tender.createdBy}</span>
                       <div className="flex items-center gap-1">
-                        <MapPin className="w-4 h-4" />
-                        <span>{tender.location}</span>
+                        <MapPin className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
+                        <span className="break-words">{tender.location}</span>
                       </div>
-                      <Badge variant="outline">{tender.category}</Badge>
+                      <Badge variant="outline" className="text-xs">{tender.category}</Badge>
                     </div>
                     
-                    <p className="text-gray-700 text-sm mb-4 line-clamp-2">
+                    <p className="text-gray-700 text-xs md:text-sm mb-4 line-clamp-2">
                       {tender.description}
                     </p>
 
-                    <div className="flex items-center gap-6 text-sm">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-gray-500" />
+                    <div className="flex flex-wrap items-center gap-3 md:gap-6 text-xs md:text-sm">
+                      <div className="flex items-center gap-1 md:gap-2">
+                        <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-gray-500 flex-shrink-0" />
                         <span>Wartość: {formatCurrency(tender.estimatedValue, tender.currency)}</span>
                       </div>
                       
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-gray-500" />
+                      <div className="flex items-center gap-1 md:gap-2">
+                        <Users className="h-3 w-3 md:h-4 md:w-4 text-gray-500 flex-shrink-0" />
                         <span>{tender.bidCount} ofert</span>
                       </div>
                       
@@ -390,29 +392,30 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
                             }
                           }}
                           disabled={tender.bidCount === 0}
+                          className="text-xs"
                         >
-                          <Users className="h-4 w-4 mr-2" />
+                          <Users className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                           Zobacz oferty {tender.bidCount > 0 && `(${tender.bidCount})`}
                         </Button>
                       )}
                       
                       {tender.status === 'active' && (
-                        <div className="flex items-center gap-2 text-orange-600">
-                          <Clock className="h-4 w-4" />
+                        <div className="flex items-center gap-1 md:gap-2 text-orange-600">
+                          <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                           <span>{getDaysRemaining(tender.submissionDeadline)} dni do końca</span>
                         </div>
                       )}
 
                       {tender.status === 'awarded' && tender.winnerName && (
-                        <div className="flex items-center gap-2 text-green-600">
-                          <Trophy className="h-4 w-4" />
+                        <div className="flex items-center gap-1 md:gap-2 text-green-600">
+                          <Trophy className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                           <span>Wygrał: {tender.winnerName}</span>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2 ml-6">
+                  <div className="flex flex-row sm:flex-col gap-2 w-full md:w-auto md:ml-6">
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -420,8 +423,9 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
                         e.stopPropagation();
                         handleTenderClick(tender.id);
                       }}
+                      className="flex-1 sm:flex-initial"
                     >
-                      <Eye className="h-4 w-4 mr-2" />
+                      <Eye className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                       Szczegóły
                     </Button>
                     
@@ -435,8 +439,9 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
                             onTenderEdit(tender.id);
                           }
                         }}
+                        className="flex-1 sm:flex-initial"
                       >
-                        <Pencil className="h-4 w-4 mr-2" />
+                        <Pencil className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                         Edytuj
                       </Button>
                     )}
@@ -448,6 +453,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
                           e.stopPropagation();
                           handleBidClick(tender.id);
                         }}
+                        className="flex-1 sm:flex-initial"
                       >
                         Złóż ofertę
                       </Button>
@@ -463,6 +469,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
                             onTenderSelect(tender.id);
                           }
                         }}
+                        className="flex-1 sm:flex-initial"
                       >
                         Oceń oferty
                       </Button>

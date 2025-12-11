@@ -72,7 +72,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={onBack} className="flex items-center gap-2">
+              <Button variant="ghost" onClick={onBack} className="hidden md:flex items-center gap-2">
                 <ArrowLeft className="w-4 h-4" />
                 Powrót
               </Button>
@@ -178,22 +178,15 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Bookmark className="w-4 h-4 text-primary fill-current" />
-                      <span className="text-sm text-muted-foreground">
-                        Zapisane ogłoszenie
-                      </span>
-                    </div>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onJobSelect(bookmark.id)}
+                      className="w-full md:w-auto"
                     >
                       <Eye className="w-4 h-4 mr-2" />
                       Zobacz szczegóły
                     </Button>
-                  </div>
                 </CardContent>
               </Card>
             ))}

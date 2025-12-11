@@ -18,7 +18,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
       <div className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" onClick={onBack} className="hidden md:inline-flex">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Powrót
             </Button>

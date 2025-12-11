@@ -402,7 +402,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
 
   return (
     <div className={`relative transition-all duration-300 flex-shrink-0 ${
-      isExpanded ? 'fixed top-0 left-0 right-0 bottom-0 z-50 w-full h-[calc(100vh-4rem)]' : 'w-[450px] h-[450px]'
+      isExpanded ? 'fixed top-0 left-0 right-0 bottom-0 z-50 w-full h-[calc(100vh-4rem-5rem)] md:h-[calc(100vh-4rem)]' : 'w-[450px] h-[450px]'
     }`}>
       {/* Map Container */}
       <div className={`relative w-full h-full overflow-hidden bg-muted ${
@@ -422,7 +422,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
 
         {/* Expand/Collapse Button */}
         {onToggleExpand && (
-          <div className={`absolute z-[1001] ${isExpanded ? 'top-4 right-4' : 'top-4 right-4'}`}>
+          <div className={`absolute z-[1001] ${isExpanded ? 'top-4 right-4' : 'top-4 right-4'} hidden md:block`}>
             <Button
               variant="outline"
               size={isExpanded ? "default" : "icon"}
@@ -455,8 +455,15 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
 
         {/* Map Legend - Only visible when expanded */}
         {isExpanded && showMapLegend && (
-          <div className="absolute bottom-8 right-16 z-[1000]">
+          <div className="absolute bottom-8 right-16 z-[1000] hidden md:block">
             <MapLegend />
+          </div>
+        )}
+        
+        {/* Map Legend - Mobile version (top right, collapsed by default) */}
+        {isExpanded && showMapLegend && (
+          <div className="absolute top-4 right-4 z-[1000] md:hidden">
+            <MapLegend initialExpanded={false} />
           </div>
         )}
 

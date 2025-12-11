@@ -889,44 +889,44 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <Avatar className="w-16 h-16">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4 md:gap-6">
+              <Avatar className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0">
                 <AvatarImage src={company?.logo_url || ''} />
                 <AvatarFallback className="bg-primary text-white">
                   {(company?.name || user?.company || 'N').split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <h1 className="text-3xl font-bold">{company?.name || user?.company || 'Nowa organizacja'}</h1>
-                <p className="text-gray-600">{getCompanyTypeDisplayName(company?.type || null)}</p>
-                <div className="flex items-center gap-4 text-sm text-gray-500 mt-2">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl md:text-3xl font-bold break-words">{company?.name || user?.company || 'Nowa organizacja'}</h1>
+                <p className="text-gray-600 text-sm md:text-base">{getCompanyTypeDisplayName(company?.type || null)}</p>
+                <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-500 mt-2">
                   {getCompanyAddress(company) && (
                     <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      <span>{getCompanyAddress(company)}</span>
+                      <MapPin className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
+                      <span className="break-words">{getCompanyAddress(company)}</span>
                     </div>
                   )}
                   {company?.phone && (
                     <div className="flex items-center gap-1">
-                      <Phone className="w-4 h-4" />
-                      <span>{company.phone}</span>
+                      <Phone className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
+                      <span className="break-all">{company.phone}</span>
                     </div>
                   )}
                   {(company?.email || user?.email) && (
                     <div className="flex items-center gap-1">
-                      <Mail className="w-4 h-4" />
-                      <span>{company?.email || user?.email}</span>
+                      <Mail className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
+                      <span className="break-all">{company?.email || user?.email}</span>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={handleTenderCreate}>
+            <div className="flex flex-wrap gap-2 md:gap-3 w-full md:w-auto">
+              <Button variant="outline" onClick={handleTenderCreate} className="flex-1 md:flex-initial">
                 Utwórz przetarg
               </Button>
-              <Button onClick={onPostJob}>
+              <Button onClick={onPostJob} className="flex-1 md:flex-initial">
                 Opublikuj zlecenie
               </Button>
             </div>
@@ -937,13 +937,15 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Przegląd</TabsTrigger>
-            <TabsTrigger value="jobs">Zlecenia</TabsTrigger>
-            <TabsTrigger value="tenders">Przetargi</TabsTrigger>
-            <TabsTrigger value="properties">Nieruchomości</TabsTrigger>
-            <TabsTrigger value="contractors">Wykonawcy</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+            <TabsList className="grid w-full grid-cols-5 min-w-[500px] md:min-w-0">
+              <TabsTrigger value="overview" className="text-xs md:text-sm whitespace-nowrap">Przegląd</TabsTrigger>
+              <TabsTrigger value="jobs" className="text-xs md:text-sm whitespace-nowrap">Zlecenia</TabsTrigger>
+              <TabsTrigger value="tenders" className="text-xs md:text-sm whitespace-nowrap">Przetargi</TabsTrigger>
+              <TabsTrigger value="properties" className="text-xs md:text-sm whitespace-nowrap">Nieruchomości</TabsTrigger>
+              <TabsTrigger value="contractors" className="text-xs md:text-sm whitespace-nowrap">Wykonawcy</TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
@@ -1087,13 +1089,13 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
 
           {/* Jobs Tab */}
           <TabsContent value="jobs" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Zarządzanie zleceniami</h2>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={handleTenderCreate}>
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+              <h2 className="text-xl md:text-2xl font-bold">Zarządzanie zleceniami</h2>
+              <div className="flex flex-wrap gap-2 md:gap-3">
+                <Button variant="outline" onClick={handleTenderCreate} className="flex-1 md:flex-initial">
                   Utwórz przetarg
                 </Button>
-                <Button onClick={onPostJob}>
+                <Button onClick={onPostJob} className="flex-1 md:flex-initial">
                   Dodaj zlecenie
                 </Button>
               </div>
@@ -1112,31 +1114,31 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
               <div className="grid gap-4">
                 {recentJobs.length > 0 ? recentJobs.map((job) => (
                 <Card key={job.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-lg">{job.title}</h3>
+                  <CardContent className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+                          <h3 className="font-semibold text-base md:text-lg break-words">{job.title}</h3>
                           {getStatusBadge(job.status)}
                         </div>
-                        <p className="text-gray-600 mb-2">{job.category}</p>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <p className="text-gray-600 mb-2 text-sm md:text-base">{job.category}</p>
+                        <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-500">
                           <div className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            <span>{job.address}</span>
+                            <MapPin className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
+                            <span className="break-words">{job.address}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
+                            <Calendar className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
                             <span>Termin: {job.deadline}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <UserCheck className="w-4 h-4" />
+                            <UserCheck className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
                             <span>{job.applications} ofert</span>
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-green-600">
+                      <div className="flex flex-col md:text-right gap-2 md:gap-0">
+                        <p className="text-xl md:text-2xl font-bold text-green-600">
                           {formatBudget(
                             typeof job.budget === 'string' 
                               ? {
@@ -1148,7 +1150,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                               : job.budget
                           )}
                         </p>
-                        <div className="flex gap-2 mt-2">
+                        <div className="flex flex-col sm:flex-row gap-2 mt-2">
                           <Button 
                             variant="outline" 
                             size="sm"
@@ -1156,12 +1158,14 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                               setSelectedJobForDetails(job.id);
                               setShowJobDetailsDialog(true);
                             }}
+                            className="w-full sm:w-auto"
                           >
                             Szczegóły
                           </Button>
                           <Button 
                             size="sm"
                             onClick={() => setSelectedJobForApplications(job.id)}
+                            className="w-full sm:w-auto"
                           >
                             Zobacz oferty
                           </Button>
@@ -1336,7 +1340,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
           {/* Contractors Tab */}
           <TabsContent value="contractors" className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Wykonawcy</h2>
+              <h2 className="text-xl md:text-2xl font-bold">Wykonawcy</h2>
             </div>
             
             {loadingContractors ? (
@@ -1353,32 +1357,33 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                 {contractors.length > 0 ? (
                   contractors.map((contractor) => (
                     <Card key={contractor.id}>
-                      <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                          <Avatar className="w-16 h-16">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="flex flex-col md:flex-row md:items-center gap-4">
+                          <Avatar className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0">
                             <AvatarImage src={contractor.avatar} />
                             <AvatarFallback>{contractor.name.split(' ')[0][0]}</AvatarFallback>
                           </Avatar>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-lg">{contractor.name}</h3>
-                            <p className="text-gray-600 mb-2">{contractor.specialization}</p>
-                            <div className="flex items-center gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-base md:text-lg break-words">{contractor.name}</h3>
+                            <p className="text-gray-600 mb-2 text-sm md:text-base">{contractor.specialization}</p>
+                            <div className="flex flex-wrap items-center gap-2 md:gap-4">
                               <div className="flex items-center gap-1">
-                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                                <span>{contractor.rating} • {contractor.completedJobs} projektów</span>
+                                <Star className="w-3 h-3 md:w-4 md:h-4 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+                                <span className="text-xs md:text-sm">{contractor.rating} • {contractor.completedJobs} projektów</span>
                               </div>
-                              <Badge variant="outline">{contractor.currentJob}</Badge>
+                              <Badge variant="outline" className="text-xs">{contractor.currentJob}</Badge>
                             </div>
-                            <p className="text-sm text-gray-500 mt-2">
+                            <p className="text-xs md:text-sm text-gray-500 mt-2">
                               Kliknij "Zobacz profil", aby zobaczyć portfolio wykonawcy
                             </p>
                           </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm">Wyślij wiadomość</Button>
+                          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                            <Button variant="outline" size="sm" className="w-full sm:w-auto">Wyślij wiadomość</Button>
                             <Button 
                               variant="outline" 
                               size="sm"
                               onClick={() => router.push(`/contractors/${contractor.id}`)}
+                              className="w-full sm:w-auto"
                             >
                               Zobacz profil
                             </Button>
