@@ -173,23 +173,6 @@ export function MobileMenuDock() {
       },
     },
     {
-      title: 'Szukaj',
-      icon: <Search className="size-6" />,
-      isActive: false, // Search doesn't have a specific path
-      onClick: () => {
-        setMenuDrawerOpen(false);
-        setTimeout(() => {
-          // Trigger command palette
-          const event = new KeyboardEvent('keydown', {
-            key: 'k',
-            metaKey: true,
-            ctrlKey: navigator.platform.includes('Mac') ? false : true,
-          });
-          document.dispatchEvent(event);
-        }, 150);
-      },
-    },
-    {
       title: 'Wykonawcy',
       icon: <Briefcase className="size-6" />,
       href: '/contractors',
@@ -210,6 +193,23 @@ export function MobileMenuDock() {
         setMenuDrawerOpen(false);
         setTimeout(() => {
           router.push(isAuthenticated ? '/messages' : '/user-type-selection');
+        }, 150);
+      },
+    },
+    {
+      title: 'Szukaj',
+      icon: <Search className="size-6" />,
+      isActive: false, // Search doesn't have a specific path
+      onClick: () => {
+        setMenuDrawerOpen(false);
+        setTimeout(() => {
+          // Trigger command palette
+          const event = new KeyboardEvent('keydown', {
+            key: 'k',
+            metaKey: true,
+            ctrlKey: navigator.platform.includes('Mac') ? false : true,
+          });
+          document.dispatchEvent(event);
         }, 150);
       },
     },

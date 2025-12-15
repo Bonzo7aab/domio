@@ -6,6 +6,7 @@ import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { extractCity, extractSublocality, getProvinceForCity, getProvincesFromCities, type LocationData } from '../utils/locationMapping';
+import { isTenderEndingSoon } from '../utils/tenderHelpers';
 import type { Job } from '../types/job';
 
 export interface FilterState {
@@ -88,6 +89,8 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUpdatingFromSelfRef = useRef(false);
+  const previousFilterStateRef = useRef<FilterState | null>(null);
+  const isInitialMountRef = useRef(true);
 
   // Sync local state with incoming filters (from quick filters or URL)
   useEffect(() => {
@@ -99,7 +102,11 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       if (initialFilters.sublocalities !== undefined) setSelectedSublocalities(initialFilters.sublocalities);
       if (initialFilters.provinces !== undefined) setSelectedProvinces(initialFilters.provinces);
       if (initialFilters.clientTypes !== undefined) setSelectedClientTypes(initialFilters.clientTypes);
-      if (initialFilters.postTypes !== undefined) setSelectedPostTypes(initialFilters.postTypes);
+      if (initialFilters.postTypes !== undefined) {
+        // Ensure at least one postType is selected
+        const postTypes = initialFilters.postTypes.length > 0 ? initialFilters.postTypes : ['job', 'tender'];
+        setSelectedPostTypes(postTypes);
+      }
       if (initialFilters.urgency !== undefined) setSelectedUrgency(initialFilters.urgency);
       if (initialFilters.budgetRanges !== undefined) setSelectedBudgetRanges(initialFilters.budgetRanges);
       if (initialFilters.budgetMin !== undefined) setBudgetMin(initialFilters.budgetMin.toString());
@@ -110,7 +117,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
     }
     // Reset the flag after syncing
     isUpdatingFromSelfRef.current = false;
-  }, [initialFilters]);
+  }, [initialFilters, isMapView]);
 
   // Calculate categories dynamically from jobs (using category.name)
   const categories = useMemo(() => {
@@ -207,14 +214,247 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
     return counts;
   }, [jobs]);
 
+  // Calculate filtered jobs count based on current filter state
+  const filteredJobsCount = useMemo(() => {
+    if (!jobs || jobs.length === 0) return 0;
+    
+    const budgetMinNum = budgetMin && budgetMin.trim() ? parseFloat(budgetMin) : undefined;
+    const budgetMaxNum = budgetMax && budgetMax.trim() ? parseFloat(budgetMax) : undefined;
+    
+    return jobs.filter(job => {
+      // Filter by postTypes (job vs tender)
+      if (selectedPostTypes && selectedPostTypes.length > 0) {
+        const jobPostType = ('postType' in job && job.postType) ? job.postType : 'job';
+        if (!selectedPostTypes.includes(jobPostType)) {
+          return false;
+        }
+      }
+      
+      // Filter by categories
+      if (selectedCategories && selectedCategories.length > 0) {
+        const jobCategory = typeof job.category === 'string' 
+          ? job.category 
+          : (job.category?.name || 'Inne');
+        if (!selectedCategories.includes(jobCategory)) {
+          return false;
+        }
+      }
+      
+      // Filter by subcategories
+      if (selectedSubcategories && selectedSubcategories.length > 0) {
+        if (job.subcategory && !selectedSubcategories.includes(job.subcategory)) {
+          return false;
+        }
+      }
+      
+      // Filter by contract types
+      if (selectedContractTypes && selectedContractTypes.length > 0) {
+        if (!selectedContractTypes.includes(job.type)) {
+          return false;
+        }
+      }
+      
+      // Filter by cities and sublocalities
+      if ((selectedCities && selectedCities.length > 0) || (selectedSublocalities && selectedSublocalities.length > 0)) {
+        const jobCity = extractCity(job.location);
+        const jobSublocality = extractSublocality(job.location);
+        
+        if (selectedSublocalities && selectedSublocalities.length > 0) {
+          const matchesSublocality = selectedSublocalities.some(sublocalityKey => {
+            const [filterCity, filterSublocality] = sublocalityKey.split(':');
+            return jobCity === filterCity && jobSublocality === filterSublocality;
+          });
+          
+          if (matchesSublocality) {
+            // Job matches a selected sublocality, include it
+          } else {
+            const citiesWithSelectedSublocalities = new Set(
+              selectedSublocalities.map(s => s.split(':')[0])
+            );
+            
+            const cityExplicitlySelected = selectedCities && selectedCities.some(city => 
+              city === jobCity && !citiesWithSelectedSublocalities.has(city)
+            );
+            
+            if (!cityExplicitlySelected) {
+              return false;
+            }
+          }
+        } else if (selectedCities && selectedCities.length > 0) {
+          if (!jobCity || !selectedCities.includes(jobCity)) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by provinces
+      if (selectedProvinces && selectedProvinces.length > 0) {
+        const jobCity = extractCity(job.location);
+        const jobProvince = jobCity ? getProvinceForCity(jobCity) : null;
+        if (!jobProvince || !selectedProvinces.includes(jobProvince)) {
+          return false;
+        }
+      }
+      
+      // Filter by client types
+      if (selectedClientTypes && selectedClientTypes.length > 0) {
+        if (job.clientType && !selectedClientTypes.includes(job.clientType)) {
+          return false;
+        }
+      }
+
+      // Filter by urgency
+      if (selectedUrgency && selectedUrgency.length > 0) {
+        if ('urgency' in job && job.urgency && !selectedUrgency.includes(job.urgency)) {
+          return false;
+        }
+      }
+
+      // Filter by ending soon
+      if (endingSoon && 'postType' in job && job.postType === 'tender' && 'tenderInfo' in job && job.tenderInfo?.submissionDeadline) {
+        if (!isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline))) {
+          return false;
+        }
+      }
+      
+      // Filter by budget ranges
+      if (selectedBudgetRanges && selectedBudgetRanges.length > 0) {
+        const jobBudgetMin = (job as any).budget_min;
+        const jobBudgetMax = (job as any).budget_max;
+        
+        const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
+        const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
+        
+        if (hasBudgetMin || hasBudgetMax) {
+          const min = hasBudgetMin ? Number(jobBudgetMin) : (hasBudgetMax ? 0 : 0);
+          const max = hasBudgetMax ? Number(jobBudgetMax) : (hasBudgetMin ? Number(jobBudgetMin) : Infinity);
+
+          let matchesRange = false;
+          for (const range of selectedBudgetRanges) {
+            if (range === '<5000' && max < 5000) {
+              matchesRange = true;
+              break;
+            } else if (range === '5000-20000' && min <= 20000 && max >= 5000) {
+              matchesRange = true;
+              break;
+            } else if (range === '20000+' && min >= 20000) {
+              matchesRange = true;
+              break;
+            }
+          }
+          
+          if (!matchesRange) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by budget min/max inputs
+      if (budgetMinNum !== undefined && budgetMinNum !== null) {
+        const jobBudgetMin = (job as any).budget_min ?? null;
+        const jobBudgetMax = (job as any).budget_max ?? null;
+        
+        if (jobBudgetMin !== null || jobBudgetMax !== null) {
+          const jobMaxBudget = jobBudgetMax ?? jobBudgetMin ?? 0;
+          if (jobMaxBudget < budgetMinNum) {
+            return false;
+          }
+        }
+      }
+
+      if (budgetMaxNum !== undefined && budgetMaxNum !== null) {
+        const jobBudgetMin = (job as any).budget_min ?? null;
+        const jobBudgetMax = (job as any).budget_max ?? null;
+        
+        if (jobBudgetMin !== null || jobBudgetMax !== null) {
+          const jobMinBudget = jobBudgetMin ?? jobBudgetMax ?? 0;
+          if (jobMinBudget > budgetMaxNum) {
+            return false;
+          }
+        }
+      }
+      
+      // Filter by search query
+      if (searchQuery && searchQuery.trim().length > 0) {
+        const searchTerm = searchQuery.toLowerCase().trim();
+        const jobTitle = (job.title || '').toLowerCase();
+        
+        if (!jobTitle.includes(searchTerm)) {
+          return false;
+        }
+      }
+
+      // Filter by date added
+      if (selectedDateAdded && selectedDateAdded.length > 0) {
+        const jobCreatedAt = (job as any).created_at;
+        if (jobCreatedAt) {
+          const jobDate = new Date(jobCreatedAt);
+          
+          if (!isNaN(jobDate.getTime())) {
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            todayStart.setHours(0, 0, 0, 0);
+            
+            const jobDateStart = new Date(jobDate.getFullYear(), jobDate.getMonth(), jobDate.getDate());
+            jobDateStart.setHours(0, 0, 0, 0);
+            
+            let matchesDateFilter = false;
+            for (const dateFilter of selectedDateAdded) {
+              let filterStartDate: Date;
+              
+              switch (dateFilter) {
+                case 'today':
+                  filterStartDate = new Date(todayStart);
+                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
+                  break;
+                case 'last-week':
+                  filterStartDate = new Date(todayStart);
+                  filterStartDate.setTime(filterStartDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
+                  break;
+                case 'last-month':
+                  filterStartDate = new Date(todayStart);
+                  filterStartDate.setTime(filterStartDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
+                  break;
+                case 'last-3-months':
+                  filterStartDate = new Date(todayStart);
+                  filterStartDate.setTime(filterStartDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
+                  break;
+                case 'last-6-months':
+                  filterStartDate = new Date(todayStart);
+                  filterStartDate.setTime(filterStartDate.getTime() - 180 * 24 * 60 * 60 * 1000);
+                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
+                  break;
+                case 'last-year':
+                  filterStartDate = new Date(todayStart);
+                  filterStartDate.setTime(filterStartDate.getTime() - 365 * 24 * 60 * 60 * 1000);
+                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
+                  break;
+              }
+              
+              if (matchesDateFilter) break;
+            }
+            
+            if (!matchesDateFilter) {
+              return false;
+            }
+          }
+        }
+      }
+      
+      return true;
+    }).length;
+  }, [jobs, selectedPostTypes, selectedCategories, selectedSubcategories, selectedContractTypes, selectedCities, selectedSublocalities, selectedProvinces, selectedClientTypes, selectedUrgency, selectedBudgetRanges, budgetMin, budgetMax, searchQuery, endingSoon, selectedDateAdded]);
+
   // Emit filter changes to parent
   useEffect(() => {
     if (onFilterChange) {
-      isUpdatingFromSelfRef.current = true;
       const budgetMinNum = budgetMin && budgetMin.trim() ? parseFloat(budgetMin) : undefined;
       const budgetMaxNum = budgetMax && budgetMax.trim() ? parseFloat(budgetMax) : undefined;
       
-      onFilterChange({
+      const newFilterState: FilterState = {
         categories: selectedCategories,
         subcategories: selectedSubcategories,
         contractTypes: selectedContractTypes,
@@ -231,9 +471,34 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
         searchQuery,
         endingSoon: endingSoon,
         dateAdded: selectedDateAdded
+      };
+
+      const filtersChanged = previousFilterStateRef.current === null || JSON.stringify(previousFilterStateRef.current) !== JSON.stringify(newFilterState);
+      // Check if new filter state matches initialFilters (to avoid unnecessary updates on mount)
+      const matchesInitialFilters = initialFilters && JSON.stringify({
+        ...initialFilters,
+        locations: [] // Normalize locations field
+      }) === JSON.stringify({
+        ...newFilterState,
+        locations: []
       });
+
+      // Skip emitting if filters haven't actually changed
+      // Also skip on initial mount if the state matches initialFilters exactly (prevents unnecessary updates when component mounts)
+      if (filtersChanged && !(isInitialMountRef.current && matchesInitialFilters)) {
+        isUpdatingFromSelfRef.current = true;
+        previousFilterStateRef.current = newFilterState;
+        isInitialMountRef.current = false;
+        onFilterChange(newFilterState);
+      } else {
+        // Still update the ref to track state, but don't emit
+        if (isInitialMountRef.current) {
+          previousFilterStateRef.current = newFilterState;
+          isInitialMountRef.current = false;
+        }
+      }
     }
-  }, [selectedCategories, selectedSubcategories, selectedContractTypes, selectedCities, selectedSublocalities, selectedProvinces, selectedClientTypes, selectedPostTypes, selectedUrgency, selectedBudgetRanges, budgetMin, budgetMax, searchQuery, endingSoon, selectedDateAdded, onFilterChange]);
+  }, [selectedCategories, selectedSubcategories, selectedContractTypes, selectedCities, selectedSublocalities, selectedProvinces, selectedClientTypes, selectedPostTypes, selectedUrgency, selectedBudgetRanges, budgetMin, budgetMax, searchQuery, endingSoon, selectedDateAdded, onFilterChange, isMapView, initialFilters]);
 
   // Scroll detection for showing scroll indicator
   useEffect(() => {
@@ -324,7 +589,52 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
     setSelectedDateAdded([]);
   };
 
-  // Get all applied filters
+  // Get location filters separately
+  const getLocationFilters = () => {
+    const locationFilters: Array<{ label: string; value: string; onRemove: () => void }> = [];
+
+    // Cities (only if no sublocalities are selected for that city)
+    selectedCities.forEach(city => {
+      const citySublocalities = selectedSublocalities.filter(s => s.startsWith(`${city}:`));
+      // Only show city badge if no sublocalities are selected for this city
+      if (citySublocalities.length === 0) {
+        locationFilters.push({
+          label: city,
+          value: `city-${city}`,
+          onRemove: () => {
+            handleCityChange(city, false);
+          }
+        });
+      }
+    });
+
+    // Sublocalities
+    selectedSublocalities.forEach(sublocalityKey => {
+      const [city, sublocality] = sublocalityKey.split(':');
+      locationFilters.push({
+        label: `${city} - ${sublocality}`,
+        value: `sublocality-${sublocalityKey}`,
+        onRemove: () => {
+          handleSublocalityChange(city, sublocality, false);
+        }
+      });
+    });
+
+    // Provinces
+    selectedProvinces.forEach(province => {
+      locationFilters.push({
+        label: province,
+        value: `province-${province}`,
+        onRemove: () => {
+          setSelectedProvinces(prev => prev.filter(p => p !== province));
+        }
+      });
+    });
+
+    return locationFilters;
+  };
+
+  // Get all applied filters (excluding location filters)
   const getAppliedFilters = () => {
     const applied: Array<{ label: string; value: string; onRemove: () => void }> = [];
 
@@ -350,44 +660,6 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
         value: category,
         onRemove: () => {
           setSelectedCategories(prev => prev.filter(c => c !== category));
-        }
-      });
-    });
-
-    // Cities (only if no sublocalities are selected for that city)
-    selectedCities.forEach(city => {
-      const citySublocalities = selectedSublocalities.filter(s => s.startsWith(`${city}:`));
-      // Only show city badge if no sublocalities are selected for this city
-      if (citySublocalities.length === 0) {
-        applied.push({
-          label: city,
-          value: `city-${city}`,
-          onRemove: () => {
-            handleCityChange(city, false);
-          }
-        });
-      }
-    });
-
-    // Sublocalities
-    selectedSublocalities.forEach(sublocalityKey => {
-      const [city, sublocality] = sublocalityKey.split(':');
-      applied.push({
-        label: `${city} - ${sublocality}`,
-        value: `sublocality-${sublocalityKey}`,
-        onRemove: () => {
-          handleSublocalityChange(city, sublocality, false);
-        }
-      });
-    });
-
-    // Provinces
-    selectedProvinces.forEach(province => {
-      applied.push({
-        label: province,
-        value: `province-${province}`,
-        onRemove: () => {
-          setSelectedProvinces(prev => prev.filter(p => p !== province));
         }
       });
     });
@@ -522,6 +794,11 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <h3 className="text-lg font-bold text-gray-900">Filtry</h3>
+              {isMapView && (
+                <span className="text-sm font-normal text-gray-600">
+                  ({filteredJobsCount})
+                </span>
+              )}
             </div>
           </div>
 
@@ -553,28 +830,68 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
             )}
 
               {/* Applied Filters */}
-              {getAppliedFilters().length > 0 && (
+              {(getLocationFilters().length > 0 || getAppliedFilters().length > 0 || (primaryLocation && primaryLocation !== 'Polska')) && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-xs font-semibold text-gray-700">Aktywne filtry</Label>
-                    <div className="text-xs cursor-pointer flex items-center text-gray-500 hover:text-gray-900 h-auto py-0 px-2" onClick={clearAllFilters}>
+                    <div className="text-xs cursor-pointer flex items-center text-red-400 hover:text-gray-900 h-auto py-0 px-2" onClick={clearAllFilters}>
                       <X className="h-3 w-3 mr-1" />
                       Wyczyść wszystko
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {getAppliedFilters().map((filter) => (
-                      <Badge
+                  
+                  {/* Location Filters - Separate line at top with icon */}
+                  {(getLocationFilters().length > 0 || (primaryLocation && primaryLocation !== 'Polska')) && (
+                    <div className="mb-2 flex flex-wrap gap-1 items-center">
+                      {/* Current Location Badge - Informational, always shown when available */}
+                      {primaryLocation && primaryLocation !== 'Polska' && (
+                        <Badge
+                          variant="secondary"
+                          className="text-xs px-2 py-1 bg-gray-50 border border-gray-200 text-gray-700"
+                        >
+                          <div className="flex items-center">
+                            <MapPin className="w-3 h-3 text-gray-600 mr-1" />
+                            <span className="font-medium">Aktualna lokalizacja:</span>
+                            <span className="ml-1">{primaryLocation}</span>
+                          </div>
+                        </Badge>
+                      )}
+                      
+                      {/* Selected Location Filters */}
+                      {getLocationFilters().map((filter) => (
+                        <Badge
                         key={filter.value}
                         variant="secondary"
                         className="text-xs px-2 py-1 bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer"
                         onClick={filter.onRemove}
-                      >
-                        {filter.label}
-                        <X className="h-3 w-3 ml-1" />
-                      </Badge>
-                    ))}
-                  </div>
+                        >
+                          <div className="flex items-center">
+                            <MapPin className="w-3 h-3 text-gray-600 mr-1" />
+                            {filter.label}
+                          </div>
+                          <X className="h-3 w-3 ml-1" />
+                        </Badge>
+                        
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Other Filters */}
+                  {getAppliedFilters().length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {getAppliedFilters().map((filter) => (
+                        <Badge
+                          key={filter.value}
+                          variant="secondary"
+                          className="text-xs px-2 py-1 bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer"
+                          onClick={filter.onRemove}
+                        >
+                          {filter.label}
+                          <X className="h-3 w-3 ml-1" />
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
           </div>
@@ -610,7 +927,11 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                         if (checked) {
                           setSelectedPostTypes(prev => [...prev, 'job']);
                         } else {
-                          setSelectedPostTypes(prev => prev.filter(t => t !== 'job'));
+                          setSelectedPostTypes(prev => {
+                            const newTypes = prev.filter(t => t !== 'job');
+                            // Ensure at least one postType is selected
+                            return newTypes.length > 0 ? newTypes : ['tender'];
+                          });
                         }
                       }}
                     />
@@ -628,7 +949,11 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                         if (checked) {
                           setSelectedPostTypes(prev => [...prev, 'tender']);
                         } else {
-                          setSelectedPostTypes(prev => prev.filter(t => t !== 'tender'));
+                          setSelectedPostTypes(prev => {
+                            const newTypes = prev.filter(t => t !== 'tender');
+                            // Ensure at least one postType is selected
+                            return newTypes.length > 0 ? newTypes : ['job'];
+                          });
                         }
                       }}
                     />

@@ -92,11 +92,15 @@ export default function JobList({
     
     return availableJobs.filter(job => {
       // Filter by postTypes (job vs tender)
+      // Defensive check: if postTypes is empty, show all jobs (shouldn't happen due to guard clauses, but handle gracefully)
       if (filters.postTypes && filters.postTypes.length > 0) {
         const jobPostType = ('postType' in job && job.postType) ? job.postType : 'job';
         if (!filters.postTypes.includes(jobPostType)) {
           return false;
         }
+      } else if (filters.postTypes && filters.postTypes.length === 0) {
+        // Empty array should not happen due to guard clauses, but if it does, show all jobs
+        // (no return false, so job passes this filter)
       }
       
       // Filter by categories
@@ -424,8 +428,7 @@ export default function JobList({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-bold">Dostępne Zlecenia</h2>
-          <p className="text-sm sm:text-base text-muted-foreground">Znaleziono {sortedJobs.length} zleceń</p>
+          <h2 className="text-lg sm:text-xl font-bold">Dostępne zlecenia: {sortedJobs.length}</h2>
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2 sm:gap-0">

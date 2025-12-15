@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Star, Building, Phone, Mail, Award, ExternalLink, TrendingUp, FileText, Users, Clock, CheckCircle } from 'lucide-react';
+import { MapPin, Star, Building, Phone, Mail, Award, ExternalLink, TrendingUp, FileText, Users, Clock, CheckCircle, Briefcase } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -10,6 +11,8 @@ import { Progress } from './ui/progress';
 import { fetchManagerById } from '../lib/database/managers';
 import { mockManagerDetailsMap } from '../mocks';
 import { getCategoryLabel } from './contractor-dashboard/shared/utils';
+import { createClient } from '../lib/supabase/client';
+import { formatBudget, budgetFromDatabase } from '../types/budget';
 
 interface ManagerProfilePageProps {
   managerId: string;
@@ -150,10 +153,14 @@ const convertManagerToPageFormat = (manager: any) => {
 };
 
 export default function ManagerProfilePage({ managerId, onBack }: ManagerProfilePageProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [manager, setManager] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeJobs, setActiveJobs] = useState<any[]>([]);
+  const [activeTenders, setActiveTenders] = useState<any[]>([]);
+  const [loadingJobsTenders, setLoadingJobsTenders] = useState(false);
 
   useEffect(() => {
     async function loadManager() {
@@ -194,8 +201,8 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
       const hash = window.location.hash;
       if (hash === '#overview' || hash === '') {
         setActiveTab('overview');
-      } else if (hash === '#services') {
-        setActiveTab('services');
+      } else if (hash === '#active-jobs') {
+        setActiveTab('active-jobs');
       } else if (hash === '#properties') {
         setActiveTab('properties');
       } else if (hash === '#team') {
@@ -209,6 +216,76 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  // Fetch active jobs and tenders when tab is active
+  useEffect(() => {
+    const fetchActiveJobsAndTenders = async () => {
+      if (activeTab !== 'active-jobs' || !managerId) {
+        return;
+      }
+
+      setLoadingJobsTenders(true);
+      const supabase = createClient();
+
+      try {
+        // Fetch active jobs
+        const { data: jobsData, error: jobsError } = await supabase
+          .from('jobs')
+          .select(`
+            id,
+            title,
+            budget_min,
+            budget_max,
+            budget_type,
+            currency,
+            deadline,
+            status,
+            job_categories (name),
+            location
+          `)
+          .eq('company_id', managerId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (jobsError) {
+          console.error('Error fetching active jobs:', jobsError);
+        } else {
+          setActiveJobs(jobsData || []);
+        }
+
+        // Fetch active tenders
+        const { data: tendersData, error: tendersError } = await (supabase as any)
+          .from('tenders')
+          .select(`
+            id,
+            title,
+            estimated_value,
+            currency,
+            submission_deadline,
+            status,
+            category:job_categories!tenders_category_id_fkey (
+              name
+            ),
+            location
+          `)
+          .eq('company_id', managerId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (tendersError) {
+          console.error('Error fetching active tenders:', tendersError);
+        } else {
+          setActiveTenders(tendersData || []);
+        }
+      } catch (err) {
+        console.error('Error fetching jobs and tenders:', err);
+      } finally {
+        setLoadingJobsTenders(false);
+      }
+    };
+
+    fetchActiveJobsAndTenders();
+  }, [activeTab, managerId]);
 
   if (loading) {
     return (
@@ -420,30 +497,142 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
           </div>
         )}
 
-        {/* Services Tab */}
-        {activeTab === 'services' && (
-          <div id="services" className="scroll-mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {manager.services.map((service: any, index: number) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2 text-sm sm:text-base">
-                      {index === 0 && <Building className="w-4 h-4 sm:w-5 sm:h-5" />}
-                      {index === 1 && <FileText className="w-4 h-4 sm:w-5 sm:h-5" />}
-                      {index === 2 && <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />}
-                      <span>{service.name}</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600 mb-3 sm:mb-4 text-sm">{service.description}</p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-base sm:text-lg font-bold text-green-600">{service.price}</span>
-                      <Button size="sm" className="text-xs sm:text-sm">Zapytaj</Button>
+        {/* Active Jobs and Tenders Tab */}
+        {activeTab === 'active-jobs' && (
+          <div id="active-jobs" className="scroll-mt-4">
+            {loadingJobsTenders ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie zleceń...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : activeJobs.length === 0 && activeTenders.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <Briefcase className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium mb-2">Brak aktywnych zleceń i przetargów</h3>
+                  <p className="text-sm sm:text-base text-gray-600">Brak aktywnych zleceń i przetargów w tym momencie.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-6">
+                {/* Active Jobs Section */}
+                {activeJobs.length > 0 && (
+                  <div>
+                    <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Aktywne zlecenia</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                      {activeJobs.map((job: any) => (
+                        <Card key={job.id}>
+                          <CardHeader>
+                            <CardTitle className="text-sm sm:text-base">{job.title}</CardTitle>
+                            <div className="flex items-center gap-2 mt-2">
+                              {job.job_categories && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {job.job_categories.name || 'Inne'}
+                                </Badge>
+                              )}
+                              <Badge className="bg-green-100 text-green-800 text-xs">Aktywne</Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {job.budget_min !== null && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs sm:text-sm text-gray-600">Budżet:</span>
+                                  <span className="text-sm sm:text-base font-semibold text-green-600">
+                                    {formatBudget(budgetFromDatabase({
+                                      budget_min: job.budget_min,
+                                      budget_max: job.budget_max,
+                                      budget_type: job.budget_type || 'fixed',
+                                      currency: job.currency || 'PLN'
+                                    }))}
+                                  </span>
+                                </div>
+                              )}
+                              {job.deadline && (
+                                <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                                  <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  <span>Termin: {new Date(job.deadline).toLocaleDateString('pl-PL')}</span>
+                                </div>
+                              )}
+                              {job.location && (
+                                <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                                  <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  <span>{typeof job.location === 'string' ? job.location : job.location.address || 'Lokalizacja nieokreślona'}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-4 pt-4 border-t">
+                              <Button 
+                                className="w-full" 
+                                size="sm"
+                                onClick={() => router.push(`/jobs/${job.id}`)}
+                              >
+                                Przejdź do zlecenia
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  </div>
+                )}
+
+                {/* Active Tenders Section */}
+                {activeTenders.length > 0 && (
+                  <div>
+                    <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Aktywne przetargi</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                      {activeTenders.map((tender: any) => (
+                        <Card key={tender.id}>
+                          <CardHeader>
+                            <CardTitle className="text-sm sm:text-base">{tender.title}</CardTitle>
+                            <div className="flex items-center gap-2 mt-2">
+                              {tender.category && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {tender.category.name || 'Inne'}
+                                </Badge>
+                              )}
+                              <Badge className="bg-green-100 text-green-800 text-xs">Aktywny</Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {tender.estimated_value !== null && tender.estimated_value !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs sm:text-sm text-gray-600">Szacowana wartość:</span>
+                                  <span className="text-sm sm:text-base font-semibold text-green-600">
+                                    {new Intl.NumberFormat('pl-PL', {
+                                      minimumFractionDigits: 0,
+                                      maximumFractionDigits: 0
+                                    }).format(tender.estimated_value)} {tender.currency || 'PLN'}
+                                  </span>
+                                </div>
+                              )}
+                              {tender.submission_deadline && (
+                                <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                                  <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  <span>Termin składania: {new Date(tender.submission_deadline).toLocaleDateString('pl-PL')}</span>
+                                </div>
+                              )}
+                              {tender.location && (
+                                <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                                  <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  <span>{typeof tender.location === 'string' ? tender.location : tender.location.address || 'Lokalizacja nieokreślona'}</span>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

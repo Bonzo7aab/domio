@@ -2,9 +2,16 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
-import { googleMapsConfig, mapOptions, markerColors } from '../lib/google-maps/config';
-import { generateInfoWindowContent } from '../lib/google-maps/infoWindowContent';
+import { googleMapsConfig, mapOptions, markerColors, createMarkerGlyph, lightenColor } from '../lib/google-maps/config';
+import { generateInfoWindowContent, generateMobileDrawerContent } from '../lib/google-maps/infoWindowContent';
 import { Job } from '../types/job';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from './ui/drawer';
+import { useIsMobile } from './ui/use-mobile';
 
 interface GoogleMapProps {
   markers?: MapMarker[];
@@ -33,11 +40,14 @@ const MapComponent: React.FC<{
   const [map, setMap] = useState<google.maps.Map>();
   const [mapMarkers, setMapMarkers] = useState<google.maps.marker.AdvancedMarkerElement[]>([]);
   const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
+  const [selectedJobForMobile, setSelectedJobForMobile] = useState<Job | null>(null);
   const mapMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const infoWindowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveringInfoWindowRef = useRef<boolean>(false);
   const boundsDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
+  const bouncingMarkerRef = useRef<HTMLElement | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (mapRef.current && !map) {
@@ -87,10 +97,46 @@ const MapComponent: React.FC<{
         document.head.appendChild(style);
       }
 
+      // Add bounce animation CSS for markers
+      const bounceStyle = document.createElement('style');
+      bounceStyle.textContent = `
+        @keyframes markerBounce {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+        .marker-bounce {
+          animation: markerBounce 1s ease-in-out infinite;
+        }
+      `;
+      if (!document.querySelector('#marker-bounce-style')) {
+        bounceStyle.id = 'marker-bounce-style';
+        document.head.appendChild(bounceStyle);
+      }
+
+      // Track infoWindow close to stop bounce animation
+      const stopBounce = () => {
+        if (bouncingMarkerRef.current) {
+          bouncingMarkerRef.current.classList.remove('marker-bounce');
+          bouncingMarkerRef.current = null;
+        }
+      };
+
       // Add click listener to close infoWindow when clicking on map
       newMap.addListener('click', (event: google.maps.MapMouseEvent) => {
+        // Stop bounce animation when closing infoWindow
+        stopBounce();
+        
         // Close infoWindow when clicking on the map (not on markers)
         newInfoWindow.close();
+        
+        // Close mobile drawer when clicking on map
+        if (isMobile) {
+          setSelectedJobForMobile(null);
+        }
         
         // Call the optional onMapClick callback if provided
         if (onMapClick) {
@@ -175,19 +221,40 @@ const MapComponent: React.FC<{
 
     // Create new advanced markers
     const newMarkers = markers.map(markerData => {
-      // Determine color scheme based on marker type
-      const colorScheme = markerData.isUrgent 
-        ? markerColors.urgent
-        : markerData.isSelected 
-          ? markerColors.selected
-          : markerColors.default;
+      // Determine icon color based on job type
+      const postType = markerData.postType || 'job';
+      const iconColor = postType === 'job' ? markerColors.job.glyphColor : markerColors.tender.glyphColor;
+      
+      // Determine background color based on priority/urgency
+      let backgroundColor: string;
+      if (markerData.isSelected) {
+        backgroundColor = markerColors.selected.background;
+      } else if (markerData.urgency) {
+        // Use priority-based background colors (low/medium/high)
+        backgroundColor = markerColors.priority[markerData.urgency] || markerColors.priority.medium;
+      } else if (markerData.isUrgent) {
+        // Legacy support: map urgent to high priority
+        backgroundColor = markerColors.priority.high;
+      } else {
+        // Default to medium priority if no urgency specified
+        backgroundColor = markerColors.priority.medium;
+      }
 
-      // Create a custom pin element with color based on marker type
+      // Border color is 2 shades lighter than background
+      const borderColor = lightenColor(backgroundColor, 30);
+
+      // Create glyph/icon based on job type - white icons with colored outline matching background
+      const glyph = createMarkerGlyph(postType, backgroundColor);
+
+      // Create a custom pin element with color based on priority and icon based on job type
+      // Increased scale for better visibility: default 1.3, selected 1.6, hovered 1.35
+      const baseScale = markerData.isSelected ? 1.6 : (markerData.isHovered ? 1.35 : 1.3);
       const pinElement = new google.maps.marker.PinElement({
-        background: colorScheme.background,
-        borderColor: colorScheme.borderColor,
-        glyphColor: colorScheme.glyphColor,
-        scale: markerData.isSelected ? 1.2 : 1,
+        background: backgroundColor,
+        borderColor: borderColor, // 2 shades lighter than background
+        glyphColor: '#ffffff', // White glyph color for white icons
+        glyph: glyph,
+        scale: baseScale,
       });
 
       // Set zIndex based on hover state
@@ -209,96 +276,93 @@ const MapComponent: React.FC<{
         zIndex: markerData.isSelected ? 1000 : markerData.isHovered ? 1001 : 100,
       });
 
+      // Helper function to open info window (used by both click and hover)
+      const openInfoWindow = () => {
+        if (!markerData.jobData) {
+          return;
+        }
+
+        // On mobile, show drawer instead of info window
+        if (isMobile) {
+          setSelectedJobForMobile(markerData.jobData);
+          return;
+        }
+
+        // Desktop: use info window
+        if (!infoWindow) {
+          return;
+        }
+
+        // Clear any pending close timeout
+        if (infoWindowTimeoutRef.current) {
+          clearTimeout(infoWindowTimeoutRef.current);
+          infoWindowTimeoutRef.current = null;
+        }
+
+        // Stop any existing bounce animation
+        if (bouncingMarkerRef.current) {
+          bouncingMarkerRef.current.classList.remove('marker-bounce');
+        }
+
+        // Increase zIndex
+        pinElement.element.style.zIndex = '1001';
+
+        // Start continuous bounce animation while infoWindow is open
+        if (!isMobile) {
+          pinElement.element.classList.add('marker-bounce');
+          bouncingMarkerRef.current = pinElement.element;
+        }
+
+        const content = generateInfoWindowContent(markerData.jobData, isSmallMap);
+        infoWindow.setContent(content);
+        infoWindow.open(map, marker);
+
+        // Add click listener and hover listeners to info window content after it's rendered
+        setTimeout(() => {
+          const infoWindowElement = document.querySelector(`[data-job-id="${markerData.id}"]`);
+          if (infoWindowElement) {
+            // Click handler - only info window click navigates
+            infoWindowElement.addEventListener('click', () => {
+              if (markerData.onClick) {
+                markerData.onClick();
+              }
+            });
+
+            // Keep info window open when hovering over it
+            infoWindowElement.addEventListener('mouseenter', () => {
+              isHoveringInfoWindowRef.current = true;
+              if (infoWindowTimeoutRef.current) {
+                clearTimeout(infoWindowTimeoutRef.current);
+                infoWindowTimeoutRef.current = null;
+              }
+            });
+
+            infoWindowElement.addEventListener('mouseleave', () => {
+              isHoveringInfoWindowRef.current = false;
+              // Don't close - keep infoWindow open
+            });
+          }
+        }, 100);
+      };
+
       // Marker click opens info window (doesn't navigate)
       if (infoWindow && markerData.jobData) {
+        // Click listener on marker
         marker.addListener('click', () => {
-          // Clear any pending close timeout
-          if (infoWindowTimeoutRef.current) {
-            clearTimeout(infoWindowTimeoutRef.current);
-            infoWindowTimeoutRef.current = null;
-          }
-
-          // Increase zIndex on click
-          pinElement.element.style.zIndex = '1001';
-
-          const content = generateInfoWindowContent(markerData.jobData, isSmallMap);
-          infoWindow.setContent(content);
-          infoWindow.open(map, marker);
-
-          // Add click listener and hover listeners to info window content after it's rendered
-          setTimeout(() => {
-            const infoWindowElement = document.querySelector(`[data-job-id="${markerData.id}"]`);
-            if (infoWindowElement) {
-              // Click handler - only info window click navigates
-              infoWindowElement.addEventListener('click', () => {
-                if (markerData.onClick) {
-                  markerData.onClick();
-                }
-              });
-
-              // Keep info window open when hovering over it
-              infoWindowElement.addEventListener('mouseenter', () => {
-                isHoveringInfoWindowRef.current = true;
-                if (infoWindowTimeoutRef.current) {
-                  clearTimeout(infoWindowTimeoutRef.current);
-                  infoWindowTimeoutRef.current = null;
-                }
-              });
-
-              infoWindowElement.addEventListener('mouseleave', () => {
-                isHoveringInfoWindowRef.current = false;
-                // Don't close - keep infoWindow open
-              });
-            }
-          }, 100);
+          openInfoWindow();
         });
 
-        marker.addListener('mouseover', () => {
-          // Clear any pending close timeout
-          if (infoWindowTimeoutRef.current) {
-            clearTimeout(infoWindowTimeoutRef.current);
-            infoWindowTimeoutRef.current = null;
-          }
+        // Hover listeners on DOM element (pinElement.element) - AdvancedMarkerElement doesn't support mouseover on marker object
+        // Only show on hover for desktop (not mobile)
+        if (!isMobile) {
+          pinElement.element.addEventListener('mouseenter', () => {
+            openInfoWindow();
+          });
+        }
 
-          // Increase zIndex on hover
-          pinElement.element.style.zIndex = '1001';
-
-          const content = generateInfoWindowContent(markerData.jobData, isSmallMap);
-          infoWindow.setContent(content);
-          infoWindow.open(map, marker);
-
-          // Add click listener and hover listeners to info window content after it's rendered
-          setTimeout(() => {
-            const infoWindowElement = document.querySelector(`[data-job-id="${markerData.id}"]`);
-            if (infoWindowElement) {
-              // Click handler - only info window click navigates
-              infoWindowElement.addEventListener('click', () => {
-                if (markerData.onClick) {
-                  markerData.onClick();
-                }
-              });
-
-              // Keep info window open when hovering over it
-              infoWindowElement.addEventListener('mouseenter', () => {
-                isHoveringInfoWindowRef.current = true;
-                if (infoWindowTimeoutRef.current) {
-                  clearTimeout(infoWindowTimeoutRef.current);
-                  infoWindowTimeoutRef.current = null;
-                }
-              });
-
-              infoWindowElement.addEventListener('mouseleave', () => {
-                isHoveringInfoWindowRef.current = false;
-                // Don't close - keep infoWindow open
-              });
-            }
-          }, 100);
-        });
-
-        marker.addListener('mouseout', () => {
-          // Reset zIndex when leaving
+        pinElement.element.addEventListener('mouseleave', () => {
+          // Reset zIndex when leaving marker
           pinElement.element.style.zIndex = '100';
-          
           // Don't close - keep infoWindow open
         });
       }
@@ -395,7 +459,61 @@ const MapComponent: React.FC<{
     };
   }, []);
 
-  return <div ref={mapRef} style={{ height: '100%', width: '100%' }} />;
+  return (
+    <>
+      <div ref={mapRef} style={{ height: '100%', width: '100%' }} />
+      
+      {/* Mobile Drawer - Shows job info instead of info window */}
+      {isMobile && (
+        <Drawer
+          open={!!selectedJobForMobile}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedJobForMobile(null);
+            }
+          }}
+        >
+          <DrawerContent className="max-h-[85vh] flex flex-col">
+            <DrawerHeader className="pb-4 pt-6">
+              <DrawerTitle className="sr-only">Szczegóły zlecenia</DrawerTitle>
+            </DrawerHeader>
+            
+            {/* Job content - scrollable area with larger text and spacing */}
+            <div 
+              className="flex-1 px-6 pb-4 overflow-y-auto"
+              onClick={() => {
+                if (selectedJobForMobile) {
+                  const marker = markers.find(m => m.id === selectedJobForMobile.id);
+                  if (marker?.onClick) {
+                    marker.onClick();
+                  }
+                }
+              }}
+            >
+              {selectedJobForMobile && (
+                <div 
+                  dangerouslySetInnerHTML={{ 
+                    __html: generateMobileDrawerContent(selectedJobForMobile) 
+                  }} 
+                />
+              )}
+            </div>
+            
+            {/* Close button at bottom */}
+            <div className="sticky bottom-0 bg-background p-4 pt-4 pb-4">
+              <button
+                onClick={() => setSelectedJobForMobile(null)}
+                className="w-full py-4 px-6 bg-primary text-primary-foreground rounded-lg font-semibold text-base hover:bg-primary/90 transition-colors"
+                aria-label="Zamknij"
+              >
+                Zamknij
+              </button>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      )}
+    </>
+  );
 };
 
 const LoadingComponent = () => (
@@ -428,7 +546,9 @@ export interface MapMarker {
   onClick?: () => void;
   isSelected?: boolean;
   isHovered?: boolean;
-  isUrgent?: boolean;
+  isUrgent?: boolean; // Legacy support
+  postType?: 'job' | 'tender'; // Job type for icon selection
+  urgency?: 'low' | 'medium' | 'high'; // Priority level for color selection
   jobData?: Job;
 }
 

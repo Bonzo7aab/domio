@@ -269,7 +269,7 @@ function MessagesPageContent() {
   }
 
   return (
-    <div className="h-[calc(100vh-10rem)] bg-background">
+    <div className="h-[calc(100vh-4rem)] md:h-[calc(100vh-10rem)] bg-background">
       <MessagingSystem
         isFullPage={true}
         initialConversationId={conversationId || undefined}

@@ -17,7 +17,8 @@ import { isTenderEndingSoon } from '../utils/tenderHelpers';
 interface EnhancedMapViewProps {
   isExpanded?: boolean;
   onToggleExpand?: () => void;
-  jobs?: Job[];
+  jobs?: Job[]; // Jobs for map markers (can be bounds-filtered)
+  allJobs?: Job[]; // All jobs for filters (should not be bounds-filtered)
   selectedJobId?: string | null;
   onJobSelect?: (jobId: string) => void;
   hoveredJobId?: string | null;
@@ -51,7 +52,8 @@ const cityCoordinates = {
 export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   isExpanded = false,
   onToggleExpand,
-  jobs = [],
+  jobs = [], // Jobs for map markers (can be bounds-filtered)
+  allJobs, // All jobs for filters (should not be bounds-filtered, falls back to jobs if not provided)
   selectedJobId,
   onJobSelect,
   hoveredJobId,
@@ -67,6 +69,9 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   onCitySelectorClose,
   onBoundsChanged
 }) => {
+  // Use allJobs for filters, fall back to jobs if allJobs not provided
+  // This ensures filters always work on the full dataset, not bounds-filtered results
+  const jobsForFilters = allJobs !== undefined && allJobs.length > 0 ? allJobs : jobs;
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showCitySelector, setShowCitySelector] = useState(false);
   const [showJobClusters] = useState(true); // Always show all jobs
@@ -371,7 +376,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
     });
     
     return result;
-  }, [filteredJobs, filters]);
+  }, [filteredJobs, filters, isExpanded, userLocation]);
 
   // Convert jobs to map markers
   const mapMarkers: MapMarker[] = useMemo(() => {
@@ -385,7 +390,9 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
       onClick: () => onJobSelect?.(job.id),
       isSelected: selectedJobId === job.id,
       isHovered: hoveredJobId === job.id,
-      isUrgent: job.urgent,
+      isUrgent: job.urgent, // Legacy support
+      postType: job.postType || 'job', // Job type for icon selection
+      urgency: job.urgency || 'medium', // Priority level for color selection
       jobData: job,
     }));
   }, [filteredByMapFilters, selectedJobId, hoveredJobId, onJobSelect]);
@@ -443,12 +450,15 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
         )}
 
         {/* Map Filters - Only visible when expanded and on desktop */}
+        {/* Note: Use allJobs (not bounds-filtered) for filters to show accurate counts */}
         {isExpanded && showMapFilters && onFiltersChange && (
           <div className="absolute top-28 left-4 z-[1001] w-80 hidden md:block">
             <JobFilters 
               onFilterChange={onFiltersChange}
+              initialFilters={filters}
               primaryLocation={selectedCityName || undefined}
               isMapView={true}
+              jobs={jobsForFilters}
             />
           </div>
         )}

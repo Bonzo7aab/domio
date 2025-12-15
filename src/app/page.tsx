@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import JobFilters, { FilterState } from '../components/JobFilters';
 import { EnhancedJobList } from '../components/EnhancedJobList';
@@ -71,8 +71,21 @@ export default function HomePage() {
   const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
   const [showCitySelector, setShowCitySelector] = useState(false);
 
+  // Use refs to store latest values for use in async callbacks to avoid stale closures
+  const mapBoundsRef = useRef(mapBounds);
+  const isMapExpandedRef = useRef(isMapExpanded);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    mapBoundsRef.current = mapBounds;
+  }, [mapBounds]);
+
+  useEffect(() => {
+    isMapExpandedRef.current = isMapExpanded;
+  }, [isMapExpanded]);
+
   // Load jobs from database function - fetch all jobs within bounds
-  const loadJobsFromDatabase = async (bounds?: { north: number; south: number; east: number; west: number } | null) => {
+  const loadJobsFromDatabase = async (bounds?: { north: number; south: number; east: number; west: number } | null, updateLoadedJobs = true) => {
     try {
       setIsLoadingJobs(true);
       
@@ -88,19 +101,29 @@ export default function HomePage() {
       
       if (error) {
         console.error('Error fetching jobs from database:', error);
-        setLoadedJobs([]);
+        if (updateLoadedJobs) {
+          setLoadedJobs([]);
+        }
         setJobs([]);
       } else if (data) {
-        // Store all jobs
-        setLoadedJobs(data);
+        // Store all jobs (for filters) only if explicitly requested
+        // This ensures loadedJobs always has all jobs, while jobs can be bounds-filtered for map display
+        if (updateLoadedJobs) {
+          setLoadedJobs(data);
+        }
+        // Always update jobs (for map display) - can be bounds-filtered
         setJobs(data);
       } else {
-        setLoadedJobs([]);
+        if (updateLoadedJobs) {
+          setLoadedJobs([]);
+        }
         setJobs([]);
       }
     } catch (error) {
       console.error('Error loading jobs from database:', error);
-      setLoadedJobs([]);
+      if (updateLoadedJobs) {
+        setLoadedJobs([]);
+      }
       setJobs([]);
     } finally {
       setIsLoadingJobs(false);
@@ -115,15 +138,31 @@ export default function HomePage() {
   // Handle map bounds changes
   const handleMapBoundsChange = (bounds: { north: number; south: number; east: number; west: number }) => {
     setMapBounds(bounds);
-    // Reload all jobs when bounds change
-    loadJobsFromDatabase(bounds);
+    // Reload jobs when bounds change, but don't update loadedJobs (keep all jobs for filters)
+    // Only update jobs array (for map display) with bounds-filtered results
+    loadJobsFromDatabase(bounds, false);
   };
 
   // Refetch jobs when filters change (keeping current bounds)
+  // Note: Only depend on filters, not isMapExpanded, to prevent reloads when map toggles
+  // Note: We reload all jobs (without bounds) when filters change, so filters always work on full dataset
+  // Map jobs will be updated separately when bounds change or when map is toggled
   useEffect(() => {
-    if (mapBounds) {
-      loadJobsFromDatabase(mapBounds);
-    }
+    // When filters change, reload ALL jobs (no bounds) so filters work on full dataset
+    // This updates loadedJobs (used by filters and list view)
+    // If map has bounds, we'll reload with bounds for map display separately
+    loadJobsFromDatabase(null, true).then(() => {
+      // After loading all jobs, if map has bounds and map is expanded, also update jobs array with bounds-filtered results for map markers
+      // Only do this if map is actually expanded to avoid unnecessary API calls
+      // Use refs to get latest values to avoid stale closure bug
+      const currentMapBounds = mapBoundsRef.current;
+      const currentIsMapExpanded = isMapExpandedRef.current;
+      if (currentMapBounds && currentIsMapExpanded) {
+        // Load bounds-filtered jobs for map markers, but don't update loadedJobs (keep all jobs for filters)
+        loadJobsFromDatabase(currentMapBounds, false);
+      }
+      // If no bounds or map not expanded, jobs will already be set to all jobs by the loadJobsFromDatabase call above
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
@@ -425,6 +464,7 @@ export default function HomePage() {
       {isMapExpanded && (
         <EnhancedMapView 
           jobs={jobs}
+          allJobs={loadedJobs}
           isExpanded={isMapExpanded}
           onToggleExpand={() => setIsMapExpanded(!isMapExpanded)}
           selectedJobId={selectedJobId}

@@ -5,7 +5,7 @@ import { cn } from '../ui/utils';
 
 const tabs = [
   { id: 'overview', label: 'Przegląd', hash: '#overview' },
-  { id: 'services', label: 'Usługi', hash: '#services' },
+  { id: 'active-jobs', label: 'Aktywne zlecenia', hash: '#active-jobs' },
   { id: 'properties', label: 'Nieruchomości', hash: '#properties' },
   { id: 'team', label: 'Zespół', hash: '#team' },
   { id: 'reviews', label: 'Opinie', hash: '#reviews' },
@@ -23,8 +23,8 @@ export function ManagerProfileNav({ managerId }: ManagerProfileNavProps) {
       const hash = window.location.hash;
       if (hash === '#overview' || hash === '') {
         setActiveTab('overview');
-      } else if (hash === '#services') {
-        setActiveTab('services');
+      } else if (hash === '#active-jobs') {
+        setActiveTab('active-jobs');
       } else if (hash === '#properties') {
         setActiveTab('properties');
       } else if (hash === '#team') {
