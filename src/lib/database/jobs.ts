@@ -24,6 +24,20 @@ export interface JobLocation {
   sublocality_level_1?: string;
 }
 
+/**
+ * Normalize urgency value to ensure it's one of the valid values
+ */
+function normalizeUrgency(urgency: string | null | undefined): 'low' | 'medium' | 'high' {
+  if (!urgency) {
+    return 'medium';
+  }
+  const normalized = urgency.toLowerCase().trim();
+  const result = ['low', 'medium', 'high'].includes(normalized)
+    ? normalized as 'low' | 'medium' | 'high'
+    : 'medium';
+  return result;
+}
+
 export interface JobWithCompany {
   id: string;
   title: string;
@@ -494,7 +508,7 @@ export async function fetchJobsAndTenders(
     category: job.category?.name || 'Inne',
     subcategory: job.subcategory || undefined,
     deadline: job.deadline || undefined,
-    urgency: job.urgency,
+    urgency: normalizeUrgency(job.urgency),
     applications: job.applications_count,
     verified: job.company?.is_verified || false,
     urgent: job.urgency === 'high',
@@ -539,6 +553,7 @@ export async function fetchJobsAndTenders(
     budget: `${tender.estimated_value} ${tender.currency}`,
     category: tender.category?.name || 'Inne',
     deadline: tender.submission_deadline,
+    urgency: 'medium' as const, // Tenders don't have urgency field, default to medium
     applications: tender.bids_count,
     verified: tender.company?.is_verified || false,
     urgent: false,

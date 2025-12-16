@@ -26,6 +26,174 @@ interface GoogleMapProps {
   isSmallMap?: boolean;
 }
 
+// Marker configuration interface
+interface MarkerConfig {
+  id: string;
+  position: { lat: number; lng: number };
+  title: string;
+  onClick?: () => void;
+  isSelected?: boolean;
+  isHovered?: boolean;
+  postType?: 'job' | 'tender';
+  urgency?: 'low' | 'medium' | 'high';
+  jobData?: Job;
+}
+
+// Marker pool manager for reusing marker instances
+class MarkerPool {
+  private pool: google.maps.marker.AdvancedMarkerElement[] = [];
+  private activeMarkers: Map<string, google.maps.marker.AdvancedMarkerElement> = new Map();
+  private markerConfigs: Map<string, MarkerConfig> = new Map();
+  private pinElementCache: Map<string, google.maps.marker.PinElement> = new Map();
+
+  acquire(id: string, config: MarkerConfig, map: google.maps.Map): google.maps.marker.AdvancedMarkerElement {
+    // Check if marker already exists
+    const existing = this.activeMarkers.get(id);
+    if (existing) {
+      // Update existing marker
+      this.update(id, config, map);
+      return existing;
+    }
+
+    // Try to reuse from pool
+    let marker: google.maps.marker.AdvancedMarkerElement;
+    if (this.pool.length > 0) {
+      marker = this.pool.pop()!;
+    } else {
+      // Create new marker
+      marker = new google.maps.marker.AdvancedMarkerElement({
+        map,
+        position: config.position,
+        title: config.title,
+        zIndex: config.isSelected ? 1000 : config.isHovered ? 1001 : 100,
+      });
+    }
+
+    // Configure marker
+    this.configureMarker(marker, config, map);
+    
+    // Track active marker
+    this.activeMarkers.set(id, marker);
+    this.markerConfigs.set(id, config);
+
+    return marker;
+  }
+
+  private configureMarker(
+    marker: google.maps.marker.AdvancedMarkerElement,
+    config: MarkerConfig,
+    map: google.maps.Map
+  ): void {
+    // Determine background color based on priority/urgency
+    let backgroundColor: string;
+    if (config.isSelected) {
+      backgroundColor = markerColors.selected.background;
+    } else if (config.urgency && ['low', 'medium', 'high'].includes(config.urgency)) {
+      // Ensure urgency is valid before using it as a key
+      backgroundColor = markerColors.priority[config.urgency];
+    } else {
+      backgroundColor = markerColors.priority.medium;
+    }
+
+    const borderColor = lightenColor(backgroundColor, 30);
+    const postType = config.postType || 'job';
+    const baseScale = config.isSelected ? 1.6 : (config.isHovered ? 1.35 : 1.3);
+
+    // Create PinElement - create new one each time to ensure background color is properly applied
+    // Note: Cloning PinElement.element loses the background color styling, so we create new instances
+    const glyph = createMarkerGlyph(postType, backgroundColor);
+    const pinElement = new google.maps.marker.PinElement({
+      background: backgroundColor,
+      borderColor: borderColor,
+      glyphColor: '#ffffff',
+      glyph: glyph,
+      scale: baseScale,
+    });
+
+    // Update marker properties
+    marker.position = config.position;
+    marker.title = config.title;
+    
+    // Use the PinElement's element directly - don't clone to avoid losing background color
+    // The PinElement's background is applied internally by Google Maps
+    marker.content = pinElement.element;
+    marker.zIndex = config.isSelected ? 1000 : config.isHovered ? 1001 : 100;
+    marker.map = map;
+
+    // Set zIndex on element
+    const element = marker.content as HTMLElement;
+    element.style.zIndex = config.isHovered ? '1001' : '100';
+    element.setAttribute('data-marker-id', config.id);
+  }
+
+  update(id: string, config: Partial<MarkerConfig>, map: google.maps.Map): void {
+    const marker = this.activeMarkers.get(id);
+    if (!marker) return;
+
+    const currentConfig = this.markerConfigs.get(id) || {} as MarkerConfig;
+    const newConfig = { ...currentConfig, ...config };
+
+    // Only reconfigure if visual properties changed
+    const needsReconfig = 
+      currentConfig.position?.lat !== newConfig.position?.lat ||
+      currentConfig.position?.lng !== newConfig.position?.lng ||
+      currentConfig.isSelected !== newConfig.isSelected ||
+      currentConfig.isHovered !== newConfig.isHovered ||
+      currentConfig.urgency !== newConfig.urgency ||
+      currentConfig.postType !== newConfig.postType;
+
+    if (needsReconfig) {
+      this.configureMarker(marker, newConfig, map);
+      this.markerConfigs.set(id, newConfig);
+    }
+  }
+
+  release(id: string): void {
+    const marker = this.activeMarkers.get(id);
+    if (marker) {
+      marker.map = null;
+      this.activeMarkers.delete(id);
+      this.markerConfigs.delete(id);
+      // Return to pool (limit pool size to 50)
+      if (this.pool.length < 50) {
+        this.pool.push(marker);
+      }
+    }
+  }
+
+  releaseAll(): void {
+    this.activeMarkers.forEach((marker) => {
+      marker.map = null;
+      if (this.pool.length < 50) {
+        this.pool.push(marker);
+      }
+    });
+    this.activeMarkers.clear();
+    this.markerConfigs.clear();
+  }
+
+  getActiveMarkers(): Map<string, google.maps.marker.AdvancedMarkerElement> {
+    return this.activeMarkers;
+  }
+}
+
+// Viewport culling helper
+function isMarkerInBounds(
+  position: { lat: number; lng: number },
+  bounds: { north: number; south: number; east: number; west: number },
+  buffer: number = 0.1
+): boolean {
+  const latBuffer = (bounds.north - bounds.south) * buffer;
+  const lngBuffer = (bounds.east - bounds.west) * buffer;
+
+  return (
+    position.lat >= bounds.south - latBuffer &&
+    position.lat <= bounds.north + latBuffer &&
+    position.lng >= bounds.west - lngBuffer &&
+    position.lng <= bounds.east + lngBuffer
+  );
+}
+
 const MapComponent: React.FC<{
   markers: MapMarker[];
   center: { lat: number; lng: number };
@@ -38,16 +206,27 @@ const MapComponent: React.FC<{
 }> = ({ markers, center, zoom, onMapClick, onMarkerClick, onBoundsChanged, isMapExpanded = false, isSmallMap = false }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map>();
-  const [mapMarkers, setMapMarkers] = useState<google.maps.marker.AdvancedMarkerElement[]>([]);
   const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
   const [selectedJobForMobile, setSelectedJobForMobile] = useState<Job | null>(null);
-  const mapMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  
+  // Use refs for marker management (avoid React re-renders)
+  const markerPoolRef = useRef<MarkerPool | null>(null);
+  const mapMarkersRef = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
   const infoWindowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveringInfoWindowRef = useRef<boolean>(false);
   const boundsDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
   const bouncingMarkerRef = useRef<HTMLElement | null>(null);
+  const currentBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
+  const loadingChunkRef = useRef<number>(0);
   const isMobile = useIsMobile();
+
+  // Initialize marker pool
+  useEffect(() => {
+    if (!markerPoolRef.current) {
+      markerPoolRef.current = new MarkerPool();
+    }
+  }, []);
 
   useEffect(() => {
     if (mapRef.current && !map) {
@@ -55,15 +234,15 @@ const MapComponent: React.FC<{
         ...mapOptions,
         center,
         zoom,
-        mapId: 'DOMIO_MAP_ID', // Map ID is required for advanced markers
+        mapId: 'DOMIO_MAP_ID',
       });
       
       setMap(newMap);
 
       // Initialize info window
       const newInfoWindow = new google.maps.InfoWindow({
-        disableAutoPan: true, // Disable auto-pan animation
-        pixelOffset: new google.maps.Size(0, -10), // Position closer to the marker
+        disableAutoPan: true,
+        pixelOffset: new google.maps.Size(0, -10),
         ariaLabel: 'Szczegóły ogłoszenia',
       });
       setInfoWindow(newInfoWindow);
@@ -127,18 +306,13 @@ const MapComponent: React.FC<{
 
       // Add click listener to close infoWindow when clicking on map
       newMap.addListener('click', (event: google.maps.MapMouseEvent) => {
-        // Stop bounce animation when closing infoWindow
         stopBounce();
-        
-        // Close infoWindow when clicking on the map (not on markers)
         newInfoWindow.close();
         
-        // Close mobile drawer when clicking on map
         if (isMobile) {
           setSelectedJobForMobile(null);
         }
         
-        // Call the optional onMapClick callback if provided
         if (onMapClick) {
           onMapClick(event);
         }
@@ -147,12 +321,10 @@ const MapComponent: React.FC<{
       // Add bounds_changed listener with debouncing
       if (onBoundsChanged) {
         newMap.addListener('bounds_changed', () => {
-          // Clear existing debounce timeout
           if (boundsDebounceRef.current) {
             clearTimeout(boundsDebounceRef.current);
           }
 
-          // Debounce the bounds change callback (300ms)
           boundsDebounceRef.current = setTimeout(() => {
             const bounds = newMap.getBounds();
             if (bounds) {
@@ -166,6 +338,9 @@ const MapComponent: React.FC<{
                 west: southWest.lng(),
               };
 
+              // Update current bounds for viewport culling
+              currentBoundsRef.current = newBounds;
+
               // Only trigger callback if bounds changed significantly (>1% difference)
               const hasSignificantChange = !lastBoundsRef.current || 
                 Math.abs(newBounds.north - lastBoundsRef.current.north) > (newBounds.north - newBounds.south) * 0.01 ||
@@ -177,32 +352,82 @@ const MapComponent: React.FC<{
                 lastBoundsRef.current = newBounds;
                 onBoundsChanged(newBounds);
               }
+
+              // Update marker visibility based on new bounds
+              updateMarkerVisibility(newMap, markers);
             }
-          }, 300);
+          }, 500);
         });
 
-        // Trigger initial bounds callback after map is ready
-        const idleListener = newMap.addListener('idle', () => {
-          const bounds = newMap.getBounds();
-          if (bounds && onBoundsChanged) {
-            const northEast = bounds.getNorthEast();
-            const southWest = bounds.getSouthWest();
-            
-            const initialBounds = {
-              north: northEast.lat(),
-              south: southWest.lat(),
-              east: northEast.lng(),
-              west: southWest.lng(),
-            };
-            
+        // Set initial bounds immediately when map is ready
+        const setInitialBounds = () => {
+          try {
+            const bounds = newMap.getBounds();
+            if (bounds) {
+              const northEast = bounds.getNorthEast();
+              const southWest = bounds.getSouthWest();
+              
+              const initialBounds = {
+                north: northEast.lat(),
+                south: southWest.lat(),
+                east: northEast.lng(),
+                west: southWest.lng(),
+              };
+              
             lastBoundsRef.current = initialBounds;
-            onBoundsChanged(initialBounds);
-            google.maps.event.removeListener(idleListener);
+              currentBoundsRef.current = initialBounds;
+              if (onBoundsChanged) {
+                onBoundsChanged(initialBounds);
+              }
+            }
+          } catch (e) {
+            // Map might not be fully ready yet, will retry
+            console.debug('Could not set initial bounds yet:', e);
           }
+        };
+
+        // Try to set bounds immediately (multiple attempts to ensure it works)
+        setTimeout(() => {
+          setInitialBounds();
+        }, 50);
+        
+        setTimeout(() => {
+          setInitialBounds();
+        }, 200);
+
+        // Also set bounds when map is idle (backup)
+        const idleListener = newMap.addListener('idle', () => {
+          setInitialBounds();
+          google.maps.event.removeListener(idleListener);
         });
       }
     }
-  }, [mapRef, map, center, zoom, onMapClick, onBoundsChanged]);
+  }, [mapRef, map, center, zoom, onMapClick, onBoundsChanged, markers, isMobile]);
+
+  // Helper function to update marker visibility based on bounds
+  const updateMarkerVisibility = useCallback((mapInstance: google.maps.Map, markerData: MapMarker[]) => {
+    if (!markerPoolRef.current || !currentBoundsRef.current) return;
+
+    const bounds = currentBoundsRef.current;
+    const pool = markerPoolRef.current;
+    const activeMarkers = pool.getActiveMarkers();
+
+    // Update visibility for all markers
+    markerData.forEach((markerConfig) => {
+      const isVisible = isMarkerInBounds(markerConfig.position, bounds);
+      const marker = activeMarkers.get(markerConfig.id);
+
+      if (marker) {
+        if (isVisible && !marker.map) {
+          // Marker should be visible but isn't - add it back
+          marker.map = mapInstance;
+        } else if (!isVisible && marker.map) {
+          // Marker should be hidden - remove from map
+          marker.map = null;
+        }
+      }
+    });
+  }, []);
 
   // Update map center and zoom when props change
   useEffect(() => {
@@ -212,221 +437,242 @@ const MapComponent: React.FC<{
     }
   }, [map, center, zoom]);
 
-  // Update markers when markers prop changes
-  useEffect(() => {
-    if (!map || !infoWindow) return;
+  // Helper function to create marker event handlers
+  const createMarkerHandlers = useCallback((
+    marker: google.maps.marker.AdvancedMarkerElement,
+    markerData: MarkerConfig,
+    mapInstance: google.maps.Map,
+    infoWindowInstance: google.maps.InfoWindow
+  ) => {
+    const openInfoWindow = () => {
+      if (!markerData.jobData) return;
 
-    // Clear existing markers
-    mapMarkersRef.current.forEach(marker => marker.map = null);
-
-    // Create new advanced markers
-    const newMarkers = markers.map(markerData => {
-      // Determine icon color based on job type
-      const postType = markerData.postType || 'job';
-      const iconColor = postType === 'job' ? markerColors.job.glyphColor : markerColors.tender.glyphColor;
-      
-      // Determine background color based on priority/urgency
-      let backgroundColor: string;
-      if (markerData.isSelected) {
-        backgroundColor = markerColors.selected.background;
-      } else if (markerData.urgency) {
-        // Use priority-based background colors (low/medium/high)
-        backgroundColor = markerColors.priority[markerData.urgency] || markerColors.priority.medium;
-      } else if (markerData.isUrgent) {
-        // Legacy support: map urgent to high priority
-        backgroundColor = markerColors.priority.high;
-      } else {
-        // Default to medium priority if no urgency specified
-        backgroundColor = markerColors.priority.medium;
+      if (isMobile) {
+        setSelectedJobForMobile(markerData.jobData);
+        return;
       }
 
-      // Border color is 2 shades lighter than background
-      const borderColor = lightenColor(backgroundColor, 30);
+      if (!infoWindowInstance) return;
 
-      // Create glyph/icon based on job type - white icons with colored outline matching background
-      const glyph = createMarkerGlyph(postType, backgroundColor);
+      if (infoWindowTimeoutRef.current) {
+        clearTimeout(infoWindowTimeoutRef.current);
+        infoWindowTimeoutRef.current = null;
+      }
 
-      // Create a custom pin element with color based on priority and icon based on job type
-      // Increased scale for better visibility: default 1.3, selected 1.6, hovered 1.35
-      const baseScale = markerData.isSelected ? 1.6 : (markerData.isHovered ? 1.35 : 1.3);
-      const pinElement = new google.maps.marker.PinElement({
-        background: backgroundColor,
-        borderColor: borderColor, // 2 shades lighter than background
-        glyphColor: '#ffffff', // White glyph color for white icons
-        glyph: glyph,
-        scale: baseScale,
-      });
+      if (bouncingMarkerRef.current) {
+        bouncingMarkerRef.current.classList.remove('marker-bounce');
+      }
 
-      // Set zIndex based on hover state
-        if (markerData.isHovered) {
-          pinElement.element.style.zIndex = '1001';
-        } else {
-          pinElement.element.style.zIndex = '100';
-        }
+      const element = marker.content as HTMLElement;
+      element.style.zIndex = '1001';
+      if (!isMobile) {
+        element.classList.add('marker-bounce');
+        bouncingMarkerRef.current = element;
+      }
 
-      // Add data attribute to track marker ID
-      pinElement.element.setAttribute('data-marker-id', markerData.id);
+      const content = generateInfoWindowContent(markerData.jobData, isSmallMap);
+      infoWindowInstance.setContent(content);
+      infoWindowInstance.open(mapInstance, marker);
 
-      // Create the advanced marker
-      const marker = new google.maps.marker.AdvancedMarkerElement({
-        position: markerData.position,
-        map,
-        title: markerData.title,
-        content: pinElement.element,
-        zIndex: markerData.isSelected ? 1000 : markerData.isHovered ? 1001 : 100,
-      });
+      setTimeout(() => {
+        const infoWindowElement = document.querySelector(`[data-job-id="${markerData.id}"]`);
+        if (infoWindowElement) {
+          infoWindowElement.addEventListener('click', () => {
+            if (markerData.onClick) {
+              markerData.onClick();
+            }
+          });
 
-      // Helper function to open info window (used by both click and hover)
-      const openInfoWindow = () => {
-        if (!markerData.jobData) {
-          return;
-        }
+          infoWindowElement.addEventListener('mouseenter', () => {
+            isHoveringInfoWindowRef.current = true;
+            if (infoWindowTimeoutRef.current) {
+              clearTimeout(infoWindowTimeoutRef.current);
+              infoWindowTimeoutRef.current = null;
+            }
+          });
 
-        // On mobile, show drawer instead of info window
-        if (isMobile) {
-          setSelectedJobForMobile(markerData.jobData);
-          return;
-        }
-
-        // Desktop: use info window
-        if (!infoWindow) {
-          return;
-        }
-
-        // Clear any pending close timeout
-        if (infoWindowTimeoutRef.current) {
-          clearTimeout(infoWindowTimeoutRef.current);
-          infoWindowTimeoutRef.current = null;
-        }
-
-        // Stop any existing bounce animation
-        if (bouncingMarkerRef.current) {
-          bouncingMarkerRef.current.classList.remove('marker-bounce');
-        }
-
-        // Increase zIndex
-        pinElement.element.style.zIndex = '1001';
-
-        // Start continuous bounce animation while infoWindow is open
-        if (!isMobile) {
-          pinElement.element.classList.add('marker-bounce');
-          bouncingMarkerRef.current = pinElement.element;
-        }
-
-        const content = generateInfoWindowContent(markerData.jobData, isSmallMap);
-        infoWindow.setContent(content);
-        infoWindow.open(map, marker);
-
-        // Add click listener and hover listeners to info window content after it's rendered
-        setTimeout(() => {
-          const infoWindowElement = document.querySelector(`[data-job-id="${markerData.id}"]`);
-          if (infoWindowElement) {
-            // Click handler - only info window click navigates
-            infoWindowElement.addEventListener('click', () => {
-              if (markerData.onClick) {
-                markerData.onClick();
-              }
-            });
-
-            // Keep info window open when hovering over it
-            infoWindowElement.addEventListener('mouseenter', () => {
-              isHoveringInfoWindowRef.current = true;
-              if (infoWindowTimeoutRef.current) {
-                clearTimeout(infoWindowTimeoutRef.current);
-                infoWindowTimeoutRef.current = null;
-              }
-            });
-
-            infoWindowElement.addEventListener('mouseleave', () => {
-              isHoveringInfoWindowRef.current = false;
-              // Don't close - keep infoWindow open
-            });
-          }
-        }, 100);
-      };
-
-      // Marker click opens info window (doesn't navigate)
-      if (infoWindow && markerData.jobData) {
-        // Click listener on marker
-        marker.addListener('click', () => {
-          openInfoWindow();
-        });
-
-        // Hover listeners on DOM element (pinElement.element) - AdvancedMarkerElement doesn't support mouseover on marker object
-        // Only show on hover for desktop (not mobile)
-        if (!isMobile) {
-          pinElement.element.addEventListener('mouseenter', () => {
-            openInfoWindow();
+          infoWindowElement.addEventListener('mouseleave', () => {
+            isHoveringInfoWindowRef.current = false;
           });
         }
+      }, 100);
+    };
 
-        pinElement.element.addEventListener('mouseleave', () => {
-          // Reset zIndex when leaving marker
-          pinElement.element.style.zIndex = '100';
-          // Don't close - keep infoWindow open
-        });
-      }
-
-      return marker;
+    // Click listener
+    marker.addListener('click', () => {
+      openInfoWindow();
     });
 
-    setMapMarkers(newMarkers);
-    mapMarkersRef.current = newMarkers;
+    // Hover listeners (desktop only)
+    if (!isMobile) {
+      const element = marker.content as HTMLElement;
+      element.addEventListener('mouseenter', () => {
+        openInfoWindow();
+      });
 
-    // Keep the map centered on the specified center instead of auto-fitting to markers
-  }, [map, infoWindow, markers, onMarkerClick, isMapExpanded, isSmallMap]);
+      element.addEventListener('mouseleave', () => {
+        const element = marker.content as HTMLElement;
+        element.style.zIndex = '100';
+      });
+    }
+  }, [isMobile, isSmallMap]);
 
-  // Handle programmatic hover state changes (from JobCard hover)
+  // Update markers with pooling, viewport culling, and incremental loading
   useEffect(() => {
-    if (!map || !infoWindow || mapMarkersRef.current.length === 0) return;
+    if (!map || !infoWindow || !markerPoolRef.current) return;
 
-    // Find the hovered marker by checking the data attribute
-    const hoveredMarker = mapMarkersRef.current.find(marker => {
-      const markerId = (marker.content as HTMLElement)?.getAttribute('data-marker-id');
-      const markerData = markers.find(m => m.id === markerId);
-      return markerData?.isHovered;
+    const pool = markerPoolRef.current;
+    const activeMarkers = pool.getActiveMarkers();
+    
+    // Try to get bounds from map
+    let mapBounds: google.maps.LatLngBounds | null = null;
+    try {
+      mapBounds = map.getBounds();
+    } catch (e) {
+      // Map might not be ready yet
+      console.debug('Map bounds not available yet');
+    }
+    
+    // Get bounds for viewport culling
+    // Use currentBoundsRef if available (plain object), otherwise use map bounds
+    let cullingBounds: { north: number; south: number; east: number; west: number } | null = null;
+    if (currentBoundsRef.current) {
+      // Use cached bounds (plain object)
+      cullingBounds = currentBoundsRef.current;
+    } else if (mapBounds) {
+      // Use map bounds (google.maps.LatLngBounds object)
+      const northEast = mapBounds.getNorthEast();
+      const southWest = mapBounds.getSouthWest();
+      cullingBounds = {
+        north: northEast.lat(),
+        south: southWest.lat(),
+        east: northEast.lng(),
+        west: southWest.lng(),
+      };
+      // Cache it for next time
+      currentBoundsRef.current = cullingBounds;
+    }
+    
+    // If no bounds available yet and we have markers, show all markers initially
+    // They'll be filtered once bounds are available
+
+    // Filter markers by viewport (with buffer)
+    // If no bounds available yet, show all markers (they'll be filtered once bounds are available)
+    // This ensures markers are visible on initial load
+    const visibleMarkers = cullingBounds
+      ? markers.filter(m => isMarkerInBounds(m.position, cullingBounds))
+      : markers; // Show all markers if bounds not available yet
+
+    // Get current marker IDs
+    const currentMarkerIds = new Set(visibleMarkers.map(m => m.id));
+    const existingMarkerIds = new Set(activeMarkers.keys());
+
+    // Release markers that are no longer needed
+    existingMarkerIds.forEach((id) => {
+      if (!currentMarkerIds.has(id)) {
+        pool.release(id);
+      }
     });
 
-    if (hoveredMarker) {
-      const markerId = (hoveredMarker.content as HTMLElement)?.getAttribute('data-marker-id');
-      const markerData = markers.find(m => m.id === markerId);
-      if (markerData && markerData.jobData) {
-        // Clear any pending close timeout
+    // Batch marker creation/update
+    const CHUNK_SIZE = 50;
+    const chunks: MapMarker[][] = [];
+    for (let i = 0; i < visibleMarkers.length; i += CHUNK_SIZE) {
+      chunks.push(visibleMarkers.slice(i, i + CHUNK_SIZE));
+    }
+
+    // Process first chunk immediately
+    const processChunk = (chunk: MapMarker[], chunkIndex: number) => {
+      chunk.forEach((markerData) => {
+        const config: MarkerConfig = {
+          id: markerData.id,
+          position: markerData.position,
+          title: markerData.title,
+          onClick: markerData.onClick,
+          isSelected: markerData.isSelected,
+          isHovered: markerData.isHovered,
+          postType: markerData.postType,
+          urgency: markerData.urgency,
+          jobData: markerData.jobData,
+        };
+
+        const marker = pool.acquire(markerData.id, config, map);
+        mapMarkersRef.current.set(markerData.id, marker);
+
+        // Set up event handlers (only if marker is new or needs handlers)
+        if (!markerData.jobData) return;
+        
+        // Only set up handlers if marker doesn't have them yet (check by looking for existing listeners)
+        // Clear existing listeners to avoid duplicates
+        google.maps.event.clearInstanceListeners(marker);
+        
+        // Get the element and ensure it has the data attribute
+        const element = marker.content as HTMLElement;
+        if (element) {
+          element.setAttribute('data-marker-id', markerData.id);
+        }
+        
+        createMarkerHandlers(marker, config, map, infoWindow);
+      });
+
+      // Process next chunk in idle time
+      if (chunkIndex < chunks.length - 1) {
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(() => {
+            processChunk(chunks[chunkIndex + 1], chunkIndex + 1);
+          });
+        } else {
+          setTimeout(() => {
+            processChunk(chunks[chunkIndex + 1], chunkIndex + 1);
+          }, 0);
+        }
+      }
+    };
+
+    if (chunks.length > 0) {
+      processChunk(chunks[0], 0);
+    }
+  }, [map, infoWindow, markers, createMarkerHandlers]);
+
+  // Handle programmatic hover state changes
+  useEffect(() => {
+    if (!map || !infoWindow || !markerPoolRef.current) return;
+
+    const pool = markerPoolRef.current;
+    const hoveredMarkerData = markers.find(m => m.isHovered);
+
+    if (hoveredMarkerData && hoveredMarkerData.jobData) {
+      const marker = pool.getActiveMarkers().get(hoveredMarkerData.id);
+      if (marker) {
         if (infoWindowTimeoutRef.current) {
           clearTimeout(infoWindowTimeoutRef.current);
           infoWindowTimeoutRef.current = null;
         }
 
-        // Calculate offset position to make room for infoWindow above the marker
-        // Convert 150 pixels to latitude degrees based on current zoom level
         const zoom = map.getZoom() || 12;
         const scale = Math.pow(2, zoom);
         const pixelsPerDegree = (256 * scale) / 360;
         const latOffset = 110 / pixelsPerDegree;
 
-        // Pan to offset position in one smooth animation
         const offsetPosition = {
-          lat: markerData.position.lat + latOffset,
-          lng: markerData.position.lng
+          lat: hoveredMarkerData.position.lat + latOffset,
+          lng: hoveredMarkerData.position.lng
         };
         map.panTo(offsetPosition);
 
-        const content = generateInfoWindowContent(markerData.jobData, isSmallMap);
+        const content = generateInfoWindowContent(hoveredMarkerData.jobData, isSmallMap);
         infoWindow.setContent(content);
-        infoWindow.open(map, hoveredMarker);
+        infoWindow.open(map, marker);
 
-        // Add click listener and hover listeners to info window content after it's rendered
         setTimeout(() => {
-          const infoWindowElement = document.querySelector(`[data-job-id="${markerData.id}"]`);
+          const infoWindowElement = document.querySelector(`[data-job-id="${hoveredMarkerData.id}"]`);
           if (infoWindowElement) {
-            // Click handler
             infoWindowElement.addEventListener('click', () => {
-              if (markerData.onClick) {
-                markerData.onClick();
+              if (hoveredMarkerData.onClick) {
+                hoveredMarkerData.onClick();
               }
             });
 
-            // Keep info window open when hovering over it
             infoWindowElement.addEventListener('mouseenter', () => {
               isHoveringInfoWindowRef.current = true;
               if (infoWindowTimeoutRef.current) {
@@ -437,17 +683,14 @@ const MapComponent: React.FC<{
 
             infoWindowElement.addEventListener('mouseleave', () => {
               isHoveringInfoWindowRef.current = false;
-              // Don't close - keep infoWindow open
             });
           }
         }, 100);
       }
-    } else {
-      // Don't close - keep infoWindow open
     }
-  }, [map, infoWindow, markers, isMapExpanded, isSmallMap]);
+  }, [map, infoWindow, markers, isSmallMap]);
 
-  // Cleanup timeouts on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (infoWindowTimeoutRef.current) {
@@ -456,6 +699,9 @@ const MapComponent: React.FC<{
       if (boundsDebounceRef.current) {
         clearTimeout(boundsDebounceRef.current);
       }
+      if (markerPoolRef.current) {
+        markerPoolRef.current.releaseAll();
+      }
     };
   }, []);
 
@@ -463,7 +709,7 @@ const MapComponent: React.FC<{
     <>
       <div ref={mapRef} style={{ height: '100%', width: '100%' }} />
       
-      {/* Mobile Drawer - Shows job info instead of info window */}
+      {/* Mobile Drawer */}
       {isMobile && (
         <Drawer
           open={!!selectedJobForMobile}
@@ -478,7 +724,6 @@ const MapComponent: React.FC<{
               <DrawerTitle className="sr-only">Szczegóły zlecenia</DrawerTitle>
             </DrawerHeader>
             
-            {/* Job content - scrollable area with larger text and spacing */}
             <div 
               className="flex-1 px-6 pb-4 overflow-y-auto"
               onClick={() => {
@@ -499,7 +744,6 @@ const MapComponent: React.FC<{
               )}
             </div>
             
-            {/* Close button at bottom */}
             <div className="sticky bottom-0 bg-background p-4 pt-4 pb-4">
               <button
                 onClick={() => setSelectedJobForMobile(null)}
@@ -547,8 +791,8 @@ export interface MapMarker {
   isSelected?: boolean;
   isHovered?: boolean;
   isUrgent?: boolean; // Legacy support
-  postType?: 'job' | 'tender'; // Job type for icon selection
-  urgency?: 'low' | 'medium' | 'high'; // Priority level for color selection
+  postType?: 'job' | 'tender';
+  urgency?: 'low' | 'medium' | 'high';
   jobData?: Job;
 }
 

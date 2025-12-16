@@ -1,13 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import JobCard from './JobCard';
 import { FilterState } from './JobFilters';
 import { getBookmarkedJobs, addBookmark, removeBookmark } from '../utils/bookmarkStorage';
 import { extractCity, extractSublocality, getProvinceForCity } from '../utils/locationMapping';
 import { isTenderEndingSoon } from '../utils/tenderHelpers';
+import { isJobExpired } from '../utils/jobHelpers';
 import type { Job } from '../types/job';
 
 interface JobListProps {
@@ -34,6 +36,26 @@ export default function JobList({
 }: JobListProps) {
   const [sortBy, setSortBy] = useState('newest');
   const [bookmarkedJobs, setBookmarkedJobs] = useState<string[]>([]);
+  const [isExpiredJobsOpen, setIsExpiredJobsOpen] = useState(false);
+  
+  // Load bookmark count updates from sessionStorage on mount
+  const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>(() => {
+    try {
+      const stored = sessionStorage.getItem('bookmark-count-updates');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+  
+  // Persist bookmark count updates to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('bookmark-count-updates', JSON.stringify(bookmarkCountUpdates));
+    } catch (error) {
+      console.error('Error saving bookmark count updates:', error);
+    }
+  }, [bookmarkCountUpdates]);
 
   // Load bookmarked jobs from localStorage
   useEffect(() => {
@@ -58,18 +80,59 @@ export default function JobList({
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Use jobs from props
-  const availableJobs = jobsProp || [];
+  // Merge bookmark count updates with fresh server data
+  // Keep optimistic updates but update with server data if it's higher (to handle other users' bookmarks)
+  useEffect(() => {
+    if (jobsProp && jobsProp.length > 0) {
+      setBookmarkCountUpdates(prev => {
+        const newUpdates: Record<string, number> = { ...prev };
+        // Update counts from server data, but keep optimistic updates if they're higher
+        // This ensures user's actions are reflected while also showing other users' bookmarks
+        jobsProp.forEach(job => {
+          const serverCount = (job as any).bookmarks_count || 0;
+          const optimisticCount = prev[job.id];
+          
+          if (optimisticCount !== undefined) {
+            // Keep the optimistic count if it's higher (user just bookmarked)
+            // Otherwise use server count (which includes other users' bookmarks)
+            newUpdates[job.id] = Math.max(optimisticCount, serverCount);
+          } else if (serverCount > 0) {
+            // No optimistic update, but server has a count - use it
+            // Don't set it here, let it come from props naturally
+          }
+        });
+        return newUpdates;
+      });
+    }
+  }, [jobsProp]);
+
+  // Use jobs from props and apply bookmark count updates
+  const availableJobs = useMemo(() => {
+    const jobs = jobsProp || [];
+    return jobs.map(job => {
+      const countUpdate = bookmarkCountUpdates[job.id];
+      if (countUpdate !== undefined) {
+        return { ...job, bookmarks_count: countUpdate };
+      }
+      return job;
+    });
+  }, [jobsProp, bookmarkCountUpdates]);
 
   const handleBookmark = (jobId: string) => {
     const job = availableJobs.find(j => j.id === jobId);
     if (!job) return;
 
     const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
+    const currentCount = (job as any).bookmarks_count || 0;
     
     if (isCurrentlyBookmarked) {
       removeBookmark(jobId);
       setBookmarkedJobs(prev => prev.filter(id => id !== jobId));
+      // Optimistically decrement bookmark count
+      setBookmarkCountUpdates(prev => ({
+        ...prev,
+        [jobId]: Math.max(0, currentCount - 1)
+      }));
     } else {
       const jobData = job as any;
       const bookmarkData = {
@@ -83,6 +146,11 @@ export default function JobList({
       };
       addBookmark(bookmarkData);
       setBookmarkedJobs(prev => [...prev, jobId]);
+      // Optimistically increment bookmark count
+      setBookmarkCountUpdates(prev => ({
+        ...prev,
+        [jobId]: currentCount + 1
+      }));
     }
   };
 
@@ -420,15 +488,28 @@ export default function JobList({
     return sorted;
   }, [filteredJobs, sortBy]);
 
-  // Display all sorted jobs (pagination is handled by database)
-  const displayedJobs = sortedJobs;
+  // Separate jobs into active and expired
+  const { activeJobs, expiredJobs } = useMemo(() => {
+    const active: Job[] = [];
+    const expired: Job[] = [];
+    
+    sortedJobs.forEach(job => {
+      if (isJobExpired(job)) {
+        expired.push(job);
+      } else {
+        active.push(job);
+      }
+    });
+    
+    return { activeJobs: active, expiredJobs: expired };
+  }, [sortedJobs]);
 
   return (
     <div className="flex-1 p-2 sm:p-4 max-w-full overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-bold">Dostępne zlecenia: {sortedJobs.length}</h2>
+          <h2 className="text-lg sm:text-xl font-bold">Dostępne zlecenia: {activeJobs.length}</h2>
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2 sm:gap-0">
@@ -506,35 +587,35 @@ export default function JobList({
       </div>
 
       {/* Loading State */}
-      {isLoadingJobs && displayedJobs.length === 0 && (
+      {isLoadingJobs && activeJobs.length === 0 && expiredJobs.length === 0 && (
         <div className="text-center py-8">
           <div className="text-muted-foreground mb-2">Ładowanie ogłoszeń...</div>
         </div>
       )}
 
       {/* Empty State */}
-      {!isLoadingJobs && displayedJobs.length === 0 && availableJobs.length === 0 && (
+      {!isLoadingJobs && activeJobs.length === 0 && expiredJobs.length === 0 && availableJobs.length === 0 && (
         <div className="text-center py-8">
           <div className="text-muted-foreground mb-2">Brak ogłoszeń</div>
         </div>
       )}
 
       {/* Debug info - remove in production */}
-      {!isLoadingJobs && displayedJobs.length === 0 && availableJobs.length > 0 && (
+      {!isLoadingJobs && activeJobs.length === 0 && expiredJobs.length === 0 && availableJobs.length > 0 && (
         <div className="text-center py-8">
           <div className="text-muted-foreground mb-2">
             Znaleziono {availableJobs.length} ogłoszeń, ale zostały przefiltrowane
           </div>
           <div className="text-xs text-muted-foreground">
-            Dostępne: {availableJobs.length}, Filtrowane: {filteredJobs.length}, Wyświetlane: {displayedJobs.length}
+            Dostępne: {availableJobs.length}, Filtrowane: {filteredJobs.length}
           </div>
         </div>
       )}
 
-      {/* Job Cards */}
-      {!isLoadingJobs && displayedJobs.length > 0 && (
+      {/* Active Job Cards */}
+      {!isLoadingJobs && activeJobs.length > 0 && (
         <div className="space-y-2 max-w-full overflow-x-hidden">
-          {displayedJobs.map(job => (
+          {activeJobs.map(job => (
             <JobCard 
               key={job.id} 
               job={job} 
@@ -542,8 +623,47 @@ export default function JobList({
               onBookmark={handleBookmark}
               isBookmarked={bookmarkedJobs.includes(job.id)}
               onApplyClick={onApplyClick}
+              isExpired={false}
             />
           ))}
+        </div>
+      )}
+
+      {/* Expired Jobs Section */}
+      {!isLoadingJobs && expiredJobs.length > 0 && (
+        <div className="mt-8">
+          <Collapsible open={isExpiredJobsOpen} onOpenChange={setIsExpiredJobsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-0 h-auto hover:bg-transparent mb-4"
+              >
+                <h3 className="text-base sm:text-lg font-semibold text-gray-600">
+                  Wygasłe zlecenia ({expiredJobs.length})
+                </h3>
+                {isExpiredJobsOpen ? (
+                  <ChevronUp className="h-5 w-5 text-gray-600" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-gray-600" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-2 max-w-full overflow-x-hidden">
+                {expiredJobs.map(job => (
+                  <JobCard 
+                    key={job.id} 
+                    job={job} 
+                    onClick={() => onJobSelect?.(job.id)}
+                    onBookmark={handleBookmark}
+                    isBookmarked={bookmarkedJobs.includes(job.id)}
+                    onApplyClick={onApplyClick}
+                    isExpired={true}
+                  />
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       )}
 

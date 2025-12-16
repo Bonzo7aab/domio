@@ -1250,7 +1250,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                       }}
                     />
                     <Label htmlFor="urgency-medium" className="text-sm cursor-pointer flex items-center space-x-2">
-                      <AlertCircle className="w-4 h-4 text-yellow-600" />
+                      <AlertCircle className="w-4 h-4 text-blue-600" />
                       <span className="text-foreground">Średni</span>
                     </Label>
                   </div>

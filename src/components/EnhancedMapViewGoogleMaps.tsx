@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { X, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -162,6 +162,21 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
     }
   };
 
+  // Deep equality check helper for filters
+  const filtersRef = useRef<FilterState | undefined>(filters);
+  const filtersStringRef = useRef<string>('');
+  
+  // Check if filters actually changed using JSON stringification (simple deep equality)
+  const filtersChanged = useMemo(() => {
+    const filtersString = JSON.stringify(filters);
+    if (filtersString === filtersStringRef.current) {
+      return false;
+    }
+    filtersStringRef.current = filtersString;
+    filtersRef.current = filters;
+    return true;
+  }, [filters]);
+
   // Filter jobs by radius if user location is available
   const filteredJobs = useMemo(() => {
     if (!userLocation || !showJobClusters) return jobs;
@@ -172,85 +187,138 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
     });
   }, [jobs, userLocation, searchRadius, showJobClusters]);
 
+  // Split filter functions for better memoization
+  const filterByPostType = useCallback((job: Job, filterPostTypes?: string[]): boolean => {
+    if (!filterPostTypes || filterPostTypes.length === 0) return true;
+    const jobPostType = job.postType || 'job';
+    if (filterPostTypes.length === 2 && filterPostTypes.includes('job') && filterPostTypes.includes('tender')) {
+      return true;
+    }
+    return filterPostTypes.includes(jobPostType);
+  }, []);
+
+  const filterByCategory = useCallback((job: Job, filterCategories?: string[]): boolean => {
+    if (!filterCategories || filterCategories.length === 0) return true;
+    const jobCategory = typeof job.category === 'string' 
+      ? job.category 
+      : (job.category?.name || 'Inne');
+    return filterCategories.includes(jobCategory);
+  }, []);
+
+  const filterByLocation = useCallback((job: Job, filterCities?: string[], filterSublocalities?: string[]): boolean => {
+    if ((!filterCities || filterCities.length === 0) && (!filterSublocalities || filterSublocalities.length === 0)) {
+      return true;
+    }
+    
+    const jobCity = extractCity(job.location);
+    const jobSublocality = extractSublocality(job.location);
+    
+    if (filterSublocalities && filterSublocalities.length > 0) {
+      const matchesSublocality = filterSublocalities.some(sublocalityKey => {
+        const [filterCity, filterSublocality] = sublocalityKey.split(':');
+        return jobCity === filterCity && jobSublocality === filterSublocality;
+      });
+      
+      if (matchesSublocality) {
+        return true;
+      }
+      
+      const citiesWithSelectedSublocalities = new Set(
+        filterSublocalities.map(s => s.split(':')[0])
+      );
+      
+      const cityExplicitlySelected = filterCities && filterCities.some(city => 
+        city === jobCity && !citiesWithSelectedSublocalities.has(city)
+      );
+      
+      return !!cityExplicitlySelected;
+    } else if (filterCities && filterCities.length > 0) {
+      return !!jobCity && filterCities.includes(jobCity);
+    }
+    
+    return true;
+  }, []);
+
+  const filterByBudget = useCallback((job: Job, budgetRanges?: string[], budgetMin?: number | null, budgetMax?: number | null): boolean => {
+    const jobBudgetMin = (job as any).budget_min;
+    const jobBudgetMax = (job as any).budget_max;
+    const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
+    const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
+    
+    // Budget ranges filter
+    if (budgetRanges && budgetRanges.length > 0) {
+      if (!hasBudgetMin && !hasBudgetMax) {
+        // Job has no budget, skip range filtering
+      } else {
+        const min = hasBudgetMin ? Number(jobBudgetMin) : (hasBudgetMax ? 0 : 0);
+        const max = hasBudgetMax ? Number(jobBudgetMax) : (hasBudgetMin ? Number(jobBudgetMin) : Infinity);
+
+        let matchesRange = false;
+        for (const range of budgetRanges) {
+          if (range === '<5000' && max < 5000) {
+            matchesRange = true;
+            break;
+          } else if (range === '5000-20000' && min <= 20000 && max >= 5000) {
+            matchesRange = true;
+            break;
+          } else if (range === '20000+' && min >= 20000) {
+            matchesRange = true;
+            break;
+          }
+        }
+        
+        if (!matchesRange) {
+          return false;
+        }
+      }
+    }
+
+    // Budget min filter
+    if (budgetMin !== undefined && budgetMin !== null) {
+      if (jobBudgetMin === null && jobBudgetMax === null) {
+        // Skip filter
+      } else {
+        const jobMaxBudget = jobBudgetMax ?? jobBudgetMin ?? 0;
+        if (jobMaxBudget < budgetMin) {
+          return false;
+        }
+      }
+    }
+
+    // Budget max filter
+    if (budgetMax !== undefined && budgetMax !== null) {
+      if (jobBudgetMin === null && jobBudgetMax === null) {
+        // Skip filter
+      } else {
+        const jobMinBudget = jobBudgetMin ?? jobBudgetMax ?? 0;
+        if (jobMinBudget > budgetMax) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }, []);
+
   // Apply map filters (always apply filters, not just when expanded)
+  // Only recalculate if filters actually changed or filteredJobs changed
   const filteredByMapFilters = useMemo(() => {
     if (!filters) return filteredJobs;
     
+    // If filters haven't changed and we have cached result, we could return early
+    // But since filteredJobs might have changed, we still need to filter
     
     const result = filteredJobs.filter(job => {
-      // Filter by post type (job vs tender)
-      if (filters.postTypes && filters.postTypes.length > 0) {
-        const jobPostType = job.postType || 'job';
-        if (filters.postTypes.length === 2 && filters.postTypes.includes('job') && filters.postTypes.includes('tender')) {
-          // Show all posts
-        } else if (!filters.postTypes.includes(jobPostType)) {
-          return false;
-        }
-      }
-      
-      // Filter by category
-      if (filters.categories && filters.categories.length > 0) {
-        const jobCategory = typeof job.category === 'string' 
-          ? job.category 
-          : (job.category?.name || 'Inne');
-        if (!filters.categories.includes(jobCategory)) {
-          return false;
-        }
-      }
-      
-      // Filter by subcategories
+      // Use optimized filter functions
+      if (!filterByPostType(job, filters.postTypes)) return false;
+      if (!filterByCategory(job, filters.categories)) return false;
       if (filters.subcategories && filters.subcategories.length > 0 && !filters.subcategories.includes(job.subcategory)) {
         return false;
       }
-      
-      // Filter by contract types
       if (filters.contractTypes && filters.contractTypes.length > 0 && !filters.contractTypes.includes(job.type)) {
         return false;
       }
-      
-      // Filter by cities and sublocalities
-      if ((filters.cities && filters.cities.length > 0) || (filters.sublocalities && filters.sublocalities.length > 0)) {
-        const jobCity = extractCity(job.location);
-        const jobSublocality = extractSublocality(job.location);
-        
-        // If sublocalities are selected, prioritize sublocality matching
-        if (filters.sublocalities && filters.sublocalities.length > 0) {
-          const matchesSublocality = filters.sublocalities.some(sublocalityKey => {
-            const [filterCity, filterSublocality] = sublocalityKey.split(':');
-            return jobCity === filterCity && jobSublocality === filterSublocality;
-          });
-          
-          if (matchesSublocality) {
-            // Job matches a selected sublocality, include it
-            // Continue to next filter check
-          } else {
-            // Check if city is explicitly selected (not just auto-selected via sublocality)
-            // Get cities that have selected sublocalities
-            const citiesWithSelectedSublocalities = new Set(
-              filters.sublocalities.map(s => s.split(':')[0])
-            );
-            
-            // If city is selected AND doesn't have any selected sublocalities, include all jobs in that city
-            // Otherwise, exclude jobs that don't match sublocalities
-            const cityExplicitlySelected = filters.cities && filters.cities.some(city => 
-              city === jobCity && !citiesWithSelectedSublocalities.has(city)
-            );
-            
-            if (cityExplicitlySelected) {
-              // City is selected without sublocalities, include all jobs in city
-              // Continue to next filter check
-            } else {
-              // No match, exclude job
-              return false;
-            }
-          }
-        } else if (filters.cities && filters.cities.length > 0) {
-          // Only cities selected, no sublocalities
-          if (!jobCity || !filters.cities.includes(jobCity)) {
-            return false;
-          }
-        }
-      }
+      if (!filterByLocation(job, filters.cities, filters.sublocalities)) return false;
       
       // Legacy location filter support
       if (filters.locations && filters.locations.length > 0) {
@@ -260,113 +328,23 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
         }
       }
       
-      // Filter by client types
       if (filters.clientTypes && filters.clientTypes.length > 0 && !filters.clientTypes.includes(job.clientType)) {
         return false;
       }
-
-      // Filter by urgency
-      if (filters.urgency && filters.urgency.length > 0) {
-        if (!filters.urgency.includes(job.urgency)) {
-          return false;
-        }
+      if (filters.urgency && filters.urgency.length > 0 && !filters.urgency.includes(job.urgency)) {
+        return false;
       }
-
-      // Filter by ending soon (tenders ending in less than 7 days)
       if (filters.endingSoon && job.postType === 'tender' && job.tenderInfo?.submissionDeadline) {
         if (!isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline))) {
           return false;
         }
       }
-      
-      // Filter by budget ranges (checkboxes)
-      if (filters.budgetRanges && filters.budgetRanges.length > 0) {
-        const jobBudgetMin = (job as any).budget_min;
-        const jobBudgetMax = (job as any).budget_max;
-        
-        // Check if job has budget info (null/undefined check, but 0 is valid)
-        const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
-        const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
-        
-        // If job has no budget info, skip budget range filtering (include the job)
-        if (!hasBudgetMin && !hasBudgetMax) {
-          // Job has no budget, skip range filtering
-        } else {
-          // Use actual min/max values, handling nulls appropriately
-          // If max is null, use min as both min and max (single value)
-          // If min is null but max exists, use 0 as min
-          const min = hasBudgetMin ? Number(jobBudgetMin) : (hasBudgetMax ? 0 : 0);
-          const max = hasBudgetMax ? Number(jobBudgetMax) : (hasBudgetMin ? Number(jobBudgetMin) : Infinity);
-
-          let matchesRange = false;
-          for (const range of filters.budgetRanges) {
-            if (range === '<5000') {
-              // Match if job's max budget is less than 5000
-              if (max < 5000) {
-                matchesRange = true;
-                break;
-              }
-            } else if (range === '5000-20000') {
-              // Match if job's budget range overlaps with 5000-20000
-              // Overlap occurs when: min <= 20000 AND max >= 5000
-              if (min <= 20000 && max >= 5000) {
-                matchesRange = true;
-                break;
-              }
-            } else if (range === '20000+') {
-              // Match if job's min budget is >= 20000
-              if (min >= 20000) {
-                matchesRange = true;
-                break;
-              }
-            }
-          }
-          
-          if (!matchesRange) {
-            return false;
-          }
-        }
+      if (!filterByBudget(job, filters.budgetRanges, filters.budgetMin, filters.budgetMax)) {
+        return false;
       }
-
-      // Filter by budget min/max inputs
-      if (filters.budgetMin !== undefined && filters.budgetMin !== null) {
-        const jobBudgetMin = (job as any).budget_min ?? null;
-        const jobBudgetMax = (job as any).budget_max ?? null;
-        
-        // If job has no budget info, skip this filter (include the job)
-        if (jobBudgetMin === null && jobBudgetMax === null) {
-          // Skip filter
-        } else {
-          // Job must have budget_max >= filters.budgetMin (or budget_min if max is null)
-          const jobMaxBudget = jobBudgetMax ?? jobBudgetMin ?? 0;
-          if (jobMaxBudget < filters.budgetMin) {
-            return false;
-          }
-        }
-      }
-
-      if (filters.budgetMax !== undefined && filters.budgetMax !== null) {
-        const jobBudgetMin = (job as any).budget_min ?? null;
-        const jobBudgetMax = (job as any).budget_max ?? null;
-        
-        // If job has no budget info, skip this filter (include the job)
-        if (jobBudgetMin === null && jobBudgetMax === null) {
-          // Skip filter
-        } else {
-          // Job must have budget_min <= filters.budgetMax (or budget_max if min is null)
-          const jobMinBudget = jobBudgetMin ?? jobBudgetMax ?? 0;
-          if (jobMinBudget > filters.budgetMax) {
-            return false;
-          }
-        }
-      }
-      
-      
-      // Filter by search query (title only)
       if (filters.searchQuery && filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();
         const jobTitle = (job.title || '').toLowerCase();
-        
         if (!jobTitle.includes(query)) {
           return false;
         }
@@ -376,25 +354,32 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
     });
     
     return result;
-  }, [filteredJobs, filters, isExpanded, userLocation]);
+  }, [filteredJobs, filtersChanged, filterByPostType, filterByCategory, filterByLocation, filterByBudget]);
 
   // Convert jobs to map markers
   const mapMarkers: MapMarker[] = useMemo(() => {
     // Always use filteredByMapFilters to ensure consistent filtering with job list
     const jobsToShow = filteredByMapFilters;
     
-    return jobsToShow.map(job => ({
-      id: job.id,
-      position: { lat: job.lat, lng: job.lng },
-      title: job.title,
-      onClick: () => onJobSelect?.(job.id),
-      isSelected: selectedJobId === job.id,
-      isHovered: hoveredJobId === job.id,
-      isUrgent: job.urgent, // Legacy support
-      postType: job.postType || 'job', // Job type for icon selection
-      urgency: job.urgency || 'medium', // Priority level for color selection
-      jobData: job,
-    }));
+    return jobsToShow.map(job => {
+      // Normalize urgency to ensure it's valid
+      const urgency = job.urgency && ['low', 'medium', 'high'].includes(job.urgency.toLowerCase())
+        ? job.urgency.toLowerCase() as 'low' | 'medium' | 'high'
+        : 'medium';
+      
+      return {
+        id: job.id,
+        position: { lat: job.lat, lng: job.lng },
+        title: job.title,
+        onClick: () => onJobSelect?.(job.id),
+        isSelected: selectedJobId === job.id,
+        isHovered: hoveredJobId === job.id,
+        isUrgent: job.urgent, // Legacy support
+        postType: job.postType || 'job', // Job type for icon selection
+        urgency, // Priority level for color selection
+        jobData: job,
+      };
+    });
   }, [filteredByMapFilters, selectedJobId, hoveredJobId, onJobSelect]);
 
   // Handle map clicks

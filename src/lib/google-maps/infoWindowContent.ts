@@ -1,13 +1,64 @@
 import { Job } from "../../types";
 
+// Cache for InfoWindow content to avoid regenerating for the same job
+const infoWindowContentCache = new Map<string, string>();
+const CACHE_MAX_SIZE = 100; // Limit cache size to prevent memory issues
+
+/**
+ * Clear InfoWindow content cache (useful for memory management)
+ */
+export function clearInfoWindowCache(): void {
+  infoWindowContentCache.clear();
+}
+
+/**
+ * Get cached InfoWindow content or generate new content
+ */
+function getCachedContent(jobId: string, isSmallMap: boolean, generator: () => string): string {
+  const cacheKey = `${jobId}-${isSmallMap ? 'small' : 'large'}`;
+  
+  // Check cache first
+  const cached = infoWindowContentCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  
+  // Generate new content
+  const content = generator();
+  
+  // Cache it (with size limit)
+  if (infoWindowContentCache.size >= CACHE_MAX_SIZE) {
+    // Remove oldest entry (first key in Map)
+    const firstKey = infoWindowContentCache.keys().next().value;
+    if (firstKey) {
+      infoWindowContentCache.delete(firstKey);
+    }
+  }
+  infoWindowContentCache.set(cacheKey, content);
+  
+  return content;
+}
+
 /**
  * Generates rich HTML content for Google Maps info windows
  * Styled with project's color palette and design system
+ * Uses caching to avoid regenerating content for the same job
  */
 export function generateInfoWindowContent(jobData?: Job, isSmallMap: boolean = false): string {
   if (!jobData) {
     return '<div class="p-3 text-sm text-gray-600">Brak danych</div>';
   }
+  
+  // Use cached content if available
+  return getCachedContent(jobData.id, isSmallMap, () => {
+    return generateInfoWindowContentInternal(jobData, isSmallMap);
+  });
+}
+
+/**
+ * Internal function that actually generates the content
+ */
+function generateInfoWindowContentInternal(jobData: Job, isSmallMap: boolean): string {
 
   const {
     id,
@@ -64,7 +115,7 @@ export function generateInfoWindowContent(jobData?: Job, isSmallMap: boolean = f
   }
 
   return `
-    <div class="info-window-content" data-job-id="${id}" style="cursor: pointer; width: 100%; max-width: 360px;">
+    <div class="info-window-content" data-job-id="${id}" style="cursor: pointer; width: 100%; max-width: ${isSmallMap ? '240px' : '360px'};">
       <div style="
         padding: 16px;
         background: white;

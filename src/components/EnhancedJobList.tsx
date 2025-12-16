@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { addBookmark, getBookmarkedJobs, removeBookmark } from '../utils/bookmarkStorage';
 import { getStoredJobs, Job as StorageJob } from '../utils/jobStorage';
 import JobCard from './JobCard';
@@ -6,8 +7,10 @@ import { FilterState } from './JobFilters';
 import { JobListHeader } from './JobListHeader';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { extractCity, extractSublocality, getProvinceForCity } from '../utils/locationMapping';
 import { isTenderEndingSoon } from '../utils/tenderHelpers';
+import { isJobExpired } from '../utils/jobHelpers';
 import type { Job } from '../types/job';
 
 interface EnhancedJobListProps {
@@ -46,6 +49,26 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   const [bookmarkedJobs, setBookmarkedJobs] = useState<string[]>([]);
   const [loadedCount, setLoadedCount] = useState(20);
   const [storedJobs, setStoredJobs] = useState<StorageJob[]>([]);
+  const [isExpiredJobsOpen, setIsExpiredJobsOpen] = useState(false);
+  
+  // Load bookmark count updates from sessionStorage on mount
+  const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>(() => {
+    try {
+      const stored = sessionStorage.getItem('bookmark-count-updates');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+  
+  // Persist bookmark count updates to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('bookmark-count-updates', JSON.stringify(bookmarkCountUpdates));
+    } catch (error) {
+      console.error('Error saving bookmark count updates:', error);
+    }
+  }, [bookmarkCountUpdates]);
   
   // Load stored jobs from localStorage (simplified) - fallback
   useEffect(() => {
@@ -81,7 +104,33 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
   
-  // Use jobs from props, fallback to stored jobs if needed
+  // Merge bookmark count updates with fresh server data
+  // Keep optimistic updates but update with server data if it's higher (to handle other users' bookmarks)
+  useEffect(() => {
+    if (jobs && jobs.length > 0) {
+      setBookmarkCountUpdates(prev => {
+        const newUpdates: Record<string, number> = { ...prev };
+        // Update counts from server data, but keep optimistic updates if they're higher
+        // This ensures user's actions are reflected while also showing other users' bookmarks
+        jobs.forEach(job => {
+          const serverCount = (job as any).bookmarks_count || 0;
+          const optimisticCount = prev[job.id];
+          
+          if (optimisticCount !== undefined) {
+            // Keep the optimistic count if it's higher (user just bookmarked)
+            // Otherwise use server count (which includes other users' bookmarks)
+            newUpdates[job.id] = Math.max(optimisticCount, serverCount);
+          } else if (serverCount > 0) {
+            // No optimistic update, but server has a count - use it
+            // Don't set it here, let it come from props naturally
+          }
+        });
+        return newUpdates;
+      });
+    }
+  }, [jobs]);
+
+  // Use jobs from props, fallback to stored jobs if needed, and apply bookmark count updates
   const allJobs = useMemo(() => {
     let jobsToReturn: any[] = [];
     
@@ -102,8 +151,15 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       return true;
     });
     
-    return uniqueJobs;
-  }, [jobs, storedJobs, isLoadingJobs]);
+    // Apply bookmark count updates
+    return uniqueJobs.map(job => {
+      const countUpdate = bookmarkCountUpdates[job.id];
+      if (countUpdate !== undefined) {
+        return { ...job, bookmarks_count: countUpdate };
+      }
+      return job;
+    });
+  }, [jobs, storedJobs, isLoadingJobs, bookmarkCountUpdates]);
 
   // Simple search functionality (title only)
   const searchFilteredJobs = useMemo(() => {
@@ -355,8 +411,24 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     }
   }, [filteredJobs, sortBy]);
 
-  // Get displayed jobs with simple pagination
-  const displayedJobs = sortedJobs.slice(0, loadedCount);
+  // Separate jobs into active and expired
+  const { activeJobs, expiredJobs } = useMemo(() => {
+    const active: Job[] = [];
+    const expired: Job[] = [];
+    
+    sortedJobs.forEach(job => {
+      if (isJobExpired(job)) {
+        expired.push(job);
+      } else {
+        active.push(job);
+      }
+    });
+    
+    return { activeJobs: active, expiredJobs: expired };
+  }, [sortedJobs]);
+
+  // Get displayed jobs with simple pagination (only active jobs)
+  const displayedActiveJobs = activeJobs.slice(0, loadedCount);
 
   // Determine primary location for dynamic title
   const primaryLocation = useMemo(() => {
@@ -403,11 +475,17 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
 
   const handleBookmark = useCallback((jobId: string, job: any) => {
     const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
+    const currentCount = job.bookmarks_count || 0;
     
     if (isCurrentlyBookmarked) {
       // Remove bookmark
       removeBookmark(jobId);
       setBookmarkedJobs(prev => prev.filter(id => id !== jobId));
+      // Optimistically decrement bookmark count
+      setBookmarkCountUpdates(prev => ({
+        ...prev,
+        [jobId]: Math.max(0, currentCount - 1)
+      }));
     } else {
       // Add bookmark
       const bookmarkData = {
@@ -426,6 +504,11 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       };
       addBookmark(bookmarkData);
       setBookmarkedJobs(prev => [...prev, jobId]);
+      // Optimistically increment bookmark count
+      setBookmarkCountUpdates(prev => ({
+        ...prev,
+        [jobId]: currentCount + 1
+      }));
     }
   }, [bookmarkedJobs]);
 
@@ -448,7 +531,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
           <div className="p-4 pb-0">
             <JobListHeader 
               totalResults={allJobs.length}
-              filteredResults={sortedJobs.length}
+              filteredResults={activeJobs.length}
               sortBy={sortBy}
               onSortChange={setSortBy}
               isMapVisible={isMapVisible}
@@ -470,7 +553,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
                   </Badge>
                 )}
               </div>
-            ) : displayedJobs.length === 0 ? (
+            ) : displayedActiveJobs.length === 0 && expiredJobs.length === 0 ? (
               <div className="text-center py-8">
                 <div className="text-muted-foreground mb-2">Brak wyników</div>
                 <div className="text-sm text-muted-foreground">
@@ -496,31 +579,74 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
                 </Button>
               </div>
             ) : (
-              displayedJobs.map((job, index) => (
-                <JobCard
-                  key={job.id || `fallback-${index}`}
-                  job={job}
-                  onClick={() => handleJobSelect(job.id)}
-                  onMouseEnter={() => handleJobHover(job.id)}
-                  onMouseLeave={() => handleJobHover(null)}
-                  isHighlighted={hoveredJobId === job.id}
-                  isBookmarked={bookmarkedJobs.includes(job.id)}
-                  onBookmark={() => handleBookmark(job.id, job)}
-                  onApplyClick={onApplyClick}
-                />
-              ))
-            )}
+              <>
+                {/* Active Jobs */}
+                {displayedActiveJobs.map((job, index) => (
+                  <JobCard
+                    key={job.id || `fallback-${index}`}
+                    job={job}
+                    onClick={() => handleJobSelect(job.id)}
+                    onMouseEnter={() => handleJobHover(job.id)}
+                    onMouseLeave={() => handleJobHover(null)}
+                    isHighlighted={hoveredJobId === job.id}
+                    isBookmarked={bookmarkedJobs.includes(job.id)}
+                    onBookmark={() => handleBookmark(job.id, job)}
+                    onApplyClick={onApplyClick}
+                    isExpired={false}
+                  />
+                ))}
 
-            {/* Load More Button */}
-            {sortedJobs.length > loadedCount && (
-              <div className="text-center pt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={handleLoadMore}
-                >
-                  Załaduj więcej ogłoszeń
-                </Button>
-              </div>
+                {/* Load More Button for Active Jobs */}
+                {activeJobs.length > loadedCount && (
+                  <div className="text-center pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleLoadMore}
+                    >
+                      Załaduj więcej ogłoszeń
+                    </Button>
+                  </div>
+                )}
+
+                {/* Expired Jobs Section */}
+                {expiredJobs.length > 0 && (
+                  <div className="mt-8">
+                    <Collapsible open={isExpiredJobsOpen} onOpenChange={setIsExpiredJobsOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-between p-0 h-auto hover:bg-transparent mb-4"
+                        >
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-600">
+                            Wygasłe zlecenia ({expiredJobs.length})
+                          </h3>
+                          {isExpiredJobsOpen ? (
+                            <ChevronUp className="h-5 w-5 text-gray-600" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-gray-600" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        {expiredJobs.map((job, index) => (
+                          <JobCard
+                            key={job.id || `expired-fallback-${index}`}
+                            job={job}
+                            onClick={() => handleJobSelect(job.id)}
+                            onMouseEnter={() => handleJobHover(job.id)}
+                            onMouseLeave={() => handleJobHover(null)}
+                            isHighlighted={hoveredJobId === job.id}
+                            isBookmarked={bookmarkedJobs.includes(job.id)}
+                            onBookmark={() => handleBookmark(job.id, job)}
+                            onApplyClick={onApplyClick}
+                            isExpired={true}
+                          />
+                        ))}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

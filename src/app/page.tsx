@@ -74,6 +74,16 @@ export default function HomePage() {
   // Use refs to store latest values for use in async callbacks to avoid stale closures
   const mapBoundsRef = useRef(mapBounds);
   const isMapExpandedRef = useRef(isMapExpanded);
+  
+  // Cache for bounds queries to avoid redundant API calls
+  const boundsCacheRef = useRef<Map<string, { bounds: { north: number; south: number; east: number; west: number }; data: any[]; timestamp: number }>>(new Map());
+  const boundsDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastQueriedBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
+  
+  // Cache TTL: 5 minutes
+  const CACHE_TTL = 5 * 60 * 1000;
+  // Minimum distance threshold: only query if bounds moved significantly (>5% change)
+  const MIN_BOUNDS_CHANGE_THRESHOLD = 0.05;
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -84,10 +94,83 @@ export default function HomePage() {
     isMapExpandedRef.current = isMapExpanded;
   }, [isMapExpanded]);
 
+  // Helper function to check if bounds are significantly different
+  const areBoundsSignificantlyDifferent = (
+    bounds1: { north: number; south: number; east: number; west: number },
+    bounds2: { north: number; south: number; east: number; west: number }
+  ): boolean => {
+    if (!bounds1 || !bounds2) return true;
+    
+    const latRange1 = bounds1.north - bounds1.south;
+    const lngRange1 = bounds1.east - bounds1.west;
+    const latRange2 = bounds2.north - bounds2.south;
+    const lngRange2 = bounds2.east - bounds2.west;
+    
+    const latDiff = Math.abs(bounds1.north - bounds2.north) + Math.abs(bounds1.south - bounds2.south);
+    const lngDiff = Math.abs(bounds1.east - bounds2.east) + Math.abs(bounds1.west - bounds2.west);
+    
+    const latChangePercent = latDiff / Math.max(latRange1, latRange2);
+    const lngChangePercent = lngDiff / Math.max(lngRange1, lngRange2);
+    
+    return latChangePercent > MIN_BOUNDS_CHANGE_THRESHOLD || lngChangePercent > MIN_BOUNDS_CHANGE_THRESHOLD;
+  };
+
+  // Helper function to check if cached bounds cover the requested bounds
+  const getCachedDataForBounds = (bounds: { north: number; south: number; east: number; west: number }): any[] | null => {
+    const now = Date.now();
+    
+    for (const [key, cached] of boundsCacheRef.current.entries()) {
+      // Check if cache is still valid
+      if (now - cached.timestamp > CACHE_TTL) {
+        boundsCacheRef.current.delete(key);
+        continue;
+      }
+      
+      // Check if cached bounds cover the requested bounds
+      if (
+        cached.bounds.south <= bounds.south &&
+        cached.bounds.north >= bounds.north &&
+        cached.bounds.west <= bounds.west &&
+        cached.bounds.east >= bounds.east
+      ) {
+        // Filter cached data to match exact bounds
+        return cached.data.filter((job: any) => 
+          job.lat >= bounds.south &&
+          job.lat <= bounds.north &&
+          job.lng >= bounds.west &&
+          job.lng <= bounds.east
+        );
+      }
+    }
+    
+    return null;
+  };
+
+  // Helper function to create cache key from bounds
+  const getBoundsCacheKey = (bounds: { north: number; south: number; east: number; west: number }): string => {
+    // Round bounds to reduce cache fragmentation
+    const round = (n: number, precision: number = 2) => Math.round(n * Math.pow(10, precision)) / Math.pow(10, precision);
+    return `${round(bounds.north, 2)}-${round(bounds.south, 2)}-${round(bounds.east, 2)}-${round(bounds.west, 2)}`;
+  };
+
   // Load jobs from database function - fetch all jobs within bounds
   const loadJobsFromDatabase = async (bounds?: { north: number; south: number; east: number; west: number } | null, updateLoadedJobs = true) => {
     try {
       setIsLoadingJobs(true);
+      
+      // Check cache first if bounds are provided
+      if (bounds) {
+        const cachedData = getCachedDataForBounds(bounds);
+        if (cachedData) {
+          // Use cached data
+          if (updateLoadedJobs) {
+            setLoadedJobs(cachedData);
+          }
+          setJobs(cachedData);
+          setIsLoadingJobs(false);
+          return;
+        }
+      }
       
       // Fetch all jobs within bounds (with reasonable maximum to prevent overload)
       const dbFilters: DBJobFilters = {
@@ -106,6 +189,24 @@ export default function HomePage() {
         }
         setJobs([]);
       } else if (data) {
+        // Cache the result if bounds are provided
+        if (bounds) {
+          const cacheKey = getBoundsCacheKey(bounds);
+          boundsCacheRef.current.set(cacheKey, {
+            bounds,
+            data,
+            timestamp: Date.now(),
+          });
+          
+          // Limit cache size to 10 entries
+          if (boundsCacheRef.current.size > 10) {
+            const firstKey = boundsCacheRef.current.keys().next().value;
+            if (firstKey) {
+              boundsCacheRef.current.delete(firstKey);
+            }
+          }
+        }
+        
         // Store all jobs (for filters) only if explicitly requested
         // This ensures loadedJobs always has all jobs, while jobs can be bounds-filtered for map display
         if (updateLoadedJobs) {
@@ -135,12 +236,28 @@ export default function HomePage() {
     loadJobsFromDatabase(null);
   }, []);
 
-  // Handle map bounds changes
+  // Handle map bounds changes with debouncing and caching
   const handleMapBoundsChange = (bounds: { north: number; south: number; east: number; west: number }) => {
     setMapBounds(bounds);
-    // Reload jobs when bounds change, but don't update loadedJobs (keep all jobs for filters)
-    // Only update jobs array (for map display) with bounds-filtered results
-    loadJobsFromDatabase(bounds, false);
+    
+    // Clear existing debounce
+    if (boundsDebounceRef.current) {
+      clearTimeout(boundsDebounceRef.current);
+    }
+    
+    // Check if bounds changed significantly
+    if (lastQueriedBoundsRef.current && !areBoundsSignificantlyDifferent(bounds, lastQueriedBoundsRef.current)) {
+      // Bounds haven't changed significantly, skip query
+      return;
+    }
+    
+    // Debounce the query (500ms instead of immediate)
+    boundsDebounceRef.current = setTimeout(() => {
+      lastQueriedBoundsRef.current = bounds;
+      // Reload jobs when bounds change, but don't update loadedJobs (keep all jobs for filters)
+      // Only update jobs array (for map display) with bounds-filtered results
+      loadJobsFromDatabase(bounds, false);
+    }, 500);
   };
 
   // Refetch jobs when filters change (keeping current bounds)

@@ -1,11 +1,11 @@
 import React, { useMemo, useCallback } from 'react';
-import { MapPin, Clock, BookmarkIcon, Eye, Gavel, Wrench, Users } from 'lucide-react';
+import { MapPin, Clock, BookmarkIcon, Eye, Gavel, Wrench, Users, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { TenderStatusBadge } from './TenderStatusBadge';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
+import { getDaysRemaining, formatDaysRemaining, isTenderEndingSoon } from '../utils/tenderHelpers';
 import { useUserProfile } from '../contexts/AuthContext';
 import type { Job, TenderInfo } from '../types/job';
 
@@ -31,6 +31,7 @@ interface JobCardProps {
   onMouseLeave?: () => void;
   isHighlighted?: boolean;
   onApplyClick?: (jobId: string, jobData?: any) => void;
+  isExpired?: boolean;
 }
 
 const JobCard = React.memo(function JobCard({ 
@@ -41,7 +42,8 @@ const JobCard = React.memo(function JobCard({
   onMouseEnter, 
   onMouseLeave, 
   isHighlighted = false,
-  onApplyClick
+  onApplyClick,
+  isExpired = false
 }: JobCardProps) {
   const { user } = useUserProfile();
   const isManager = user?.userType === 'manager';
@@ -60,18 +62,51 @@ const JobCard = React.memo(function JobCard({
 
   const isTender = useMemo(() => job.postType === 'tender', [job.postType]);
 
-  // Render tender card with new design
-  const daysRemaining = useMemo(() => {
-    return isTender && job.tenderInfo?.submissionDeadline 
-      ? getDaysRemaining(new Date(job.tenderInfo.submissionDeadline))
-      : 0;
-  }, [isTender, job.tenderInfo?.submissionDeadline]);
+  // Calculate days remaining for deadline
+  const deadlineDaysRemaining = useMemo(() => {
+    if (isTender && job.tenderInfo?.submissionDeadline) {
+      return getDaysRemaining(new Date(job.tenderInfo.submissionDeadline));
+    }
+    if (job.deadline) {
+      return getDaysRemaining(new Date(job.deadline));
+    }
+    return null;
+  }, [isTender, job.tenderInfo?.submissionDeadline, job.deadline]);
+
+  // Check if deadline is ending soon (less than 7 days)
+  const isEndingSoon = useMemo(() => {
+    if (isTender && job.tenderInfo?.submissionDeadline) {
+      return isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline));
+    }
+    if (job.deadline && deadlineDaysRemaining !== null) {
+      return deadlineDaysRemaining > 0 && deadlineDaysRemaining < 7;
+    }
+    return false;
+  }, [isTender, job.tenderInfo?.submissionDeadline, job.deadline, deadlineDaysRemaining]);
+
+  // Format deadline for display
+  const formattedDeadline = useMemo(() => {
+    if (!job.deadline) return null;
+    try {
+      const deadlineDate = new Date(job.deadline);
+      if (isNaN(deadlineDate.getTime())) return job.deadline; // Return as-is if invalid
+      return deadlineDate.toLocaleDateString('pl-PL', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch {
+      return job.deadline; // Return as-is if parsing fails
+    }
+  }, [job.deadline]);
 
   if (isTender) {
 
     return (
       <Card 
-        className="cursor-pointer hover:shadow-lg transition-shadow bg-white w-full max-w-full"
+        className={`cursor-pointer hover:shadow-lg transition-shadow w-full max-w-full ${
+          isExpired ? 'bg-gray-50 opacity-60' : 'bg-white'
+        }`}
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
@@ -83,9 +118,14 @@ const JobCard = React.memo(function JobCard({
                 <div className="flex items-start md:items-center gap-2 md:gap-3 flex-wrap min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                     <Gavel className="w-4 h-4 text-warning flex-shrink-0" />
-                    <h3 className="font-semibold text-base md:text-lg truncate">{job.title}</h3>
+                    <h3 className={`font-semibold text-base md:text-lg truncate ${isExpired ? 'text-gray-500' : ''}`}>{job.title}</h3>
                   </div>
                   <div className="flex items-center gap-1.5 md:gap-3 flex-wrap">
+                    {isExpired && (
+                      <Badge variant="secondary" className="text-xs">
+                        Wygasłe
+                      </Badge>
+                    )}
                     {/* Map current phase to valid tender status */}
                     <TenderStatusBadge status={
                       job.tenderInfo?.currentPhase?.toLowerCase().includes('ocena') || 
@@ -150,10 +190,17 @@ const JobCard = React.memo(function JobCard({
                     <span>{job.applications} ofert</span>
                   </div>
                   
-                  {daysRemaining > 0 && (
-                    <div className="flex items-center gap-2 text-orange-600">
-                      <Clock className="h-4 w-4 flex-shrink-0" />
-                      <span>{formatDaysRemaining(daysRemaining)} do końca</span>
+                  {isTender && job.tenderInfo?.submissionDeadline && (
+                    <div className="flex items-center gap-2 text-blue-600 font-medium">
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span>
+                        Termin: {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
+                        {isEndingSoon && deadlineDaysRemaining !== null && (
+                          <span className="text-orange-600 ml-1">
+                            ({formatDaysRemaining(deadlineDaysRemaining)} do końca)
+                          </span>
+                        )}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -176,7 +223,9 @@ const JobCard = React.memo(function JobCard({
   // Updated job card design for regular jobs with action buttons
   return (
     <Card 
-      className="cursor-pointer hover:shadow-lg transition-shadow bg-white w-full max-w-full"
+      className={`cursor-pointer hover:shadow-lg transition-shadow w-full max-w-full ${
+        isExpired ? 'bg-gray-50 opacity-60' : 'bg-white'
+      }`}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -188,13 +237,20 @@ const JobCard = React.memo(function JobCard({
               <div className="flex items-start md:items-center gap-2 md:gap-3 flex-wrap min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                   <Wrench className="w-4 h-4 text-primary flex-shrink-0" />
-                  <h3 className="font-semibold text-base md:text-lg truncate">{job.title}</h3>
+                  <h3 className={`font-semibold text-base md:text-lg truncate ${isExpired ? 'text-gray-500' : ''}`}>{job.title}</h3>
                 </div>
-                {job.urgent && (
-                  <Badge variant="destructive" className="text-xs">
-                    Pilne
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+                  {isExpired && (
+                    <Badge variant="secondary" className="text-xs">
+                      Wygasłe
+                    </Badge>
+                  )}
+                  {job.urgent && (
+                    <Badge variant="destructive" className="text-xs">
+                      Pilne
+                    </Badge>
+                  )}
+                </div>
               </div>
               
               {/* Action buttons in top right block */}
@@ -318,6 +374,20 @@ const JobCard = React.memo(function JobCard({
                     <div className="flex items-center gap-1 text-gray-500">
                       <span className="text-xs">
                         {job.distance < 1 ? `${Math.round(job.distance * 1000)}m` : `${job.distance.toFixed(1)}km`}
+                      </span>
+                    </div>
+                  )}
+
+                  {formattedDeadline && (
+                    <div className="flex items-center gap-2 text-blue-600 font-medium">
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span>
+                        Termin: {formattedDeadline}
+                        {isEndingSoon && deadlineDaysRemaining !== null && (
+                          <span className="text-orange-600 ml-1">
+                            ({formatDaysRemaining(deadlineDaysRemaining)} do końca)
+                          </span>
+                        )}
                       </span>
                     </div>
                   )}

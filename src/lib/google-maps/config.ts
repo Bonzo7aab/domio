@@ -76,10 +76,30 @@ export const markerColors = {
   },
 };
 
+// SVG glyph cache - cache SVG elements by postType + backgroundColor combination
+const glyphCache = new Map<string, SVGSVGElement>();
+
+// Helper function to clone SVG element (required for reuse)
+const cloneSVG = (svg: SVGSVGElement): SVGSVGElement => {
+  return svg.cloneNode(true) as SVGSVGElement;
+};
+
 // Marker glyphs/icons for job types
 // Returns SVG element for use in Google Maps PinElement glyph
 // Icons are white filled with colored outline, placed directly on marker background
+// Uses caching to avoid recreating SVG elements for the same postType + backgroundColor combination
 export const createMarkerGlyph = (postType: 'job' | 'tender', backgroundColor: string): SVGSVGElement => {
+  // Create cache key
+  const cacheKey = `${postType}-${backgroundColor}`;
+  
+  // Check cache first
+  const cached = glyphCache.get(cacheKey);
+  if (cached) {
+    // Clone the cached SVG to avoid DOM node reuse issues
+    return cloneSVG(cached);
+  }
+
+  // Create new SVG element
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('width', '24');
   svg.setAttribute('height', '24');
@@ -128,5 +148,9 @@ export const createMarkerGlyph = (postType: 'job' | 'tender', backgroundColor: s
     svg.appendChild(g);
   }
 
-  return svg;
+  // Cache the SVG element
+  glyphCache.set(cacheKey, svg);
+  
+  // Return a clone to avoid DOM node reuse issues
+  return cloneSVG(svg);
 };
