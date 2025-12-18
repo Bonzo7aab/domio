@@ -534,7 +534,6 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                                   {job.job_categories.name || 'Inne'}
                                 </Badge>
                               )}
-                              <Badge className="bg-green-100 text-green-800 text-xs">Aktywne</Badge>
                             </div>
                           </CardHeader>
                           <CardContent>

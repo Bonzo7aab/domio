@@ -420,43 +420,58 @@ export function generateMobileDrawerContent(jobData: Job): string {
           ` : ''}
           
           <div style="flex: 1; min-width: 0;">
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-              ${isTender ? `
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(32 95% 44%)" stroke-width="2.5">
-                  <path d="M17 10L12 5 7 10M17 19H7a4 4 0 01-4-4V8a4 4 0 014-4h10a4 4 0 014 4v7a4 4 0 01-4 4z"/>
-                </svg>
-              ` : `
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(221 83% 40%)" stroke-width="2.5">
-                  <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-                </svg>
-              `}
-              ${urgent ? `
-                <span style="
-                  display: inline-flex;
-                  padding: 4px 12px;
-                  font-size: 12px;
-                  font-weight: 700;
-                  border-radius: 8px;
-                  background: hsl(0 72% 51%);
-                  color: white;
-                  text-transform: uppercase;
-                  letter-spacing: 0.025em;
-                ">Pilne</span>
-              ` : ''}
-              ${verified ? `
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="hsl(221 83% 40%)" style="flex-shrink: 0;">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              ` : ''}
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+              <h3 style="
+                font-size: 22px;
+                font-weight: 700;
+                color: hsl(215 25% 17%);
+                margin: 0;
+                line-height: 1.4;
+                flex: 1;
+                min-width: 0;
+              ">${safeTitle}</h3>
+              
+              <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                ${isTender ? `
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(32 95% 44%)" stroke-width="2.5">
+                    <path d="M17 10L12 5 7 10M17 19H7a4 4 0 01-4-4V8a4 4 0 014-4h10a4 4 0 014 4v7a4 4 0 01-4 4z"/>
+                  </svg>
+                ` : `
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(221 83% 40%)" stroke-width="2.5">
+                    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                  </svg>
+                `}
+                ${urgent ? `
+                  <span style="
+                    display: inline-flex;
+                    padding: 4px 12px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    border-radius: 8px;
+                    background: hsl(0 72% 51%);
+                    color: white;
+                    text-transform: uppercase;
+                    letter-spacing: 0.025em;
+                  ">Pilne</span>
+                ` : ''}
+                ${verified ? `
+                  <div style="
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background: hsl(142 76% 36%);
+                    flex-shrink: 0;
+                  ">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" style="flex-shrink: 0;">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                ` : ''}
+              </div>
             </div>
-            
-            <h3 style="
-              font-size: 22px;
-              font-weight: 700;
-              color: hsl(215 25% 17%);
-              margin: 0 0 12px 0;
-              line-height: 1.4;
-            ">${safeTitle}</h3>
           </div>
         </div>
 

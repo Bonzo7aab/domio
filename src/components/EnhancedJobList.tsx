@@ -61,6 +61,16 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     }
   });
   
+  // Load view count updates from sessionStorage on mount
+  const [viewCountUpdates, setViewCountUpdates] = useState<Record<string, number>>(() => {
+    try {
+      const stored = sessionStorage.getItem('view-count-updates');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+  
   // Persist bookmark count updates to sessionStorage
   useEffect(() => {
     try {
@@ -69,6 +79,17 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       console.error('Error saving bookmark count updates:', error);
     }
   }, [bookmarkCountUpdates]);
+
+  // Load view count updates from sessionStorage when jobs change
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('view-count-updates');
+      const updates = stored ? JSON.parse(stored) : {};
+      setViewCountUpdates(updates);
+    } catch (error) {
+      console.error('Error loading view count updates:', error);
+    }
+  }, [jobs]);
   
   // Load stored jobs from localStorage (simplified) - fallback
   useEffect(() => {
@@ -151,15 +172,27 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       return true;
     });
     
-    // Apply bookmark count updates
+    // Apply bookmark and view count updates
     return uniqueJobs.map(job => {
-      const countUpdate = bookmarkCountUpdates[job.id];
-      if (countUpdate !== undefined) {
-        return { ...job, bookmarks_count: countUpdate };
+      let updatedJob = { ...job };
+      const bookmarkCountUpdate = bookmarkCountUpdates[job.id];
+      if (bookmarkCountUpdate !== undefined) {
+        updatedJob = { ...updatedJob, bookmarks_count: bookmarkCountUpdate };
       }
-      return job;
+      const viewCountUpdate = viewCountUpdates[job.id];
+      if (viewCountUpdate !== undefined) {
+        updatedJob = { 
+          ...updatedJob, 
+          visits_count: viewCountUpdate,
+          metrics: {
+            ...updatedJob.metrics,
+            visits: viewCountUpdate,
+          },
+        };
+      }
+      return updatedJob;
     });
-  }, [jobs, storedJobs, isLoadingJobs, bookmarkCountUpdates]);
+  }, [jobs, storedJobs, isLoadingJobs, bookmarkCountUpdates, viewCountUpdates]);
 
   // Simple search functionality (title only)
   const searchFilteredJobs = useMemo(() => {
@@ -405,7 +438,11 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       case 'budget':
         return sorted.sort((a, b) => (b.budgetTotal || 0) - (a.budgetTotal || 0));
       case 'applications':
-        return sorted.sort((a, b) => a.applications - b.applications);
+        return sorted.sort((a, b) => {
+          const aApplications = a.applications ?? a.metrics?.applications ?? 0;
+          const bApplications = b.applications ?? b.metrics?.applications ?? 0;
+          return aApplications - bApplications;
+        });
       default:
         return sorted;
     }

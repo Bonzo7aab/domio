@@ -19,6 +19,7 @@ import {
   Briefcase,
   DollarSign
 } from 'lucide-react';
+import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { useUserProfile } from '../contexts/AuthContext';
 import { toast } from 'sonner';
@@ -134,16 +135,17 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="min-w-full lg:min-w-[800px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
-        <DialogHeader className="p-6 pb-0">
+        <DialogHeader className="px-6 py-3 pb-2 border-b">
           <DialogTitle className="text-xl font-semibold">
             {postType === 'tender' ? 'Złóż ofertę w przetargu' : 'Złóż ofertę'}
           </DialogTitle>
         </DialogHeader>
 
         {/* Job Information Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-          <div className="p-6">
-            <div className="flex items-start gap-4">
+        <div className="bg-white border-b">
+          <div className="px-6 py-4">
+            {/* Icon and Title Row */}
+            <div className="flex items-center gap-3 mb-3">
               {/* Job Icon */}
               <div className="flex-shrink-0">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -155,94 +157,89 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                 </div>
               </div>
               
-              {/* Job Details */}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                  {jobTitle}
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {/* Company & Location */}
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Building2 className="w-4 h-4 text-gray-400" />
-                    <span className="font-medium">{companyName}</span>
-                  </div>
-                  
-                  {jobData?.location && (
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                      <span>{formatLocation(jobData.location)}</span>
-                    </div>
-                  )}
-                  
-                  {/* Salary/Budget */}
-                  {jobData?.salary && (
-                    <div className="flex items-center gap-2 text-green-600">
-                      <DollarSign className="w-4 h-4 text-green-500" />
-                      <span className="font-medium">{jobData.salary}</span>
-                    </div>
-                  )}
-                  
-                  {/* Posted Time */}
-                  {jobData?.postedTime && (
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      <span>{jobData.postedTime}</span>
-                    </div>
-                  )}
-                  
-                  {/* Applications Count */}
-                  {jobData?.applications && (
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <Users className="w-4 h-4 text-gray-400" />
-                      <span>{jobData.applications} {jobData.applications === 1 ? 'oferta' : 'oferty'}</span>
-                    </div>
-                  )}
-                  
-                  {/* Visits and Bookmarks */}
-                  {(jobData?.visits_count || jobData?.bookmarks_count) && (
-                    <div className="flex items-center gap-3 text-xs text-gray-600">
-                      {jobData.visits_count !== undefined && jobData.visits_count > 0 && (
-                        <span>{jobData.visits_count} wyświetleń</span>
-                      )}
-                      {jobData.bookmarks_count !== undefined && jobData.bookmarks_count > 0 && (
-                        <span>{jobData.bookmarks_count} zapisów</span>
-                      )}
-                    </div>
-                  )}
+              {/* Job Title */}
+              <h3 className="text-lg font-bold text-gray-900 line-clamp-2 flex-1">
+                {jobTitle}
+              </h3>
+            </div>
+            
+            {/* Info Cards Row - left aligned */}
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              {/* Company */}
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
+                <Building2 className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-gray-700 font-medium truncate">{companyName}</span>
+              </div>
+              
+              {/* Location */}
+              {jobData?.location && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
+                  <MapPin className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium truncate">{formatLocation(jobData.location)}</span>
                 </div>
-                
-                {/* Category & Type */}
-                {(jobData?.category || jobData?.type) && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {jobData?.category && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {jobData.category}
-                      </span>
-                    )}
-                    {jobData?.type && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        {jobData.type}
-                      </span>
-                    )}
-                    {postType === 'tender' && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                        Przetarg
-                      </span>
-                    )}
-                  </div>
+              )}
+              
+              {/* Salary/Budget */}
+              {jobData?.salary && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 rounded-md border border-green-100">
+                  <DollarSign className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm text-green-700 font-medium">{jobData.salary}</span>
+                </div>
+              )}
+              
+              {/* Posted Time */}
+              {jobData?.postedTime && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
+                  <Clock className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{jobData.postedTime}</span>
+                </div>
+              )}
+              
+              {/* Applications Count */}
+              {jobData?.applications && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
+                  <Users className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{jobData.applications} {jobData.applications === 1 ? 'oferta' : 'oferty'}</span>
+                </div>
+              )}
+              
+              {/* Visits */}
+              {jobData?.visits_count !== undefined && jobData.visits_count > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{jobData.visits_count} wyświetleń</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Category & Type Badges - left aligned */}
+            {(jobData?.category || jobData?.type || postType === 'tender') && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {jobData?.category && (
+                  <Badge variant="outline" className="text-xs px-2.5 py-1">
+                    {jobData.category}
+                  </Badge>
                 )}
-                
-                {/* Job Description */}
-                {jobData?.description && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-700 line-clamp-3">
-                      {jobData.description}
-                    </p>
-                  </div>
+                {jobData?.type && (
+                  <Badge variant="outline" className="text-xs px-2.5 py-1">
+                    {jobData.type}
+                  </Badge>
+                )}
+                {postType === 'tender' && (
+                  <Badge variant="outline" className="text-xs px-2.5 py-1 bg-orange-50 text-orange-800 border-orange-200">
+                    Przetarg
+                  </Badge>
                 )}
               </div>
-            </div>
+            )}
+            
+            {/* Job Description - left aligned */}
+            {jobData?.description && (
+              <div>
+                <p className="text-sm text-gray-700 line-clamp-3">
+                  {jobData.description}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -258,7 +255,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="proposedPrice">Proponowana cena (zł) *</Label>
                     <Input

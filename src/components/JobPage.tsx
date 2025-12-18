@@ -187,31 +187,61 @@ function normalizeJobData(
         : []) : [],
       responsibilities: [],
       skills: storedJob.searchKeywords || [],
+      metrics: {
+        applications: storedJob.applications || 0,
+        visits: storedJob.visits_count || 0,
+        bookmarks: storedJob.bookmarks_count || 0,
+      },
+      // Legacy metrics fields (for backward compatibility)
       applications: storedJob.applications || 0,
       visits_count: storedJob.visits_count || 0,
       bookmarks_count: storedJob.bookmarks_count || 0,
       verified: storedJob.verified || false,
       urgent: storedJob.urgent || false,
       urgency: storedJob.urgency || 'medium',
+      trust: {
+        verified: storedJob.verified || false,
+        isPremium: storedJob.premium || false,
+        hasInsurance: false,
+        completedJobs: 0,
+        certificates: storedJob.certificates || [],
+      },
+      // Legacy trust fields (for backward compatibility)
       isPremium: storedJob.premium || false,
+      hasInsurance: false,
+      completedJobs: 0,
+      certificates: storedJob.certificates || [],
       category: storedJob.category || 'Inne',
       subcategory: storedJob.subcategory,
       clientType: storedJob.clientType,
       deadline: storedJob.deadline,
       projectDuration: 'Do uzgodnienia',
+      contact: storedJob.contactName || storedJob.contactPhone || storedJob.contactEmail ? {
+        person: storedJob.contactName || '',
+        phone: storedJob.contactPhone || '',
+        email: storedJob.contactEmail || '',
+      } : undefined,
+      // Legacy contact fields (for backward compatibility)
       contactPerson: storedJob.contactName,
       contactPhone: storedJob.contactPhone,
       contactEmail: storedJob.contactEmail,
+      building: storedJob.organizationType || storedJob.additionalInfo ? {
+        type: storedJob.organizationType || '',
+        year: 0,
+        surface: '',
+        address: storedJob.address || undefined,
+        additionalInfo: storedJob.additionalInfo || undefined,
+      } : undefined,
+      // Legacy building fields (for backward compatibility)
       buildingType: storedJob.organizationType,
       buildingYear: undefined,
       surface: undefined,
       additionalInfo: storedJob.additionalInfo,
+      address: storedJob.address,
       companyInfo: undefined,
       images: [],
       lat: storedJob.lat,
       lng: storedJob.lng,
-      address: storedJob.address,
-      certificates: storedJob.certificates || [],
       tenderInfo: storedJob.postType === 'tender' && storedJob.tenderInfo ? {
         tenderType: 'Zamówienie publiczne',
         phases: storedJob.tenderInfo.phases?.map((phase: string) => ({ name: phase, status: 'pending' as const, deadline: '' })) || [],
@@ -254,25 +284,57 @@ function normalizeJobData(
       requirements: dbJob.requirements || [],
       responsibilities: dbJob.responsibilities || [],
       skills: dbJob.skills_required || [],
+      metrics: {
+        applications: dbJob.applications_count || 0,
+        visits: dbJob.views_count || 0,
+        bookmarks: dbJob.bookmarks_count || 0,
+      },
+      // Legacy metrics fields (for backward compatibility)
       applications: dbJob.applications_count || 0,
       visits_count: dbJob.views_count || 0,
       bookmarks_count: dbJob.bookmarks_count || 0,
       verified: dbJob.company?.is_verified || false,
       urgent: dbJob.urgency === 'high',
       urgency: dbJob.urgency as 'low' | 'medium' | 'high',
+      trust: {
+        verified: dbJob.company?.is_verified || false,
+        isPremium: dbJob.type === 'premium',
+        hasInsurance: false, // Would need to check certificates
+        completedJobs: 0, // Would need to query
+        certificates: [], // Would need to query
+      },
+      // Legacy trust fields (for backward compatibility)
       isPremium: dbJob.type === 'premium',
+      hasInsurance: false, // Would need to check certificates
+      completedJobs: 0, // Would need to query
+      certificates: [], // Would need to query
       category: dbJob.category?.name || 'Inne',
       subcategory: dbJob.subcategory || undefined,
       clientType: undefined, // Company type not available in current query
       deadline: dbJob.deadline || undefined,
       projectDuration: dbJob.project_duration || undefined,
+      contact: dbJob.contact_person || dbJob.contact_phone || dbJob.contact_email ? {
+        person: dbJob.contact_person || '',
+        phone: dbJob.contact_phone || '',
+        email: dbJob.contact_email || '',
+      } : undefined,
+      // Legacy contact fields (for backward compatibility)
       contactPerson: dbJob.contact_person || undefined,
       contactPhone: dbJob.contact_phone || undefined,
       contactEmail: dbJob.contact_email || undefined,
+      building: dbJob.building_type || dbJob.building_year || dbJob.surface_area ? {
+        type: dbJob.building_type || '',
+        year: dbJob.building_year || 0,
+        surface: dbJob.surface_area || '',
+        address: dbJob.address || undefined,
+        additionalInfo: dbJob.additional_info || undefined,
+      } : undefined,
+      // Legacy building fields (for backward compatibility)
       buildingType: dbJob.building_type || undefined,
-      buildingYear: undefined, // Not in current JobWithCompany schema
-      surface: undefined, // Not in current JobWithCompany schema
-      additionalInfo: undefined, // Not in current schema
+      buildingYear: dbJob.building_year || undefined,
+      surface: dbJob.surface_area || undefined,
+      additionalInfo: dbJob.additional_info || undefined,
+      address: dbJob.address || undefined,
       companyInfo: dbJob.company ? {
         id: dbJob.company.id,
         logo_url: dbJob.company.logo_url,
@@ -281,7 +343,6 @@ function normalizeJobData(
       images: dbJob.images || [],
       lat: dbJob.latitude || undefined,
       lng: dbJob.longitude || undefined,
-      certificates: [], // Not in current JobWithCompany schema
       status: dbJob.status as JobDisplayData['status'],
       published_at: dbJob.published_at,
       expires_at: undefined, // Not in current JobWithCompany interface
@@ -337,13 +398,30 @@ function normalizeJobData(
       requirements: dbTender.requirements || [],
       responsibilities: [],
       skills: [],
+      metrics: {
+        applications: dbTender.bids_count || 0,
+        visits: dbTender.views_count || 0,
+        bookmarks: 0,
+      },
+      // Legacy metrics fields (for backward compatibility)
       applications: dbTender.bids_count || 0,
       visits_count: dbTender.views_count || 0,
       bookmarks_count: 0,
       verified: dbTender.company?.is_verified || false,
       urgent: false,
       urgency: 'medium',
+      trust: {
+        verified: dbTender.company?.is_verified || false,
+        isPremium: false, // Tenders don't have premium status
+        hasInsurance: false,
+        completedJobs: 0,
+        certificates: [],
+      },
+      // Legacy trust fields (for backward compatibility)
       isPremium: false, // Tenders don't have premium status
+      hasInsurance: false,
+      completedJobs: 0,
+      certificates: [],
       category: dbTender.category?.name || 'Inne',
       deadline: dbTender.submission_deadline,
       projectDuration: dbTender.project_duration || undefined,
@@ -358,7 +436,6 @@ function normalizeJobData(
       images: [],
       lat: dbTender.latitude || undefined,
       lng: dbTender.longitude || undefined,
-      certificates: [], // Not in current TenderWithCompany schema
       status: dbTender.status as JobDisplayData['status'],
       published_at: dbTender.published_at,
       tenderInfo: {
@@ -428,7 +505,34 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           // Increment views count (only once per job)
           if (hasIncrementedViews.current !== jobId && supabase) {
             hasIncrementedViews.current = jobId;
-            incrementJobViews(supabase, jobId).catch(err => {
+            incrementJobViews(supabase, jobId).then(result => {
+              if (result.error) {
+                console.error('Failed to increment job views:', result.error);
+              } else if (result.data) {
+                const newViewsCount = result.data.views_count;
+                // Update jobData with the new views count
+                setJobData(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    metrics: {
+                      ...prev.metrics,
+                      visits: newViewsCount,
+                    },
+                    visits_count: newViewsCount,
+                  };
+                });
+                // Store view count update in sessionStorage for JobCard updates
+                try {
+                  const stored = sessionStorage.getItem('view-count-updates');
+                  const updates = stored ? JSON.parse(stored) : {};
+                  updates[jobId] = newViewsCount;
+                  sessionStorage.setItem('view-count-updates', JSON.stringify(updates));
+                } catch (error) {
+                  console.error('Error storing view count update:', error);
+                }
+              }
+            }).catch(err => {
               console.error('Failed to increment job views:', err);
             });
           }
@@ -450,7 +554,34 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           // Increment views count (only once per tender)
           if (hasIncrementedViews.current !== jobId && supabase) {
             hasIncrementedViews.current = jobId;
-            incrementTenderViews(supabase, jobId).catch(err => {
+            incrementTenderViews(supabase, jobId).then(result => {
+              if (result.error) {
+                console.error('Failed to increment tender views:', result.error);
+              } else if (result.data) {
+                const newViewsCount = result.data.views_count;
+                // Update jobData with the new views count
+                setJobData(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    metrics: {
+                      ...prev.metrics,
+                      visits: newViewsCount,
+                    },
+                    visits_count: newViewsCount,
+                  };
+                });
+                // Store view count update in sessionStorage for JobCard updates
+                try {
+                  const stored = sessionStorage.getItem('view-count-updates');
+                  const updates = stored ? JSON.parse(stored) : {};
+                  updates[jobId] = newViewsCount;
+                  sessionStorage.setItem('view-count-updates', JSON.stringify(updates));
+                } catch (error) {
+                  console.error('Error storing view count update:', error);
+                }
+              }
+            }).catch(err => {
               console.error('Failed to increment tender views:', err);
             });
           }
@@ -795,13 +926,19 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
-              <div className="relative flex-shrink-0">
+              <div className="relative flex-shrink-0 flex flex-col items-center gap-1.5 sm:gap-2">
                 <Avatar className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20">
                   <AvatarImage src={job.companyInfo?.logo_url || undefined} alt={job.company} />
                   <AvatarFallback className="bg-primary text-white text-sm sm:text-lg md:text-xl">
                     {job.company?.charAt(0).toUpperCase() || '?'}
                   </AvatarFallback>
                 </Avatar>
+                {job.verified && (
+                  <Badge variant="outline" className="text-[9px] sm:text-[10px] md:text-xs px-1.5 py-0.5">
+                    <CheckCircle className="w-2 h-2 sm:w-2.5 sm:h-2.5 mr-0.5" />
+                    Zweryfikowany
+                  </Badge>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3 mb-1.5 sm:mb-2">
@@ -811,12 +948,6 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   {job.status && (
                     <Badge variant={getStatusBadgeVariant(job.status)} className="shrink-0 text-[10px] sm:text-xs md:text-sm">
                       {getStatusLabel(job.status)}
-                    </Badge>
-                  )}
-                  {job.verified && (
-                    <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
-                      <CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
-                      Zweryfikowany
                     </Badge>
                   )}
                   {job.urgent && (

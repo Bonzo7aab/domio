@@ -359,6 +359,25 @@ export default function HomePage() {
     setLocationChangeHandler(handleLocationChangeRequest);
   }, [setLocationChangeHandler]);
 
+  // Listen for application modal open event from map drawer
+  useEffect(() => {
+    const handleOpenApplicationModal = (event: CustomEvent<{ jobId: string }>) => {
+      const jobId = event.detail.jobId;
+      setSelectedApplicationJobId(jobId);
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        setSelectedApplicationJob(job);
+      }
+      setApplicationModalOpen(true);
+    };
+
+    window.addEventListener('openApplicationModal', handleOpenApplicationModal as EventListener);
+    
+    return () => {
+      window.removeEventListener('openApplicationModal', handleOpenApplicationModal as EventListener);
+    };
+  }, [jobs]);
+
   const handleCitySelectorClose = () => {
     setShowCitySelector(false);
   };

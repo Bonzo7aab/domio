@@ -19,9 +19,9 @@ interface JobCardProps {
     salary: string;
     description: string;
     postedTime: string;
-    applications: number;
+    applications?: number;
     verified: boolean;
-    urgent: boolean;
+    urgent?: boolean;
     distance?: number;
   };
   onClick?: () => void;
@@ -64,25 +64,29 @@ const JobCard = React.memo(function JobCard({
 
   // Calculate days remaining for deadline
   const deadlineDaysRemaining = useMemo(() => {
-    if (isTender && job.tenderInfo?.submissionDeadline) {
-      return getDaysRemaining(new Date(job.tenderInfo.submissionDeadline));
-    }
-    if (job.deadline) {
-      return getDaysRemaining(new Date(job.deadline));
+    try {
+      if (isTender && job.tenderInfo?.submissionDeadline) {
+        const date = new Date(job.tenderInfo.submissionDeadline);
+        if (isNaN(date.getTime())) return null;
+        return getDaysRemaining(date);
+      }
+      if (job.deadline) {
+        const date = new Date(job.deadline);
+        if (isNaN(date.getTime())) return null;
+        return getDaysRemaining(date);
+      }
+    } catch (error) {
+      console.error('Error calculating days remaining:', error);
     }
     return null;
   }, [isTender, job.tenderInfo?.submissionDeadline, job.deadline]);
 
-  // Check if deadline is ending soon (less than 7 days)
+  // Check if deadline is ending soon (less than 7 days, including today)
   const isEndingSoon = useMemo(() => {
-    if (isTender && job.tenderInfo?.submissionDeadline) {
-      return isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline));
-    }
-    if (job.deadline && deadlineDaysRemaining !== null) {
-      return deadlineDaysRemaining > 0 && deadlineDaysRemaining < 7;
-    }
-    return false;
-  }, [isTender, job.tenderInfo?.submissionDeadline, job.deadline, deadlineDaysRemaining]);
+    if (deadlineDaysRemaining === null) return false;
+    // Check if 7 days or less remaining (including 0 for today)
+    return deadlineDaysRemaining >= 0 && deadlineDaysRemaining <= 6;
+  }, [deadlineDaysRemaining]);
 
   // Format deadline for display
   const formattedDeadline = useMemo(() => {
@@ -187,7 +191,7 @@ const JobCard = React.memo(function JobCard({
                   
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                    <span>{job.applications} ofert</span>
+                    <span>{job.applications ?? job.metrics?.applications ?? 0} ofert</span>
                   </div>
                   
                   {isTender && job.tenderInfo?.submissionDeadline && (
@@ -219,7 +223,6 @@ const JobCard = React.memo(function JobCard({
       </Card>
     );
   }
-
   // Updated job card design for regular jobs with action buttons
   return (
     <Card 
@@ -362,32 +365,33 @@ const JobCard = React.memo(function JobCard({
                   
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                    <span>{job.applications} ofert</span>
+                    <span>{job.applications ?? job.metrics?.applications ?? 0} ofert</span>
                   </div>
                   
                   <div className="flex items-center gap-2 text-gray-500">
-                    <Clock className="h-4 w-4 flex-shrink-0" />
-                    <span>{job.postedTime}</span>
+                    <Calendar className="h-4 w-4 flex-shrink-0" />
+                    <span>Opublikowano: {job.postedTime}</span>
+                    {formattedDeadline && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <Clock className="h-4 w-4 flex-shrink-0" />
+
+                        <span>
+                          Termin: {formattedDeadline}
+                          {deadlineDaysRemaining !== null && (
+                            <span className={`ml-1 ${isEndingSoon ? 'text-orange-600 font-semibold bg-orange-50 px-1.5 py-0.5 rounded' : 'text-gray-500'}`}>
+                              ({formatDaysRemaining(deadlineDaysRemaining)} do końca)
+                            </span>
+                          )}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {job.distance && (
                     <div className="flex items-center gap-1 text-gray-500">
                       <span className="text-xs">
                         {job.distance < 1 ? `${Math.round(job.distance * 1000)}m` : `${job.distance.toFixed(1)}km`}
-                      </span>
-                    </div>
-                  )}
-
-                  {formattedDeadline && (
-                    <div className="flex items-center gap-2 text-blue-600 font-medium">
-                      <Calendar className="h-4 w-4 flex-shrink-0" />
-                      <span>
-                        Termin: {formattedDeadline}
-                        {isEndingSoon && deadlineDaysRemaining !== null && (
-                          <span className="text-orange-600 ml-1">
-                            ({formatDaysRemaining(deadlineDaysRemaining)} do końca)
-                          </span>
-                        )}
                       </span>
                     </div>
                   )}

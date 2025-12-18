@@ -43,6 +43,7 @@ export interface JobWithCompany {
   title: string;
   description: string;
   location: JobLocation | string; // Support both formats for backward compatibility
+  address: string | null;
   latitude: number | null;
   longitude: number | null;
   budget_min: number | null;
@@ -60,6 +61,9 @@ export interface JobWithCompany {
   contact_phone: string | null;
   contact_email: string | null;
   building_type: string | null;
+  building_year: number | null;
+  surface_area: string | null;
+  additional_info: string | null;
   requirements: string[] | null;
   responsibilities: string[] | null;
   skills_required: string[] | null;
@@ -271,6 +275,34 @@ export async function fetchJobs(
 
     const { data, error } = await query;
 
+    if (error) {
+      return { data: null, error };
+    }
+
+    // Calculate applications_count dynamically if not already accurate
+    if (data && data.length > 0) {
+      const jobIds = data.map((job: any) => job.id);
+      
+      // Fetch counts for all jobs at once
+      const { data: countsData, error: countsError } = await (supabase as any)
+        .from('job_applications')
+        .select('job_id')
+        .in('job_id', jobIds);
+
+      if (!countsError && countsData) {
+        // Count applications per job
+        const countsMap: { [key: string]: number } = {};
+        countsData.forEach((app: any) => {
+          countsMap[app.job_id] = (countsMap[app.job_id] || 0) + 1;
+        });
+
+        // Update applications_count for each job
+        data.forEach((job: any) => {
+          job.applications_count = countsMap[job.id] || 0;
+        });
+      }
+    }
+
     return { data: data as any, error };
   } catch (err) {
     console.error('Error fetching jobs:', err);
@@ -441,6 +473,31 @@ export async function fetchTenders(
         hint: error?.hint,
         error: error
       });
+      return { data: null, error };
+    }
+
+    // Calculate bids_count dynamically if not already accurate
+    if (data && data.length > 0) {
+      const tenderIds = data.map((tender: any) => tender.id);
+      
+      // Fetch counts for all tenders at once
+      const { data: countsData, error: countsError } = await (supabase as any)
+        .from('tender_bids')
+        .select('tender_id')
+        .in('tender_id', tenderIds);
+
+      if (!countsError && countsData) {
+        // Count bids per tender
+        const countsMap: { [key: string]: number } = {};
+        countsData.forEach((bid: any) => {
+          countsMap[bid.tender_id] = (countsMap[bid.tender_id] || 0) + 1;
+        });
+
+        // Update bids_count for each tender
+        data.forEach((tender: any) => {
+          tender.bids_count = countsMap[tender.id] || 0;
+        });
+      }
     }
 
     return { data: data as any, error };
@@ -500,19 +557,34 @@ export async function fetchJobsAndTenders(
     postType: 'job' as const,
     salary: formatBudget(budget), // Display string for salary
     budget, // Budget object with all fields (min, max, type, currency)
-    // Legacy fields (deprecated - use budget.min/max/type/currency instead)
-    budget_min: job.budget_min ?? null,
-    budget_max: job.budget_max ?? null,
-    budgetType: budget.type,
-    currency: budget.currency,
     category: job.category?.name || 'Inne',
     subcategory: job.subcategory || undefined,
     deadline: job.deadline || undefined,
     urgency: normalizeUrgency(job.urgency),
+    metrics: {
+      applications: job.applications_count,
+      visits: job.views_count || 0,
+      bookmarks: job.bookmarks_count || 0,
+    },
+    // Legacy metrics fields (for backward compatibility)
     applications: job.applications_count,
+    visits_count: job.views_count || 0,
+    bookmarks_count: job.bookmarks_count || 0,
     verified: job.company?.is_verified || false,
     urgent: job.urgency === 'high',
     premium: job.type === 'premium',
+    trust: {
+      verified: job.company?.is_verified || false,
+      isPremium: job.type === 'premium',
+      hasInsurance: false, // Would need to check certificates
+      completedJobs: 0, // Would need to query
+      certificates: [], // Would need to query
+    },
+    // Legacy trust fields (for backward compatibility)
+    isPremium: job.type === 'premium',
+    hasInsurance: false, // Would need to check certificates
+    completedJobs: 0, // Would need to query
+    certificates: [], // Would need to query
     postedTime: getTimeAgo(job.created_at),
     created_at: job.created_at, // Preserve original timestamp for filtering
     lat: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lat,
@@ -520,13 +592,30 @@ export async function fetchJobsAndTenders(
     requirements: job.requirements || [],
     responsibilities: job.responsibilities || [],
     skills: job.skills_required || [],
-    visits_count: job.views_count || 0,
-    bookmarks_count: job.bookmarks_count || 0,
-    hasInsurance: false, // Would need to check certificates
-    completedJobs: 0, // Would need to query
-    certificates: [], // Would need to query
     searchKeywords: job.skills_required || [],
     clientType: mapCompanyTypeToClientType(undefined), // Company type not available in current query
+    contact: job.contact_person || job.contact_phone || job.contact_email ? {
+      person: job.contact_person || '',
+      phone: job.contact_phone || '',
+      email: job.contact_email || '',
+    } : undefined,
+    // Legacy contact fields (for backward compatibility)
+    contactPerson: job.contact_person || undefined,
+    contactPhone: job.contact_phone || undefined,
+    contactEmail: job.contact_email || undefined,
+    building: job.building_type || job.building_year || job.surface_area ? {
+      type: job.building_type || '',
+      year: job.building_year || 0,
+      surface: job.surface_area || '',
+      address: job.address || undefined,
+      additionalInfo: job.additional_info || undefined,
+    } : undefined,
+    // Legacy building fields (for backward compatibility)
+    buildingType: job.building_type || undefined,
+    buildingYear: job.building_year || undefined,
+    surface: job.surface_area || undefined,
+    additionalInfo: job.additional_info || undefined,
+    address: job.address || undefined
   };
   });
 
@@ -619,23 +708,41 @@ export async function fetchJobById(
         )
       `)
       .eq('id', jobId)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to avoid throwing on 0 rows
 
     // Handle "not found" error (PGRST116) as a normal case, not an error
-    if (error && (error as any).code === 'PGRST116') {
-      // Job not found - this is expected, not an error
+    if (error) {
+      // Check for PGRST116 in multiple ways since error structure can vary
+      const errorCode = (error as any).code || error?.code;
+      if (errorCode === 'PGRST116' || error.message?.includes('0 rows') || error.message?.includes('single JSON object')) {
+        // Job not found - this is expected, not an error
+        return { data: null, error: null };
+      }
+      console.error('Error fetching job:', error);
+      return { data: null, error };
+    }
+
+    // If no data, job doesn't exist
+    if (!data) {
       return { data: null, error: null };
     }
 
-    if (error) {
-      console.error('Error fetching job:', error);
+    // Calculate applications_count dynamically if job exists
+    const { count, error: countsError } = await (supabase as any)
+      .from('job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('job_id', jobId);
+
+    if (!countsError && count !== null) {
+      data.applications_count = count;
     }
 
-    return { data: data as any, error };
+    return { data: data as any, error: null };
   } catch (err) {
     const error = err as any;
     // Handle "not found" error (PGRST116) as a normal case
-    if (error?.code === 'PGRST116') {
+    const errorCode = error?.code || error?.error?.code;
+    if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
       return { data: null, error: null };
     }
     console.error('Error fetching job:', err);
@@ -668,23 +775,41 @@ export async function fetchTenderById(
         )
       `)
       .eq('id', tenderId)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to avoid throwing on 0 rows
 
     // Handle "not found" error (PGRST116) as a normal case, not an error
-    if (result.error && result.error.code === 'PGRST116') {
-      // Tender not found - this is expected, not an error
+    if (result.error) {
+      // Check for PGRST116 in multiple ways since error structure can vary
+      const errorCode = result.error.code || result.error?.code;
+      if (errorCode === 'PGRST116' || result.error.message?.includes('0 rows') || result.error.message?.includes('single JSON object')) {
+        // Tender not found - this is expected, not an error
+        return { data: null, error: null };
+      }
+      console.error('Error fetching tender:', result.error);
+      return { data: null, error: result.error };
+    }
+
+    // If no data, tender doesn't exist
+    if (!result.data) {
       return { data: null, error: null };
     }
 
-    if (result.error) {
-      console.error('Error fetching tender:', result.error);
+    // Calculate bids_count dynamically if tender exists
+    const { count, error: countsError } = await (supabase as any)
+      .from('tender_bids')
+      .select('*', { count: 'exact', head: true })
+      .eq('tender_id', tenderId);
+
+    if (!countsError && count !== null) {
+      result.data.bids_count = count;
     }
 
-    return { data: result.data as any, error: result.error };
+    return { data: result.data as any, error: null };
   } catch (err) {
     const error = err as any;
     // Handle "not found" error (PGRST116) as a normal case
-    if (error?.code === 'PGRST116') {
+    const errorCode = error?.code || error?.error?.code;
+    if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
       return { data: null, error: null };
     }
     console.error('Error fetching tender:', err);
@@ -698,7 +823,7 @@ export async function fetchTenderById(
 export async function incrementJobViews(
   supabase: SupabaseClient<Database>,
   jobId: string
-): Promise<{ error: any }> {
+): Promise<{ data: { views_count: number } | null; error: any }> {
   try {
     // Fetch current views_count
     const { data: currentJob, error: fetchError } = await supabase
@@ -707,24 +832,35 @@ export async function incrementJobViews(
       .eq('id', jobId)
       .single();
 
+    // Handle "not found" error (PGRST116) - job doesn't exist
+    if (fetchError && (fetchError as any).code === 'PGRST116') {
+      return { data: null, error: new Error('Job not found') };
+    }
+
     if (fetchError) {
-      return { error: fetchError };
+      return { data: null, error: fetchError };
     }
 
     if (!currentJob) {
-      return { error: new Error('Job not found') };
+      return { data: null, error: new Error('Job not found') };
     }
+
+    const newViewsCount = (currentJob.views_count || 0) + 1;
 
     // Increment and update
     const { error: updateError } = await supabase
       .from('jobs')
-      .update({ views_count: (currentJob.views_count || 0) + 1 })
+      .update({ views_count: newViewsCount })
       .eq('id', jobId);
 
-    return { error: updateError };
+    if (updateError) {
+      return { data: null, error: updateError };
+    }
+
+    return { data: { views_count: newViewsCount }, error: null };
   } catch (err) {
     console.error('Error incrementing job views:', err);
-    return { error: err };
+    return { data: null, error: err };
   }
 }
 
@@ -734,7 +870,7 @@ export async function incrementJobViews(
 export async function incrementTenderViews(
   supabase: SupabaseClient<Database>,
   tenderId: string
-): Promise<{ error: any }> {
+): Promise<{ data: { views_count: number } | null; error: any }> {
   try {
     // Fetch current views_count
     const { data: currentTender, error: fetchError } = await (supabase as any)
@@ -743,24 +879,35 @@ export async function incrementTenderViews(
       .eq('id', tenderId)
       .single();
 
+    // Handle "not found" error (PGRST116) - tender doesn't exist
+    if (fetchError && fetchError.code === 'PGRST116') {
+      return { data: null, error: new Error('Tender not found') };
+    }
+
     if (fetchError) {
-      return { error: fetchError };
+      return { data: null, error: fetchError };
     }
 
     if (!currentTender) {
-      return { error: new Error('Tender not found') };
+      return { data: null, error: new Error('Tender not found') };
     }
+
+    const newViewsCount = (currentTender.views_count || 0) + 1;
 
     // Increment and update
     const { error: updateError } = await (supabase as any)
       .from('tenders')
-      .update({ views_count: (currentTender.views_count || 0) + 1 })
+      .update({ views_count: newViewsCount })
       .eq('id', tenderId);
 
-    return { error: updateError };
+    if (updateError) {
+      return { data: null, error: updateError };
+    }
+
+    return { data: { views_count: newViewsCount }, error: null };
   } catch (err) {
     console.error('Error incrementing tender views:', err);
-    return { error: err };
+    return { data: null, error: err };
   }
 }
 

@@ -27,7 +27,7 @@ export function isTenderEndingSoon(deadline: string | Date): boolean {
  * @returns Formatted string (e.g., "1 dzień", "5 dni")
  */
 export function formatDaysRemaining(days: number): string {
-  if (days === 0) return 'Ostatni dzień';
+  if (days === 0) return '0 dni';
   if (days === 1) return '1 dzień';
   if (days < 5) return `${days} dni`;
   return `${days} dni`;

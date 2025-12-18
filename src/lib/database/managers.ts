@@ -198,16 +198,10 @@ export async function fetchManagerById(
 
   try {
     // Fetch company data - use maybeSingle to avoid throwing errors when no row found
-    // Explicitly select JSONB columns to ensure they're properly parsed
+    // Use * to select all columns (including JSONB columns like manager_data, experience_data, etc.)
     const { data: company, error: companyError } = await supabase
       .from('companies')
-      .select(`
-        *,
-        manager_data,
-        experience_data,
-        stats_data,
-        portfolio_data
-      `)
+      .select('*')
       .eq('id', id)
       .in('type', ['property_management', 'housing_association', 'cooperative', 'condo_management', 'spółdzielnia', 'wspólnota'])
       .maybeSingle();
@@ -306,13 +300,6 @@ export async function fetchManagerById(
       rating: {
         overall: ratingsData?.average_rating || 0,
         reviewsCount: ratingsData?.total_reviews || 0,
-        ratingBreakdown: ratingsData?.rating_breakdown || {
-          '5': 0,
-          '4': 0,
-          '3': 0,
-          '2': 0,
-          '1': 0
-        },
         categories: {
           paymentTimeliness: ratingsData?.category_ratings?.payment_timeliness || 0,
           communication: ratingsData?.category_ratings?.communication || 0,

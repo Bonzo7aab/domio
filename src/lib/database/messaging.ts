@@ -421,15 +421,29 @@ export async function findExistingConversation(
       .from('conversations')
       .select('id')
       .or(`and(participant_1.eq.${participant1},participant_2.eq.${participant2}),and(participant_1.eq.${participant2},participant_2.eq.${participant1})`)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to avoid throwing on 0 rows
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+    // Handle "not found" error (PGRST116) as a normal case, not an error
+    if (error) {
+      // Check for PGRST116 in multiple ways since error structure can vary
+      const errorCode = error.code || error?.code;
+      if (errorCode === 'PGRST116' || error.message?.includes('0 rows') || error.message?.includes('single JSON object')) {
+        // Conversation not found - this is expected, not an error
+        return { data: null, error: null };
+      }
       console.error('Error finding conversation:', error);
       return { data: null, error };
     }
 
+    // If no data, conversation doesn't exist
     return { data: conversation?.id || null, error: null };
   } catch (err) {
+    const error = err as any;
+    // Handle "not found" error (PGRST116) as a normal case
+    const errorCode = error?.code || error?.error?.code;
+    if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
+      return { data: null, error: null };
+    }
     console.error('Error finding conversation:', err);
     return { data: null, error: err };
   }
@@ -452,15 +466,29 @@ export async function findConversationByJob(
       .select('id')
       .eq(jobField, jobId)
       .or(`and(participant_1.eq.${participant1},participant_2.eq.${participant2}),and(participant_1.eq.${participant2},participant_2.eq.${participant1})`)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to avoid throwing on 0 rows
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+    // Handle "not found" error (PGRST116) as a normal case, not an error
+    if (error) {
+      // Check for PGRST116 in multiple ways since error structure can vary
+      const errorCode = error.code || error?.code;
+      if (errorCode === 'PGRST116' || error.message?.includes('0 rows') || error.message?.includes('single JSON object')) {
+        // Conversation not found - this is expected, not an error
+        return { data: null, error: null };
+      }
       console.error('Error finding conversation by job:', error);
       return { data: null, error };
     }
 
+    // If no data, conversation doesn't exist
     return { data: conversation?.id || null, error: null };
   } catch (err) {
+    const error = err as any;
+    // Handle "not found" error (PGRST116) as a normal case
+    const errorCode = error?.code || error?.error?.code;
+    if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
+      return { data: null, error: null };
+    }
     console.error('Error finding conversation by job:', err);
     return { data: null, error: err };
   }

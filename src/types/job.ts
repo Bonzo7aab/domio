@@ -21,56 +21,99 @@ export interface Job {
   // Budget/Financial
   salary: string; // Display string for salary/budget
   budget: Budget; // Consolidated budget object with all budget fields
-  // Legacy fields (deprecated - use budget.min/max/type/currency instead)
-  /** @deprecated Use budget.min instead */
-  budgetMin?: number;
-  /** @deprecated Use budget.max instead */
-  budgetMax?: number;
-  /** @deprecated Use budget.type instead */
-  budgetType?: 'fixed' | 'hourly' | 'negotiable' | 'range';
-  /** @deprecated Use budget.currency instead */
-  currency?: string;
   
   // Requirements & Skills
   requirements?: string[];
   responsibilities?: string[];
   skills?: string[];
+  // Legacy search field (deprecated - use skills instead)
+  /** @deprecated Use skills instead */
+  searchKeywords?: string[];
   
-  // Metrics
-  applications: number;
+  // Metrics (grouped)
+  metrics: {
+    applications: number;
+    visits: number;
+    bookmarks: number;
+  };
+  // Legacy metrics fields (deprecated - use metrics object instead)
+  /** @deprecated Use metrics.applications instead */
+  applications?: number;
+  /** @deprecated Use metrics.visits instead */
   visits_count?: number;
+  /** @deprecated Use metrics.bookmarks instead */
   bookmarks_count?: number;
   
   // Verification & Priority
   verified: boolean;
-  urgent: boolean;
   urgency: 'low' | 'medium' | 'high';
+  // Legacy urgency field (deprecated - derive from urgency === 'high')
+  /** @deprecated Use urgency === 'high' instead */
+  urgent?: boolean;
   
   // Categorization
   category: string | { name: string; slug?: string };
   subcategory?: string;
   clientType?: string;
   
-  // Premium features
+  // Trust indicators (grouped)
+  trust?: {
+    verified: boolean;
+    isPremium: boolean;
+    hasInsurance: boolean;
+    completedJobs: number;
+    certificates: string[];
+  };
+  // Legacy trust fields (deprecated - use trust object instead)
+  /** @deprecated Use trust.isPremium instead */
   isPremium?: boolean;
+  /** @deprecated Use trust.hasInsurance instead */
   hasInsurance?: boolean;
+  /** @deprecated Use trust.completedJobs instead */
   completedJobs?: number;
+  /** @deprecated Use trust.certificates instead */
   certificates?: string[];
+  // Legacy premium field (deprecated - duplicate of isPremium, use trust.isPremium instead)
+  /** @deprecated Use trust.isPremium or isPremium instead */
+  premium?: boolean;
   
   // Timeline
   deadline?: string;
   projectDuration?: string;
   
-  // Contact info (optional)
+  // Contact info (grouped)
+  contact?: {
+    person: string;
+    phone: string;
+    email: string;
+  };
+  // Legacy contact fields (deprecated - use contact object instead)
+  /** @deprecated Use contact.person instead */
   contactPerson?: string;
+  /** @deprecated Use contact.phone instead */
   contactPhone?: string;
+  /** @deprecated Use contact.email instead */
   contactEmail?: string;
   
-  // Building/Property details (optional)
+  // Building/Property details (grouped)
+  building?: {
+    type: string;
+    year: number;
+    surface: string;
+    address?: string;
+    additionalInfo?: string;
+  };
+  // Legacy building fields (deprecated - use building object instead)
+  /** @deprecated Use building.type instead */
   buildingType?: string;
+  /** @deprecated Use building.year instead */
   buildingYear?: number;
+  /** @deprecated Use building.surface instead */
   surface?: string;
+  /** @deprecated Use building.additionalInfo instead */
   additionalInfo?: string;
+  /** @deprecated Use building.address instead */
+  address?: string;
   
   // Media
   images?: string[];

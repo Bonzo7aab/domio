@@ -219,6 +219,7 @@ const MapComponent: React.FC<{
   const bouncingMarkerRef = useRef<HTMLElement | null>(null);
   const currentBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
   const loadingChunkRef = useRef<number>(0);
+  const activeInfoWindowMarkerIdRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
 
   // Initialize marker pool
@@ -304,8 +305,15 @@ const MapComponent: React.FC<{
         }
       };
 
+      // Track infoWindow close event
+      google.maps.event.addListener(newInfoWindow, 'closeclick', () => {
+        activeInfoWindowMarkerIdRef.current = null;
+        stopBounce();
+      });
+
       // Add click listener to close infoWindow when clicking on map
       newMap.addListener('click', (event: google.maps.MapMouseEvent) => {
+        activeInfoWindowMarkerIdRef.current = null;
         stopBounce();
         newInfoWindow.close();
         
@@ -444,8 +452,17 @@ const MapComponent: React.FC<{
     mapInstance: google.maps.Map,
     infoWindowInstance: google.maps.InfoWindow
   ) => {
-    const openInfoWindow = () => {
+    const openInfoWindow = (isFromClick: boolean = false) => {
       if (!markerData.jobData) return;
+
+      // When map is expanded and infoWindow is already open, prevent hover switching
+      // Allow click to always switch
+      if (!isFromClick && isMapExpanded && activeInfoWindowMarkerIdRef.current !== null) {
+        // If hovering over a different marker, don't switch
+        if (activeInfoWindowMarkerIdRef.current !== markerData.id) {
+          return;
+        }
+      }
 
       if (isMobile) {
         setSelectedJobForMobile(markerData.jobData);
@@ -473,6 +490,9 @@ const MapComponent: React.FC<{
       const content = generateInfoWindowContent(markerData.jobData, isSmallMap);
       infoWindowInstance.setContent(content);
       infoWindowInstance.open(mapInstance, marker);
+      
+      // Track the active marker
+      activeInfoWindowMarkerIdRef.current = markerData.id;
 
       setTimeout(() => {
         const infoWindowElement = document.querySelector(`[data-job-id="${markerData.id}"]`);
@@ -498,16 +518,16 @@ const MapComponent: React.FC<{
       }, 100);
     };
 
-    // Click listener
+    // Click listener - always allow clicks to switch
     marker.addListener('click', () => {
-      openInfoWindow();
+      openInfoWindow(true);
     });
 
     // Hover listeners (desktop only)
     if (!isMobile) {
       const element = marker.content as HTMLElement;
       element.addEventListener('mouseenter', () => {
-        openInfoWindow();
+        openInfoWindow(false); // false indicates this is from hover
       });
 
       element.addEventListener('mouseleave', () => {
@@ -515,7 +535,7 @@ const MapComponent: React.FC<{
         element.style.zIndex = '100';
       });
     }
-  }, [isMobile, isSmallMap]);
+  }, [isMobile, isSmallMap, isMapExpanded]);
 
   // Update markers with pooling, viewport culling, and incremental loading
   useEffect(() => {
@@ -641,7 +661,17 @@ const MapComponent: React.FC<{
     const pool = markerPoolRef.current;
     const hoveredMarkerData = markers.find(m => m.isHovered);
 
+    // When map is expanded and infoWindow is already open, prevent hover switching
     if (hoveredMarkerData && hoveredMarkerData.jobData) {
+      // If map is expanded and there's already an active infoWindow, don't switch on hover
+      if (isMapExpanded && activeInfoWindowMarkerIdRef.current !== null) {
+        // Only allow switching if hovering over a different marker - but we still block it
+        // because user wants to prevent switching when map is enlarged
+        if (activeInfoWindowMarkerIdRef.current !== hoveredMarkerData.id) {
+          return;
+        }
+      }
+
       const marker = pool.getActiveMarkers().get(hoveredMarkerData.id);
       if (marker) {
         if (infoWindowTimeoutRef.current) {
@@ -663,6 +693,9 @@ const MapComponent: React.FC<{
         const content = generateInfoWindowContent(hoveredMarkerData.jobData, isSmallMap);
         infoWindow.setContent(content);
         infoWindow.open(map, marker);
+        
+        // Track the active marker
+        activeInfoWindowMarkerIdRef.current = hoveredMarkerData.id;
 
         setTimeout(() => {
           const infoWindowElement = document.querySelector(`[data-job-id="${hoveredMarkerData.id}"]`);
@@ -688,7 +721,7 @@ const MapComponent: React.FC<{
         }, 100);
       }
     }
-  }, [map, infoWindow, markers, isSmallMap]);
+  }, [map, infoWindow, markers, isSmallMap, isMapExpanded]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -745,13 +778,31 @@ const MapComponent: React.FC<{
             </div>
             
             <div className="sticky bottom-0 bg-background p-4 pt-4 pb-4">
-              <button
-                onClick={() => setSelectedJobForMobile(null)}
-                className="w-full py-4 px-6 bg-primary text-primary-foreground rounded-lg font-semibold text-base hover:bg-primary/90 transition-colors"
-                aria-label="Zamknij"
-              >
-                Zamknij
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSelectedJobForMobile(null)}
+                  className="flex-1 py-4 px-6 bg-gray-200 text-gray-900 rounded-lg font-semibold text-base hover:bg-gray-300 transition-colors"
+                  aria-label="Zamknij"
+                >
+                  Zamknij
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedJobForMobile) {
+                      // Dispatch custom event to open application modal
+                      window.dispatchEvent(new CustomEvent('openApplicationModal', {
+                        detail: { jobId: selectedJobForMobile.id }
+                      }));
+                      // Close the drawer
+                      setSelectedJobForMobile(null);
+                    }
+                  }}
+                  className="flex-1 py-4 px-6 bg-primary text-primary-foreground rounded-lg font-semibold text-base hover:bg-primary/90 transition-colors"
+                  aria-label="Złóż ofertę"
+                >
+                  Złóż ofertę
+                </button>
+              </div>
             </div>
           </DrawerContent>
         </Drawer>
