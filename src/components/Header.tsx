@@ -177,9 +177,9 @@ export function Header({ initialUser }: HeaderProps) {
             </div>
           </div>
 
-            {/* Add Job button - only visible on desktop for managers and unauthenticated users */}
+            {/* Add Job button - only visible on desktop for authenticated users (not contractors) */}
             <div className="hidden md:block mr-4">
-              {(!userIsAuthenticated || currentUser?.userType !== 'contractor') && (
+              {userIsAuthenticated && currentUser?.userType !== 'contractor' && (
                 <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
                   Dodaj Ogłoszenie
                 </Button>
@@ -412,10 +412,12 @@ export function Header({ initialUser }: HeaderProps) {
                       <GraduationCap className="mr-2 h-4 w-4" />
                       <span>Tutorial</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleProfileCompletionClick}>
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Uzupełnij profil</span>
-                    </DropdownMenuItem>
+                    {!currentUser?.profileCompleted && (
+                      <DropdownMenuItem onClick={handleProfileCompletionClick}>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Uzupełnij profil</span>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     
                     <DropdownMenuItem onClick={handleLogout}>
@@ -434,7 +436,7 @@ export function Header({ initialUser }: HeaderProps) {
                     <DrawerTrigger asChild>
                     <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
                       <User className="h-4 w-4 mr-2" />
-                      Zaloguj się / Zarejestruj
+                      
                     </Button>
                   </DrawerTrigger>
                   <DrawerContent>
@@ -449,7 +451,7 @@ export function Header({ initialUser }: HeaderProps) {
                           onClick={handleLoginClick}
                         >
                           <User className="mr-2 h-4 w-4" />
-                          <span>Zaloguj się</span>
+                          <span>Logowanie</span>
                         </Button>
                         <Button
                           variant="ghost"
@@ -471,7 +473,7 @@ export function Header({ initialUser }: HeaderProps) {
                     <DropdownMenuTrigger asChild>
                       <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
                         <User className="h-4 w-4 mr-2" />
-                        Zaloguj się / Zarejestruj
+                        Logowanie
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -481,7 +483,7 @@ export function Header({ initialUser }: HeaderProps) {
                     >
                     <DropdownMenuItem onClick={handleLoginClick}>
                       <User className="mr-2 h-4 w-4" />
-                      <span>Zaloguj się</span>
+                      <span>Logowanie</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleRegisterClick}>
                       <User className="mr-2 h-4 w-4" />

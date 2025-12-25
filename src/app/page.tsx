@@ -13,6 +13,7 @@ import { useUserProfile } from '../contexts/AuthContext';
 import { getJobsAndTenders, type DBJobFilters } from '../lib/data';
 import { useLayoutContext } from '../components/ConditionalFooter';
 import { useFilterContext } from '../contexts/FilterContext';
+import { JobsProvider, useJobsContext } from '../contexts/JobsContext';
 import { createClient } from '../lib/supabase/client';
 import { createJobApplication, createTenderBid } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
@@ -43,11 +44,12 @@ const MessagingSystem = dynamic(
 
 const EnhancedMapView = EnhancedMapViewGoogleMaps;
 
-export default function HomePage() {
+function HomePageContent() {
   const { user } = useUserProfile();
   const router = useRouter();
   const { isMapExpanded, setIsMapExpanded } = useLayoutContext();
   const { filters, setFilters, primaryLocation, setPrimaryLocation, setLocationChangeHandler, onLocationChangeRequest } = useFilterContext();
+  const { setLoadedJobs: setContextLoadedJobs, setJobs: setContextJobs } = useJobsContext();
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -211,21 +213,27 @@ export default function HomePage() {
         // This ensures loadedJobs always has all jobs, while jobs can be bounds-filtered for map display
         if (updateLoadedJobs) {
           setLoadedJobs(data);
+          setContextLoadedJobs(data);
         }
         // Always update jobs (for map display) - can be bounds-filtered
         setJobs(data);
+        setContextJobs(data);
       } else {
         if (updateLoadedJobs) {
           setLoadedJobs([]);
+          setContextLoadedJobs([]);
         }
         setJobs([]);
+        setContextJobs([]);
       }
     } catch (error) {
       console.error('Error loading jobs from database:', error);
       if (updateLoadedJobs) {
         setLoadedJobs([]);
+        setContextLoadedJobs([]);
       }
       setJobs([]);
+      setContextJobs([]);
     } finally {
       setIsLoadingJobs(false);
     }
@@ -660,4 +668,8 @@ export default function HomePage() {
       )}
     </>
   );
+}
+
+export default function HomePage() {
+  return <HomePageContent />;
 }

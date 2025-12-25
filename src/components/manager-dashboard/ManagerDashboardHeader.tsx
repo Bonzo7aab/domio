@@ -3,6 +3,7 @@
 import { Mail, MapPin, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Button } from '../ui/button';
 import { getCompanyTypeDisplayName, getCompanyAddress } from './shared/utils';
@@ -22,10 +23,20 @@ export function ManagerDashboardHeader({ company, userEmail, userCompany }: Mana
   };
 
   const handlePostJob = () => {
+    if (!company) {
+      toast.error('Najpierw musisz dodać dane firmy w profilu');
+      router.push('/account?tab=company');
+      return;
+    }
     router.push('/post-job');
   };
 
   const handleTenderCreate = () => {
+    if (!company) {
+      toast.error('Najpierw musisz dodać dane firmy w profilu');
+      router.push('/account?tab=company');
+      return;
+    }
     router.push('/manager-dashboard/tenders?create=true');
   };
 

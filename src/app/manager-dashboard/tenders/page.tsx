@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { createTender, updateTender, fetchTenderById } from '../../../lib/database/jobs';
@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import TenderSystem from '../../../components/TenderSystem';
 import TenderCreationForm from '../../../components/TenderCreationForm';
 import { Card, CardContent } from '../../../components/ui/card';
+import { Button } from '../../../components/ui/button';
+import Link from 'next/link';
 import type { TenderWithCompany } from '../../../lib/database/jobs';
 
 export default function TendersPage() {
@@ -19,24 +21,80 @@ export default function TendersPage() {
   const [showTenderCreation, setShowTenderCreation] = useState(false);
   const [editingTenderId, setEditingTenderId] = useState<string | null>(null);
   const [editingTenderData, setEditingTenderData] = useState<TenderWithCompany | null>(null);
+  const [hasCompany, setHasCompany] = useState<boolean | null>(null);
+  const [isCheckingCompany, setIsCheckingCompany] = useState(true);
+  const pendingCreateRef = React.useRef(false);
+
+  // Check if user has a company
+  useEffect(() => {
+    const checkCompany = async () => {
+      if (!user?.id) {
+        setIsCheckingCompany(false);
+        return;
+      }
+      
+      try {
+        const supabase = createClient();
+        const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);
+        setHasCompany(!!company);
+      } catch (error) {
+        console.error('Error checking company:', error);
+        setHasCompany(false);
+      } finally {
+        setIsCheckingCompany(false);
+      }
+    };
+    
+    checkCompany();
+  }, [user]);
 
   // Check if we should open tender form from URL
   useEffect(() => {
     const shouldCreate = searchParams.get('create') === 'true';
     if (shouldCreate) {
-      setShowTenderCreation(true);
+      pendingCreateRef.current = true;
       // Remove query param from URL
       router.replace('/manager-dashboard/tenders', { scroll: false });
     }
   }, [searchParams, router]);
 
+  // Handle pending create action after company check completes
+  useEffect(() => {
+    // Wait for company check to complete
+    if (isCheckingCompany || !pendingCreateRef.current) return;
+    
+    // Clear the pending flag
+    pendingCreateRef.current = false;
+    
+    // Handle the create action based on company status
+    if (hasCompany) {
+      setShowTenderCreation(true);
+    } else {
+      // Show error toast if trying to create without company
+      toast.error('Najpierw musisz dodać dane firmy w profilu');
+    }
+  }, [hasCompany, isCheckingCompany]);
+
   const handleTenderCreate = () => {
+    // Check if company exists before allowing creation
+    if (!hasCompany) {
+      toast.error('Najpierw musisz dodać dane firmy w profilu');
+      router.push('/account?tab=company');
+      return;
+    }
     setEditingTenderId(null);
     setEditingTenderData(null);
     setShowTenderCreation(true);
   };
 
   const handleTenderEdit = async (tenderId: string) => {
+    // Check if company exists before allowing edit
+    if (!hasCompany) {
+      toast.error('Najpierw musisz dodać dane firmy w profilu');
+      router.push('/account?tab=company');
+      return;
+    }
+
     try {
       const supabase = createClient();
       const { data: tenderData, error } = await fetchTenderById(supabase, tenderId);
@@ -65,6 +123,13 @@ export default function TendersPage() {
   const handleTenderSubmit = async (tender: any, tenderId?: string) => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby utworzyć przetarg');
+      return;
+    }
+
+    // Ensure company exists before any tender operation
+    if (!hasCompany) {
+      toast.error('Najpierw musisz dodać dane firmy w profilu');
+      router.push('/account?tab=company');
       return;
     }
 
@@ -129,6 +194,38 @@ export default function TendersPage() {
     router.push(`/manager-dashboard/tenders/${tenderId}`);
   };
 
+  // Show loading while checking company
+  if (isCheckingCompany) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="ml-2 text-sm text-muted-foreground">Ładowanie...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show message with button if no company
+  if (!hasCompany) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6 text-center space-y-4 gap-2 flex flex-col justify-center">
+            <p className="text-muted-foreground">Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.</p>
+            <Link href="/account?tab=company">
+              <Button>Dodaj dane firmy w profilu</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <Suspense fallback={
@@ -153,7 +250,7 @@ export default function TendersPage() {
       </Suspense>
 
       {/* Tender Creation Modal */}
-      {showTenderCreation && (
+      {showTenderCreation && hasCompany && (
         <TenderCreationForm
           onClose={() => {
             setShowTenderCreation(false);

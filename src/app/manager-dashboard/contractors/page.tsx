@@ -3,7 +3,9 @@ import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { fetchContractorsByWorkHistory } from '../../../lib/database/contractors';
 import { Card, CardContent } from '../../../components/ui/card';
+import { Button } from '../../../components/ui/button';
 import { ContractorsContent } from './ContractorsContent';
+import Link from 'next/link';
 
 async function getContractorsData(userId: string) {
   const supabase = await createClient();
@@ -52,8 +54,11 @@ async function ContractorsDataFetcher() {
   if (!contractorsData) {
     return (
       <Card>
-        <CardContent className="pt-6 text-center">
+        <CardContent className="pt-6 text-center space-y-4 gap-2 flex flex-col justify-center">
           <p className="text-muted-foreground">Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.</p>
+          <Link href="/account?tab=company">
+            <Button>Dodaj dane firmy w profilu</Button>
+          </Link>
         </CardContent>
       </Card>
     );

@@ -3,7 +3,9 @@ import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { fetchCompanyBuildings } from '../../../lib/database/buildings';
 import { Card, CardContent } from '../../../components/ui/card';
+import { Button } from '../../../components/ui/button';
 import { PropertiesContent } from './PropertiesContent';
+import Link from 'next/link';
 
 async function getPropertiesData(userId: string) {
   const supabase = await createClient();
@@ -53,8 +55,11 @@ async function PropertiesDataFetcher() {
   if (!propertiesData) {
     return (
       <Card>
-        <CardContent className="pt-6 text-center">
+        <CardContent className="pt-6 text-center space-y-4 gap-2 flex flex-col justify-center">
           <p className="text-muted-foreground">Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.</p>
+          <Link href="/account?tab=company">
+            <Button>Dodaj dane firmy w profilu</Button>
+          </Link>
         </CardContent>
       </Card>
     );

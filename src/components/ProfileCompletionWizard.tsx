@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, Check, Building, User, MapPin, Award, Upload, Phone, Mail, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from './ui/button';
@@ -12,6 +12,8 @@ import { Progress } from './ui/progress';
 import { Checkbox } from './ui/checkbox';
 import { useUserProfile } from '../contexts/AuthContext';
 import { updateUserAction } from '../lib/auth/actions';
+import { createClient } from '../lib/supabase/client';
+import { fetchUserPrimaryCompany } from '../lib/database/companies';
 
 interface ProfileCompletionWizardProps {
   onComplete: () => void;
@@ -77,6 +79,46 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
     propertyTypes: []
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoadingCompany, setIsLoadingCompany] = useState(true);
+
+  // Fetch and pre-fill company data
+  useEffect(() => {
+    const loadCompanyData = async () => {
+      if (!user?.id) {
+        setIsLoadingCompany(false);
+        return;
+      }
+
+      try {
+        const supabase = createClient();
+        const { data: company, error } = await fetchUserPrimaryCompany(supabase, user.id);
+
+        if (error || !company) {
+          setIsLoadingCompany(false);
+          return;
+        }
+
+        // Pre-fill form fields with existing company data
+        setProfileData(prev => ({
+          ...prev,
+          companyName: company.name || prev.companyName,
+          description: company.description || prev.description,
+          website: company.website || prev.website,
+          phone: company.phone || prev.phone || user?.phone || '',
+          street: company.address || prev.street,
+          city: company.city || prev.city,
+          postalCode: company.postal_code || prev.postalCode,
+          // Note: voivodeship is not stored in companies table, so we keep the default
+        }));
+      } catch (err) {
+        console.error('Error loading company data:', err);
+      } finally {
+        setIsLoadingCompany(false);
+      }
+    };
+
+    loadCompanyData();
+  }, [user?.id, user?.phone]);
 
   const isContractor = user?.userType === 'contractor';
   const totalSteps = isContractor ? 5 : 4;

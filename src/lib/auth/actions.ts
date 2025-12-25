@@ -125,7 +125,18 @@ export async function registerAction(formData: FormData) {
   }
   
   revalidatePath('/', 'layout')
-  redirect('/login?message=Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')
+  
+  // Check if user was auto-confirmed (session exists) or needs email confirmation
+  // If session exists, user is already logged in - redirect to home
+  // Otherwise, redirect to login with message about email confirmation
+  if (authData.session) {
+    // User is auto-confirmed and logged in - redirect to home
+    // The auth context will sync the session on the next page load
+    redirect('/?message=Konto zostało utworzone pomyślnie. Zostałeś automatycznie zalogowany.')
+  } else {
+    // Email confirmation required - redirect to login
+    redirect('/login?message=Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')
+  }
 }
 
 /**

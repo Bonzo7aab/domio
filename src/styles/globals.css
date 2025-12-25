@@ -248,10 +248,10 @@ html {
 .info-window-content {
   animation: fadeInScale 0.2s ease-out;
   user-select: none;
-}
-
-.info-window-content:hover {
-  transform: scale(1.01);
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  box-sizing: border-box !important;
 }
 
 /* Custom Google Maps Info Window Styles */
@@ -260,14 +260,19 @@ html {
   border-radius: 12px !important;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
   max-width: 320px !important;
-  overflow: visible !important;
+  /* overflow: visible !important; */
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
 }
 
 .gm-style .gm-style-iw-d {
-  overflow: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
   max-height: 400px !important;
   scrollbar-width: thin;
   scrollbar-color: hsl(214 32% 91%) transparent;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .gm-style .gm-style-iw-d::-webkit-scrollbar {
@@ -304,6 +309,13 @@ html {
 .info-window-content,
 .info-window-content * {
   pointer-events: auto !important;
+}
+
+/* Prevent horizontal overflow in info window content */
+.info-window-content * {
+  max-width: 100% !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
 }
 
 /* Toast notifications - ensure they're always visible on top */

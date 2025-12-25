@@ -245,6 +245,7 @@ const MapComponent: React.FC<{
         disableAutoPan: true,
         pixelOffset: new google.maps.Size(0, -10),
         ariaLabel: 'Szczegóły ogłoszenia',
+        maxWidth: 360,
       });
       setInfoWindow(newInfoWindow);
 
@@ -455,14 +456,8 @@ const MapComponent: React.FC<{
     const openInfoWindow = (isFromClick: boolean = false) => {
       if (!markerData.jobData) return;
 
-      // When map is expanded and infoWindow is already open, prevent hover switching
-      // Allow click to always switch
-      if (!isFromClick && isMapExpanded && activeInfoWindowMarkerIdRef.current !== null) {
-        // If hovering over a different marker, don't switch
-        if (activeInfoWindowMarkerIdRef.current !== markerData.id) {
-          return;
-        }
-      }
+      // Always allow hover to show infoWindow for any marker
+      // Click always works regardless of state
 
       if (isMobile) {
         setSelectedJobForMobile(markerData.jobData);
@@ -661,17 +656,8 @@ const MapComponent: React.FC<{
     const pool = markerPoolRef.current;
     const hoveredMarkerData = markers.find(m => m.isHovered);
 
-    // When map is expanded and infoWindow is already open, prevent hover switching
+    // Always show infoWindow when hovering over any marker
     if (hoveredMarkerData && hoveredMarkerData.jobData) {
-      // If map is expanded and there's already an active infoWindow, don't switch on hover
-      if (isMapExpanded && activeInfoWindowMarkerIdRef.current !== null) {
-        // Only allow switching if hovering over a different marker - but we still block it
-        // because user wants to prevent switching when map is enlarged
-        if (activeInfoWindowMarkerIdRef.current !== hoveredMarkerData.id) {
-          return;
-        }
-      }
-
       const marker = pool.getActiveMarkers().get(hoveredMarkerData.id);
       if (marker) {
         if (infoWindowTimeoutRef.current) {
@@ -679,16 +665,19 @@ const MapComponent: React.FC<{
           infoWindowTimeoutRef.current = null;
         }
 
-        const zoom = map.getZoom() || 12;
-        const scale = Math.pow(2, zoom);
-        const pixelsPerDegree = (256 * scale) / 360;
-        const latOffset = 110 / pixelsPerDegree;
+        // Don't pan/zoom when map is expanded - user wants to stay at current view
+        if (!isMapExpanded) {
+          const zoom = map.getZoom() || 12;
+          const scale = Math.pow(2, zoom);
+          const pixelsPerDegree = (256 * scale) / 360;
+          const latOffset = 110 / pixelsPerDegree;
 
-        const offsetPosition = {
-          lat: hoveredMarkerData.position.lat + latOffset,
-          lng: hoveredMarkerData.position.lng
-        };
-        map.panTo(offsetPosition);
+          const offsetPosition = {
+            lat: hoveredMarkerData.position.lat + latOffset,
+            lng: hoveredMarkerData.position.lng
+          };
+          map.panTo(offsetPosition);
+        }
 
         const content = generateInfoWindowContent(hoveredMarkerData.jobData, isSmallMap);
         infoWindow.setContent(content);

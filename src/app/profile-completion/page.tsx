@@ -7,15 +7,23 @@ import { useEffect } from 'react';
 
 export default function ProfileCompletion() {
   const router = useRouter();
-  const { user } = useUserProfile();
+  const { user, isLoading } = useUserProfile();
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
+    if (!isLoading) {
+      if (!user) {
+        router.push('/login');
+      } else if (user.profileCompleted) {
+        router.push('/');
+      }
     }
-  }, [user, router]);
+  }, [user, isLoading, router]);
 
-  if (!user) {
+  if (isLoading || !user) {
+    return null;
+  }
+
+  if (user.profileCompleted) {
     return null;
   }
 

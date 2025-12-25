@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { getBookmarkedJobs, removeBookmark, BookmarkedJob } from '../utils/bookmarkStorage';
+import { formatBudget, type Budget } from '../types/budget';
 import { toast } from 'sonner';
 
 interface BookmarkedJobsPageProps {
@@ -24,13 +25,37 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
     loadBookmarks();
   }, []);
 
+  // Helper function to format location as string
+  const formatLocation = (location: string | { city?: string; sublocality_level_1?: string } | undefined): string => {
+    if (!location) return 'Nieznana lokalizacja';
+    if (typeof location === 'string') return location;
+    if (typeof location === 'object' && location !== null) {
+      if (location.sublocality_level_1) {
+        return `${location.city || 'Unknown'}, ${location.sublocality_level_1}`;
+      }
+      return location.city || 'Unknown';
+    }
+    return 'Nieznana lokalizacja';
+  };
+
+  // Helper function to format budget (handles both string and object formats)
+  const formatBudgetValue = (budget: string | Budget | undefined): string => {
+    if (!budget) return '';
+    if (typeof budget === 'string') return budget;
+    return formatBudget(budget);
+  };
+
   useEffect(() => {
     if (searchQuery) {
-      const filtered = bookmarks.filter(bookmark => 
-        bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        bookmark.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        bookmark.location.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const query = searchQuery.toLowerCase();
+      const filtered = bookmarks.filter(bookmark => {
+        const locationString = formatLocation(bookmark.location);
+        return (
+          bookmark.title.toLowerCase().includes(query) ||
+          bookmark.company.toLowerCase().includes(query) ||
+          locationString.toLowerCase().includes(query)
+        );
+      });
       setFilteredBookmarks(filtered);
     } else {
       setFilteredBookmarks(bookmarks);
@@ -160,7 +185,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
                     </div>
                     <div className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
-                      {bookmark.location}
+                      {formatLocation(bookmark.location)}
                     </div>
                     {bookmark.deadline && (
                       <div className="flex items-center gap-1">
@@ -173,7 +198,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
                   {bookmark.budget && (
                     <div className="mb-4">
                       <span className="text-sm font-medium text-success">
-                        Budżet: {bookmark.budget}
+                        Budżet: {formatBudgetValue(bookmark.budget)}
                       </span>
                     </div>
                   )}

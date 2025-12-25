@@ -4,15 +4,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 import { addJobBookmark as addJobBookmarkDb, removeJobBookmark as removeJobBookmarkDb } from '../lib/database/bookmarks';
+import type { Budget } from '../types/budget';
 
 export interface BookmarkedJob {
   id: string;
   title: string;
   company: string;
-  location: string;
+  location: string | { city?: string; sublocality_level_1?: string };
   postType: 'job' | 'tender';
   bookmarkedAt: string;
-  budget?: string;
+  budget?: string | Budget;
   deadline?: string;
 }
 

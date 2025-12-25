@@ -14,7 +14,8 @@ import { toast } from 'sonner';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
 import { createJob } from '../lib/database/jobs';
-import { fetchUserPrimaryCompany, upsertUserCompany } from '../lib/database/companies';
+import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import Link from 'next/link';
 import LocationAutocomplete from './LocationAutocomplete';
 import type { BudgetInput } from '../types/budget';
 import { uploadJobAttachments, deleteJobAttachments } from '../lib/storage/job-attachments';
@@ -128,11 +129,35 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
   const supabase = createClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [hasCompany, setHasCompany] = useState<boolean | null>(null);
+  const [isCheckingCompany, setIsCheckingCompany] = useState(true);
 
   // Prevent hydration mismatch
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Check if user has a company
+  useEffect(() => {
+    const checkCompany = async () => {
+      if (!user?.id) {
+        setIsCheckingCompany(false);
+        return;
+      }
+      
+      try {
+        const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);
+        setHasCompany(!!company);
+      } catch (error) {
+        console.error('Error checking company:', error);
+        setHasCompany(false);
+      } finally {
+        setIsCheckingCompany(false);
+      }
+    };
+    
+    checkCompany();
+  }, [user, supabase]);
 
   const [formData, setFormData] = useState<JobFormData>({
     title: '',
@@ -318,11 +343,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       }
     }
 
-    // Walidacja dodatkowych pól
-    if (!formData.organizationName || !formData.organizationType || !formData.contactName || !formData.contactEmail) {
-      toast.error('Proszę wypełnić wszystkie wymagane pola kontaktowe');
-      return;
-    }
+    // Walidacja pól kontaktowych (opcjonalne, używane jako kontakt do zlecenia, nie do tworzenia firmy)
+    // Company is required and checked earlier
 
     setIsSubmitting(true);
 
@@ -346,40 +368,12 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       // Use session user ID to ensure it matches auth.uid() in RLS policies
       const managerId = sessionUserId;
 
-      // Get or create company
-      let company = await fetchUserPrimaryCompany(supabase, managerId);
+      // Get company - must exist (checked earlier)
+      const company = await fetchUserPrimaryCompany(supabase, managerId);
       
       if (!company.data) {
-        // Map organization type to database type
-        const orgTypeMapping: Record<string, string> = {
-          'Spółdzielnia Mieszkaniowa': 'spółdzielnia',
-          'Wspólnota Mieszkaniowa': 'wspólnota',
-          'Zarządca Nieruchomości': 'property_management',
-          'Deweloper': 'property_management',
-          'Inne': 'property_management',
-        };
-
-        const companyType = orgTypeMapping[formData.organizationType] || 'property_management';
-
-        // Create company
-        const createResult = await upsertUserCompany(supabase, managerId, {
-          name: formData.organizationName,
-          type: companyType,
-          phone: formData.contactPhone || undefined,
-          email: formData.contactEmail,
-          city: typeof formData.location === 'string' ? formData.location : formData.location?.city || '',
-          address: formData.address || undefined,
-        });
-
-        if (createResult.error || !createResult.data) {
-          throw new Error(createResult.error?.message || 'Nie udało się utworzyć firmy');
-        }
-
-        company = { data: createResult.data, error: null };
-      }
-
-      if (!company.data) {
-        throw new Error('Nie udało się pobrać lub utworzyć firmy');
+        toast.error('Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.');
+        return;
       }
 
       // Use stored coordinates (already geocoded when location was selected)
@@ -467,7 +461,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         subcategory: formData.subcategory,
         budget: budgetInput,
         managerId: managerId,
-        companyId: company.data.id,
+        companyId: company.data!.id,
         attachmentsCount: uploadedUrls.length,
       });
 
@@ -497,7 +491,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         requirements: requirementsArray.length > 0 ? requirementsArray : undefined,
         images: uploadedUrls.length > 0 ? uploadedUrls : undefined,
         managerId: managerId,
-        companyId: company.data.id,
+        companyId: company.data!.id,
       });
 
       console.log('Job creation result:', jobResult);
@@ -582,6 +576,46 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       setIsUploading(false);
     }
   };
+
+  // Show loading while checking company
+  if (isCheckingCompany) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <p className="ml-2 text-sm text-muted-foreground">Ładowanie...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message with button if no company
+  if (!hasCompany) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="pt-6 text-center space-y-4 gap-2 flex flex-col justify-center">
+              <p className="text-muted-foreground">Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.</p>
+              <Link href="/account?tab=company">
+                <Button>Dodaj dane firmy w profilu</Button>
+              </Link>
+              <Button variant="outline" onClick={onBack} className="mt-2">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Powrót
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -7,6 +7,7 @@ import AuthProvider from '../contexts/AuthContext'
 import { Header } from '../components/Header'
 import { LayoutProvider } from '../components/ConditionalFooter'
 import { FilterProvider } from '../contexts/FilterContext'
+import { JobsProvider } from '../contexts/JobsContext'
 import { GlobalCommandPalette } from '../components/GlobalCommandPalette'
 import { MobileMenuDock } from '../components/MobileMenuDock'
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration'
@@ -59,16 +60,18 @@ export default function RootLayout({
             </div>
           }>
             <FilterProvider>
-              <LayoutProvider>
-                <Header />
-                <main className="min-h-[calc(100vh-10rem)] pb-20 lg:pb-0">
-                  {children}
-                </main>
-                <MobileMenuDock />
-                <CookieConsentBanner />
-                <Toaster />
-                <GlobalCommandPalette />
-              </LayoutProvider>
+              <JobsProvider>
+                <LayoutProvider>
+                  <Header />
+                  <main className="min-h-[calc(100vh-10rem)] pb-20 lg:pb-0">
+                    {children}
+                  </main>
+                  <MobileMenuDock />
+                  <CookieConsentBanner />
+                  <Toaster />
+                  <GlobalCommandPalette />
+                </LayoutProvider>
+              </JobsProvider>
             </FilterProvider>
           </Suspense>
         </AuthProvider>

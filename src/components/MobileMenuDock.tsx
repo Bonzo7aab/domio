@@ -27,6 +27,7 @@ import { FloatingDock, type FloatingDockItem } from './ui/floating-dock';
 import { useUserProfile } from '../contexts/AuthContext';
 import { useLayoutContext } from './ConditionalFooter';
 import { useFilterContext } from '../contexts/FilterContext';
+import { useJobsContext } from '../contexts/JobsContext';
 import JobFilters from './JobFilters';
 
 export function MobileMenuDock() {
@@ -35,6 +36,7 @@ export function MobileMenuDock() {
   const { user, isAuthenticated } = useUserProfile();
   const { isMapExpanded, setIsMapExpanded } = useLayoutContext();
   const { filters, setFilters, primaryLocation, onLocationChangeRequest } = useFilterContext();
+  const { loadedJobs } = useJobsContext();
   
   const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
@@ -252,8 +254,11 @@ export function MobileMenuDock() {
               <div className="w-full">
                 <JobFilters
                   onFilterChange={setFilters}
+                  initialFilters={filters}
                   primaryLocation={primaryLocation}
                   onLocationChange={onLocationChangeRequest}
+                  jobs={loadedJobs}
+                  isMapView={isMapExpanded}
                 />
               </div>
             </div>

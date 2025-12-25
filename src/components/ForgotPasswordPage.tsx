@@ -209,7 +209,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
               onClick={onLoginClick}
               className="px-0 text-primary hover:text-primary/80"
             >
-              Zaloguj się
+              Zaloguj
             </Button>
           </p>
         </div>

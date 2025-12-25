@@ -178,7 +178,7 @@ const JobCard = React.memo(function JobCard({
                 </Badge>
               </div>
               
-              <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-4 line-clamp-2">
+              <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-0 line-clamp-2">
                 {job.description}
               </p>
 
@@ -234,15 +234,86 @@ const JobCard = React.memo(function JobCard({
       onMouseLeave={onMouseLeave}
     >
       <CardContent className="p-4 md:p-6">
-        <div className="flex items-start justify-between mb-3 md:mb-4">
+          <div className="flex items-start justify-between mb-3 md:mb-4">
           <div className="flex-1 min-w-0">
+            {/* Badges and bookmarks/visited on same level on mobile, separate on desktop */}
+            <div className="flex items-center justify-between gap-1.5 md:gap-2 flex-wrap mb-2 md:mb-0 md:hidden">
+              <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+                {isExpired && (
+                  <Badge variant="secondary" className="text-xs">
+                    Wygasłe
+                  </Badge>
+                )}
+                {job.urgent && (
+                  <Badge variant="destructive" className="text-xs">
+                    Pilne
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 md:gap-2">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  {(job.applications !== undefined || job.metrics?.applications !== undefined) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 cursor-default">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{job.applications ?? job.metrics?.applications ?? 0} ofert</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Ofert</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {(job.visits_count !== undefined || job.bookmarks_count !== undefined) && (
+                    <>
+                      {job.visits_count !== undefined && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-default">
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>{job.visits_count}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Odwiedzone</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {job.bookmarks_count !== undefined && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-default">
+                              <BookmarkIcon className="w-3.5 h-3.5" />
+                              <span>{job.bookmarks_count}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Zapisane</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </>
+                  )}
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
+                  onClick={handleBookmarkClick}
+                >
+                  <BookmarkIcon className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                </Button>
+              </div>
+            </div>
+            
             <div className="flex items-start md:items-center justify-between mb-2 gap-2">
               <div className="flex items-start md:items-center gap-2 md:gap-3 flex-wrap min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                   <Wrench className="w-4 h-4 text-primary flex-shrink-0" />
                   <h3 className={`font-semibold text-base md:text-lg truncate ${isExpired ? 'text-gray-500' : ''}`}>{job.title}</h3>
                 </div>
-                <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+                <div className="hidden md:flex items-center gap-1.5 md:gap-2 flex-wrap">
                   {isExpired && (
                     <Badge variant="secondary" className="text-xs">
                       Wygasłe
@@ -256,38 +327,53 @@ const JobCard = React.memo(function JobCard({
                 </div>
               </div>
               
-              {/* Action buttons in top right block */}
-              <div className="flex gap-1.5 md:gap-2 flex-shrink-0">
-                {(job.visits_count !== undefined || job.bookmarks_count !== undefined) && (
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    {job.visits_count !== undefined && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1 cursor-default">
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>{job.visits_count}</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Odwiedzone</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {job.bookmarks_count !== undefined && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1 cursor-default">
-                            <BookmarkIcon className="w-3.5 h-3.5" />
-                            <span>{job.bookmarks_count}</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Zapisane</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                )}
+              {/* Action buttons in top right block - desktop only */}
+              <div className="hidden md:flex gap-1.5 md:gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  {(job.applications !== undefined || job.metrics?.applications !== undefined) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 cursor-default">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{job.applications ?? job.metrics?.applications ?? 0} ofert</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Ofert</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {(job.visits_count !== undefined || job.bookmarks_count !== undefined) && (
+                    <>
+                      {job.visits_count !== undefined && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-default">
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>{job.visits_count}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Odwiedzone</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {job.bookmarks_count !== undefined && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-default">
+                              <BookmarkIcon className="w-3.5 h-3.5" />
+                              <span>{job.bookmarks_count}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Zapisane</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </>
+                  )}
+                </div>
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -300,10 +386,10 @@ const JobCard = React.memo(function JobCard({
             </div>
             
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4 text-xs text-gray-600 mb-3">
-              <div className='flex flex-wrap gap-2 sm:gap-4 items-center'>
-                <div className="flex items-center gap-1">
+              <div className='flex items-center gap-2 sm:gap-4 min-w-0'>
+                <div className="flex items-center gap-1 min-w-0">
                   <MapPin className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">
+                  <span>
                     {typeof job.location === 'string' 
                       ? job.location 
                       : (job.location && typeof job.location === 'object' && 'city' in job.location)
@@ -313,15 +399,15 @@ const JobCard = React.memo(function JobCard({
                         : 'Unknown'}
                   </span>
                 </div>
-                <span className="hidden sm:inline h-4 border-gray-300 border-r-2" />
-                <span className="font-normal text-gray-500">{job.company}</span>
+                <span className="hidden sm:inline h-4 border-gray-300 border-r-2 flex-shrink-0" />
+                <span className="font-normal text-gray-500 truncate">{job.company}</span>
               </div>
               <Badge variant="secondary" className="w-fit">
                 {typeof job.category === 'string' ? job.category : job.category?.name || job.type}
               </Badge>
             </div>
             
-            <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-4 line-clamp-2">
+            <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-0 line-clamp-2">
               {job.description}
             </p>
 
@@ -357,35 +443,32 @@ const JobCard = React.memo(function JobCard({
                 )}
 
                 {/* Job details */}
-                <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-start sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2 mt-2 sm:mt-4">
                     <span className="text-green-600 font-medium">💰</span>
-                    <span>Stawka: {job.salary}</span>
+                    <span>Stawka: <span className="text-green-600">{job.salary}</span></span>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                    <span>{job.applications ?? job.metrics?.applications ?? 0} ofert</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Calendar className="h-4 w-4 flex-shrink-0" />
-                    <span>Opublikowano: {job.postedTime}</span>
-                    {formattedDeadline && (
-                      <>
-                        <span className="mx-1">•</span>
-                        <Clock className="h-4 w-4 flex-shrink-0" />
-
-                        <span>
-                          Termin: {formattedDeadline}
+                  <div className="flex items-start sm:items-center gap-4 text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span>Opublikowano: {job.postedTime}</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                      {formattedDeadline && (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4 flex-shrink-0" />
+                            <span>Termin: {formattedDeadline}</span>
+                          </div>
                           {deadlineDaysRemaining !== null && (
-                            <span className={`ml-1 ${isEndingSoon ? 'text-orange-600 font-semibold bg-orange-50 px-1.5 py-0.5 rounded' : 'text-gray-500'}`}>
+                            <span className={`pl-5 sm:pl-0 sm:ml-1 ${isEndingSoon ? 'text-orange-600 font-semibold bg-orange-50 px-1.5 py-0.5 rounded' : 'text-gray-500'}`}>
                               ({formatDaysRemaining(deadlineDaysRemaining)} do końca)
                             </span>
                           )}
-                        </span>
-                      </>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {job.distance && (

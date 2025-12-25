@@ -9,9 +9,11 @@ interface JobTypeSelectionPageProps {
   onSelectTender: () => void;
   isAuthenticated?: boolean;
   userType?: 'contractor' | 'manager';
+  hasCompany?: boolean | null;
+  isCheckingCompany?: boolean;
 }
 
-export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTender, isAuthenticated, userType }: JobTypeSelectionPageProps) {
+export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTender, isAuthenticated, userType, hasCompany, isCheckingCompany }: JobTypeSelectionPageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -93,9 +95,27 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                 </div>
               </div>
 
-              <Button onClick={onSelectJob} className="w-full" size="lg">
-                Stwórz zlecenie
-              </Button>
+              {userType === 'manager' && isCheckingCompany ? (
+                <Button disabled className="w-full" size="lg">
+                  Ładowanie...
+                </Button>
+              ) : userType === 'manager' && hasCompany === false ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-700">
+                      <AlertCircle className="w-4 h-4 inline mr-1" />
+                      Najpierw musisz dodać dane firmy w profilu
+                    </p>
+                  </div>
+                  <Button onClick={onSelectJob} className="w-full" size="lg">
+                    Dodaj dane firmy
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={onSelectJob} className="w-full" size="lg">
+                  Stwórz zlecenie
+                </Button>
+              )}
             </CardContent>
           </Card>
 
@@ -180,6 +200,30 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                   </div>
                   <Button disabled className="w-full" size="lg" variant="outline">
                     Dostępne dla zarządców
+                  </Button>
+                </div>
+              ) : isCheckingCompany ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-sm text-gray-700">
+                      <AlertCircle className="w-4 h-4 inline mr-1" />
+                      Sprawdzanie danych firmy...
+                    </p>
+                  </div>
+                  <Button disabled className="w-full" size="lg" variant="outline">
+                    Ładowanie...
+                  </Button>
+                </div>
+              ) : hasCompany === false ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-700">
+                      <AlertCircle className="w-4 h-4 inline mr-1" />
+                      Najpierw musisz dodać dane firmy w profilu
+                    </p>
+                  </div>
+                  <Button onClick={onSelectTender} className="w-full" size="lg" variant="outline">
+                    Dodaj dane firmy
                   </Button>
                 </div>
               ) : (
