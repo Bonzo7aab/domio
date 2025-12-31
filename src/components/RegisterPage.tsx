@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useState, useTransition } from 'react';
+import React, { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useFormStatus } from 'react-dom';
 import { Building, User, Phone, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -9,24 +11,30 @@ import { Card, CardContent } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { registerAction } from '../lib/auth/actions';
 
-interface RegisterPageProps {
-  searchParams?: {
-    error?: string;
-    message?: string;
-    userType?: 'contractor' | 'manager';
-  };
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button 
+      type="submit"
+      disabled={pending}
+      className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 group disabled:opacity-50"
+    >
+      <User className="mr-2 h-5 w-5" />
+      {pending ? 'Tworzenie konta...' : 'Utwórz konto'}
+    </Button>
+  );
 }
 
-export function RegisterPage({ searchParams }: RegisterPageProps) {
-  const error = searchParams?.error;
-  const message = searchParams?.message;
-  const defaultUserType = searchParams?.userType || 'contractor';
+export function RegisterPage() {
+  const searchParams = useSearchParams();
+  const error = searchParams?.get('error') || undefined;
+  const message = searchParams?.get('message') || undefined;
+  const defaultUserType = (searchParams?.get('userType') as 'contractor' | 'manager') || 'contractor';
   
   const [selectedUserType, setSelectedUserType] = useState<'contractor' | 'manager'>(defaultUserType);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
   return (
     <div className="min-h-screen bg-slate-50 py-16">
@@ -58,18 +66,7 @@ export function RegisterPage({ searchParams }: RegisterPageProps) {
           {/* Registration Form */}
           <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-6">
-              <form action={async (formData) => {
-                setFormError(null);
-                startTransition(async () => {
-                  try {
-                    await registerAction(formData);
-                    // If successful, the function will redirect
-                  } catch (error) {
-                    // Handle any unexpected errors
-                    setFormError('Wystąpił nieoczekiwany błąd. Spróbuj ponownie.');
-                  }
-                });
-              }} className="space-y-6">
+              <form action={registerAction} className="space-y-6">
                 {/* Hidden userType input */}
                 <input type="hidden" name="userType" value={selectedUserType} />
                 
@@ -253,14 +250,7 @@ export function RegisterPage({ searchParams }: RegisterPageProps) {
                 </div>
 
                 {/* Submit Button */}
-                <Button 
-                  type="submit"
-                  disabled={isPending}
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 group disabled:opacity-50"
-                >
-                  <User className="mr-2 h-5 w-5" />
-                  {isPending ? 'Tworzenie konta...' : 'Utwórz konto'}
-                </Button>
+                <SubmitButton />
 
                 {/* Terms and Conditions */}
                 <div className="text-center text-sm text-slate-600">

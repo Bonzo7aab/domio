@@ -33,3 +33,11 @@ pnpm-debug.log*
 .pnp*
 .idea/
 .vscode/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Test user pool
+tests/.test-user-pool.json

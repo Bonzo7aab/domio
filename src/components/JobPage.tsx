@@ -779,7 +779,14 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   };
 
   const handleApplicationFormSubmit = async (applicationData: any) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:781',message:'handleApplicationFormSubmit entry',data:{userId:user?.id,hasSupabase:!!supabase,jobPostType:job.postType,applicationData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     if (!user?.id || !supabase) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:783',message:'missing user or supabase',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       toast.error('Musisz być zalogowany aby złożyć ofertę');
       return;
     }
@@ -814,6 +821,10 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
             errorHint: error?.hint,
           });
           
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:802',message:'tender bid error',data:{errorMessage,errorType:error?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
+          
           // Check if error is about missing company
           if (errorMessage.includes('company') || errorMessage.includes('firm') || errorMessage.includes('Contractor must have')) {
             setShowApplicationForm(false);
@@ -826,11 +837,20 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         }
 
         console.log('Tender bid submitted successfully:', data);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:829',message:'before tender success toast',data:{data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         toast.success('Oferta w przetargu została złożona pomyślnie!');
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:830',message:'after tender success toast',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         // Update state to reflect that bid has been submitted
         setHasExistingBid(true);
       } else {
         // Handle regular job application submission
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:834',message:'before createJobApplication call',data:{jobId,userId:user.id,applicationData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         const { data, error } = await createJobApplication(
           supabase,
           jobId,
@@ -842,6 +862,10 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
             additionalNotes: applicationData.additionalNotes,
           }
         );
+
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:844',message:'after createJobApplication call',data:{hasData:!!data,hasError:!!error,errorMessage:error instanceof Error ? error.message : error?.message || String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
 
         if (error) {
           // Extract error message from various error object structures
@@ -858,6 +882,10 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
             errorHint: error?.hint,
           });
           
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:846',message:'job application error',data:{errorMessage,errorType:error?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
+          
           // Check if error is about missing company
           if (errorMessage.includes('company') || errorMessage.includes('firm') || errorMessage.includes('Contractor must have')) {
             setShowApplicationForm(false);
@@ -870,7 +898,13 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         }
 
         console.log('Application submitted successfully:', data);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:873',message:'before success toast',data:{data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         toast.success('Oferta została złożona pomyślnie!');
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:874',message:'after success toast',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
       }
 
       setShowApplicationForm(false);

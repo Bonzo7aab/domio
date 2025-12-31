@@ -1045,7 +1045,7 @@ export async function createTender(
     title: string;
     description: string;
     category: string; // Category name, will be converted to category_id
-    location: string;
+    location: JobLocation | string; // Can be object or string for backward compatibility
     estimatedValue: string;
     currency: string;
     submissionDeadline: Date;
@@ -1198,6 +1198,18 @@ export async function createTender(
       // For now, we'll store metadata only
     })) : null;
 
+    // Prepare location as JSONB object (same format as jobs)
+    let locationJsonb: any;
+    if (typeof tenderData.location === 'string') {
+      // If location is a string, convert to object format
+      locationJsonb = {
+        city: tenderData.location
+      };
+    } else {
+      // If location is already an object, use it directly
+      locationJsonb = tenderData.location;
+    }
+
     // Insert tender
     const { data: insertedTender, error: insertError } = await (supabase as any)
       .from('tenders')
@@ -1207,7 +1219,7 @@ export async function createTender(
         category_id: categoryId,
         manager_id: tenderData.managerId,
         company_id: tenderData.companyId,
-        location: tenderData.location,
+        location: locationJsonb,
         address: tenderData.address || null,
         latitude: tenderData.latitude || null,
         longitude: tenderData.longitude || null,
@@ -1783,10 +1795,18 @@ export async function createJobApplication(
     additionalNotes?: string;
   }
 ): Promise<{ data: any | null; error: any }> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1775',message:'createJobApplication entry',data:{jobId,contractorId,applicationData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
   try {
     // Fetch contractor's primary company
     const { fetchUserPrimaryCompany } = await import('./companies');
     const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, contractorId);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1789',message:'after fetchUserPrimaryCompany',data:{hasCompany:!!company,hasError:!!companyError,errorMessage:companyError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     
     if (companyError) {
       console.error('Error fetching contractor company:', companyError);
@@ -1799,6 +1819,9 @@ export async function createJobApplication(
     }
     
     if (!company) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1801',message:'no company found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return { 
         data: null, 
         error: new Error('Contractor must have a company to submit applications')
@@ -1813,7 +1836,14 @@ export async function createJobApplication(
       ? applicationData.proposedPrice 
       : parseFloat(String(applicationData.proposedPrice)) || 0;
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1812',message:'price validation',data:{proposedPrice,originalPrice:applicationData.proposedPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     if (proposedPrice <= 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1816',message:'invalid price',data:{proposedPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return {
         data: null,
         error: new Error('Proposed price must be greater than 0')
@@ -1822,6 +1852,9 @@ export async function createJobApplication(
     
     // Validate required fields
     if (!applicationData.coverLetter || applicationData.coverLetter.trim().length === 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1824',message:'missing cover letter',data:{coverLetterLength:applicationData.coverLetter?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return {
         data: null,
         error: new Error('Cover letter is required')
@@ -1857,11 +1890,18 @@ export async function createJobApplication(
     });
     
     // Insert application (using type assertion since job_applications may not be in generated types)
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1881',message:'before database insert',data:{insertData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     const { data: insertedApplication, error: insertError } = await (supabase as any)
       .from('job_applications')
       .insert(insertData)
       .select()
       .single();
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1886',message:'after database insert',data:{hasData:!!insertedApplication,hasError:!!insertError,errorMessage:insertError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     
     if (insertError) {
       const error = insertError as { message?: string; details?: string; hint?: string; code?: string };
@@ -1878,6 +1918,9 @@ export async function createJobApplication(
           companyId: company.id,
         }
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1887',message:'database insert error',data:{errorMessage:error?.message,errorCode:error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return { 
         data: null, 
         error: insertError instanceof Error 
@@ -1905,9 +1948,15 @@ export async function createJobApplication(
       company_id: insertedApplication.company_id,
       status: insertedApplication.status
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1939',message:'createJobApplication success',data:{insertedApplicationId:insertedApplication?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     return { data: insertedApplication, error: null };
   } catch (err) {
     console.error('Error creating job application:', err);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1940',message:'createJobApplication exception',data:{error:String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     return { 
       data: null, 
       error: err instanceof Error 

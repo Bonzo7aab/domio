@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { TenderCreationFormInline } from './TenderCreationFormInline';
@@ -52,8 +52,18 @@ interface TenderDocument {
 }
 
 export default function TenderCreationPage({ onBack }: TenderCreationPageProps) {
-  const { user } = useUserProfile();
+  const { user, session, isLoading } = useUserProfile();
   const router = useRouter();
+  
+  // Redirect to login if not authenticated (fallback in case middleware doesn't catch it)
+  useEffect(() => {
+    if (!isLoading && !user && !session) {
+      const currentUrl = new URL(window.location.href);
+      const redirectTo = currentUrl.searchParams.get('redirectTo') || window.location.pathname;
+      const loginUrl = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
+      router.push(loginUrl);
+    }
+  }, [user, session, isLoading, router]);
 
   const handleTenderSubmit = async (tender: NewTender) => {
     if (!user?.id) {
@@ -99,6 +109,11 @@ export default function TenderCreationPage({ onBack }: TenderCreationPageProps) 
   const handleFormClose = () => {
     onBack();
   };
+
+  // Don't render if not authenticated (will redirect)
+  if (!isLoading && !user && !session) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

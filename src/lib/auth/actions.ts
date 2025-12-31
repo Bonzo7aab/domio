@@ -132,10 +132,10 @@ export async function registerAction(formData: FormData) {
   if (authData.session) {
     // User is auto-confirmed and logged in - redirect to home
     // The auth context will sync the session on the next page load
-    redirect('/?message=Konto zostało utworzone pomyślnie. Zostałeś automatycznie zalogowany.')
+    redirect(`/?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Zostałeś automatycznie zalogowany.')}`)
   } else {
     // Email confirmation required - redirect to login
-    redirect('/login?message=Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')
+    redirect(`/login?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')}`)
   }
 }
 

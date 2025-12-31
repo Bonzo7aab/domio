@@ -74,6 +74,7 @@ export function UserAccountPageClient({
   }, [isLoading]);
 
   // Redirect to login only after we've confirmed no user and no session
+  // This is a fallback in case middleware doesn't catch it (e.g., in test environment)
   React.useEffect(() => {
     // Don't redirect if still loading or if we haven't checked auth yet
     if (isLoading || !hasCheckedAuth.current) {
@@ -88,7 +89,11 @@ export function UserAccountPageClient({
 
     // Only redirect if we're sure there's no user and no session
     if (!user && !session) {
-      router.push('/login');
+      // Preserve redirectTo parameter from current URL (set by middleware) or use current pathname
+      const currentUrl = new URL(window.location.href);
+      const redirectTo = currentUrl.searchParams.get('redirectTo') || window.location.pathname;
+      const loginUrl = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
+      router.push(loginUrl);
     }
   }, [user, session, isLoading, router]);
 
