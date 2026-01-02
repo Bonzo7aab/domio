@@ -17,7 +17,7 @@ export interface CreateNotificationOptions {
   type: NotificationType;
   title: string;
   message: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   actionUrl?: string;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   expiresAt?: Date;

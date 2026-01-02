@@ -5,7 +5,7 @@ import { Eye, EyeOff, Edit2, X, Check, Lock } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { CardContent } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 
 export function PasswordForm() {
@@ -134,7 +134,7 @@ export function PasswordForm() {
         {!isEditingPassword ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Kliknij "Zmień hasło" aby zaktualizować swoje hasło.
+              Kliknij &quot;Zmień hasło&quot; aby zaktualizować swoje hasło.
             </p>
             <div className="flex items-center py-2 px-3 bg-muted rounded-md">
               <Lock className="h-4 w-4 mr-2 text-muted-foreground" />

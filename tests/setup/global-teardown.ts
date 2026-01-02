@@ -2,7 +2,7 @@ import { FullConfig } from '@playwright/test';
 import { cleanupTestUsers } from '../helpers/auth-helpers';
 import { cleanupPool } from '../helpers/test-user-pool';
 
-async function globalTeardown(config: FullConfig) {
+async function globalTeardown(_config: FullConfig) {
   console.log('Running global teardown...');
 
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;

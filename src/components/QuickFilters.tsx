@@ -18,7 +18,7 @@ import {
 interface QuickFilter {
   id: string;
   label: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
   color: 'default' | 'primary' | 'success' | 'warning' | 'destructive';
   count: number;
   description: string;

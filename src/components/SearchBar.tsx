@@ -19,7 +19,7 @@ interface SavedSearch {
   id: string;
   name: string;
   query: string;
-  filters?: any;
+  filters?: Record<string, unknown>;
   createdAt: Date;
   notificationsEnabled: boolean;
 }
@@ -307,7 +307,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             {value && filteredSuggestions.length === 0 && (
               <div className="p-4 text-center text-muted-foreground">
                 <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Brak sugestii dla "{value}"</p>
+                <p className="text-sm">Brak sugestii dla &quot;{value}&quot;</p>
                 <p className="text-xs mt-1">Spróbuj innych słów kluczowych</p>
               </div>
             )}

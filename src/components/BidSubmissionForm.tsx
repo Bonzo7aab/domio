@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
@@ -12,20 +11,14 @@ import { Progress } from './ui/progress';
 import { 
   Upload, 
   X, 
-  Plus, 
-  Minus,
   FileText, 
-  Image, 
   AlertCircle, 
   CheckCircle,
   Calculator,
-  Calendar,
   Clock,
   Shield,
   Award,
-  DollarSign,
-  Download,
-  Eye
+  DollarSign
 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -108,7 +101,7 @@ export const BidSubmissionForm: React.FC<BidSubmissionFormProps> = ({
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
 
-  const [formData, setFormData] = useState<NewBid>({
+  const [formData, setFormData] = useState<NewBid>(() => ({
     tenderId,
     contractorId: user?.id || '',
     totalPrice: 0,
@@ -129,7 +122,7 @@ export const BidSubmissionForm: React.FC<BidSubmissionFormProps> = ({
     })),
     acceptTerms: false,
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
-  });
+  }));
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -191,7 +184,7 @@ export const BidSubmissionForm: React.FC<BidSubmissionFormProps> = ({
       const attachment: BidAttachment = {
         id: `attachment-${Date.now()}-${Math.random()}`,
         name: file.name,
-        type: type as any,
+        type: type as BidAttachment['type'],
         file,
         description: ''
       };

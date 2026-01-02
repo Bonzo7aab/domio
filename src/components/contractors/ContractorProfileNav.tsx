@@ -15,7 +15,7 @@ interface ContractorProfileNavProps {
   contractorId: string;
 }
 
-export function ContractorProfileNav({ contractorId }: ContractorProfileNavProps) {
+export function ContractorProfileNav({ contractorId: _contractorId }: ContractorProfileNavProps) {
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
@@ -38,7 +38,10 @@ export function ContractorProfileNav({ contractorId }: ContractorProfileNavProps
     if (!window.location.hash) {
       // Use replaceState to avoid adding to history
       window.history.replaceState(null, '', '#overview');
-      setActiveTab('overview');
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setActiveTab('overview');
+      }, 0);
     } else {
       handleHashChange();
     }

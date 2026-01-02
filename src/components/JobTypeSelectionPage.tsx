@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowLeft, FileText, Gavel, Clock, Users, Star, Shield, CheckCircle, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
 
 interface JobTypeSelectionPageProps {
   onBack: () => void;
@@ -34,6 +35,20 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Banner for missing company data */}
+        {userType === 'manager' && hasCompany === false && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-amber-700">
+                  Najpierw musisz <Link href="/account?tab=company" className="text-blue-700 underline">dodać dane firmy w profilu</Link>, aby móc tworzyć zlecenia i przetargi.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Zlecenie Card */}
@@ -56,7 +71,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li>• Prace konserwacyjne i utrzymaniowe</li>
                   <li>• Sprzątanie i utrzymanie czystości</li>
-                  <li>• Małe naprawy i remonty (do 10,000 zł)</li>
+                  <li>• Małe naprawy i remonty (do 10,000&nbsp;zł)</li>
                   <li>• Pilne interwencje (awarie, usterki)</li>
                   <li>• Sezonowe prace (odśnieżanie, koszenie)</li>
                 </ul>
@@ -100,17 +115,9 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                   Ładowanie...
                 </Button>
               ) : userType === 'manager' && hasCompany === false ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-sm text-amber-700">
-                      <AlertCircle className="w-4 h-4 inline mr-1" />
-                      Najpierw musisz dodać dane firmy w profilu
-                    </p>
-                  </div>
-                  <Button onClick={onSelectJob} className="w-full" size="lg">
-                    Dodaj dane firmy
-                  </Button>
-                </div>
+                <Button disabled className="w-full" size="lg">
+                  Stwórz zlecenie
+                </Button>
               ) : (
                 <Button onClick={onSelectJob} className="w-full" size="lg">
                   Stwórz zlecenie
@@ -137,7 +144,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                   Idealne dla:
                 </h3>
                 <ul className="space-y-2 text-sm text-gray-600">
-                  <li>• Duże remonty i modernizacje (powyżej 10,000 zł)</li>
+                  <li>• Duże remonty i modernizacje (powyżej 10,000&nbsp;zł)</li>
                   <li>• Wymiana wind, instalacji</li>
                   <li>• Termomodernizacje budynków</li>
                   <li>• Prace wymagające specjalistów</li>
@@ -215,17 +222,9 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                   </Button>
                 </div>
               ) : hasCompany === false ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-sm text-amber-700">
-                      <AlertCircle className="w-4 h-4 inline mr-1" />
-                      Najpierw musisz dodać dane firmy w profilu
-                    </p>
-                  </div>
-                  <Button onClick={onSelectTender} className="w-full" size="lg" variant="outline">
-                    Dodaj dane firmy
-                  </Button>
-                </div>
+                <Button disabled className="w-full" size="lg" variant="outline">
+                  Utwórz przetarg
+                </Button>
               ) : (
                 <Button onClick={onSelectTender} className="w-full" size="lg" variant="outline">
                   Utwórz przetarg

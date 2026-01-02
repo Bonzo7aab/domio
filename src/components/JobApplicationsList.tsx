@@ -39,7 +39,7 @@ interface JobApplicationsListProps {
 }
 
 export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
-  jobId,
+  jobId: _jobId,
   jobTitle,
   jobBudget,
   applications,
@@ -204,7 +204,7 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                 <p className="text-gray-500">
                   {selectedTab === 'all' 
                     ? 'Nie otrzymano jeszcze żadnych ofert na to zlecenie.'
-                    : `Brak ofert o statusie \"${selectedTab}\".`
+                    : `Brak ofert o statusie "${selectedTab}".`
                   }
                 </p>
               </CardContent>

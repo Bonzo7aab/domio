@@ -9,7 +9,7 @@ import { Progress } from './ui/progress';
 import { fetchContractorById, fetchContractorReviews, fetchContractorRatingSummary, fetchContractorPortfolio } from '../lib/database/contractors';
 import { createClient } from '../lib/supabase/client';
 import { QuoteRequestModal } from './QuoteRequestModal';
-import { ServicePricing } from '../types/contractor';
+import { ServicePricing, ContractorProfile } from '../types/contractor';
 import { getCategoryLabel } from './contractor-dashboard/shared/utils';
 
 interface ContractorProfilePageProps {
@@ -40,7 +40,7 @@ const formatServicePrice = (pricing: ServicePricing | undefined): string => {
 };
 
 // Convert detailed contractor profile to page format
-const convertContractorToPageFormat = (contractor: any) => {
+const convertContractorToPageFormat = (contractor: Record<string, unknown>) => {
   if (!contractor) return null;
 
   // Get all unique services from all categories
@@ -130,10 +130,10 @@ const convertContractorToPageFormat = (contractor: any) => {
 
 export default function ContractorProfilePage({ contractorId, onBack }: ContractorProfilePageProps) {
   const [activeTab, setActiveTab] = useState('overview');
-  const [contractor, setContractor] = useState<any>(null);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [ratingSummary, setRatingSummary] = useState<any>(null);
-  const [portfolio, setPortfolio] = useState<any[]>([]);
+  const [contractor, setContractor] = useState<ContractorProfile | null>(null);
+  const [reviews, setReviews] = useState<ContractorProfile['reviews']>([]);
+  const [ratingSummary, setRatingSummary] = useState<ContractorProfile['rating'] | null>(null);
+  const [portfolio, setPortfolio] = useState<ContractorProfile['portfolio']['featuredProjects']>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
@@ -142,7 +142,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
   useEffect(() => {
     async function loadContractor() {
       try {
-        const supabase = createClient();
+        const _supabase = createClient();
         const contractorData = await fetchContractorById(contractorId);
         
         if (contractorData) {
@@ -417,7 +417,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
         {activeTab === 'services' && (
           <div id="services" className="scroll-mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {contractor.services.map((service: any, index: number) => (
+              {((contractor.services as Array<Record<string, unknown>>) || []).map((service: Record<string, unknown>, index: number) => (
                 <Card key={index}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-sm sm:text-base">
@@ -455,6 +455,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                       <Card key={project.id} className="overflow-hidden">
                         <div className="aspect-video bg-gray-200 rounded-t-lg overflow-hidden">
                           {project.images.length > 0 ? (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img 
                               src={project.images[0]} 
                               alt={project.title}
@@ -499,7 +500,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                           
                           {project.clientFeedback && (
                             <div className="bg-gray-50 p-3 rounded-lg">
-                              <p className="text-sm text-gray-700 italic">"{project.clientFeedback}"</p>
+                              <p className="text-sm text-gray-700 italic">&quot;{project.clientFeedback}&quot;</p>
                               {project.clientName && (
                                 <p className="text-xs text-gray-500 mt-1">- {project.clientName}</p>
                               )}
@@ -527,7 +528,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
         {activeTab === 'team' && (
           <div id="team" className="scroll-mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {contractor.team.map((member: any, index: number) => (
+              {((contractor.team as Array<Record<string, unknown>>) || []).map((member: Record<string, unknown>, index: number) => (
                 <Card key={index}>
                   <CardContent className="pt-4 sm:pt-6 text-center">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 rounded-full bg-primary/10 flex items-center justify-center">
@@ -632,7 +633,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
               ) : (
                 <div className="space-y-4">
                   {reviews.length > 0 ? (
-                    reviews.map((review: any, index: number) => (
+                    reviews.map((review: Record<string, unknown>, index: number) => (
                       <Card key={review.id || index}>
                         <CardContent className="pt-6">
                           <div className="flex items-start justify-between mb-4">

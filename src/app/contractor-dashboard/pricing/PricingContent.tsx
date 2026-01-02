@@ -2,7 +2,6 @@
 
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { createClient } from '../../../lib/supabase/client';
 import { fetchContractorById } from '../../../lib/database/contractors';
 import { Card, CardContent } from '../../../components/ui/card';
 import ServicePricingManager from '../../../components/ServicePricingManager';

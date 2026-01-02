@@ -16,7 +16,7 @@ import { useEffect, useState, useRef } from 'react';
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
-import { getManagerById, mockApplications } from '../mocks';
+import { getManagerById } from '../mocks';
 import { createClient } from '../lib/supabase/client';
 import { createTender, updateTender, fetchTenderById, fetchJobApplicationsByJobId, fetchJobById, fetchTenderBidsByTenderId } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany, type CompanyData } from '../lib/database/companies';
@@ -26,9 +26,7 @@ import type { Building } from '../types/building';
 import { BUILDING_TYPE_OPTIONS } from '../types/building';
 import { toast } from 'sonner';
 import { formatBudget, budgetFromDatabase } from '../types/budget';
-import type { Budget } from '../types/budget';
 import BidEvaluationPanel from './BidEvaluationPanel';
-import JobApplicationsList from './JobApplicationsList';
 import TenderCreationForm from './TenderCreationForm';
 import TenderSystem from './TenderSystem';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -71,11 +69,11 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   // Track client-side mount to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
   // Applications state
-  const [applications, setApplications] = useState<any[]>([]);
+  const [applications, setApplications] = useState<Array<{ id: string; contractor_id: string; job_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
   const [isLoadingApplications, setIsLoadingApplications] = useState(false);
   const [selectedJobData, setSelectedJobData] = useState<{ title: string; budget: string } | null>(null);
   // Tender bids state
-  const [tenderBids, setTenderBids] = useState<any[]>([]);
+  const [tenderBids, setTenderBids] = useState<Array<{ id: string; contractor_id: string; tender_id: string; proposed_price: number; proposed_timeline: string; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
   const [isLoadingTenderBids, setIsLoadingTenderBids] = useState(false);
   const [selectedTenderData, setSelectedTenderData] = useState<{ title: string } | null>(null);
   // Job details dialog state
@@ -207,7 +205,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     phone: user?.phone || "+48 123 456 789",
     email: user?.email || "kontakt@example.pl",
     avatar: "",
-    managerName: `${user?.firstName} ${user?.lastName}` || "Imię Nazwisko",
+    managerName: (user?.firstName && user?.lastName) ? `${user.firstName} ${user.lastName}` : "Imię Nazwisko",
     managerPosition: "Zarządca",
     license: "Brak licencji",
     experience: "Brak danych",
@@ -511,7 +509,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
           .limit(5);
         
         // Format jobs for display
-        const formattedJobs = (jobsData || []).map((job: any) => {
+        const formattedJobs = (jobsData || []).map((job: JobWithCompany) => {
           const location = typeof job.location === 'string' 
             ? job.location 
             : job.location?.city || 'Nieznana lokalizacja';
@@ -622,12 +620,12 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         }
 
         // Get all job IDs to count applications
-        const jobIds = (jobsData || []).map((job: any) => job.id);
+        const jobIds = (jobsData || []).map((job: JobWithCompany) => job.id);
 
         // Count applications for each job (all statuses)
         const applicationCounts: { [key: string]: number } = {};
         if (jobIds.length > 0) {
-          const { data: applicationsData } = await (supabase as any)
+          const { data: applicationsData } = await supabase
             .from('job_applications')
             .select('job_id')
             .in('job_id', jobIds);
@@ -646,7 +644,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         const { budgetFromDatabase } = await import('../types/budget');
 
         // Format jobs for display
-        const formattedJobs = (jobsData || []).map((job: any) => {
+        const formattedJobs = (jobsData || []).map((job: JobWithCompany) => {
           const location = typeof job.location === 'string' 
             ? job.location 
             : job.location?.city || 'Nieznana lokalizacja';
@@ -781,7 +779,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     }
   };
 
-  const handleTenderSubmit = async (tender: any, tenderId?: string) => {
+  const handleTenderSubmit = async (tender: Record<string, unknown>, tenderId?: string) => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby utworzyć przetarg');
       return;
@@ -1330,7 +1328,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                   <h3 className="text-lg font-medium mb-2">Brak zarejestrowanych budynków</h3>
                   <p className="text-gray-600 mb-4">Nie posiadasz jeszcze zarejestrowanych budynków w portfolio.</p>
                   <p className="text-sm text-gray-500">
-                    Przejdź do sekcji "Firma" w ustawieniach konta, aby dodać budynki.
+                    Przejdź do sekcji &quot;Firma&quot; w ustawieniach konta, aby dodać budynki.
                   </p>
                 </CardContent>
               </Card>
@@ -1374,7 +1372,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                               <Badge variant="outline" className="text-xs">{contractor.currentJob}</Badge>
                             </div>
                             <p className="text-xs md:text-sm text-gray-500 mt-2">
-                              Kliknij "Zobacz profil", aby zobaczyć portfolio wykonawcy
+                              Kliknij &quot;Zobacz profil&quot;, aby zobaczyć portfolio wykonawcy
                             </p>
                           </div>
                           <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">

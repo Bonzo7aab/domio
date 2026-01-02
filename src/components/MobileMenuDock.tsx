@@ -21,7 +21,6 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from './ui/drawer';
 import { FloatingDock, type FloatingDockItem } from './ui/floating-dock';
 import { useUserProfile } from '../contexts/AuthContext';

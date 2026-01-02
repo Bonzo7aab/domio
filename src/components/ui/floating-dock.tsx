@@ -144,7 +144,7 @@ function IconContainer({
   href,
   onClick,
 }: {
-  mouseX: any;
+  mouseX: number | null;
   title: string;
   icon: React.ReactNode;
   href?: string;

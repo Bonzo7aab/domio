@@ -1,6 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
-import type { Budget, BudgetInput, BudgetDatabase } from '../../types/budget';
+import type { Budget, BudgetInput } from '../../types/budget';
 import { budgetFromDatabase, budgetToDatabase, formatBudget } from '../../types/budget';
 
 export interface JobFilters {
@@ -101,8 +101,8 @@ export interface TenderWithCompany {
   project_duration: string | null;
   is_public: boolean;
   requirements: string[] | null;
-  evaluation_criteria: any;
-  phases: any;
+  evaluation_criteria: Record<string, unknown> | null;
+  phases: Record<string, unknown> | null;
   current_phase: string | null;
   wadium: number | null;
   bids_count: number;
@@ -127,7 +127,7 @@ export interface TenderWithCompany {
 export async function fetchJobs(
   supabase: SupabaseClient<Database>,
   filters: JobFilters = {}
-): Promise<{ data: JobWithCompany[] | null; error: any }> {
+): Promise<{ data: JobWithCompany[] | null; error: PostgrestError | null }> {
   try {
     let query = supabase
       .from('jobs')
@@ -144,7 +144,7 @@ export async function fetchJobs(
           slug
         )
       `)
-      .eq('status', (filters.status || 'active') as any)
+      .eq('status', filters.status || 'active')
       .eq('is_public', true);
 
     // Apply filters
@@ -281,10 +281,10 @@ export async function fetchJobs(
 
     // Calculate applications_count dynamically if not already accurate
     if (data && data.length > 0) {
-      const jobIds = data.map((job: any) => job.id);
+      const jobIds = data.map((job: JobWithCompany) => job.id);
       
       // Fetch counts for all jobs at once
-      const { data: countsData, error: countsError } = await (supabase as any)
+      const { data: countsData, error: countsError } = await supabase
         .from('job_applications')
         .select('job_id')
         .in('job_id', jobIds);
@@ -292,18 +292,18 @@ export async function fetchJobs(
       if (!countsError && countsData) {
         // Count applications per job
         const countsMap: { [key: string]: number } = {};
-        countsData.forEach((app: any) => {
+        countsData.forEach((app: { job_id: string }) => {
           countsMap[app.job_id] = (countsMap[app.job_id] || 0) + 1;
         });
 
         // Update applications_count for each job
-        data.forEach((job: any) => {
+        data.forEach((job: JobWithCompany) => {
           job.applications_count = countsMap[job.id] || 0;
         });
       }
     }
 
-    return { data: data as any, error };
+    return { data: data as JobWithCompany[], error };
   } catch (err) {
     console.error('Error fetching jobs:', err);
     return { data: null, error: err };
@@ -317,10 +317,10 @@ export async function fetchTenders(
   supabase: SupabaseClient<Database>,
   filters: JobFilters = {},
   managerId?: string // If provided, include manager's drafts even if not public
-): Promise<{ data: TenderWithCompany[] | null; error: any }> {
+): Promise<{ data: TenderWithCompany[] | null; error: PostgrestError | null }> {
   try {
     // Type assertion needed as tenders table may not be in generated types yet
-    let query = (supabase as any)
+    let query = supabase
       .from('tenders')
       .select(`
         *,
@@ -360,11 +360,11 @@ export async function fetchTenders(
 
     // Apply filters (using any to avoid type issues with tenders table)
     if (filters.categories && filters.categories.length > 0) {
-      query = query.in('category_id' as any, filters.categories);
+      query = query.in('category_id', filters.categories);
     }
 
     if (filters.locations && filters.locations.length > 0) {
-      query = query.in('location' as any, filters.locations);
+      query = query.in('location', filters.locations);
     }
 
     if (filters.searchQuery) {
@@ -426,17 +426,17 @@ export async function fetchTenders(
       
       // Apply the date filter - tenders created_at >= earliestDate
       if (earliestDate) {
-        query = query.gte('created_at' as any, earliestDate.toISOString());
+        query = query.gte('created_at', earliestDate.toISOString());
       }
     }
 
     // Apply bounds filtering (geographic bounds)
     if (filters.bounds) {
       query = query
-        .gte('latitude' as any, filters.bounds.south)
-        .lte('latitude' as any, filters.bounds.north)
-        .gte('longitude' as any, filters.bounds.west)
-        .lte('longitude' as any, filters.bounds.east);
+        .gte('latitude', filters.bounds.south)
+        .lte('latitude', filters.bounds.north)
+        .gte('longitude', filters.bounds.west)
+        .lte('longitude', filters.bounds.east);
     }
 
     // Apply sorting
@@ -478,10 +478,10 @@ export async function fetchTenders(
 
     // Calculate bids_count dynamically if not already accurate
     if (data && data.length > 0) {
-      const tenderIds = data.map((tender: any) => tender.id);
+      const tenderIds = data.map((tender: TenderWithCompany) => tender.id);
       
       // Fetch counts for all tenders at once
-      const { data: countsData, error: countsError } = await (supabase as any)
+      const { data: countsData, error: countsError } = await supabase
         .from('tender_bids')
         .select('tender_id')
         .in('tender_id', tenderIds);
@@ -489,18 +489,18 @@ export async function fetchTenders(
       if (!countsError && countsData) {
         // Count bids per tender
         const countsMap: { [key: string]: number } = {};
-        countsData.forEach((bid: any) => {
+        countsData.forEach((bid: { tender_id: string }) => {
           countsMap[bid.tender_id] = (countsMap[bid.tender_id] || 0) + 1;
         });
 
         // Update bids_count for each tender
-        data.forEach((tender: any) => {
+        data.forEach((tender: TenderWithCompany) => {
           tender.bids_count = countsMap[tender.id] || 0;
         });
       }
     }
 
-    return { data: data as any, error };
+    return { data: data as JobWithCompany[], error };
   } catch (err) {
     console.error('Exception fetching tenders:', err);
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -690,7 +690,7 @@ export async function fetchJobsAndTenders(
 export async function fetchJobById(
   supabase: SupabaseClient<Database>,
   jobId: string
-): Promise<{ data: JobWithCompany | null; error: any }> {
+): Promise<{ data: JobWithCompany | null; error: PostgrestError | null }> {
   try {
     const { data, error } = await supabase
       .from('jobs')
@@ -713,7 +713,7 @@ export async function fetchJobById(
     // Handle "not found" error (PGRST116) as a normal case, not an error
     if (error) {
       // Check for PGRST116 in multiple ways since error structure can vary
-      const errorCode = (error as any).code || error?.code;
+      const errorCode = (error as PostgrestError).code || error?.code;
       if (errorCode === 'PGRST116' || error.message?.includes('0 rows') || error.message?.includes('single JSON object')) {
         // Job not found - this is expected, not an error
         return { data: null, error: null };
@@ -728,7 +728,7 @@ export async function fetchJobById(
     }
 
     // Calculate applications_count dynamically if job exists
-    const { count, error: countsError } = await (supabase as any)
+    const { count, error: countsError } = await supabase
       .from('job_applications')
       .select('*', { count: 'exact', head: true })
       .eq('job_id', jobId);
@@ -737,9 +737,9 @@ export async function fetchJobById(
       data.applications_count = count;
     }
 
-    return { data: data as any, error: null };
+    return { data: data as number, error: null };
   } catch (err) {
-    const error = err as any;
+    const error = err as PostgrestError | Error;
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = error?.code || error?.error?.code;
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
@@ -756,10 +756,10 @@ export async function fetchJobById(
 export async function fetchTenderById(
   supabase: SupabaseClient<Database>,
   tenderId: string
-): Promise<{ data: TenderWithCompany | null; error: any }> {
+): Promise<{ data: TenderWithCompany | null; error: PostgrestError | null }> {
   try {
     // Type assertion needed as tenders table may not be in generated types yet
-    const result = await (supabase as any)
+    const result = await supabase
       .from('tenders')
       .select(`
         *,
@@ -795,7 +795,7 @@ export async function fetchTenderById(
     }
 
     // Calculate bids_count dynamically if tender exists
-    const { count, error: countsError } = await (supabase as any)
+    const { count, error: countsError } = await supabase
       .from('tender_bids')
       .select('*', { count: 'exact', head: true })
       .eq('tender_id', tenderId);
@@ -804,9 +804,9 @@ export async function fetchTenderById(
       result.data.bids_count = count;
     }
 
-    return { data: result.data as any, error: null };
+    return { data: result.data as TenderWithCompany, error: null };
   } catch (err) {
-    const error = err as any;
+    const error = err as PostgrestError | Error;
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = error?.code || error?.error?.code;
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
@@ -823,7 +823,7 @@ export async function fetchTenderById(
 export async function incrementJobViews(
   supabase: SupabaseClient<Database>,
   jobId: string
-): Promise<{ data: { views_count: number } | null; error: any }> {
+): Promise<{ data: { views_count: number } | null; error: PostgrestError | null }> {
   try {
     // Fetch current views_count
     const { data: currentJob, error: fetchError } = await supabase
@@ -833,7 +833,7 @@ export async function incrementJobViews(
       .single();
 
     // Handle "not found" error (PGRST116) - job doesn't exist
-    if (fetchError && (fetchError as any).code === 'PGRST116') {
+      if (fetchError && (fetchError as PostgrestError).code === 'PGRST116') {
       return { data: null, error: new Error('Job not found') };
     }
 
@@ -870,10 +870,10 @@ export async function incrementJobViews(
 export async function incrementTenderViews(
   supabase: SupabaseClient<Database>,
   tenderId: string
-): Promise<{ data: { views_count: number } | null; error: any }> {
+): Promise<{ data: { views_count: number } | null; error: PostgrestError | null }> {
   try {
     // Fetch current views_count
-    const { data: currentTender, error: fetchError } = await (supabase as any)
+    const { data: currentTender, error: fetchError } = await supabase
       .from('tenders')
       .select('views_count')
       .eq('id', tenderId)
@@ -895,7 +895,7 @@ export async function incrementTenderViews(
     const newViewsCount = (currentTender.views_count || 0) + 1;
 
     // Increment and update
-    const { error: updateError } = await (supabase as any)
+    const { error: updateError } = await supabase
       .from('tenders')
       .update({ views_count: newViewsCount })
       .eq('id', tenderId);
@@ -1051,8 +1051,8 @@ export async function createTender(
     submissionDeadline: Date;
     evaluationDeadline: Date;
     requirements: string[];
-    evaluationCriteria: any[];
-    documents?: any[];
+    evaluationCriteria: Array<Record<string, unknown>>;
+    documents?: Array<Record<string, unknown>>;
     isPublic: boolean;
     allowQuestions: boolean;
     questionsDeadline?: Date;
@@ -1069,7 +1069,7 @@ export async function createTender(
     longitude?: number;
     projectDuration?: string;
   }
-): Promise<{ data: TenderWithCompany | null; error: any }> {
+): Promise<{ data: TenderWithCompany | null; error: PostgrestError | null }> {
   try {
     // Map form category names to database category names
     const categoryMapping: Record<string, string> = {
@@ -1094,13 +1094,14 @@ export async function createTender(
     // Check if this is a custom category (not in predefined list)
     const isCustomCategory = !predefinedCategories.includes(tenderData.category);
     
-    let categoryData: any = null;
-    let categoryError: any = null;
+    let categoryData: { id: string; name: string; slug: string } | null = null;
+    let categoryError: PostgrestError | null = null;
 
     // For custom categories, try to find/create category with the exact custom name first
     // For predefined categories, use the mapped name
     if (isCustomCategory) {
       // First, try exact match with the custom category name (case-insensitive)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: customMatch, error: customError } = await (supabase as any)
         .from('job_categories')
         .select('id, name')
@@ -1113,7 +1114,7 @@ export async function createTender(
         categoryError = null;
       } else {
         // If custom category doesn't exist, try partial match
-        const { data: partialCustomMatch, error: partialCustomError } = await (supabase as any)
+        const { data: partialCustomMatch, error: partialCustomError } = await supabase
           .from('job_categories')
           .select('id, name')
           .ilike('name', `%${tenderData.category}%`)
@@ -1134,7 +1135,7 @@ export async function createTender(
         (isCustomCategory ? 'Zarządzanie Nieruchomościami' : tenderData.category);
 
       // Try exact match with mapped name
-      const { data: mappedMatch, error: mappedError } = await (supabase as any)
+      const { data: mappedMatch, error: mappedError } = await supabase
         .from('job_categories')
         .select('id, name')
         .ilike('name', searchCategoryName)
@@ -1146,7 +1147,7 @@ export async function createTender(
         categoryError = null;
       } else {
         // If exact match fails, try partial match
-        const { data: partialMatch, error: partialError } = await (supabase as any)
+        const { data: partialMatch, error: partialError } = await supabase
           .from('job_categories')
           .select('id, name')
           .ilike('name', `%${searchCategoryName}%`)
@@ -1169,7 +1170,7 @@ export async function createTender(
       });
       
       // Try to get all available categories for debugging
-      const { data: allCategories } = await (supabase as any)
+      const { data: allCategories } = await supabase
         .from('job_categories')
         .select('name, slug')
         .eq('is_active', true)
@@ -1179,7 +1180,7 @@ export async function createTender(
       
       return { 
         data: null, 
-        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: any) => c.name).join(', ') || 'none'}`) 
+        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) 
       };
     }
 
@@ -1199,7 +1200,7 @@ export async function createTender(
     })) : null;
 
     // Prepare location as JSONB object (same format as jobs)
-    let locationJsonb: any;
+    let locationJsonb: { city: string; sublocality_level_1?: string };
     if (typeof tenderData.location === 'string') {
       // If location is a string, convert to object format
       locationJsonb = {
@@ -1211,7 +1212,7 @@ export async function createTender(
     }
 
     // Insert tender
-    const { data: insertedTender, error: insertError } = await (supabase as any)
+    const { data: insertedTender, error: insertError } = await supabase
       .from('tenders')
       .insert({
         title: tenderData.title,
@@ -1272,7 +1273,7 @@ export async function createTender(
       };
     }
 
-    return { data: insertedTender as any, error: null };
+    return { data: insertedTender as TenderWithCompany, error: null };
   } catch (err) {
     console.error('Error creating tender:', err);
     return { data: null, error: err };
@@ -1296,8 +1297,8 @@ export async function updateTender(
     submissionDeadline: Date;
     evaluationDeadline: Date;
     requirements: string[];
-    evaluationCriteria: any[];
-    documents?: any[];
+    evaluationCriteria: Array<Record<string, unknown>>;
+    documents?: Array<Record<string, unknown>>;
     isPublic: boolean;
     allowQuestions: boolean;
     questionsDeadline?: Date;
@@ -1312,10 +1313,10 @@ export async function updateTender(
     longitude?: number;
     projectDuration?: string;
   }
-): Promise<{ data: TenderWithCompany | null; error: any }> {
+): Promise<{ data: TenderWithCompany | null; error: PostgrestError | null }> {
   try {
     // First, verify the tender exists and is in draft status
-    const { data: existingTender, error: fetchError } = await (supabase as any)
+    const { data: existingTender, error: fetchError } = await supabase
       .from('tenders')
       .select('id, status')
       .eq('id', tenderId)
@@ -1348,7 +1349,7 @@ export async function updateTender(
     const searchCategoryName = categoryMapping[tenderData.category] || tenderData.category;
 
     // First, try exact match (case-insensitive)
-    let { data: categoryData, error: categoryError } = await (supabase as any)
+    let { data: categoryData, error: categoryError } = await supabase
       .from('job_categories')
       .select('id, name')
       .ilike('name', searchCategoryName)
@@ -1357,7 +1358,7 @@ export async function updateTender(
 
     // If exact match fails, try partial match
     if (categoryError || !categoryData) {
-      const { data: partialMatch, error: partialError } = await (supabase as any)
+      const { data: partialMatch, error: partialError } = await supabase
         .from('job_categories')
         .select('id, name')
         .ilike('name', `%${searchCategoryName}%`)
@@ -1373,7 +1374,7 @@ export async function updateTender(
 
     // If still no match, try searching with the original category name
     if (categoryError || !categoryData) {
-      const { data: originalMatch, error: originalError } = await (supabase as any)
+      const { data: originalMatch, error: originalError } = await supabase
         .from('job_categories')
         .select('id, name')
         .ilike('name', `%${tenderData.category}%`)
@@ -1395,7 +1396,7 @@ export async function updateTender(
       });
       
       // Try to get all available categories for debugging
-      const { data: allCategories } = await (supabase as any)
+      const { data: allCategories } = await supabase
         .from('job_categories')
         .select('name, slug')
         .eq('is_active', true)
@@ -1405,7 +1406,7 @@ export async function updateTender(
       
       return { 
         data: null, 
-        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: any) => c.name).join(', ') || 'none'}`) 
+        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) 
       };
     }
 
@@ -1421,7 +1422,7 @@ export async function updateTender(
     })) : null;
 
     // Update tender
-    const { data: updatedTender, error: updateError } = await (supabase as any)
+    const { data: updatedTender, error: updateError } = await supabase
       .from('tenders')
       .update({
         title: tenderData.title,
@@ -1465,7 +1466,7 @@ export async function updateTender(
       return { data: null, error: updateError };
     }
 
-    return { data: updatedTender as any, error: null };
+    return { data: updatedTender as TenderWithCompany, error: null };
   } catch (err) {
     console.error('Error updating tender:', err);
     return { data: null, error: err };
@@ -1511,7 +1512,7 @@ export async function createJob(
     managerId: string; // User profile ID
     companyId: string; // Company ID
   }
-): Promise<{ data: JobWithCompany | null; error: any }> {
+): Promise<{ data: JobWithCompany | null; error: PostgrestError | null }> {
   try {
     // Map form category names to database category names
     const categoryMapping: Record<string, string> = {
@@ -1584,7 +1585,7 @@ export async function createJob(
       
       return { 
         data: null, 
-        error: new Error(`Category "${jobData.category}" not found. Available categories: ${allCategories?.map((c: any) => c.name).join(', ') || 'none'}`) 
+        error: new Error(`Category "${jobData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) 
       };
     }
 
@@ -1610,7 +1611,7 @@ export async function createJob(
     const budgetDb = budgetToDatabase(budgetInput);
 
     // Prepare location as JSONB object
-    let locationJsonb: any;
+    let locationJsonb: { city: string; sublocality_level_1?: string } | null;
     if (typeof jobData.location === 'string') {
       // If location is a string, convert to object format
       locationJsonb = {
@@ -1700,6 +1701,7 @@ export async function createJob(
       return { data: null, error: insertError };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return { data: insertedJob as any, error: null };
   } catch (err) {
     console.error('Error creating job:', err);
@@ -1794,7 +1796,7 @@ export async function createJobApplication(
     coverLetter: string;
     additionalNotes?: string;
   }
-): Promise<{ data: any | null; error: any }> {
+): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1775',message:'createJobApplication entry',data:{jobId,contractorId,applicationData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
@@ -1862,7 +1864,7 @@ export async function createJobApplication(
     }
     
     // Prepare insert data
-    const insertData: any = {
+    const insertData: Record<string, unknown> = {
       job_id: jobId,
       contractor_id: contractorId,
       company_id: company.id,
@@ -1893,7 +1895,7 @@ export async function createJobApplication(
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1881',message:'before database insert',data:{insertData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
-    const { data: insertedApplication, error: insertError } = await (supabase as any)
+    const { data: insertedApplication, error: insertError } = await supabase
       .from('job_applications')
       .insert(insertData)
       .select()
@@ -1972,10 +1974,10 @@ export async function createJobApplication(
 export async function fetchJobApplicationsByJobId(
   supabase: SupabaseClient<Database>,
   jobId: string
-): Promise<{ data: any[] | null; error: any }> {
+): Promise<{ data: Record<string, unknown>[] | null; error: PostgrestError | null }> {
   try {
     // Use type assertion since job_applications may not be in generated types
-    const { data: applications, error } = await (supabase as any)
+    const { data: applications, error } = await supabase
       .from('job_applications')
       .select(`
         id,
@@ -2017,7 +2019,7 @@ export async function fetchJobApplicationsByJobId(
     
     // Transform to Application type format
     const formattedApplications = await Promise.all(
-      ((applications || []) as any[]).map(async (app: any) => {
+      ((applications || []) as Record<string, unknown>[]).map(async (app: Record<string, unknown>) => {
         // Fetch contractor profile for additional data (rating, completed jobs, location)
         const { fetchContractorById } = await import('./contractors');
         const contractorProfile = await fetchContractorById(app.company?.id || '');
@@ -2056,7 +2058,7 @@ export async function fetchJobApplicationsByJobId(
           teamSize: app.team_size || 1,
           availableFrom: app.available_from || new Date().toISOString(),
           guaranteePeriod: app.guarantee_period ? `${app.guarantee_period} miesięcy` : '12 miesięcy',
-          attachments: (app.attachments as any) || [],
+          attachments: (app.attachments as Array<Record<string, unknown>>) || [],
           certificates: (app.certificates as string[]) || [],
           status: (app.status as 'submitted' | 'under_review' | 'accepted' | 'rejected') || 'submitted',
           submittedAt: new Date(app.submitted_at),
@@ -2086,7 +2088,7 @@ export async function createTenderBid(
     coverLetter: string;
     additionalNotes?: string;
   }
-): Promise<{ data: any | null; error: any }> {
+): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
   try {
     // Fetch contractor's primary company
     const { fetchUserPrimaryCompany } = await import('./companies');
@@ -2110,7 +2112,7 @@ export async function createTenderBid(
     }
     
     // Check if a non-cancelled bid already exists for this tender and company
-    const { data: existingBids, error: checkError } = await (supabase as any)
+    const { data: existingBids, error: checkError } = await supabase
       .from('tender_bids')
       .select('id, status')
       .eq('tender_id', tenderId)
@@ -2137,7 +2139,7 @@ export async function createTenderBid(
     const proposedTimeline = convertEstimatedCompletionToDays(bidData.estimatedCompletion);
     
     // Prepare insert data
-    const insertData: any = {
+    const insertData: Record<string, unknown> = {
       tender_id: tenderId,
       contractor_id: contractorId,
       company_id: company.id,
@@ -2154,7 +2156,7 @@ export async function createTenderBid(
     }
     
     // Insert bid (using type assertion since tender_bids may not be in generated types)
-    const { data: insertedBid, error: insertError } = await (supabase as any)
+    const { data: insertedBid, error: insertError } = await supabase
       .from('tender_bids')
       .insert(insertData)
       .select()
@@ -2200,10 +2202,10 @@ export async function createTenderBid(
 export async function fetchTenderBidsByTenderId(
   supabase: SupabaseClient<Database>,
   tenderId: string
-): Promise<{ data: any[] | null; error: any }> {
+): Promise<{ data: Record<string, unknown>[] | null; error: PostgrestError | null }> {
   try {
     // Use type assertion since tender_bids may not be in generated types
-    const { data: bids, error } = await (supabase as any)
+    const { data: bids, error } = await supabase
       .from('tender_bids')
       .select(`
         id,
@@ -2246,7 +2248,7 @@ export async function fetchTenderBidsByTenderId(
     
     // Transform to TenderBid type format
     const formattedBids = await Promise.all(
-      ((bids || []) as any[]).map(async (bid: any) => {
+      ((bids || []) as Record<string, unknown>[]).map(async (bid: Record<string, unknown>) => {
         // Fetch contractor profile for additional data
         const { fetchContractorById } = await import('./contractors');
         const contractorProfile = await fetchContractorById(bid.company?.id || '');
@@ -2271,7 +2273,7 @@ export async function fetchTenderBidsByTenderId(
           guaranteePeriod: 12, // Default, could be extracted from bid if available
           description: bid.technical_proposal || '',
           technicalProposal: bid.technical_proposal || '',
-          attachments: (bid.attachments as any) || [],
+          attachments: (bid.attachments as Array<Record<string, unknown>>) || [],
           criteriaResponses: [], // Would need to be extracted from bid if stored separately
           submittedAt: new Date(bid.submitted_at),
           status: (bid.status as 'submitted' | 'under_review' | 'shortlisted' | 'rejected' | 'awarded') || 'submitted',
@@ -2301,7 +2303,7 @@ export async function cancelJobApplication(
   supabase: SupabaseClient<Database>,
   applicationId: string,
   contractorId: string
-): Promise<{ data: any | null; error: any }> {
+): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
   try {
     // Fetch contractor's primary company
     const { fetchUserPrimaryCompany } = await import('./companies');
@@ -2315,7 +2317,7 @@ export async function cancelJobApplication(
     }
 
     // First, fetch the application to check ownership and current status
-    const { data: application, error: fetchError } = await (supabase as any)
+    const { data: application, error: fetchError } = await supabase
       .from('job_applications')
       .select('id, company_id, status')
       .eq('id', applicationId)
@@ -2354,7 +2356,7 @@ export async function cancelJobApplication(
 
     // Update status to 'cancelled'
     // Filter by both contractor_id (for RLS policy) and company_id (for validation)
-    const { data: updateData, error: updateError } = await (supabase as any)
+    const { data: updateData, error: updateError } = await supabase
       .from('job_applications')
       .update({ 
         status: 'cancelled',
@@ -2418,7 +2420,7 @@ export async function cancelTenderBid(
   supabase: SupabaseClient<Database>,
   bidId: string,
   contractorId: string
-): Promise<{ data: any | null; error: any }> {
+): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
   try {
     // Fetch contractor's primary company
     const { fetchUserPrimaryCompany } = await import('./companies');
@@ -2432,7 +2434,7 @@ export async function cancelTenderBid(
     }
 
     // First, fetch the bid to check ownership and current status
-    const { data: bid, error: fetchError } = await (supabase as any)
+    const { data: bid, error: fetchError } = await supabase
       .from('tender_bids')
       .select('id, company_id, status')
       .eq('id', bidId)
@@ -2471,7 +2473,7 @@ export async function cancelTenderBid(
 
     // Update status to 'cancelled'
     // Filter by both contractor_id (for RLS policy) and company_id (for validation)
-    const { data: updateData, error: updateError } = await (supabase as any)
+    const { data: updateData, error: updateError } = await supabase
       .from('tender_bids')
       .update({ 
         status: 'cancelled',
@@ -2560,14 +2562,14 @@ export async function fetchJobsByWorkHistory(
       return [];
     }
 
-    const jobIds = (companyJobs || []).map((job: any) => job.id);
+    const jobIds = (companyJobs || []).map((job: { id: string }) => job.id);
 
     if (jobIds.length === 0) {
       return [];
     }
 
     // Step 2: Get accepted applications for these jobs
-    const { data: acceptedApplications, error: appsError } = await (supabase as any)
+    const { data: acceptedApplications, error: appsError } = await supabase
       .from('job_applications')
       .select('job_id')
       .in('job_id', jobIds)
@@ -2583,7 +2585,7 @@ export async function fetchJobsByWorkHistory(
     }
 
     // Step 3: Get distinct job IDs that have accepted applications
-    const jobIdsWithApplications: string[] = Array.from(new Set<string>(acceptedApplications.map((app: any) => app.job_id as string)));
+    const jobIdsWithApplications: string[] = Array.from(new Set<string>(acceptedApplications.map((app: { job_id: string }) => app.job_id)));
 
     if (jobIdsWithApplications.length === 0) {
       return [];
@@ -2627,7 +2629,7 @@ export async function fetchJobsByWorkHistory(
     }
 
     // Step 6: Format jobs for display
-    const formattedJobs = jobsData.map((job: any) => {
+    const formattedJobs = jobsData.map((job: Record<string, unknown>) => {
       const location = typeof job.location === 'string' 
         ? job.location 
         : job.location?.city || 'Nieznana lokalizacja';

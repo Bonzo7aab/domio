@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 import MyApplications from '../../../components/MyApplications';
+import type { JobWithCompany, TenderWithCompany } from '../../../lib/database/jobs';
 
 interface Application {
   id: string;
@@ -66,9 +67,9 @@ export function ApplicationsContent({ applications, companyId }: ApplicationsCon
 
       let managerId: string | null = null;
       if (dbJob && !jobError) {
-        managerId = (dbJob as any).manager_id || null;
+        managerId = (dbJob as JobWithCompany & { manager_id?: string }).manager_id || null;
       } else if (dbTender && !tenderError) {
-        managerId = (dbTender as any).manager_id || null;
+        managerId = (dbTender as TenderWithCompany & { manager_id?: string }).manager_id || null;
       }
 
       if (!managerId) {

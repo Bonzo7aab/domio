@@ -7,13 +7,13 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Switch } from './ui/switch';
 import type { AuthUser } from '../types/auth';
 import { createClient } from '../lib/supabase/client';
-import { fetchUserPrimaryCompany, upsertUserCompany, type CompanyData } from '../lib/database/companies';
+import { fetchUserPrimaryCompany, upsertUserCompany } from '../lib/database/companies';
 import { BuildingManagement } from './BuildingManagement';
 import { cn } from './ui/utils';
 
@@ -103,7 +103,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
           founded_year: company.founded_year || null,
           employee_count: company.employee_count || '',
           description: company.description || '',
-          is_public: (company as any).is_public !== undefined ? (company as any).is_public : true, // Default to true if not set
+          is_public: ('is_public' in company && company.is_public !== undefined) ? company.is_public as boolean : true, // Default to true if not set
         };
         setCompanyData(fetchedData);
         setOriginalCompanyData(fetchedData);
@@ -114,7 +114,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
         setHasCompany(false);
         setCompanyId(null);
       }
-    } catch (err) {
+    } catch (_err) {
       if (isMounted.current) {
         setHasCompany(false);
         setCompanyId(null);
@@ -237,7 +237,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
 
     try {
       const supabase = createClient();
-      const { data: savedCompany, error: saveError } = await upsertUserCompany(
+      const { data: _savedCompany, error: saveError } = await upsertUserCompany(
         supabase,
         user.id,
         {
@@ -271,7 +271,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
         await loadCompany();
         setTimeout(() => setSuccess(''), 3000);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Wystąpił błąd podczas zapisywania');
     } finally {
       setIsLoading(false);
@@ -439,7 +439,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
               Nie masz jeszcze dodanej firmy
             </p>
             <p className="text-xs text-muted-foreground">
-              Kliknij "Dodaj firmę" aby uzupełnić dane swojej organizacji
+              Kliknij &quot;Dodaj firmę&quot; aby uzupełnić dane swojej organizacji
             </p>
           </div>
         ) : (

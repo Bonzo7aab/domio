@@ -170,11 +170,12 @@ function MessagesPageContent() {
       const supabase = createClient();
 
       // First, let's check if the conversation exists and user is a participant
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: conversation, error: convError } = await (supabase as any)
         .from('conversations')
         .select('id, participant_1, participant_2')
         .eq('id', conversationId)
-        .single();
+        .single() as { data: { id: string; participant_1: string; participant_2: string } | null; error: unknown };
 
       if (convError) {
         console.error('Conversation check error:', convError);
@@ -188,6 +189,7 @@ function MessagesPageContent() {
       }
 
       // Send message to database
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: sendResult, error } = await (supabase as any)
         .from('messages')
         .insert({

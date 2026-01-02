@@ -64,6 +64,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
           {/* Logo and title */}
           <div className="text-center space-y-2">
             <div className="flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src="/logo.svg" 
                 alt="Urbi.eu Logo" 
@@ -134,6 +135,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
         {/* Logo and title */}
         <div className="text-center space-y-2">
           <div className="flex justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src="/logo.svg" 
               alt="Urbi.eu Logo" 

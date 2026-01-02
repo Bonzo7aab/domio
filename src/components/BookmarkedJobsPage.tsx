@@ -21,10 +21,6 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
   const [filteredBookmarks, setFilteredBookmarks] = useState<BookmarkedJob[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadBookmarks();
-  }, []);
-
   // Helper function to format location as string
   const formatLocation = (location: string | { city?: string; sublocality_level_1?: string } | undefined): string => {
     if (!location) return 'Nieznana lokalizacja';
@@ -45,6 +41,18 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
     return formatBudget(budget);
   };
 
+  const loadBookmarks = () => {
+    const savedBookmarks = getBookmarkedJobs();
+    setBookmarks(savedBookmarks);
+  };
+
+  useEffect(() => {
+    // Use setTimeout to avoid synchronous setState in effect
+    setTimeout(() => {
+      loadBookmarks();
+    }, 0);
+  }, []);
+
   useEffect(() => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -56,16 +64,17 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
           locationString.toLowerCase().includes(query)
         );
       });
-      setFilteredBookmarks(filtered);
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setFilteredBookmarks(filtered);
+      }, 0);
     } else {
-      setFilteredBookmarks(bookmarks);
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setFilteredBookmarks(bookmarks);
+      }, 0);
     }
   }, [bookmarks, searchQuery]);
-
-  const loadBookmarks = () => {
-    const savedBookmarks = getBookmarkedJobs();
-    setBookmarks(savedBookmarks);
-  };
 
   const handleRemoveBookmark = (jobId: string, jobTitle: string) => {
     removeBookmark(jobId);
@@ -133,7 +142,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
             <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">Brak wyników</h3>
             <p className="text-muted-foreground">
-              Nie znaleziono ogłoszeń pasujących do wyszukiwania "{searchQuery}"
+              Nie znaleziono ogłoszeń pasujących do wyszukiwania &quot;{searchQuery}&quot;
             </p>
           </div>
         ) : filteredBookmarks.length === 0 ? (

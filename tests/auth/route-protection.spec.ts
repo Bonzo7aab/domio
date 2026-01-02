@@ -145,7 +145,7 @@ test.describe('Route Protection', () => {
           url.pathname.includes('/contractor-dashboard') || url.pathname.includes('/account'), 
           { timeout: 10000 }
         );
-      } catch (e) {
+      } catch {
         // If waitForURL times out, check current URL anyway
       }
       const currentUrl = page.url();
@@ -175,7 +175,7 @@ test.describe('Route Protection', () => {
           url.pathname.includes('/manager-dashboard'), 
           { timeout: 10000 }
         );
-      } catch (e) {
+      } catch {
         // If waitForURL times out, check current URL anyway
       }
       const currentUrl = page.url();

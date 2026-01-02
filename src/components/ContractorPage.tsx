@@ -25,10 +25,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
 import { 
-  fetchContractorDashboardData,
   fetchContractorDashboardStats,
   fetchContractorApplications,
-  fetchCompletedProjects,
   fetchPlatformProjectHistory,
   fetchContractorPortfolio,
   fetchPortfolioProjectById,
@@ -44,7 +42,6 @@ import {
   type PlatformProject
 } from '../lib/database/contractors';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
-import BidSubmissionForm from './BidSubmissionForm';
 import MessagingSystem from './MessagingSystem';
 import MyApplications from './MyApplications';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -64,8 +61,8 @@ interface ContractorPageProps {
   onBrowseJobs: () => void;
 }
 
-export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageProps) {
-  const { user, supabase } = useUserProfile();
+export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: ContractorPageProps) {
+  const { user } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -123,8 +120,22 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   const [applications, setApplications] = useState<ContractorApplication[]>([]);
   const [bids, setBids] = useState<ContractorBid[]>([]);
   const [stats, setStats] = useState<ContractorStats | null>(null);
-  const [certificates, setCertificates] = useState<Certificate[]>([]);
-  const [completedProjects, setCompletedProjects] = useState<any[]>([]);
+  const [certificates] = useState<Certificate[]>([]);
+  const [_completedProjects] = useState<Array<{
+    id: string;
+    title: string;
+    description: string;
+    images: string[];
+    budget: string;
+    duration: string;
+    year: number;
+    category: string;
+    location: string;
+    projectType: string;
+    clientName: string;
+    clientFeedback: string;
+    isFeatured: boolean;
+  }>>([]);
   const [ratingSummary, setRatingSummary] = useState<{
     averageRating: number;
     totalReviews: number;
@@ -171,11 +182,39 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   
   // Projects tab state
   const [platformProjects, setPlatformProjects] = useState<PlatformProject[]>([]);
-  const [portfolioProjects, setPortfolioProjects] = useState<any[]>([]);
+  const [portfolioProjects, setPortfolioProjects] = useState<Array<{
+    id: string;
+    title: string;
+    description: string;
+    images: string[];
+    budget: string;
+    duration: string;
+    year: number;
+    category: string;
+    location: string;
+    projectType: string;
+    clientName: string;
+    clientFeedback: string;
+    isFeatured: boolean;
+  }>>([]);
   const [loadingPlatformProjects, setLoadingPlatformProjects] = useState(false);
   const [loadingPortfolioProjects, setLoadingPortfolioProjects] = useState(false);
   const [showPortfolioForm, setShowPortfolioForm] = useState(false);
-  const [editingProject, setEditingProject] = useState<any | null>(null);
+  const [editingProject, setEditingProject] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    images: string[];
+    budget: string;
+    duration: string;
+    year: number;
+    category: string;
+    location: string;
+    projectType: string;
+    clientName: string;
+    clientFeedback: string;
+    isFeatured: boolean;
+  } | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
@@ -356,6 +395,8 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     };
 
     fetchRatingsData();
+    // ratingSummary is intentionally omitted - we only check it once when tab opens, not on every change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, companyId, loadedTabs]);
 
   // Fetch pricing tab data when tab is opened
@@ -463,9 +504,9 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
 
       let managerId: string | null = null;
       if (dbJob && !jobError) {
-        managerId = (dbJob as any).manager_id || null;
+        managerId = ('manager_id' in dbJob ? dbJob.manager_id : null) as string | null;
       } else if (dbTender && !tenderError) {
-        managerId = (dbTender as any).manager_id || null;
+        managerId = ('manager_id' in dbTender ? dbTender.manager_id : null) as string | null;
       }
 
       if (!managerId) {
@@ -577,7 +618,7 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
       : app.proposedPrice || 0;
 
     // Transform attachments to the expected format
-    const transformedAttachments = (app.attachments || []).map((attachment: any, index: number) => {
+    const transformedAttachments = (app.attachments || []).map((attachment: string | Record<string, unknown>, index: number) => {
       // Handle different attachment formats
       if (typeof attachment === 'string') {
         return {
@@ -668,72 +709,29 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   );
 
 
-  // Transform applications and bids to activeOffers format
-  const activeOffers = [
-    ...applications.map(app => ({
-      id: app.id,
-      title: app.jobTitle || 'Untitled Job',
-      client: app.companyName || 'Unknown Client',
-      location: 'Unknown', // Not available in ContractorApplication
-      budget: app.proposedPrice || '0',
-      status: app.status === 'pending' ? 'pending' : 
-              app.status === 'accepted' ? 'won' :
-              app.status === 'rejected' ? 'rejected' : 'pending',
-      submittedAt: new Date(app.appliedAt).toLocaleDateString('pl-PL'),
-      responses: 0, // Not available in ContractorApplication
-      myOffer: app.proposedPrice || '0',
-      description: app.coverLetter?.substring(0, 100) || 'Brak opisu'
-    })),
-    ...bids.map(bid => ({
-      id: bid.id,
-      title: bid.tenderTitle || 'Untitled Tender',
-      client: bid.companyName || 'Unknown Client',
-      location: 'Unknown', // Not available in ContractorBid
-      budget: bid.bidAmount || '0',
-      status: bid.status === 'pending' ? 'pending' : 
-              bid.status === 'accepted' ? 'won' :
-              bid.status === 'rejected' ? 'rejected' : 'pending',
-      submittedAt: new Date(bid.submittedAt).toLocaleDateString('pl-PL'),
-      responses: 0, // Not available in ContractorBid
-      myOffer: bid.bidAmount || '0',
-      description: 'Brak opisu' // Not available in ContractorBid
-    }))
-  ];
+  // Transform completed projects to recentJobs format (unused for now)
+  // const recentJobs = completedProjects.length > 0 ? completedProjects.map(project => ({
+  //   id: project.id,
+  //   title: project.title,
+  //   client: project.client,
+  //   location: project.location,
+  //   completedAt: new Date(project.completedAt).toLocaleDateString('pl-PL'),
+  //   rating: stats?.averageRating || 5,
+  //   earnings: project.earnings,
+  //   duration: project.duration,
+  //   feedback: project.description?.substring(0, 150) || 'Projekt ukończony pomyślnie'
+  // })) : [{
+  //   id: '1',
+  //   title: 'Brak ukończonych projektów',
+  //   client: 'N/A',
+  //   location: 'N/A',
+  //   completedAt: new Date().toLocaleDateString('pl-PL'),
+  //   rating: 0,
+  //   earnings: '0 zł',
+  //   duration: 'N/A',
+  //   feedback: 'Rozpocznij składanie ofert, aby budować swoją historię projektów'
+  // }];
 
-  // Transform completed projects to recentJobs format
-  const recentJobs = completedProjects.length > 0 ? completedProjects.map(project => ({
-    id: project.id,
-    title: project.title,
-    client: project.client,
-    location: project.location,
-    completedAt: new Date(project.completedAt).toLocaleDateString('pl-PL'),
-    rating: stats?.averageRating || 5,
-    earnings: project.earnings,
-    duration: project.duration,
-    feedback: project.description?.substring(0, 150) || 'Projekt ukończony pomyślnie'
-  })) : [{
-    id: '1',
-    title: 'Brak ukończonych projektów',
-    client: 'N/A',
-    location: 'N/A',
-    completedAt: new Date().toLocaleDateString('pl-PL'),
-    rating: 0,
-    earnings: '0 zł',
-    duration: 'N/A',
-    feedback: 'Rozpocznij składanie ofert, aby budować swoją historię projektów'
-  }];
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { label: 'Oczekująca', color: 'bg-yellow-100 text-yellow-800' },
-      shortlisted: { label: 'Shortlista', color: 'bg-blue-100 text-blue-800' },
-      won: { label: 'Wygrana', color: 'bg-green-100 text-green-800' },
-      rejected: { label: 'Odrzucona', color: 'bg-red-100 text-red-800' }
-    };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    return <Badge className={config.color}>{config.label}</Badge>;
-  };
 
   // Portfolio management handlers
   const handleAddPortfolioProject = () => {
@@ -741,7 +739,21 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
     setShowPortfolioForm(true);
   };
 
-  const handleEditPortfolioProject = async (project: any) => {
+  const handleEditPortfolioProject = async (project: {
+    id: string;
+    title: string;
+    description: string;
+    images: string[];
+    budget: string;
+    duration: string;
+    year: number;
+    category: string;
+    location: string;
+    projectType: string;
+    clientName: string;
+    clientFeedback: string;
+    isFeatured: boolean;
+  }) => {
     // Fetch full project details for editing
     const supabase = createClient();
     const fullProject = await fetchPortfolioProjectById(supabase, project.id);
@@ -787,7 +799,7 @@ export default function ContractorPage({ onBack, onBrowseJobs }: ContractorPageP
   const handlePortfolioSuccess = async () => {
     if (!companyId) return;
     
-    const supabase = createClient();
+    const _supabase = createClient();
     try {
       const portfolio = await fetchContractorPortfolio(companyId);
       setPortfolioProjects(portfolio || []);

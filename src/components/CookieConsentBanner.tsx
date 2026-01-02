@@ -17,7 +17,10 @@ export function CookieConsentBanner() {
     if (typeof window !== 'undefined') {
       const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
       if (!consent) {
-        setShowBanner(true)
+        // Use setTimeout to avoid synchronous setState in effect
+        setTimeout(() => {
+          setShowBanner(true)
+        }, 0)
       }
     }
   }, [])

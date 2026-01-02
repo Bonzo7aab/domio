@@ -77,8 +77,6 @@ export function loadPool(): UserPool | null {
  * Initializes the test user pool with contractors and managers
  */
 export async function initializePool(): Promise<UserPool> {
-  const adminClient = createAdminClient();
-
   // Clean up any existing pool users first
   await cleanupPool();
 
@@ -273,11 +271,12 @@ export async function cleanupPool(): Promise<void> {
       // Delete user-company relations first
       if (user.companyId) {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await (adminClient as any)
             .from('user_companies')
             .delete()
             .eq('company_id', user.companyId);
-        } catch (error) {
+        } catch {
           // Ignore errors if relation doesn't exist
         }
       }
@@ -292,7 +291,7 @@ export async function cleanupPool(): Promise<void> {
             .from('companies')
             .delete()
             .eq('id', user.companyId);
-        } catch (error) {
+        } catch (_error) {
           // Ignore errors if company doesn't exist
         }
       }

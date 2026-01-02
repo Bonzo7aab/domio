@@ -5,7 +5,7 @@ import { TEST_USER_PREFIX } from '../config/constants';
 import { createJob } from '../../src/lib/database/jobs';
 import { createTender } from '../../src/lib/database/jobs';
 import { upsertUserCompany } from '../../src/lib/database/companies';
-import { getPoolContractor, getPoolManager, type PoolUser, loadPool } from './test-user-pool';
+import { getPoolContractor, getPoolManager, loadPool } from './test-user-pool';
 
 /**
  * Creates a Supabase admin client for test data management
@@ -309,6 +309,7 @@ export async function cleanupTestData(
 
   // Delete tenders BEFORE companies (to avoid foreign key violations)
   if (tenderIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: tendersError } = await (adminClient as any)
       .from('tenders')
       .delete()
@@ -321,6 +322,7 @@ export async function cleanupTestData(
 
   // Delete user-company relationships (only for non-pool companies)
   if (companiesToDelete.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: relationsError } = await (adminClient as any)
       .from('user_companies')
       .delete()

@@ -221,7 +221,7 @@ export async function deleteAccountAction() {
     const adminClient = createAdminClient()
     
     // Delete the auth user - this will cascade delete user_profiles and related data
-    const { data: deleteData, error: deleteError } = await adminClient.auth.admin.deleteUser(userId)
+    const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId)
     
     if (deleteError) {
       console.error('Error deleting user account:', deleteError)
@@ -247,23 +247,23 @@ export async function deleteAccountAction() {
     await supabase.auth.signOut()
     
     redirect('/')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in deleteAccountAction:', error)
     
     // Handle missing service role key gracefully
-    if (error.message?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
+    if (error instanceof Error && error.message?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
       return { 
         error: 'Usuwanie konta nie jest skonfigurowane. Dodaj zmienną środowiskową SUPABASE_SERVICE_ROLE_KEY do pliku .env.local. Klucz można znaleźć w ustawieniach projektu Supabase w sekcji API → service_role (secret) key.' 
       }
     }
     
     // Handle missing URL
-    if (error.message?.includes('NEXT_PUBLIC_SUPABASE_URL')) {
+    if (error instanceof Error && error.message?.includes('NEXT_PUBLIC_SUPABASE_URL')) {
       return { 
         error: 'Brak konfiguracji Supabase URL. Sprawdź zmienne środowiskowe.' 
       }
     }
     
-    return { error: error.message || 'Wystąpił błąd podczas usuwania konta' }
+    return { error: error instanceof Error ? error.message : 'Wystąpił błąd podczas usuwania konta' }
   }
 }

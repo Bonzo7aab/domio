@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
-import { Building, User, Phone, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Building, User, Phone, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';

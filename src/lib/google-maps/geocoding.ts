@@ -64,7 +64,13 @@ export const reverseGeocode = async (
     geocoder.geocode({ location: latlng }, (results, status) => {
       if (status === 'OK' && results && results[0]) {
         const result = results[0];
-        const components: any = {};
+        const components: {
+          city?: string;
+          district?: string;
+          country?: string;
+          postalCode?: string;
+          sublocality_level_1?: string;
+        } = {};
         
         // Extract address components
         result.address_components.forEach(component => {

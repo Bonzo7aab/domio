@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -8,7 +8,6 @@ import { ApplicationStatusCard } from './ApplicationStatusBadge';
 import { 
   Eye, 
   MessageSquare, 
-  Calendar, 
   Euro, 
   MapPin,
   Building,

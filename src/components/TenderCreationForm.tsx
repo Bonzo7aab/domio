@@ -1,5 +1,4 @@
 import {
-  AlertCircle,
   Award,
   Calculator,
   Calendar,
@@ -13,7 +12,7 @@ import {
   Plus,
   X
 } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
@@ -179,9 +178,14 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
     new Set()
   );
 
+  // Track if form has been initialized to prevent cascading renders
+  const hasInitialized = useRef(false);
+
   // Populate form with initial data when editing
   useEffect(() => {
-    if (isEditMode && initialData) {
+    if (isEditMode && initialData && !hasInitialized.current) {
+      hasInitialized.current = true;
+      
       // Convert location to string if it's an object
       const locationString = typeof initialData.location === 'string' 
         ? initialData.location 
@@ -189,7 +193,9 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
           ? initialData.location.city + (initialData.location.sublocality_level_1 ? `, ${initialData.location.sublocality_level_1}` : '')
           : '';
       
-      setFormData({
+      // Use setTimeout to make setState asynchronous and avoid cascading renders
+      setTimeout(() => {
+        setFormData({
         title: initialData.title || '',
         description: initialData.description || '',
         category: initialData.category?.name || '',
@@ -197,12 +203,12 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
         estimatedValue: initialData.estimated_value?.toString() || '',
         currency: initialData.currency || 'PLN',
         submissionDeadline: initialData.submission_deadline ? new Date(initialData.submission_deadline) : new Date(),
-        evaluationDeadline: (initialData as any).evaluation_deadline ? new Date((initialData as any).evaluation_deadline) : new Date(),
+        evaluationDeadline: ('evaluation_deadline' in initialData && initialData.evaluation_deadline) ? new Date(initialData.evaluation_deadline as string) : new Date(),
         requirements: initialData.requirements && initialData.requirements.length > 0 
           ? initialData.requirements 
           : [''],
         evaluationCriteria: initialData.evaluation_criteria && Array.isArray(initialData.evaluation_criteria)
-          ? initialData.evaluation_criteria.map((criterion: any) => ({
+          ? initialData.evaluation_criteria.map((criterion: Record<string, unknown>) => ({
               id: criterion.id || `criterion-${Date.now()}-${Math.random()}`,
               name: criterion.name || '',
               description: criterion.description || '',
@@ -211,7 +217,7 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
             }))
           : defaultCriteria,
         documents: [], // Documents from DB are not File objects, so we start fresh
-        isPublic: (initialData as any).is_public ?? true,
+        isPublic: ('is_public' in initialData ? initialData.is_public : true) as boolean,
         allowQuestions: true, // Not stored in DB, default to true
         questionsDeadline: undefined,
         minimumExperience: 1,
@@ -220,7 +226,8 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
         advancePayment: false,
         performanceBond: false,
         status: initialData.status as 'draft' | 'active' || 'draft'
-      });
+        });
+      }, 0);
     }
   }, [isEditMode, initialData]);
 
@@ -329,7 +336,7 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
     }));
   };
 
-  const updateCriterion = (id: string, field: keyof EvaluationCriterion, value: any) => {
+  const updateCriterion = (id: string, field: keyof EvaluationCriterion, value: EvaluationCriterion[keyof EvaluationCriterion]) => {
     setFormData(prev => ({
       ...prev,
       evaluationCriteria: prev.evaluationCriteria.map(criterion => 

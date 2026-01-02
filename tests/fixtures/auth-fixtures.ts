@@ -23,7 +23,7 @@ async function createAuthenticatedPage(
   page: Page,
   email: string,
   password: string,
-  userType: 'manager' | 'contractor'
+  _userType: 'manager' | 'contractor'
 ): Promise<Page> {
   // Clear any existing auth state
   await clearAuthState(page);
@@ -55,6 +55,7 @@ export const test = base.extend<AuthFixtures>({
     try {
       // Authenticate the page with pool user
       const authenticatedPage = await createAuthenticatedPage(page, poolUser.email, poolUser.password, poolUser.userType);
+      // eslint-disable-next-line react-hooks/rules-of-hooks
       await use(authenticatedPage);
     } finally {
       // Clear auth state but don't delete pool user
@@ -76,6 +77,7 @@ export const test = base.extend<AuthFixtures>({
     try {
       // Authenticate the page with pool user
       const authenticatedPage = await createAuthenticatedPage(page, poolUser.email, poolUser.password, poolUser.userType);
+      // eslint-disable-next-line react-hooks/rules-of-hooks
       await use(authenticatedPage);
     } finally {
       // Clear auth state but don't delete pool user
@@ -97,6 +99,7 @@ export const test = base.extend<AuthFixtures>({
     try {
       // Authenticate the page with pool user
       const authenticatedPage = await createAuthenticatedPage(page, poolUser.email, poolUser.password, poolUser.userType);
+      // eslint-disable-next-line react-hooks/rules-of-hooks
       await use(authenticatedPage);
     } finally {
       // Clear auth state but don't delete pool user
@@ -107,7 +110,7 @@ export const test = base.extend<AuthFixtures>({
   /**
    * Test user credentials (user is created but not authenticated)
    */
-  testUser: async ({}, use) => {
+  testUser: async (_unused, use) => {
     const email = `test-playwright-user-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
     const password = 'TestPassword123!';
     const userType = 'contractor';
@@ -119,6 +122,7 @@ export const test = base.extend<AuthFixtures>({
     });
 
     try {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
       await use({
         email,
         password,

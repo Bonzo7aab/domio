@@ -203,7 +203,7 @@ const MapComponent: React.FC<{
   onBoundsChanged?: (bounds: { north: number; south: number; east: number; west: number }) => void;
   isMapExpanded?: boolean;
   isSmallMap?: boolean;
-}> = ({ markers, center, zoom, onMapClick, onMarkerClick, onBoundsChanged, isMapExpanded = false, isSmallMap = false }) => {
+}> = ({ markers, center, zoom, onMapClick, onMarkerClick: _onMarkerClick, onBoundsChanged, isMapExpanded = false, isSmallMap = false }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map>();
   const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
@@ -218,7 +218,7 @@ const MapComponent: React.FC<{
   const lastBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
   const bouncingMarkerRef = useRef<HTMLElement | null>(null);
   const currentBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
-  const loadingChunkRef = useRef<number>(0);
+  // const loadingChunkRef = useRef<number>(0); // Unused variable
   const activeInfoWindowMarkerIdRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
 
@@ -363,7 +363,26 @@ const MapComponent: React.FC<{
               }
 
               // Update marker visibility based on new bounds
-              updateMarkerVisibility(newMap, markers);
+              // Note: updateMarkerVisibility is defined below, but called here in a callback
+              // This is safe because the callback executes after the function is defined
+              if (markerPoolRef.current && currentBoundsRef.current) {
+                const bounds = currentBoundsRef.current;
+                const pool = markerPoolRef.current;
+                const activeMarkers = pool.getActiveMarkers();
+                
+                markers.forEach((markerConfig) => {
+                  const isVisible = isMarkerInBounds(markerConfig.position, bounds);
+                  const marker = activeMarkers.get(markerConfig.id);
+                  
+                  if (marker) {
+                    if (isVisible && !marker.map) {
+                      marker.map = newMap;
+                    } else if (!isVisible && marker.map) {
+                      marker.map = null;
+                    }
+                  }
+                });
+              }
             }
           }, 500);
         });
@@ -414,7 +433,7 @@ const MapComponent: React.FC<{
   }, [mapRef, map, center, zoom, onMapClick, onBoundsChanged, markers, isMobile]);
 
   // Helper function to update marker visibility based on bounds
-  const updateMarkerVisibility = useCallback((mapInstance: google.maps.Map, markerData: MapMarker[]) => {
+  const _updateMarkerVisibility = useCallback((mapInstance: google.maps.Map, markerData: MapMarker[]) => {
     if (!markerPoolRef.current || !currentBoundsRef.current) return;
 
     const bounds = currentBoundsRef.current;
@@ -453,7 +472,7 @@ const MapComponent: React.FC<{
     mapInstance: google.maps.Map,
     infoWindowInstance: google.maps.InfoWindow
   ) => {
-    const openInfoWindow = (isFromClick: boolean = false) => {
+    const openInfoWindow = (_isFromClick: boolean = false) => {
       if (!markerData.jobData) return;
 
       // Always allow hover to show infoWindow for any marker
@@ -530,7 +549,7 @@ const MapComponent: React.FC<{
         element.style.zIndex = '100';
       });
     }
-  }, [isMobile, isSmallMap, isMapExpanded]);
+  }, [isMobile, isSmallMap]);
 
   // Update markers with pooling, viewport culling, and incremental loading
   useEffect(() => {
@@ -543,7 +562,7 @@ const MapComponent: React.FC<{
     let mapBounds: google.maps.LatLngBounds | null = null;
     try {
       mapBounds = map.getBounds();
-    } catch (e) {
+    } catch (_e) {
       // Map might not be ready yet
       console.debug('Map bounds not available yet');
     }
@@ -897,7 +916,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
 
   return (
     <div className={className} style={style}>
-      <Wrapper apiKey={googleMapsConfig.apiKey} libraries={googleMapsConfig.libraries as any} render={render} />
+      <Wrapper apiKey={googleMapsConfig.apiKey} libraries={googleMapsConfig.libraries as ('places' | 'geometry' | 'drawing' | 'visualization')[]} render={render} />
     </div>
   );
 };

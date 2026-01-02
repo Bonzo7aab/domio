@@ -97,16 +97,17 @@ export async function fetchManagers(filters: ManagerFilters = {}): Promise<Brows
 
     // Fetch ratings for all managers
     const managerIds = (data || []).map(company => company.id);
-    let ratingsMap: { [key: string]: any } = {};
+    let ratingsMap: { [key: string]: number } = {};
     
     if (managerIds.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: ratingsData } = await (supabase as any)
         .from('company_ratings')
         .select('company_id, average_rating, total_reviews')
         .in('company_id', managerIds);
       
       if (ratingsData) {
-        ratingsMap = ratingsData.reduce((acc: any, rating: any) => {
+        ratingsMap = ratingsData.reduce((acc: { [key: string]: number }, rating: { company_id: string; average_rating: number }) => {
           acc[rating.company_id] = rating;
           return acc;
         }, {});
@@ -114,7 +115,7 @@ export async function fetchManagers(filters: ManagerFilters = {}): Promise<Brows
     }
 
     // Transform data to BrowseManager format
-    let managers: BrowseManager[] = (data || []).map((company: any) => {
+    let managers: BrowseManager[] = (data || []).map((company: Record<string, unknown>) => {
       const ratings = ratingsMap[company.id];
       const managerData = company.manager_data || {};
       const experienceData = company.experience_data || {};
@@ -227,6 +228,7 @@ export async function fetchManagerById(
     }
 
     // Fetch real ratings data - use maybeSingle since ratings might not exist
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: ratingsData } = await (supabase as any)
       .from('company_ratings')
       .select('average_rating, total_reviews, rating_breakdown, category_ratings')
@@ -234,6 +236,7 @@ export async function fetchManagerById(
       .maybeSingle();
 
     // Fetch reviews
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: reviewsData } = await (supabase as any)
       .from('company_reviews')
       .select(`
@@ -255,16 +258,19 @@ export async function fetchManagerById(
       .limit(10);
 
     // Parse JSONB fields - they might be strings or already parsed objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const managerDataRaw = (company as any).manager_data;
     const managerData = typeof managerDataRaw === 'string' 
       ? JSON.parse(managerDataRaw) 
       : (managerDataRaw || {});
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const experienceDataRaw = (company as any).experience_data;
     const experienceData = typeof experienceDataRaw === 'string'
       ? JSON.parse(experienceDataRaw)
       : (experienceDataRaw || {});
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const statsDataRaw = (company as any).stats_data;
     const statsData = typeof statsDataRaw === 'string'
       ? JSON.parse(statsDataRaw)
@@ -274,8 +280,11 @@ export async function fetchManagerById(
     const manager: ManagerProfile = {
       id: company.id,
       name: company.name,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       organizationType: managerData.organization_type || company.type as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       avatar: (company as any).avatar_url,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       coverImage: (company as any).cover_image_url,
       location: {
         city: company.city || 'Warszawa',
@@ -334,7 +343,9 @@ export async function fetchManagerById(
         budgetRange: experienceData.budget_range || { min: 0, max: 0 }
       },
       portfolio: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         images: (company as any).portfolio_data?.images || [],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         managedBuildings: (company as any).portfolio_data?.managedBuildings || []
       },
       financials: {
@@ -350,7 +361,7 @@ export async function fetchManagerById(
         workingHours: managerData.working_hours || '',
         specialRequests: managerData.special_requests || []
       },
-      reviews: (reviewsData || []).map((review: any) => ({
+      reviews: (reviewsData || []).map((review: Record<string, unknown>) => ({
         id: review.id,
         author: review.user_profiles ? 
           `${review.user_profiles.first_name} ${review.user_profiles.last_name}` : 

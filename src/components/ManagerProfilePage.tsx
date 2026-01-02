@@ -1,150 +1,199 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Star, Building, Phone, Mail, Award, ExternalLink, TrendingUp, FileText, Users, Clock, CheckCircle, Briefcase } from 'lucide-react';
+import { MapPin, Star, Building, Phone, Mail, Award, ExternalLink, FileText, Users, Clock, CheckCircle, Briefcase } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Progress } from './ui/progress';
-import { fetchManagerById } from '../lib/database/managers';
+import { fetchManagerById, type ManagerProfile } from '../lib/database/managers';
 import { mockManagerDetailsMap } from '../mocks';
 import { getCategoryLabel } from './contractor-dashboard/shared/utils';
 import { createClient } from '../lib/supabase/client';
 import { formatBudget, budgetFromDatabase } from '../types/budget';
+import type { JobWithCompany, TenderWithCompany } from '../lib/database/jobs';
 
 interface ManagerProfilePageProps {
   managerId: string;
   onBack?: () => void;
 }
 
+// Interface for the converted manager format used in the component
+interface ConvertedManagerProfile {
+  name: string;
+  logo: string;
+  coverImage: string;
+  description: string;
+  location: string;
+  rating: number;
+  reviewCount: number;
+  managedBuildings: number;
+  managedUnits: number;
+  verified: boolean;
+  hasInsurance: boolean;
+  isPremium: boolean;
+  founded: number;
+  employees: string;
+  website: string;
+  phone: string;
+  email: string;
+  address: string;
+  specialties: string[];
+  certificates: string[];
+  services: Array<{ name: string; description: string; price: string | number }>;
+  managedProperties: Array<{ name: string; image: string; location: string; buildings: number; units: number; since: string }>;
+  team: Array<{ name: string; position: string; image: string; experience: string; license: string }>;
+  reviews: Array<{ id?: string; author: string; authorCompany?: string; rating: number; title: string; text: string; date: string; property?: string; categories?: Record<string, number> }>;
+  ratingSummary: { averageRating: number; totalReviews: number; ratingBreakdown: Record<string, number>; categoryRatings: Record<string, number> };
+  stats: { propertiesManaged: number; unitsManaged: number; clientRetention: number; avgResponseTime: string; yearsExperience: number };
+  achievements: Array<{ title: string; description: string; year: string }>;
+}
+
 // Convert detailed manager profile to page format
-const convertManagerToPageFormat = (manager: any) => {
+const convertManagerToPageFormat = (manager: ManagerProfile | Record<string, unknown>): ConvertedManagerProfile | null => {
   if (!manager) return null;
 
   // Get rating breakdown from manager rating data
-  const ratingBreakdown = manager.rating?.ratingBreakdown || (() => {
-    // Calculate breakdown from reviews if not available
-    const breakdown = { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 };
-    if (manager.reviews && manager.reviews.length > 0) {
-      manager.reviews.forEach((review: any) => {
-        const rating = Math.floor(review.rating);
-        if (rating >= 1 && rating <= 5) {
-          breakdown[rating.toString() as keyof typeof breakdown]++;
-        }
-      });
-    }
-    return breakdown;
-  })();
+    const managerRating = (manager as ManagerProfile).rating || (manager as Record<string, unknown>).rating as ManagerProfile['rating'] | undefined;
+    const managerReviews = (manager as ManagerProfile).reviews || (manager as Record<string, unknown>).reviews as Array<Record<string, unknown>> | undefined;
+    const ratingBreakdown = (managerRating as Record<string, unknown>)?.ratingBreakdown as Record<string, number> | undefined || (() => {
+      // Calculate breakdown from reviews if not available
+      const breakdown = { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 };
+      if (managerReviews && Array.isArray(managerReviews) && managerReviews.length > 0) {
+        managerReviews.forEach((review: Record<string, unknown>) => {
+          const rating = Math.floor(Number(review.rating) || 0);
+          if (rating >= 1 && rating <= 5) {
+            breakdown[rating.toString() as keyof typeof breakdown]++;
+          }
+        });
+      }
+      return breakdown;
+    })();
+
+  const managerProfile = manager as ManagerProfile;
+  const managerRecord = manager as Record<string, unknown>;
+  const orgType = managerProfile.organizationType || managerRecord.organizationType as ManagerProfile['organizationType'] | undefined;
+  const managedProps = managerProfile.managedProperties || managerRecord.managedProperties as ManagerProfile['managedProperties'] | undefined;
+  const experience = managerProfile.experience || managerRecord.experience as ManagerProfile['experience'] | undefined;
+  const contactInfo = managerProfile.contactInfo || managerRecord.contactInfo as ManagerProfile['contactInfo'] | undefined;
+  const businessInfo = managerProfile.businessInfo || managerRecord.businessInfo as ManagerProfile['businessInfo'] | undefined;
+  const verification = managerProfile.verification || managerRecord.verification as ManagerProfile['verification'] | undefined;
+  const services = managerProfile.services || managerRecord.services as ManagerProfile['services'] | undefined;
+  const financials = managerProfile.financials || managerRecord.financials as ManagerProfile['financials'] | undefined;
+  const stats = managerProfile.stats || managerRecord.stats as ManagerProfile['stats'] | undefined;
+  const portfolio = managerProfile.portfolio || managerRecord.portfolio as ManagerProfile['portfolio'] | undefined;
+  const planType = (managerRecord.planType as string | undefined) || 'basic';
+  const employeeCount = (managerRecord.employeeCount as string | undefined);
 
   return {
-    name: manager.name,
-    logo: manager.avatar || '/api/placeholder/150/150',
-    coverImage: manager.coverImage || '/api/placeholder/800/300',
-    description: manager.description || `${manager.name} ${manager.organizationType === 'wspólnota' ? 'zarządza' : 'profesjonalnie zarządza'} ${manager.managedProperties?.buildingsCount || 0} budynkami z ${manager.managedProperties?.unitsCount || 0} lokalami. ${manager.experience?.yearsActive || 0} lat doświadczenia w branży nieruchomości zapewnia najwyższy standard obsługi.`,
-    location: manager.location?.city || 'Warszawa',
-    rating: manager.rating?.overall || 0,
-    reviewCount: manager.rating?.reviewsCount || 0,
-    managedBuildings: manager.managedProperties?.buildingsCount || 0,
-    managedUnits: manager.managedProperties?.unitsCount || 0,
-    verified: manager.verification?.status === 'verified' || false,
+    name: managerProfile.name || (managerRecord.name as string) || '',
+    logo: managerProfile.avatar || (managerRecord.avatar as string | undefined) || '/api/placeholder/150/150',
+    coverImage: managerProfile.coverImage || (managerRecord.coverImage as string | undefined) || '/api/placeholder/800/300',
+    description: (managerRecord.description as string | undefined) || `${managerProfile.name || (managerRecord.name as string) || ''} ${orgType === 'wspólnota' ? 'zarządza' : 'profesjonalnie zarządza'} ${managedProps?.buildingsCount || 0} budynkami z ${managedProps?.unitsCount || 0} lokalami. ${experience?.yearsActive || 0} lat doświadczenia w branży nieruchomości zapewnia najwyższy standard obsługi.`,
+    location: managerProfile.location?.city || (managerRecord.location as ManagerProfile['location'] | undefined)?.city || 'Warszawa',
+    rating: managerRating?.overall || 0,
+    reviewCount: managerRating?.reviewsCount || 0,
+    managedBuildings: managedProps?.buildingsCount || 0,
+    managedUnits: managedProps?.unitsCount || 0,
+    verified: verification?.status === 'verified' || false,
     hasInsurance: true,
-    isPremium: manager.organizationType === 'deweloper' || manager.organizationType === 'zarządca' || manager.planType === 'premium',
-    founded: manager.businessInfo?.yearEstablished || new Date().getFullYear(),
-    employees: manager.employeeCount || (manager.organizationType === 'wspólnota' ? '5-15' : 
-              manager.organizationType === 'spółdzielnia' ? '15-50' :
-              manager.organizationType === 'zarządca' ? '25-100' :
-              manager.organizationType === 'deweloper' ? '50-200' :
+    isPremium: orgType === 'deweloper' || orgType === 'zarządca' || planType === 'premium',
+    founded: businessInfo?.yearEstablished || new Date().getFullYear(),
+    employees: employeeCount || (orgType === 'wspólnota' ? '5-15' : 
+              orgType === 'spółdzielnia' ? '15-50' :
+              orgType === 'zarządca' ? '25-100' :
+              orgType === 'deweloper' ? '50-200' :
               '5-25'),
-    website: manager.contactInfo?.website || 'www.example.com',
-    phone: manager.contactInfo?.phone || '',
-    email: manager.contactInfo?.email || '',
-    address: manager.contactInfo?.address || '',
-    specialties: manager.services?.primaryNeeds?.slice(0, 5) || [],
-    certificates: manager.verification?.badges || [],
+    website: contactInfo?.website || 'www.example.com',
+    phone: contactInfo?.phone || '',
+    email: contactInfo?.email || '',
+    address: contactInfo?.address || '',
+    specialties: (services?.primaryNeeds as string[] | undefined)?.slice(0, 5) || [],
+    certificates: verification?.badges || [],
     services: [
       {
-        name: manager.organizationType === 'wspólnota' ? 'Zarządzanie wspólnotą' : 
-              manager.organizationType === 'spółdzielnia' ? 'Zarządzanie spółdzielnią' :
+        name: orgType === 'wspólnota' ? 'Zarządzanie wspólnotą' : 
+              orgType === 'spółdzielnia' ? 'Zarządzanie spółdzielnią' :
               'Zarządzanie nieruchomościami',
-        description: `Kompleksowe zarządzanie ${manager.organizationType === 'wspólnota' ? 'wspólnotą mieszkaniową' : 
-                     manager.organizationType === 'spółdzielnia' ? 'spółdzielnią mieszkaniową' :
+        description: `Kompleksowe zarządzanie ${orgType === 'wspólnota' ? 'wspólnotą mieszkaniową' : 
+                     orgType === 'spółdzielnia' ? 'spółdzielnią mieszkaniową' :
                      'nieruchomościami'}`,
-        price: manager.financials?.averageProjectBudget || 'Na zapytanie'
+        price: (financials?.averageProjectBudget as string | number | undefined) || 'Na zapytanie'
       },
       {
         name: 'Obsługa techniczna',
         description: 'Profesjonalna obsługa techniczna i konserwacja',
-        price: manager.financials?.budgetPreferences || 'Na zapytanie'
+        price: (financials?.budgetPreferences as string | number | undefined) || 'Na zapytanie'
       },
       {
         name: 'Zarządzanie projektami',
         description: 'Nadzór nad remontami i inwestycjami',
-        price: manager.stats?.averageProjectDuration || 'Na zapytanie'
+        price: (stats?.averageProjectDuration as string | number | undefined) || 'Na zapytanie'
       }
     ],
-    managedProperties: (manager.portfolio?.managedBuildings || []).map((building: any) => ({
-      name: building.name,
-      image: building.images?.[0] || '/api/placeholder/400/300',
-      location: building.address,
-      buildings: building.type === 'Bloki mieszkalne' ? 10 : 1,
-      units: building.unitsCount,
-      since: building.yearBuilt?.toString() || ''
+    managedProperties: ((portfolio?.managedBuildings as Array<Record<string, unknown>> | undefined) || []).map((building: Record<string, unknown>) => ({
+      name: (building.name as string) || '',
+      image: (Array.isArray(building.images) && building.images[0] ? building.images[0] as string : undefined) || '/api/placeholder/400/300',
+      location: (building.address as string) || '',
+      buildings: (building.type as string) === 'Bloki mieszkalne' ? 10 : 1,
+      units: (building.unitsCount as number) || 0,
+      since: (building.yearBuilt ? String(building.yearBuilt) : undefined) || ''
     })),
     team: [
       {
-        name: manager.contactInfo?.contactPerson || 'Zespół zarządzający',
-        position: manager.contactInfo?.position || 'Zarządca nieruchomości',
-        image: manager.avatar || '/api/placeholder/150/150',
-        experience: `${manager.experience?.yearsActive || 0} lat doświadczenia`,
-        license: manager.organizationType === 'zarządca' ? 'Licencja zarządcy nieruchomości' : 
-                manager.organizationType === 'deweloper' ? 'Uprawnienia deweloperskie' :
+        name: contactInfo?.contactPerson || 'Zespół zarządzający',
+        position: contactInfo?.position || 'Zarządca nieruchomości',
+        image: managerProfile.avatar || (managerRecord.avatar as string | undefined) || '/api/placeholder/150/150',
+        experience: `${experience?.yearsActive || 0} lat doświadczenia`,
+        license: orgType === 'zarządca' ? 'Licencja zarządcy nieruchomości' : 
+                orgType === 'deweloper' ? 'Uprawnienia deweloperskie' :
                 'Certyfikat zarządzania'
       }
     ],
-    reviews: manager.reviews?.map((review: any) => ({
-      id: review.id,
-      author: review.author,
-      authorCompany: review.authorCompany,
-      rating: review.rating,
-      title: review.title || '',
-      text: review.comment,
-      date: review.date,
-      property: review.project,
-      categories: review.categories || (review.categories ? {
-        paymentTimeliness: review.categories.payment_timeliness,
-        communication: review.categories.communication,
-        projectClarity: review.categories.project_clarity,
-        professionalism: review.categories.professionalism
+    reviews: (managerReviews || []).map((review: Record<string, unknown>) => ({
+      id: (review.id as string | undefined),
+      author: (review.author as string) || '',
+      authorCompany: (review.authorCompany as string | undefined),
+      rating: Number(review.rating) || 0,
+      title: (review.title as string | undefined) || '',
+      text: (review.comment as string) || '',
+      date: (review.date as string) || '',
+      property: (review.project as string | undefined),
+      categories: (review.categories as Record<string, number> | undefined) || (review.categories ? {
+        paymentTimeliness: Number((review.categories as Record<string, unknown>).payment_timeliness) || 0,
+        communication: Number((review.categories as Record<string, unknown>).communication) || 0,
+        projectClarity: Number((review.categories as Record<string, unknown>).project_clarity) || 0,
+        professionalism: Number((review.categories as Record<string, unknown>).professionalism) || 0
       } : {})
-    })) || [],
+    })),
     ratingSummary: {
-      averageRating: manager.rating?.overall || 0,
-      totalReviews: manager.rating?.reviewsCount || 0,
+      averageRating: managerRating?.overall || 0,
+      totalReviews: managerRating?.reviewsCount || 0,
       ratingBreakdown: ratingBreakdown,
       categoryRatings: {
-        paymentTimeliness: manager.rating?.categories?.paymentTimeliness || 0,
-        communication: manager.rating?.categories?.communication || 0,
-        projectClarity: manager.rating?.categories?.projectClarity || 0,
-        professionalism: manager.rating?.categories?.professionalism || 0
+        paymentTimeliness: managerRating?.categories?.paymentTimeliness || 0,
+        communication: managerRating?.categories?.communication || 0,
+        projectClarity: managerRating?.categories?.projectClarity || 0,
+        professionalism: managerRating?.categories?.professionalism || 0
       }
     },
     stats: {
-      propertiesManaged: manager.managedProperties?.buildingsCount || 0,
-      unitsManaged: manager.managedProperties?.unitsCount || 0,
-      clientRetention: manager.stats?.contractorRetentionRate || 0,
-      avgResponseTime: manager.stats?.averageResponseTime || '',
-      yearsExperience: manager.experience?.yearsActive || 0
+      propertiesManaged: managedProps?.buildingsCount || 0,
+      unitsManaged: managedProps?.unitsCount || 0,
+      clientRetention: stats?.contractorRetentionRate || 0,
+      avgResponseTime: (stats?.averageResponseTime as string | undefined) || '',
+      yearsExperience: experience?.yearsActive || 0
     },
     achievements: [
       {
-        title: manager.verification?.badges?.[0] || 'Zweryfikowany zarządca',
+        title: (verification?.badges?.[0] as string | undefined) || 'Zweryfikowany zarządca',
         description: 'Potwierdzona wiarygodność i kompetencje',
         year: new Date().getFullYear().toString()
       },
       {
-        title: `${manager.experience?.completedProjects || 0} zakończonych projektów`,
+        title: `${experience?.completedProjects || 0} zakończonych projektów`,
         description: 'Udane realizacje i zadowoleni klienci',
         year: new Date().getFullYear().toString()
       }
@@ -155,11 +204,11 @@ const convertManagerToPageFormat = (manager: any) => {
 export default function ManagerProfilePage({ managerId, onBack }: ManagerProfilePageProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
-  const [manager, setManager] = useState<any>(null);
+  const [manager, setManager] = useState<ConvertedManagerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeJobs, setActiveJobs] = useState<any[]>([]);
-  const [activeTenders, setActiveTenders] = useState<any[]>([]);
+  const [activeJobs, setActiveJobs] = useState<Array<Record<string, unknown>>>([]);
+  const [activeTenders, setActiveTenders] = useState<Array<Record<string, unknown>>>([]);
   const [loadingJobsTenders, setLoadingJobsTenders] = useState(false);
 
   useEffect(() => {
@@ -173,7 +222,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
         } else {
           const fallbackManager = mockManagerDetailsMap[managerId];
           if (fallbackManager) {
-            setManager(fallbackManager);
+            setManager(convertManagerToPageFormat(fallbackManager as unknown as ManagerProfile | Record<string, unknown>));
             setError(null);
           } else {
             setError('Nie udało się załadować profilu zarządcy');
@@ -183,7 +232,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
         console.error('Error loading manager:', err);
         const fallbackManager = mockManagerDetailsMap[managerId];
         if (fallbackManager) {
-          setManager(fallbackManager);
+          setManager(convertManagerToPageFormat(fallbackManager as unknown as ManagerProfile | Record<string, unknown>));
           setError(null);
         } else {
           setError('Nie udało się załadować profilu zarządcy');
@@ -250,10 +299,11 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
         if (jobsError) {
           console.error('Error fetching active jobs:', jobsError);
         } else {
-          setActiveJobs(jobsData || []);
+          setActiveJobs((jobsData || []) as Array<Record<string, unknown>>);
         }
 
         // Fetch active tenders
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: tendersData, error: tendersError } = await (supabase as any)
           .from('tenders')
           .select(`
@@ -275,7 +325,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
         if (tendersError) {
           console.error('Error fetching active tenders:', tendersError);
         } else {
-          setActiveTenders(tendersData || []);
+          setActiveTenders((tendersData || []) as Array<Record<string, unknown>>);
         }
       } catch (err) {
         console.error('Error fetching jobs and tenders:', err);
@@ -406,7 +456,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                     <Card>
                       <CardContent className="pt-4 sm:pt-6">
                         <div className="space-y-2 sm:space-y-3">
-                          {manager.achievements.map((achievement: any, index: number) => (
+                          {manager.achievements.map((achievement, index: number) => (
                             <div key={index} className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                               <Award className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                               <div className="min-w-0 flex-1">
@@ -524,29 +574,32 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                   <div>
                     <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Aktywne zlecenia</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                      {activeJobs.map((job: any) => (
-                        <Card key={job.id}>
+                      {activeJobs.map((job) => {
+                        const jobCategories = job.job_categories as { name?: string } | undefined;
+                        const jobLocation = job.location as string | { address?: string } | undefined;
+                        return (
+                        <Card key={String(job.id)}>
                           <CardHeader>
-                            <CardTitle className="text-sm sm:text-base">{job.title}</CardTitle>
+                            <CardTitle className="text-sm sm:text-base">{String(job.title || '')}</CardTitle>
                             <div className="flex items-center gap-2 mt-2">
-                              {job.job_categories && (
+                              {jobCategories && (
                                 <Badge variant="secondary" className="text-xs">
-                                  {job.job_categories.name || 'Inne'}
+                                  {jobCategories.name || 'Inne'}
                                 </Badge>
                               )}
                             </div>
                           </CardHeader>
                           <CardContent>
                             <div className="space-y-2">
-                              {job.budget_min !== null && (
+                              {job.budget_min !== null && job.budget_min !== undefined && (
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs sm:text-sm text-gray-600">Budżet:</span>
                                   <span className="text-sm sm:text-base font-semibold text-green-600">
                                     {formatBudget(budgetFromDatabase({
-                                      budget_min: job.budget_min,
-                                      budget_max: job.budget_max,
-                                      budget_type: job.budget_type || 'fixed',
-                                      currency: job.currency || 'PLN'
+                                      budget_min: Number(job.budget_min) || 0,
+                                      budget_max: Number(job.budget_max) || 0,
+                                      budget_type: (job.budget_type as 'fixed' | 'hourly' | 'negotiable' | 'range' | undefined) || 'fixed',
+                                      currency: String(job.currency || 'PLN')
                                     }))}
                                   </span>
                                 </div>
@@ -554,13 +607,13 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                               {job.deadline && (
                                 <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
                                   <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  <span>Termin: {new Date(job.deadline).toLocaleDateString('pl-PL')}</span>
+                                  <span>Termin: {new Date(String(job.deadline)).toLocaleDateString('pl-PL')}</span>
                                 </div>
                               )}
-                              {job.location && (
+                              {jobLocation && (
                                 <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
                                   <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  <span>{typeof job.location === 'string' ? job.location : job.location.address || 'Lokalizacja nieokreślona'}</span>
+                                  <span>{typeof jobLocation === 'string' ? jobLocation : jobLocation.address || 'Lokalizacja nieokreślona'}</span>
                                 </div>
                               )}
                             </div>
@@ -575,7 +628,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                             </div>
                           </CardContent>
                         </Card>
-                      ))}
+                      )})}
                     </div>
                   </div>
                 )}
@@ -585,14 +638,17 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                   <div>
                     <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Aktywne przetargi</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                      {activeTenders.map((tender: any) => (
-                        <Card key={tender.id}>
+                      {activeTenders.map((tender) => {
+                        const tenderCategory = tender.category as { name?: string } | undefined;
+                        const tenderLocation = tender.location as string | { address?: string } | undefined;
+                        return (
+                        <Card key={String(tender.id)}>
                           <CardHeader>
-                            <CardTitle className="text-sm sm:text-base">{tender.title}</CardTitle>
+                            <CardTitle className="text-sm sm:text-base">{String(tender.title || '')}</CardTitle>
                             <div className="flex items-center gap-2 mt-2">
-                              {tender.category && (
+                              {tenderCategory && (
                                 <Badge variant="secondary" className="text-xs">
-                                  {tender.category.name || 'Inne'}
+                                  {tenderCategory.name || 'Inne'}
                                 </Badge>
                               )}
                               <Badge className="bg-green-100 text-green-800 text-xs">Aktywny</Badge>
@@ -607,26 +663,26 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                                     {new Intl.NumberFormat('pl-PL', {
                                       minimumFractionDigits: 0,
                                       maximumFractionDigits: 0
-                                    }).format(tender.estimated_value)} {tender.currency || 'PLN'}
+                                    }).format(Number(tender.estimated_value))} {String(tender.currency || 'PLN')}
                                   </span>
                                 </div>
                               )}
                               {tender.submission_deadline && (
                                 <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
                                   <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  <span>Termin składania: {new Date(tender.submission_deadline).toLocaleDateString('pl-PL')}</span>
+                                  <span>Termin składania: {new Date(String(tender.submission_deadline)).toLocaleDateString('pl-PL')}</span>
                                 </div>
                               )}
-                              {tender.location && (
+                              {tenderLocation && (
                                 <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
                                   <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  <span>{typeof tender.location === 'string' ? tender.location : tender.location.address || 'Lokalizacja nieokreślona'}</span>
+                                  <span>{typeof tenderLocation === 'string' ? tenderLocation : tenderLocation.address || 'Lokalizacja nieokreślona'}</span>
                                 </div>
                               )}
                             </div>
                           </CardContent>
                         </Card>
-                      ))}
+                      )})}
                     </div>
                   </div>
                 )}
@@ -640,9 +696,10 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
           <div id="properties" className="scroll-mt-4">
             {manager.managedProperties && manager.managedProperties.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                {manager.managedProperties.map((property: any, index: number) => (
+                {manager.managedProperties.map((property, index: number) => (
                   <Card key={index}>
                     <div className="aspect-video bg-gray-200 rounded-t-lg overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
                         src={property.image} 
                         alt={property.name}
@@ -691,7 +748,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
         {activeTab === 'team' && (
           <div id="team" className="scroll-mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {manager.team.map((member: any, index: number) => (
+              {manager.team.map((member, index: number) => (
                 <Card key={index}>
                   <CardContent className="pt-4 sm:pt-6 text-center">
                     <Avatar className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4">
@@ -793,7 +850,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
               {/* Reviews List */}
               <div className="space-y-4">
                 {manager.reviews && manager.reviews.length > 0 ? (
-                  manager.reviews.map((review: any) => (
+                  manager.reviews.map((review) => (
                     <Card key={review.id || review.date}>
                       <CardContent className="pt-6">
                         <div className="flex items-start justify-between mb-4">

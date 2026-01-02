@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -13,7 +13,7 @@ import { Badge } from './ui/badge';
 import { CheckCircle, Building2, Users, ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface SurveyProps {
-  onComplete: (data: any) => void;
+  onComplete: (data: SurveyData) => void;
   onBack?: () => void;
 }
 
@@ -29,7 +29,7 @@ interface SurveyData {
     position: string;
     experience: string;
   };
-  responses: Record<string, any>;
+  responses: Record<string, string | number | string[]>;
 }
 
 export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
@@ -48,7 +48,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
     responses: {}
   });
 
-  const updateResponse = (key: string, value: any) => {
+  const updateResponse = (key: string, value: string | number | string[]) => {
     setSurveyData(prev => ({
       ...prev,
       responses: {
@@ -378,7 +378,18 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
     onComplete(finalData);
   };
 
-  const renderQuestion = (question: any) => {
+  interface Question {
+    id: string;
+    title: string;
+    type: 'radio' | 'checkbox' | 'select' | 'slider' | 'textarea';
+    options?: string[];
+    placeholder?: string;
+    min?: number;
+    max?: number;
+    step?: number;
+  }
+
+  const renderQuestion = (question: Question) => {
     switch (question.type) {
       case 'radio':
         return (
@@ -395,7 +406,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
           </RadioGroup>
         );
 
-      case 'checkbox':
+      case 'checkbox': {
         const selectedOptions = surveyData.responses[question.id] || [];
         return (
           <div className="space-y-3">
@@ -416,6 +427,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
             ))}
           </div>
         );
+      }
 
       case 'select':
         return (
@@ -436,7 +448,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
           </Select>
         );
 
-      case 'slider':
+      case 'slider': {
         const value = surveyData.responses[question.id] || [question.min || 0];
         return (
           <div className="space-y-4">
@@ -456,6 +468,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
             </div>
           </div>
         );
+      }
 
       case 'textarea':
         return (

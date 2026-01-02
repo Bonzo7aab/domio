@@ -23,7 +23,7 @@ interface DocumentUpload {
   required: boolean;
 }
 
-export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) => {
+export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack: _onBack }) => {
   const { user } = useUserProfile();
   const router = useRouter();
   const [uploads, setUploads] = useState<Record<string, DocumentUpload>>({});
@@ -257,7 +257,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onBack }) =>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Check className="h-4 w-4 text-success" />
-                        <span>Oznaczenie "Zweryfikowany"</span>
+                        <span>Oznaczenie &quot;Zweryfikowany&quot;</span>
                       </div>
                     </div>
                   </div>

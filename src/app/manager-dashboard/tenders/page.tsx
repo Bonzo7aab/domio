@@ -120,7 +120,7 @@ export default function TendersPage() {
     }
   };
 
-  const handleTenderSubmit = async (tender: any, tenderId?: string) => {
+  const handleTenderSubmit = async (tender: Record<string, unknown>, tenderId?: string) => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby utworzyć przetarg');
       return;
@@ -141,7 +141,7 @@ export default function TendersPage() {
       
       if (isEditing) {
         // Update existing tender
-        const { data: updatedTender, error: updateError } = await updateTender(supabase, tenderId, tender);
+        const { error: updateError } = await updateTender(supabase, tenderId, tender);
         
         if (updateError) {
           toast.error('Nie udało się zaktualizować przetargu: ' + (updateError.message || 'Nieznany błąd'));
@@ -162,7 +162,7 @@ export default function TendersPage() {
         }
 
         // Save tender to database
-        const { data: savedTender, error: saveError } = await createTender(supabase, {
+        const { error: saveError } = await createTender(supabase, {
           ...tender,
           managerId: user.id,
           companyId: company.id,

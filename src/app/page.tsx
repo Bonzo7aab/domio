@@ -1,9 +1,8 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import JobFilters, { FilterState } from '../components/JobFilters';
-import { EnhancedJobList } from '../components/EnhancedJobList';
+import JobFilters from '../components/JobFilters';
 import JobList from '../components/JobList';
 import { JobApplicationModal } from '../components/JobApplicationModal';
 import { MapPlaceholder } from '../components/MapPlaceholder';
@@ -11,9 +10,10 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getJobsAndTenders, type DBJobFilters } from '../lib/data';
+import type { Job } from '../types/job';
 import { useLayoutContext } from '../components/ConditionalFooter';
 import { useFilterContext } from '../contexts/FilterContext';
-import { JobsProvider, useJobsContext } from '../contexts/JobsContext';
+import { useJobsContext } from '../contexts/JobsContext';
 import { createClient } from '../lib/supabase/client';
 import { createJobApplication, createTenderBid } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
@@ -48,18 +48,17 @@ function HomePageContent() {
   const { user } = useUserProfile();
   const router = useRouter();
   const { isMapExpanded, setIsMapExpanded } = useLayoutContext();
-  const { filters, setFilters, primaryLocation, setPrimaryLocation, setLocationChangeHandler, onLocationChangeRequest } = useFilterContext();
+  const { filters, setFilters, primaryLocation, setPrimaryLocation, setLocationChangeHandler } = useFilterContext();
   const { setLoadedJobs: setContextLoadedJobs, setJobs: setContextJobs } = useJobsContext();
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [hoveredJobId, setHoveredJobId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [searchRadius, setSearchRadius] = useState(25);
   // Keep map-related state for when map is expanded
   const [applicationModalOpen, setApplicationModalOpen] = useState(false);
   const [selectedApplicationJobId, setSelectedApplicationJobId] = useState<string | null>(null);
-  const [selectedApplicationJob, setSelectedApplicationJob] = useState<any>(null);
+  const [selectedApplicationJob, setSelectedApplicationJob] = useState<Job | null>(null);
   const [applicationForm, setApplicationForm] = useState({
     proposedPrice: '',
     estimatedCompletion: '',
@@ -67,8 +66,8 @@ function HomePageContent() {
     additionalNotes: ''
   });
   const [showMessaging, setShowMessaging] = useState(false);
-  const [loadedJobs, setLoadedJobs] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]); // Keep for map and other uses
+  const [loadedJobs, setLoadedJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]); // Keep for map and other uses
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
   const [showCitySelector, setShowCitySelector] = useState(false);
@@ -78,7 +77,7 @@ function HomePageContent() {
   const isMapExpandedRef = useRef(isMapExpanded);
   
   // Cache for bounds queries to avoid redundant API calls
-  const boundsCacheRef = useRef<Map<string, { bounds: { north: number; south: number; east: number; west: number }; data: any[]; timestamp: number }>>(new Map());
+  const boundsCacheRef = useRef<Map<string, { bounds: { north: number; south: number; east: number; west: number }; data: unknown[]; timestamp: number }>>(new Map());
   const boundsDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastQueriedBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
   
@@ -118,7 +117,7 @@ function HomePageContent() {
   };
 
   // Helper function to check if cached bounds cover the requested bounds
-  const getCachedDataForBounds = (bounds: { north: number; south: number; east: number; west: number }): any[] | null => {
+  const getCachedDataForBounds = (bounds: { north: number; south: number; east: number; west: number }): Job[] | null => {
     const now = Date.now();
     
     for (const [key, cached] of boundsCacheRef.current.entries()) {
@@ -136,7 +135,8 @@ function HomePageContent() {
         cached.bounds.east >= bounds.east
       ) {
         // Filter cached data to match exact bounds
-        return cached.data.filter((job: any) => 
+        return cached.data.filter((job: Job) => 
+          job.lat && job.lng &&
           job.lat >= bounds.south &&
           job.lat <= bounds.north &&
           job.lng >= bounds.west &&
@@ -242,6 +242,7 @@ function HomePageContent() {
   // Load initial jobs from database (without bounds initially)
   useEffect(() => {
     loadJobsFromDatabase(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle map bounds changes with debouncing and caching
@@ -301,44 +302,8 @@ function HomePageContent() {
     router.push(`/jobs/${jobId}`);
   };
 
-  const handleMessagingClick = () => {
-    setShowMessaging(true);
-  };
-
   const handleMessagingClose = () => {
     setShowMessaging(false);
-  };
-
-  // Search handlers
-  const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
-    setFilters(prev => ({
-      ...prev,
-      searchQuery: query
-    }));
-  };
-
-  const handleSearchSelect = (query: string) => {
-    setSearchQuery(query);
-    setFilters(prev => ({
-      ...prev,
-      searchQuery: query
-    }));
-    if (query.trim()) {
-      toast.info(`Wyszukiwanie: "${query}"`);
-    }
-  };
-
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    setFilters(prev => ({
-      ...prev,
-      searchQuery: ''
-    }));
-  };
-
-  const handlePrimaryLocationChange = (location: string) => {
-    setPrimaryLocation(location);
   };
   
   // Initialize filter context on mount
@@ -350,6 +315,7 @@ function HomePageContent() {
         searchQuery: searchQuery
       }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   const handleCityNameChange = (cityName: string | null) => {
@@ -391,7 +357,7 @@ function HomePageContent() {
   };
 
   // Application modal handlers
-  const handleApplyClick = (jobId: string, jobData?: any) => {
+  const handleApplyClick = (jobId: string, jobData?: Job) => {
     if (!user) {
       toast.error('Musisz się zalogować, aby składać oferty');
       router.push('/login');
@@ -408,7 +374,7 @@ function HomePageContent() {
     setApplicationModalOpen(true);
   };
 
-  const handleApplicationSubmit = async (applicationData: any) => {
+  const handleApplicationSubmit = async (applicationData: Record<string, unknown>) => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany aby złożyć ofertę');
       return;

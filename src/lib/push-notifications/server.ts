@@ -15,7 +15,7 @@ export interface PushNotificationPayload {
   icon?: string;
   badge?: string;
   tag?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   url?: string;
   actions?: Array<{
     action: string;

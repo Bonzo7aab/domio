@@ -7,6 +7,9 @@
 
 import { shouldUseMockData } from '../config/data-source';
 import { createClient } from '../supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../../types/database';
+import type { Job } from '../../types/job';
 
 // Database imports
 import { 
@@ -31,13 +34,9 @@ import {
 // Mock imports
 import { mockJobDetailsMap } from '../../mocks/jobs/mockJobDetails';
 import { 
-  mockTenders, 
   getTenderById as mockGetTenderById 
 } from '../../mocks/tenders/mockTenders';
 import { 
-  mockConversations, 
-  mockMessages,
-  getConversationById as mockGetConversationById,
   getMessagesByConversationId as mockGetMessagesByConversationId
 } from '../../mocks/messaging/mockMessaging';
 import { getMockBrowseContractors } from '../../mocks/contractors/mockContractors';
@@ -54,10 +53,10 @@ import { getMockBrowseManagers } from '../../mocks/managers/mockManagers';
  * @param args - Arguments to pass to database function (after supabase client)
  * @returns Data from mock or database
  */
-async function fetchData<T>(
-  dbFetch: (supabase: any, ...args: any[]) => Promise<T>,
-  mockFetch: (...args: any[]) => T,
-  ...args: any[]
+async function fetchData<T, TArgs extends unknown[] = unknown[]>(
+  dbFetch: (supabase: SupabaseClient<Database>, ...args: TArgs) => Promise<T>,
+  mockFetch: (...args: TArgs) => T,
+  ...args: TArgs
 ): Promise<T> {
   if (shouldUseMockData()) {
     // Return mock data
@@ -77,7 +76,9 @@ async function fetchData<T>(
  * @returns Data from database
  */
 async function fetchDataFromDB<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dbFetch: (supabase: any, ...args: any[]) => Promise<T>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ...args: any[]
 ): Promise<T> {
   const supabase = createClient();
@@ -91,7 +92,7 @@ async function fetchDataFromDB<T>(
 /**
  * Mock fetch function for jobs and tenders
  */
-function mockFetchJobsAndTenders(filters: DBJobFilters = {}): any {
+function mockFetchJobsAndTenders(filters: DBJobFilters = {}): Job[] {
   // Convert mock data map to array format
   const mockItems = Object.values(mockJobDetailsMap);
   
@@ -100,7 +101,7 @@ function mockFetchJobsAndTenders(filters: DBJobFilters = {}): any {
   
   if (filters.searchQuery) {
     const query = filters.searchQuery.toLowerCase();
-    filtered = filtered.filter((item: any) => 
+    filtered = filtered.filter((item: Job) => 
       item.title?.toLowerCase().includes(query) ||
       item.description?.toLowerCase().includes(query) ||
       item.location?.toLowerCase().includes(query)
@@ -108,12 +109,12 @@ function mockFetchJobsAndTenders(filters: DBJobFilters = {}): any {
   }
   
   if (filters.postType && filters.postType !== 'all') {
-    filtered = filtered.filter((item: any) => item.postType === filters.postType);
+    filtered = filtered.filter((item: Job) => item.postType === filters.postType);
   }
   
   // Sort by newest (default)
   if (filters.sortBy === 'newest' || !filters.sortBy) {
-    filtered.sort((a: any, b: any) => 0); // Mock data is already in order
+    filtered.sort((_a: Job, _b: Job) => 0); // Mock data is already in order
   }
   
   // Limit
@@ -140,7 +141,7 @@ export async function getJobsAndTenders(filters: DBJobFilters = {}) {
 /**
  * Mock fetch function for single job
  */
-function mockFetchJobById(jobId: string): any {
+function mockFetchJobById(jobId: string): { data: Job | null; error: string | null } {
   const mockJob = mockJobDetailsMap[jobId];
   if (mockJob && mockJob.postType === 'job') {
     return { data: mockJob, error: null };
@@ -164,7 +165,7 @@ export async function getJobById(jobId: string) {
 /**
  * Mock fetch function for single tender
  */
-function mockFetchTenderById(tenderId: string): any {
+function mockFetchTenderById(tenderId: string): { data: Job | null; error: string | null } {
   // Check mockJobDetailsMap first (has detailed format)
   const mockTenderFromMap = mockJobDetailsMap[tenderId];
   if (mockTenderFromMap && mockTenderFromMap.postType === 'tender') {
@@ -241,6 +242,7 @@ export async function getManagers(filters: DBManagerFilters = {}) {
 /**
  * Mock fetch function for conversations
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mockFetchConversations(userId: string): any {
   // Filter conversations where user is a participant
   const userConversations = mockConversations.filter(conv =>
@@ -265,6 +267,7 @@ export async function getConversations(userId: string) {
 /**
  * Mock fetch function for messages
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mockFetchMessages(conversationId: string): any {
   const messages = mockGetMessagesByConversationId(conversationId);
   return { data: messages, error: null };

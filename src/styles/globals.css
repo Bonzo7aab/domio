@@ -208,6 +208,63 @@
 
 html {
   font-size: var(--font-size);
+  /* Reserve space for scrollbar to prevent content shift */
+  scrollbar-gutter: stable;
+  overflow-y: auto;
+}
+
+body {
+  /* Reserve space for scrollbar but hide it when not needed */
+  scrollbar-gutter: stable;
+  overflow-y: auto;
+  /* Hide scrollbar for Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  /* Prevent libraries from adding margin when scroll is locked */
+  margin: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Prevent margin from being added when scroll is locked - highest priority override */
+body[data-scroll-locked],
+html body[data-scroll-locked],
+body[data-scroll-locked="1"],
+html body[data-scroll-locked="1"] {
+  margin: 0 !important;
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Hide scrollbar for webkit browsers (Chrome, Safari, Edge) */
+body::-webkit-scrollbar {
+  width: 15px;
+}
+
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+/* Show scrollbar on hover or when actively scrolling */
+body:hover::-webkit-scrollbar-thumb,
+body.scrolling::-webkit-scrollbar-thumb {
+  background: hsl(214 32% 70%);
+}
+
+body:hover::-webkit-scrollbar-thumb:hover,
+body.scrolling::-webkit-scrollbar-thumb:hover {
+  background: hsl(214 32% 60%);
 }
 
 /* Custom Map Animations - Required by tailwindcss-animate plugin */

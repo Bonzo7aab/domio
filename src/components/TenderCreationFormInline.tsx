@@ -9,7 +9,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { Collapsible, CollapsibleContent } from './ui/collapsible';
 import { 
   Plus, 
   Minus,
@@ -144,7 +144,7 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
 }) => {
   const isEditMode = !!tenderId && !!initialData;
 
-  const [formData, setFormData] = useState<NewTender>({
+  const [formData, setFormData] = useState<NewTender>(() => ({
     title: '',
     description: '',
     category: '',
@@ -167,7 +167,7 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
     insuranceRequired: '500000',
     advancePayment: false,
     performanceBond: false
-  });
+  }));
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
@@ -190,8 +190,9 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
           : '';
       
       // Access address from the data object (may not be in type definition but exists in DB)
-      const address = (initialData as any).address || locationString || undefined;
+      const address = ('address' in initialData ? initialData.address : undefined) as string | undefined || locationString || undefined;
       
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         title: initialData.title || '',
         description: initialData.description || '',
@@ -208,12 +209,12 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
           ? initialData.requirements 
           : [''],
         evaluationCriteria: initialData.evaluation_criteria && Array.isArray(initialData.evaluation_criteria)
-          ? initialData.evaluation_criteria.map((criterion: any) => ({
-              id: criterion.id || `criterion-${Date.now()}-${Math.random()}`,
-              name: criterion.name || '',
-              description: criterion.description || '',
-              weight: criterion.weight || 0,
-              type: criterion.type || 'quality'
+          ? (initialData.evaluation_criteria as Array<Record<string, unknown>>).map((criterion: Record<string, unknown>) => ({
+              id: String(criterion.id || `criterion-${Date.now()}-${Math.random()}`),
+              name: String(criterion.name || ''),
+              description: String(criterion.description || ''),
+              weight: Number(criterion.weight || 0),
+              type: (criterion.type as 'price' | 'quality' | 'time' | 'experience') || 'quality'
             }))
           : defaultCriteria,
         documents: [], // Documents from DB are not File objects, so we start fresh
@@ -350,7 +351,7 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
     }));
   };
 
-  const updateCriterion = (id: string, field: keyof EvaluationCriterion, value: any) => {
+  const updateCriterion = (id: string, field: keyof EvaluationCriterion, value: EvaluationCriterion[typeof field]) => {
     setFormData(prev => ({
       ...prev,
       evaluationCriteria: prev.evaluationCriteria.map(criterion => {

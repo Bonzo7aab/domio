@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react';
-import { Mail, Phone, Building, Edit2, X, Check } from 'lucide-react';
+import { Mail, Phone, Edit2, X, Check } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';

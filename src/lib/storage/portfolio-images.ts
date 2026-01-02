@@ -19,7 +19,7 @@ export async function uploadPortfolioImage(
   file: File,
   userId: string,
   projectId: string
-): Promise<{ data: UploadResult | null; error: any }> {
+): Promise<{ data: UploadResult | null; error: Error | null }> {
   try {
     // Validate file type
     const fileType = file.type.toLowerCase();
@@ -50,7 +50,7 @@ export async function uploadPortfolioImage(
     const filePath = `${userId}/portfolio/${projectId}/${fileName}`;
 
     // Upload file to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from(PORTFOLIO_IMAGES_BUCKET)
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -123,9 +123,9 @@ export async function uploadPortfolioImages(
   files: File[],
   userId: string,
   projectId: string
-): Promise<{ data: UploadResult[]; errors: any[] }> {
+): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
-  const errors: any[] = [];
+  const errors: Error[] = [];
 
   for (const file of files) {
     const { data, error } = await uploadPortfolioImage(supabase, file, userId, projectId);
@@ -146,7 +146,7 @@ export async function deletePortfolioImage(
   supabase: SupabaseClient<Database>,
   fileUploadId: string,
   imagePath: string
-): Promise<{ success: boolean; error: any }> {
+): Promise<{ success: boolean; error: Error | null }> {
   try {
     // Extract path from URL if full URL is provided
     let path = imagePath;

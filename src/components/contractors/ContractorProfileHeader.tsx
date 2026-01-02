@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Award, Building, Calendar, CheckCircle, Clock, MapPin, Phone, Shield, Star, Users, Briefcase } from 'lucide-react';
+import { Award, Calendar, CheckCircle, Clock, MapPin, Shield, Star, Users, Briefcase } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';

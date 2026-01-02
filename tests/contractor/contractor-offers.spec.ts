@@ -40,11 +40,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
             await page.waitForURL((url) => !url.pathname.includes('/jobs/') || url.pathname.includes(`/jobs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
@@ -99,7 +99,7 @@ test.describe('Contractor Making Offers', () => {
         const priceValue = await priceInput.inputValue();
         const textareaValue = await coverLetterTextarea.inputValue();
         // Check that select value is set by looking for the selected option text in the combobox
-        const selectValue = await timeSelect.textContent();
+        // const selectValue = await timeSelect.textContent(); // Unused variable - commented out
         
         // Ensure we have valid data
         expect(Number(priceValue)).toBeGreaterThan(0);
@@ -153,11 +153,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
             await page.waitForURL((url) => !url.pathname.includes('/jobs/') || url.pathname.includes(`/jobs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
@@ -249,11 +249,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000); // Wait for redirect/cleanup to complete
             // Check if we're already on the correct page
             if (page.url().includes(`/jobs/${testTender.id}`)) {
@@ -327,11 +327,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000); // Wait for redirect/cleanup to complete
             // Check if we're already on the correct page
             if (page.url().includes(`/jobs/${testTender.id}`)) {
@@ -413,11 +413,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
             await page.waitForURL((url) => !url.pathname.includes('/jobs/') || url.pathname.includes(`/jobs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
@@ -474,11 +474,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
             await page.waitForURL((url) => !url.pathname.includes('/jobs/') || url.pathname.includes(`/jobs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
@@ -540,11 +540,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
             await page.waitForURL((url) => !url.pathname.includes('/jobs/') || url.pathname.includes(`/jobs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
@@ -617,11 +617,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000); // Wait for redirect/cleanup to complete
             // Check if we're already on the correct page
             if (page.url().includes(`/jobs/${testTender.id}`)) {
@@ -724,11 +724,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob1.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000);
             if (page.url().includes(`/jobs/${testJob1.id}`)) {
               await page.waitForLoadState('networkidle');
@@ -768,11 +768,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob2.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000);
             if (page.url().includes(`/jobs/${testJob2.id}`)) {
               await page.waitForLoadState('networkidle');
@@ -834,11 +834,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
             await page.waitForURL((url) => !url.pathname.includes('/jobs/') || url.pathname.includes(`/jobs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
@@ -900,11 +900,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
             await page.waitForURL((url) => !url.pathname.includes('/jobs/') || url.pathname.includes(`/jobs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
@@ -992,11 +992,11 @@ test.describe('Contractor Making Offers', () => {
         try {
           await page.goto(`/jobs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
-          if (error.message?.includes('NS_BINDING_ABORTED') || 
+          if (error instanceof Error && (error.message?.includes('NS_BINDING_ABORTED') || 
               error.message?.includes('interrupted') ||
-              error.message?.includes('interrupted by another navigation')) {
+              error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
             await page.waitForURL((url) => !url.pathname.includes('/jobs/') || url.pathname.includes(`/jobs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete

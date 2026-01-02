@@ -21,7 +21,7 @@ interface JobListProps {
   onToggleMap?: () => void;
   isMapVisible?: boolean;
   isLoadingJobs?: boolean;
-  onApplyClick?: (jobId: string, jobData?: any) => void;
+  onApplyClick?: (jobId: string, jobData?: Job) => void;
 }
 
 export default function JobList({ 
@@ -29,8 +29,8 @@ export default function JobList({
   filters,
   onFilterChange,
   onJobSelect, 
-  onToggleMap, 
-  isMapVisible = true,
+  onToggleMap: _onToggleMap, 
+  isMapVisible: _isMapVisible = true,
   isLoadingJobs = false,
   onApplyClick
 }: JobListProps) {
@@ -72,6 +72,7 @@ export default function JobList({
     try {
       const stored = sessionStorage.getItem('view-count-updates');
       const updates = stored ? JSON.parse(stored) : {};
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewCountUpdates(updates);
     } catch (error) {
       console.error('Error loading view count updates:', error);
@@ -105,12 +106,13 @@ export default function JobList({
   // Keep optimistic updates but update with server data if it's higher (to handle other users' bookmarks)
   useEffect(() => {
     if (jobsProp && jobsProp.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBookmarkCountUpdates(prev => {
         const newUpdates: Record<string, number> = { ...prev };
         // Update counts from server data, but keep optimistic updates if they're higher
         // This ensures user's actions are reflected while also showing other users' bookmarks
         jobsProp.forEach(job => {
-          const serverCount = (job as any).bookmarks_count || 0;
+          const serverCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
           const optimisticCount = prev[job.id];
           
           if (optimisticCount !== undefined) {
@@ -156,7 +158,7 @@ export default function JobList({
     if (!job) return;
 
     const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
-    const currentCount = (job as any).bookmarks_count || 0;
+    const currentCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
     
     if (isCurrentlyBookmarked) {
       removeBookmark(jobId);
@@ -167,7 +169,7 @@ export default function JobList({
         [jobId]: Math.max(0, currentCount - 1)
       }));
     } else {
-      const jobData = job as any;
+      const jobData = job as Job;
       const bookmarkData = {
         id: jobData.id,
         title: jobData.title,
@@ -323,8 +325,8 @@ export default function JobList({
       // Filter by budget ranges (checkboxes)
       if (filters.budgetRanges && filters.budgetRanges.length > 0) {
         // Get job budget values (budget_min and budget_max from job data)
-        const jobBudgetMin = (job as any).budget_min;
-        const jobBudgetMax = (job as any).budget_max;
+        const jobBudgetMin = ('budget_min' in job ? job.budget_min : undefined) as number | undefined;
+        const jobBudgetMax = ('budget_max' in job ? job.budget_max : undefined) as number | undefined;
         
         // Check if job has budget info (null/undefined check, but 0 is valid)
         const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
@@ -372,8 +374,8 @@ export default function JobList({
 
       // Filter by budget min/max inputs
       if (filters.budgetMin !== undefined && filters.budgetMin !== null) {
-        const jobBudgetMin = (job as any).budget_min ?? null;
-        const jobBudgetMax = (job as any).budget_max ?? null;
+        const jobBudgetMin = job.budget?.min ?? null;
+        const jobBudgetMax = job.budget?.max ?? null;
         
         // If job has no budget info, skip this filter (include the job)
         if (jobBudgetMin === null && jobBudgetMax === null) {
@@ -388,8 +390,8 @@ export default function JobList({
       }
 
       if (filters.budgetMax !== undefined && filters.budgetMax !== null) {
-        const jobBudgetMin = (job as any).budget_min ?? null;
-        const jobBudgetMax = (job as any).budget_max ?? null;
+        const jobBudgetMin = job.budget?.min ?? null;
+        const jobBudgetMax = job.budget?.max ?? null;
         
         // If job has no budget info, skip this filter (include the job)
         if (jobBudgetMin === null && jobBudgetMax === null) {
@@ -415,8 +417,8 @@ export default function JobList({
 
       // Filter by date added (created_at)
       if (filters.dateAdded && filters.dateAdded.length > 0) {
-        // Get job's created_at timestamp (ISO string from database)
-        const jobCreatedAt = (job as any).created_at;
+        // Get job's postedTime timestamp (ISO string from database)
+        const jobCreatedAt = job.postedTime;
         if (!jobCreatedAt) {
           // If job has no created_at, skip this filter (include the job)
         } else {

@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { ScrollArea } from './ui/scroll-area';
 import { 
   Bell, 
-  X, 
   Eye, 
   UserCheck, 
-  MessageSquare,
   Calendar,
   CheckCircle,
   Clock,
@@ -45,7 +42,7 @@ interface ApplicationNotificationsProps {
 
 export const ApplicationNotifications: React.FC<ApplicationNotificationsProps> = ({
   onApplicationSelect,
-  onJobSelect
+  onJobSelect: _onJobSelect
 }) => {
   const { user } = useUserProfile();
   const [notifications, setNotifications] = useState<ApplicationNotification[]>(mockApplicationNotifications);

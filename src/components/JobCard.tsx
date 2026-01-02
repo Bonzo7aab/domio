@@ -5,9 +5,9 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { TenderStatusBadge } from './TenderStatusBadge';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-import { getDaysRemaining, formatDaysRemaining, isTenderEndingSoon } from '../utils/tenderHelpers';
+import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
 import { useUserProfile } from '../contexts/AuthContext';
-import type { Job, TenderInfo } from '../types/job';
+import type { Job } from '../types/job';
 
 interface JobCardProps {
   job: Partial<Job> & {
@@ -30,7 +30,7 @@ interface JobCardProps {
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   isHighlighted?: boolean;
-  onApplyClick?: (jobId: string, jobData?: any) => void;
+  onApplyClick?: (jobId: string, jobData?: Job) => void;
   isExpired?: boolean;
 }
 
@@ -41,7 +41,7 @@ const JobCard = React.memo(function JobCard({
   isBookmarked = false, 
   onMouseEnter, 
   onMouseLeave, 
-  isHighlighted = false,
+  isHighlighted: _isHighlighted = false,
   onApplyClick,
   isExpired = false
 }: JobCardProps) {
@@ -58,11 +58,12 @@ const JobCard = React.memo(function JobCard({
     if (onApplyClick) {
       onApplyClick(job.id, job);
     }
-  }, [job.id, job, onApplyClick]);
+  }, [job, onApplyClick]);
 
   const isTender = useMemo(() => job.postType === 'tender', [job.postType]);
 
   // Calculate days remaining for deadline
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const deadlineDaysRemaining = useMemo(() => {
     try {
       if (isTender && job.tenderInfo?.submissionDeadline) {
@@ -443,13 +444,13 @@ const JobCard = React.memo(function JobCard({
                 )}
 
                 {/* Job details */}
-                <div className="flex flex-wrap items-start sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm">
-                  <div className="flex items-center gap-2 mt-2 sm:mt-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2">
                     <span className="text-green-600 font-medium">💰</span>
                     <span>Stawka: <span className="text-green-600">{job.salary}</span></span>
                   </div>
                   
-                  <div className="flex items-start sm:items-center gap-4 text-gray-500">
+                  <div className="flex items-center gap-4 text-gray-500">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4 flex-shrink-0" />
                       <span>Opublikowano: {job.postedTime}</span>

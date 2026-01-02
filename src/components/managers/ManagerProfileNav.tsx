@@ -15,7 +15,7 @@ interface ManagerProfileNavProps {
   managerId: string;
 }
 
-export function ManagerProfileNav({ managerId }: ManagerProfileNavProps) {
+export function ManagerProfileNav({ managerId: _managerId }: ManagerProfileNavProps) {
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
@@ -38,7 +38,10 @@ export function ManagerProfileNav({ managerId }: ManagerProfileNavProps) {
     if (!window.location.hash) {
       // Use replaceState to avoid adding to history
       window.history.replaceState(null, '', '#overview');
-      setActiveTab('overview');
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setActiveTab('overview');
+      }, 0);
     } else {
       handleHashChange();
     }

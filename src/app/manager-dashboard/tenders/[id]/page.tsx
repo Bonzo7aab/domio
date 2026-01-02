@@ -13,7 +13,7 @@ export default function TenderBidEvaluationPage() {
   const params = useParams();
   const router = useRouter();
   const tenderId = params.id as string;
-  const [tenderBids, setTenderBids] = useState<any[]>([]);
+  const [tenderBids, setTenderBids] = useState<Array<Record<string, unknown>>>([]);
   const [isLoadingTenderBids, setIsLoadingTenderBids] = useState(false);
   const [selectedTenderData, setSelectedTenderData] = useState<{ title: string } | null>(null);
 
@@ -65,12 +65,12 @@ export default function TenderBidEvaluationPage() {
     loadTenderBids();
   }, [tenderId]);
 
-  const handleAwardTender = (bidId: string, notes: string) => {
+  const handleAwardTender = (_bidId: string, _notes: string) => {
     // In real app, this would award the tender
     router.push('/manager-dashboard/tenders');
   };
 
-  const handleRejectBid = (bidId: string, reason: string) => {
+  const handleRejectBid = (_bidId: string, _reason: string) => {
     // In real app, this would reject the bid
   };
 

@@ -29,7 +29,7 @@ export async function uploadJobAttachment(
   file: File,
   userId: string,
   jobId?: string
-): Promise<{ data: UploadResult | null; error: any }> {
+): Promise<{ data: UploadResult | null; error: Error | null }> {
   try {
     // Validate file type
     const fileType = file.type.toLowerCase();
@@ -69,7 +69,7 @@ export async function uploadJobAttachment(
     const filePath = `${userId}/jobs/${jobFolder}/${fileName}`;
 
     // Upload file to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from(JOB_ATTACHMENTS_BUCKET)
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -114,9 +114,9 @@ export async function uploadJobAttachments(
   files: File[],
   userId: string,
   jobId?: string
-): Promise<{ data: UploadResult[]; errors: any[] }> {
+): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
-  const errors: any[] = [];
+  const errors: Error[] = [];
 
   for (const file of files) {
     const { data, error } = await uploadJobAttachment(supabase, file, userId, jobId);
@@ -136,7 +136,7 @@ export async function uploadJobAttachments(
 export async function deleteJobAttachment(
   supabase: SupabaseClient<Database>,
   imagePath: string
-): Promise<{ success: boolean; error: any }> {
+): Promise<{ success: boolean; error: Error | null }> {
   try {
     // Extract path from URL if full URL is provided
     let path = imagePath;
@@ -179,8 +179,8 @@ export async function deleteJobAttachment(
 export async function deleteJobAttachments(
   supabase: SupabaseClient<Database>,
   paths: string[]
-): Promise<{ success: boolean; errors: any[] }> {
-  const errors: any[] = [];
+): Promise<{ success: boolean; errors: unknown[] }> {
+  const errors: Error[] = [];
   
   for (const path of paths) {
     const { error } = await deleteJobAttachment(supabase, path);

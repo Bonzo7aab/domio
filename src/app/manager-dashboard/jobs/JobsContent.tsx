@@ -33,21 +33,11 @@ interface JobsContentProps {
   companyId: string;
 }
 
-export function JobsContent({ jobs, companyId }: JobsContentProps) {
-  const router = useRouter();
-  const [selectedJobForApplications, setSelectedJobForApplications] = useState<string | null>(null);
-  const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
+export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
+  const _router = useRouter();
   const [jobDetailsData, setJobDetailsData] = useState<JobWithCompany | null>(null);
   const [isLoadingJobDetails, setIsLoadingJobDetails] = useState(false);
   const [showJobDetailsDialog, setShowJobDetailsDialog] = useState(false);
-
-  const handleTenderCreate = () => {
-    router.push('/manager-dashboard/tenders?create=true');
-  };
-
-  const handlePostJob = () => {
-    router.push('/post-job');
-  };
 
   const handleViewJobDetails = async (jobId: string) => {
     setSelectedJobForDetails(jobId);

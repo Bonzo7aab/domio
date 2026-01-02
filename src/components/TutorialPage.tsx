@@ -14,7 +14,7 @@ interface TutorialPageProps {
 interface TutorialStep {
   title: string;
   description: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
   content: React.ReactNode;
   actionText?: string;
 }

@@ -103,7 +103,7 @@ export const JobListHeader: React.FC<JobListHeaderProps> = ({
             </h2>
             {searchQuery && (
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <span>dla: "<span className="font-medium">{searchQuery}</span>"</span>
+                <span>dla: &quot;<span className="font-medium">{searchQuery}</span>&quot;</span>
               </div>
             )}
           </div>

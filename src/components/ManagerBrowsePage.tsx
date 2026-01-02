@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, MapPin, Star, Shield, CheckCircle, Users, Building, Filter, Search, SlidersHorizontal, Award, Phone, Mail, Globe } from 'lucide-react';
+import { ArrowLeft, MapPin, Star, Shield, CheckCircle, Users, Building, Search, SlidersHorizontal, Award, Phone, Mail, Globe } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -54,7 +54,7 @@ export default function ManagerBrowsePage({ onBack, onManagerSelect }: ManagerBr
       try {
         setLoading(true);
         const cityFilter = selectedLocation !== 'Wszystkie lokalizacje' ? selectedLocation : undefined;
-        let data = await getManagers({ city: cityFilter, sortBy: sortBy as any, limit: 1000 }); // Get more to allow client-side filtering
+        let data = await getManagers({ city: cityFilter, sortBy: sortBy as 'rating' | 'name' | 'buildings' | 'units' | 'experience', limit: 1000 }); // Get more to allow client-side filtering
         
         // Client-side filtering for size
         if (selectedSize !== 'Wszystkie rozmiary') {
@@ -97,7 +97,7 @@ export default function ManagerBrowsePage({ onBack, onManagerSelect }: ManagerBr
     try {
       setLoadingMore(true);
       const cityFilter = selectedLocation !== 'Wszystkie lokalizacje' ? selectedLocation : undefined;
-      let data = await getManagers({ city: cityFilter, sortBy: sortBy as any, limit: 1000 });
+      let data = await getManagers({ city: cityFilter, sortBy: sortBy as 'rating' | 'buildings' | 'units' | 'experience' | 'name', limit: 1000 });
       
       // Apply same filters
       if (selectedSize !== 'Wszystkie rozmiary') {
@@ -213,7 +213,7 @@ export default function ManagerBrowsePage({ onBack, onManagerSelect }: ManagerBr
                   </SelectContent>
                 </Select>
 
-                <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
+                <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'rating' | 'name' | 'buildings' | 'units' | 'experience')}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sortuj według" />
                   </SelectTrigger>

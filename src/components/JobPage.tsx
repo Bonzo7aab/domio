@@ -9,7 +9,6 @@ import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Tabs, TabsContent } from './ui/tabs';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { cn } from './ui/utils';
 
@@ -53,26 +52,6 @@ function getTimeAgo(date: string): string {
   if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} dni temu`;
   
   return past.toLocaleDateString('pl-PL');
-}
-
-// Helper function to map company type to client type
-function mapCompanyTypeToClientType(companyType?: string): string {
-  switch (companyType) {
-    case 'spółdzielnia':
-      return 'Spółdzielnia Mieszkaniowa';
-    case 'wspólnota':
-      return 'Wspólnota Mieszkaniowa';
-    case 'housing_association':
-      return 'Wspólnota Mieszkaniowa';
-    case 'cooperative':
-      return 'Spółdzielnia Mieszkaniowa';
-    case 'condo_management':
-      return 'Wspólnota Mieszkaniowa';
-    case 'property_management':
-      return 'Wspólnota Mieszkaniowa';
-    default:
-      return 'Wspólnota Mieszkaniowa';
-  }
 }
 
 // Helper function to format location (string or object)
@@ -141,9 +120,9 @@ function normalizeJobData(
   // Handle stored job from localStorage
   if (source === 'stored') {
     const storedJob = data as StoredJob;
-    const locationData = typeof storedJob.location === 'string' 
+    const locationData: { city: string; sublocality_level_1?: string } | string = typeof storedJob.location === 'string' 
       ? { city: storedJob.location }
-      : storedJob.location;
+      : (storedJob.location as { city: string; sublocality_level_1?: string } | undefined) || { city: 'Unknown' };
     
     // Parse budget if it's a string
     let budget: Budget;
@@ -183,8 +162,8 @@ function normalizeJobData(
       salary: formatBudget(budget),
       budget,
       requirements: storedJob.requirements ? (typeof storedJob.requirements === 'string' 
-        ? storedJob.requirements.split('\n').filter(r => r.trim())
-        : []) : [],
+        ? storedJob.requirements.split('\n').filter((r: string) => r.trim())
+        : (Array.isArray(storedJob.requirements) ? storedJob.requirements : [])) : [],
       responsibilities: [],
       skills: storedJob.searchKeywords || [],
       metrics: {
@@ -244,7 +223,12 @@ function normalizeJobData(
       lng: storedJob.lng,
       tenderInfo: storedJob.postType === 'tender' && storedJob.tenderInfo ? {
         tenderType: 'Zamówienie publiczne',
-        phases: storedJob.tenderInfo.phases?.map((phase: string) => ({ name: phase, status: 'pending' as const, deadline: '' })) || [],
+        phases: storedJob.tenderInfo.phases?.map((phase: string | { name: string; status: string; deadline: string }) => {
+          if (typeof phase === 'string') {
+            return { name: phase, status: 'pending' as const, deadline: '' };
+          }
+          return { name: phase.name, status: phase.status as 'completed' | 'active' | 'pending', deadline: phase.deadline };
+        }) || [],
         currentPhase: storedJob.tenderInfo.currentPhase || 'Składanie ofert',
         wadium: storedJob.tenderInfo.wadium || '0 PLN',
         evaluationCriteria: storedJob.tenderInfo.evaluationCriteria || [],
@@ -259,9 +243,9 @@ function normalizeJobData(
   // Handle database job
   if (source === 'job') {
     const dbJob = data as JobWithCompany;
-    const locationData = typeof dbJob.location === 'string' 
+    const locationData: { city: string; sublocality_level_1?: string } = typeof dbJob.location === 'string' 
       ? { city: dbJob.location }
-      : dbJob.location || { city: 'Unknown' };
+      : (dbJob.location as { city: string; sublocality_level_1?: string } | undefined) || { city: 'Unknown' };
     
     const budget = budgetFromDatabase({
       budget_min: dbJob.budget_min ?? null,
@@ -352,9 +336,9 @@ function normalizeJobData(
   // Handle database tender
   if (source === 'tender') {
     const dbTender = data as TenderWithCompany;
-    const locationData = typeof dbTender.location === 'string' 
+    const locationData: { city: string; sublocality_level_1?: string } = typeof dbTender.location === 'string' 
       ? { city: dbTender.location }
-      : dbTender.location || { city: 'Unknown' };
+      : (dbTender.location as { city: string; sublocality_level_1?: string } | undefined) || { city: 'Unknown' };
     
     const budget: Budget = {
       min: dbTender.estimated_value,
@@ -367,11 +351,11 @@ function normalizeJobData(
     let evaluationCriteria: TenderInfo['evaluationCriteria'] = [];
     if (dbTender.evaluation_criteria) {
       if (Array.isArray(dbTender.evaluation_criteria)) {
-        evaluationCriteria = dbTender.evaluation_criteria;
-      } else if (dbTender.evaluation_criteria.criteria) {
-        evaluationCriteria = dbTender.evaluation_criteria.criteria;
+        evaluationCriteria = dbTender.evaluation_criteria as TenderInfo['evaluationCriteria'];
+      } else if (typeof dbTender.evaluation_criteria === 'object' && dbTender.evaluation_criteria !== null && 'criteria' in dbTender.evaluation_criteria) {
+        evaluationCriteria = (dbTender.evaluation_criteria as { criteria: TenderInfo['evaluationCriteria'] }).criteria;
       } else if (typeof dbTender.evaluation_criteria === 'object') {
-        evaluationCriteria = Object.entries(dbTender.evaluation_criteria).map(([name, weight]) => ({
+        evaluationCriteria = Object.entries(dbTender.evaluation_criteria as Record<string, unknown>).map(([name, weight]: [string, unknown]) => ({
           name,
           weight: typeof weight === 'number' ? weight : 0,
         }));
@@ -381,7 +365,7 @@ function normalizeJobData(
     // Parse phases
     let phases: TenderInfo['phases'] = [];
     if (dbTender.phases && Array.isArray(dbTender.phases)) {
-      phases = dbTender.phases;
+      phases = dbTender.phases as TenderInfo['phases'];
     }
 
     return {
@@ -497,8 +481,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         if (normalizedJob) {
           setJobData(normalizedJob);
           // Extract manager_id from dbJob if available
-          if ((dbJob as any).manager_id) {
-            setManagerId((dbJob as any).manager_id);
+          if ('manager_id' in dbJob && dbJob.manager_id) {
+            setManagerId(dbJob.manager_id as string);
           }
           setIsLoadingJob(false);
           
@@ -525,7 +509,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 // Store view count update in sessionStorage for JobCard updates
                 try {
                   const stored = sessionStorage.getItem('view-count-updates');
-                  const updates = stored ? JSON.parse(stored) : {};
+                  const updates: Record<string, number> = stored ? JSON.parse(stored) : {};
                   updates[jobId] = newViewsCount;
                   sessionStorage.setItem('view-count-updates', JSON.stringify(updates));
                 } catch (error) {
@@ -546,8 +530,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         if (normalizedTender) {
           setJobData(normalizedTender);
           // Extract manager_id from dbTender if available
-          if ((dbTender as any).manager_id) {
-            setManagerId((dbTender as any).manager_id);
+          if ('manager_id' in dbTender && dbTender.manager_id) {
+            setManagerId(dbTender.manager_id as string);
           }
           setIsLoadingJob(false);
           
@@ -574,7 +558,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 // Store view count update in sessionStorage for JobCard updates
                 try {
                   const stored = sessionStorage.getItem('view-count-updates');
-                  const updates = stored ? JSON.parse(stored) : {};
+                  const updates: Record<string, number> = stored ? JSON.parse(stored) : {};
                   updates[jobId] = newViewsCount;
                   sessionStorage.setItem('view-count-updates', JSON.stringify(updates));
                 } catch (error) {
@@ -639,7 +623,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         }
 
         // Check if a non-cancelled bid exists for this tender and company
-        const { data: existingBids, error } = await (supabase as any)
+        const { data: existingBids, error } = await supabase
           .from('tender_bids')
           .select('id, status')
           .eq('tender_id', jobData.id)
@@ -723,7 +707,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           <div className="text-center">
             <h1 className="text-2xl mb-4">Ogłoszenie nie zostało znalezione</h1>
             <p className="text-muted-foreground mb-6">
-              Ogłoszenie o ID "{jobId}" nie istnieje lub zostało usunięte.
+              Ogłoszenie o ID &quot;{jobId}&quot; nie istnieje lub zostało usunięte.
             </p>
             <Button onClick={onBack} variant="outline">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -778,7 +762,16 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     setShowApplicationForm(true);
   };
 
-  const handleApplicationFormSubmit = async (applicationData: any) => {
+  const handleApplicationFormSubmit = async (applicationData: {
+    id: string;
+    contractorId: string;
+    contractorName: string;
+    proposedPrice: number;
+    estimatedCompletion: string;
+    coverLetter: string;
+    additionalNotes?: string;
+    submittedAt: Date;
+  }) => {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:781',message:'handleApplicationFormSubmit entry',data:{userId:user?.id,hasSupabase:!!supabase,jobPostType:job.postType,applicationData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
@@ -1525,6 +1518,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     {job.images.map((imageUrl, index) => (
                       <div key={index} className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted">
                         <ImageZoom>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={imageUrl}
                             alt={`Zdjęcie ${index + 1} zlecenia ${job.title}`}

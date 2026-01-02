@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import type { Building, BuildingFormData } from '../../types/building';
 
@@ -8,9 +8,9 @@ import type { Building, BuildingFormData } from '../../types/building';
 export async function fetchCompanyBuildings(
   supabase: SupabaseClient<Database>,
   companyId: string
-): Promise<{ data: Building[] | null; error: any }> {
+): Promise<{ data: Building[] | null; error: PostgrestError | null }> {
   try {
-    const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
       .from('buildings')
       .select('*')
       .eq('company_id', companyId)
@@ -34,9 +34,9 @@ export async function createBuilding(
   supabase: SupabaseClient<Database>,
   companyId: string,
   buildingData: BuildingFormData
-): Promise<{ data: Building | null; error: any }> {
+): Promise<{ data: Building | null; error: PostgrestError | null }> {
   try {
-    const insertData: any = {
+    const insertData: Record<string, unknown> = {
       company_id: companyId,
       name: buildingData.name.trim(),
       street_address: buildingData.street_address.trim(),
@@ -87,7 +87,7 @@ export async function createBuilding(
       };
     }
 
-    const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
       .from('buildings')
       .insert(insertData)
       .select()
@@ -111,9 +111,9 @@ export async function updateBuilding(
   supabase: SupabaseClient<Database>,
   buildingId: string,
   buildingData: BuildingFormData
-): Promise<{ data: Building | null; error: any }> {
+): Promise<{ data: Building | null; error: PostgrestError | null }> {
   try {
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       name: buildingData.name.trim(),
       street_address: buildingData.street_address.trim(),
       city: buildingData.city.trim(),
@@ -163,7 +163,7 @@ export async function updateBuilding(
       };
     }
 
-    const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
       .from('buildings')
       .update(updateData)
       .eq('id', buildingId)
@@ -187,9 +187,9 @@ export async function updateBuilding(
 export async function deleteBuilding(
   supabase: SupabaseClient<Database>,
   buildingId: string
-): Promise<{ success: boolean; error: any }> {
+): Promise<{ success: boolean; error: PostgrestError | null }> {
   try {
-    const { error } = await (supabase as any)
+      const { error } = await supabase
       .from('buildings')
       .delete()
       .eq('id', buildingId);

@@ -2,10 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronDown, ChevronUp, MapPin, Clock, Gavel, Wrench, Check, X, Edit3, ChevronDown as ArrowDown, AlertCircle, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { extractCity, extractSublocality, getProvinceForCity, getProvincesFromCities, type LocationData } from '../utils/locationMapping';
+import { extractCity, extractSublocality, getProvinceForCity, getProvincesFromCities } from '../utils/locationMapping';
 import { isTenderEndingSoon } from '../utils/tenderHelpers';
 import type { Job } from '../types/job';
 
@@ -93,6 +92,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
   const isInitialMountRef = useRef(true);
 
   // Sync local state with incoming filters (from quick filters or URL)
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (initialFilters && !isUpdatingFromSelfRef.current) {
       if (initialFilters.categories !== undefined) setSelectedCategories(initialFilters.categories);
@@ -118,6 +118,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
     // Reset the flag after syncing
     isUpdatingFromSelfRef.current = false;
   }, [initialFilters, isMapView]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Calculate categories dynamically from jobs (using category.name)
   const categories = useMemo(() => {
@@ -319,8 +320,8 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       
       // Filter by budget ranges
       if (selectedBudgetRanges && selectedBudgetRanges.length > 0) {
-        const jobBudgetMin = (job as any).budget_min;
-        const jobBudgetMax = (job as any).budget_max;
+        const jobBudgetMin = ('budget_min' in job ? job.budget_min : undefined) as number | undefined;
+        const jobBudgetMax = ('budget_max' in job ? job.budget_max : undefined) as number | undefined;
         
         const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
         const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
@@ -351,8 +352,8 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
 
       // Filter by budget min/max inputs
       if (budgetMinNum !== undefined && budgetMinNum !== null) {
-        const jobBudgetMin = (job as any).budget_min ?? null;
-        const jobBudgetMax = (job as any).budget_max ?? null;
+        const jobBudgetMin = job.budget?.min ?? null;
+        const jobBudgetMax = job.budget?.max ?? null;
         
         if (jobBudgetMin !== null || jobBudgetMax !== null) {
           const jobMaxBudget = jobBudgetMax ?? jobBudgetMin ?? 0;
@@ -363,11 +364,11 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
       }
 
       if (budgetMaxNum !== undefined && budgetMaxNum !== null) {
-        const jobBudgetMin = (job as any).budget_min ?? null;
-        const jobBudgetMax = (job as any).budget_max ?? null;
+        const jobBudgetMin = ('budget_min' in job ? job.budget_min : undefined) as number | null | undefined;
+        const jobBudgetMax = ('budget_max' in job ? job.budget_max : undefined) as number | null | undefined;
         
-        if (jobBudgetMin !== null || jobBudgetMax !== null) {
-          const jobMinBudget = jobBudgetMin ?? jobBudgetMax ?? 0;
+        if (jobBudgetMin !== null && jobBudgetMin !== undefined || jobBudgetMax !== null && jobBudgetMax !== undefined) {
+          const jobMinBudget = (jobBudgetMin ?? jobBudgetMax ?? 0) as number;
           if (jobMinBudget > budgetMaxNum) {
             return false;
           }
@@ -386,7 +387,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
 
       // Filter by date added
       if (selectedDateAdded && selectedDateAdded.length > 0) {
-        const jobCreatedAt = (job as any).created_at;
+        const jobCreatedAt = ('created_at' in job ? job.created_at : undefined) as string | undefined;
         if (jobCreatedAt) {
           const jobDate = new Date(jobCreatedAt);
           

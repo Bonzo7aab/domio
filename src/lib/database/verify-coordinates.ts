@@ -42,7 +42,7 @@ export async function verifyDatabaseCoordinates(
     ) || [];
 
     // Check tenders
-    const { data: allTenders, error: allTendersError } = await (supabase as any)
+    const { data: allTenders, error: allTendersError } = await supabase
       .from('tenders')
       .select('id, title, location, latitude, longitude');
 

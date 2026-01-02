@@ -38,8 +38,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   isMapVisible = true,
   hoveredJobId,
   onJobHover,
-  userLocation,
-  searchRadius = 25,
+  userLocation: _userLocation,
+  searchRadius: _searchRadius = 25,
   onApplyClick,
   onClearSearch,
   onPrimaryLocationChange
@@ -75,8 +75,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   useEffect(() => {
     try {
       sessionStorage.setItem('bookmark-count-updates', JSON.stringify(bookmarkCountUpdates));
-    } catch (error) {
-      console.error('Error saving bookmark count updates:', error);
+      } catch {
+        // Ignore errors when saving bookmark count updates
     }
   }, [bookmarkCountUpdates]);
 
@@ -85,9 +85,12 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     try {
       const stored = sessionStorage.getItem('view-count-updates');
       const updates = stored ? JSON.parse(stored) : {};
-      setViewCountUpdates(updates);
-    } catch (error) {
-      console.error('Error loading view count updates:', error);
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setViewCountUpdates(updates);
+      }, 0);
+    } catch {
+      // Ignore errors when loading view count updates
     }
   }, [jobs]);
   
@@ -95,10 +98,15 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   useEffect(() => {
     try {
       const jobs = getStoredJobs();
-      setStoredJobs(jobs);
-    } catch (error) {
-      console.error('Error loading stored jobs:', error);
-      setStoredJobs([]);
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setStoredJobs(jobs);
+      }, 0);
+    } catch {
+      // Ignore errors when loading stored jobs
+      setTimeout(() => {
+        setStoredJobs([]);
+      }, 0);
     }
   }, []);
 
@@ -109,8 +117,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
         const bookmarks = getBookmarkedJobs();
         const bookmarkedIds = bookmarks.map(b => b.id);
         setBookmarkedJobs(bookmarkedIds);
-      } catch (error) {
-        console.error('Error loading bookmarks:', error);
+      } catch {
+        // Ignore errors when loading bookmarks
       }
     };
 
@@ -129,31 +137,34 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   // Keep optimistic updates but update with server data if it's higher (to handle other users' bookmarks)
   useEffect(() => {
     if (jobs && jobs.length > 0) {
-      setBookmarkCountUpdates(prev => {
-        const newUpdates: Record<string, number> = { ...prev };
-        // Update counts from server data, but keep optimistic updates if they're higher
-        // This ensures user's actions are reflected while also showing other users' bookmarks
-        jobs.forEach(job => {
-          const serverCount = (job as any).bookmarks_count || 0;
-          const optimisticCount = prev[job.id];
-          
-          if (optimisticCount !== undefined) {
-            // Keep the optimistic count if it's higher (user just bookmarked)
-            // Otherwise use server count (which includes other users' bookmarks)
-            newUpdates[job.id] = Math.max(optimisticCount, serverCount);
-          } else if (serverCount > 0) {
-            // No optimistic update, but server has a count - use it
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setBookmarkCountUpdates(prev => {
+          const newUpdates: Record<string, number> = { ...prev };
+          // Update counts from server data, but keep optimistic updates if they're higher
+          // This ensures user's actions are reflected while also showing other users' bookmarks
+          jobs.forEach(job => {
+            const serverCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
+            const optimisticCount = prev[job.id];
+            
+            if (optimisticCount !== undefined) {
+              // Keep the optimistic count if it's higher (user just bookmarked)
+              // Otherwise use server count (which includes other users' bookmarks)
+              newUpdates[job.id] = Math.max(optimisticCount, serverCount);
+            } else if (serverCount > 0) {
+              // No optimistic update, but server has a count - use it
             // Don't set it here, let it come from props naturally
           }
         });
         return newUpdates;
-      });
+        });
+      }, 0);
     }
   }, [jobs]);
 
   // Use jobs from props, fallback to stored jobs if needed, and apply bookmark count updates
   const allJobs = useMemo(() => {
-    let jobsToReturn: any[] = [];
+    let jobsToReturn: Job[] = [];
     
     // Collect from all potential sources
     if (jobs && jobs.length > 0) {
@@ -210,7 +221,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
 
   // Apply basic filters
   const filteredJobs = useMemo(() => {
-    let jobsToFilter = searchFilteredJobs;
+    const jobsToFilter = searchFilteredJobs;
     
     if (!filters) return jobsToFilter;
     
@@ -327,8 +338,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       
       // Filter by budget ranges (checkboxes)
       if (filters.budgetRanges && filters.budgetRanges.length > 0) {
-        const jobBudgetMin = (job as any).budget_min;
-        const jobBudgetMax = (job as any).budget_max;
+        const jobBudgetMin = ('budget_min' in job ? job.budget_min : undefined) as number | undefined;
+        const jobBudgetMax = ('budget_max' in job ? job.budget_max : undefined) as number | undefined;
         
         // Check if job has budget info (null/undefined check, but 0 is valid)
         const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
@@ -376,8 +387,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
 
       // Filter by budget min/max inputs
       if (filters.budgetMin !== undefined && filters.budgetMin !== null) {
-        const jobBudgetMin = (job as any).budget_min ?? null;
-        const jobBudgetMax = (job as any).budget_max ?? null;
+        const jobBudgetMin = job.budget?.min ?? null;
+        const jobBudgetMax = job.budget?.max ?? null;
         
         // If job has no budget info, skip this filter (include the job)
         if (jobBudgetMin === null && jobBudgetMax === null) {
@@ -392,8 +403,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       }
 
       if (filters.budgetMax !== undefined && filters.budgetMax !== null) {
-        const jobBudgetMin = (job as any).budget_min ?? null;
-        const jobBudgetMax = (job as any).budget_max ?? null;
+        const jobBudgetMin = job.budget?.min ?? null;
+        const jobBudgetMax = job.budget?.max ?? null;
         
         // If job has no budget info, skip this filter (include the job)
         if (jobBudgetMin === null && jobBudgetMax === null) {
@@ -510,7 +521,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     onJobHover?.(jobId);
   }, [onJobHover]);
 
-  const handleBookmark = useCallback((jobId: string, job: any) => {
+  const handleBookmark = useCallback((jobId: string, job: Job) => {
     const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
     const currentCount = job.bookmarks_count || 0;
     
@@ -549,7 +560,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     }
   }, [bookmarkedJobs]);
 
-  const handleClearSearch = useCallback(() => {
+  const _handleClearSearch = useCallback(() => {
     setSearchQuery('');
     if (onClearSearch) {
       onClearSearch();

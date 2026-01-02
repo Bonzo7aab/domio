@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 
 export interface CompanyData {
@@ -44,9 +44,11 @@ export interface UserCompanyRelation {
 export async function fetchUserPrimaryCompany(
   supabase: SupabaseClient<Database>,
   userId: string
-): Promise<{ data: CompanyData | null; error: any }> {
+): Promise<{ data: CompanyData | null; error: PostgrestError | null }> {
   try {
     // First, get the user_companies relation
+    // Note: user_companies table is not in Database type definition
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const relationResult = await (supabase as any)
       .from('user_companies')
       .select('company_id')
@@ -82,7 +84,7 @@ export async function fetchUserPrimaryCompany(
       return { data: null, error: companyError };
     }
 
-    return { data: company as any, error: null };
+    return { data: company as CompanyData, error: null };
   } catch (err) {
     return { data: null, error: err };
   }
@@ -94,9 +96,10 @@ export async function fetchUserPrimaryCompany(
 export async function fetchUserCompanies(
   supabase: SupabaseClient<Database>,
   userId: string
-): Promise<{ data: UserCompanyRelation[] | null; error: any }> {
+): Promise<{ data: UserCompanyRelation[] | null; error: PostgrestError | null }> {
   try {
-    // Type assertion needed for user_companies table
+    // Type assertion needed for user_companies table (not in Database type definition)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (supabase as any)
       .from('user_companies')
       .select(`
@@ -109,7 +112,7 @@ export async function fetchUserCompanies(
     
     const { data, error } = result;
 
-    return { data: data as any, error };
+    return { data: data as UserCompanyRelation[], error };
   } catch (err) {
     return { data: null, error: err };
   }
@@ -138,9 +141,10 @@ export async function upsertUserCompany(
     description?: string;
     is_public?: boolean;
   }
-): Promise<{ data: CompanyData | null; error: any }> {
+): Promise<{ data: CompanyData | null; error: PostgrestError | null }> {
   try {
     // First, check if user already has a primary company (two-step fetch to avoid nested select issues)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const existingResult = await (supabase as any)
       .from('user_companies')
       .select('company_id')
@@ -166,7 +170,7 @@ export async function upsertUserCompany(
       
       const updateData = {
         name: companyData.name,
-        type: companyData.type as any,
+        type: companyData.type,
         phone: companyData.phone || null,
         email: companyData.email || null,
         address: companyData.address || null,
@@ -187,13 +191,14 @@ export async function upsertUserCompany(
 
       const { data: updatedCompany, error: updateError } = await supabase
         .from('companies')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update(updateData as any)
         .eq('id', companyId)
         .select()
         .single();
 
       if (updateError) {
-        const updateErrorDetails = updateError as any;
+        const updateErrorDetails = updateError as PostgrestError;
         console.error('[upsertUserCompany] Error updating company:', {
           error: updateError,
           message: updateErrorDetails?.message,
@@ -212,12 +217,12 @@ export async function upsertUserCompany(
       }
 
       console.log('[upsertUserCompany] Company updated successfully:', updatedCompany.id);
-      return { data: updatedCompany as any, error: null };
+      return { data: updatedCompany as CompanyData, error: null };
     } else {
       // Create new company
       const insertData = {
         name: companyData.name,
-        type: companyData.type as any,
+        type: companyData.type,
         phone: companyData.phone || null,
         email: companyData.email || null,
         address: companyData.address || null,
@@ -233,19 +238,20 @@ export async function upsertUserCompany(
         is_public: companyData.is_public !== undefined ? companyData.is_public : true,
         country: 'PL',
         is_verified: false,
-        verification_level: 'none' as any,
+        verification_level: 'none',
       };
 
       console.log('[upsertUserCompany] Creating new company with data:', insertData);
 
       const { data: newCompany, error: createError } = await supabase
         .from('companies')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .insert(insertData as any)
         .select()
         .single();
 
       if (createError) {
-        const createErrorDetails = createError as any;
+        const createErrorDetails = createError as PostgrestError;
         console.error('[upsertUserCompany] Error creating company:', {
           error: createError,
           message: createErrorDetails?.message,
@@ -281,6 +287,7 @@ export async function upsertUserCompany(
 
       console.log('[upsertUserCompany] Creating user-company relationship:', relationData);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const relationResult = await (supabase as any)
         .from('user_companies')
         .insert(relationData);
@@ -288,7 +295,7 @@ export async function upsertUserCompany(
       const { error: relationError } = relationResult;
 
       if (relationError) {
-        const errorDetails = relationError as any;
+        const errorDetails = relationError as PostgrestError;
         console.error('[upsertUserCompany] Error creating user-company relationship:', {
           error: relationError,
           message: errorDetails?.message,
@@ -320,7 +327,7 @@ export async function upsertUserCompany(
       }
 
       console.log('[upsertUserCompany] Company verified successfully:', verifyResult.data.id);
-      return { data: verifyResult.data as any, error: null };
+      return { data: verifyResult.data as CompanyData, error: null };
     }
   } catch (err) {
     return { data: null, error: err };
@@ -334,10 +341,10 @@ export async function deleteUserCompany(
   supabase: SupabaseClient<Database>,
   userId: string,
   companyId: string
-): Promise<{ success: boolean; error: any }> {
+): Promise<{ success: boolean; error: PostgrestError | null }> {
   try {
     // First delete the relationship
-    const deleteResult = await (supabase as any)
+    const deleteResult = await supabase
       .from('user_companies')
       .delete()
       .eq('user_id', userId)
@@ -350,7 +357,7 @@ export async function deleteUserCompany(
     }
 
     // Check if company has other users
-    const checkResult = await (supabase as any)
+    const checkResult = await supabase
       .from('user_companies')
       .select('id')
       .eq('company_id', companyId)

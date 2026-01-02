@@ -56,7 +56,7 @@ async function getOverviewData(userId: string) {
   const completedJobsCount = completedJobsResult.count || 0;
 
   // Format recent jobs
-  const recentJobs = (recentJobsResult.data || []).map((job: any) => {
+  const recentJobs = (recentJobsResult.data || []).map((job: { location: string | { city?: string }; budget_min?: number | null; budget_max?: number | null; currency?: string; title: string; status: string; applications_count?: number }) => {
     const location = typeof job.location === 'string' 
       ? job.location 
       : job.location?.city || 'Nieznana lokalizacja';

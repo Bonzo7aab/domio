@@ -155,7 +155,10 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
   
   // Ensure client-side only rendering for dynamic calculations
   useEffect(() => {
-    setIsClient(true);
+    // Use setTimeout to avoid synchronous setState in effect
+    setTimeout(() => {
+      setIsClient(true);
+    }, 0);
   }, []);
   
   const mapDimensions = useMemo(() => {
@@ -186,7 +189,7 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
           onLocationChange?.(location);
           setIsGettingLocation(false);
         },
-        (error) => {
+        (_error) => {
           console.warn('Nie można uzyskać lokalizacji automatycznie');
           setIsGettingLocation(false);
           // Show toast with helpful message

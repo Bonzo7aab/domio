@@ -35,7 +35,10 @@ export function Header({ initialUser }: HeaderProps) {
 
   // Ensure consistent hydration
   useEffect(() => {
-    setIsMounted(true);
+    // Use setTimeout to avoid synchronous setState in effect
+    setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
   }, []);
   
   // Authentication state: use context (which is immediately true when session exists)
@@ -76,7 +79,7 @@ export function Header({ initialUser }: HeaderProps) {
     router.push('/contractors')
   }
 
-  const handlePricingClick = () => {
+  const _handlePricingClick = () => {
     router.push('/pricing')
   }
 
@@ -141,11 +144,6 @@ export function Header({ initialUser }: HeaderProps) {
               <Button variant="ghost" size="sm" onClick={handleManagerPageClick} className="text-sm hover:bg-gray-200">
                 Zarządcy Nieruchomości
               </Button>
-              {false && (
-                <Button variant="ghost" size="sm" onClick={handlePricingClick} className="text-sm hover:bg-gray-200">
-                  Cennik
-                </Button>
-              )}
             </div>
             
             {/* Fixed Width Search Bar */}

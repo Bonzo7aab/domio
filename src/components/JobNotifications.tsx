@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Bell, X, Check, Settings, Search, Bookmark, Clock } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -30,7 +30,8 @@ export const JobNotifications: React.FC<JobNotificationsProps> = ({
   onSearchSelect
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<JobNotification[]>([
+  // Use function initializer to avoid calling impure functions during render
+  const [notifications, setNotifications] = useState<JobNotification[]>(() => [
     {
       id: '1',
       type: 'new_job',

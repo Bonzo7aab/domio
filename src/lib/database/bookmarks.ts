@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 
 /**
@@ -8,7 +8,7 @@ export async function addJobBookmark(
   supabase: SupabaseClient<Database>,
   jobId: string,
   userId: string
-): Promise<{ error: any }> {
+): Promise<{ error: PostgrestError | null }> {
   try {
     // First, check if bookmark already exists to avoid duplicates
     const { data: existing, error: checkError } = await supabase
@@ -77,7 +77,7 @@ export async function removeJobBookmark(
   supabase: SupabaseClient<Database>,
   jobId: string,
   userId: string
-): Promise<{ error: any }> {
+): Promise<{ error: PostgrestError | null }> {
   try {
     // Delete the bookmark
     const { error } = await supabase
@@ -130,7 +130,7 @@ export async function isJobBookmarked(
   supabase: SupabaseClient<Database>,
   jobId: string,
   userId: string
-): Promise<{ bookmarked: boolean; error: any }> {
+): Promise<{ bookmarked: boolean; error: PostgrestError | null }> {
   try {
     const { data, error } = await supabase
       .from('job_bookmarks')
@@ -157,7 +157,7 @@ export async function isJobBookmarked(
 export async function getJobBookmarksCount(
   supabase: SupabaseClient<Database>,
   jobId: string
-): Promise<{ count: number; error: any }> {
+): Promise<{ count: number; error: PostgrestError | null }> {
   try {
     const { count, error } = await supabase
       .from('job_bookmarks')
@@ -177,7 +177,7 @@ export async function getJobBookmarksCount(
 export async function getUserBookmarkedJobIds(
   supabase: SupabaseClient<Database>,
   userId: string
-): Promise<{ jobIds: string[]; error: any }> {
+): Promise<{ jobIds: string[]; error: PostgrestError | null }> {
   try {
     const { data, error } = await supabase
       .from('job_bookmarks')
@@ -203,7 +203,7 @@ export async function getUserBookmarkedJobIds(
 export async function getBookmarkCountsForJobs(
   supabase: SupabaseClient<Database>,
   jobIds: string[]
-): Promise<{ counts: Record<string, number>; error: any }> {
+): Promise<{ counts: Record<string, number>; error: PostgrestError | null }> {
   try {
     if (!jobIds || jobIds.length === 0) {
       return { counts: {}, error: null };

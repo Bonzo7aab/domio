@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -13,7 +13,6 @@ import {
   Shield, 
   Database, 
   Eye,
-  EyeOff,
   AlertTriangle,
   Info,
   CheckCircle,
@@ -42,20 +41,27 @@ interface TestingSettings {
 }
 
 export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }) => {
-  const [settings, setSettings] = useState<TestingSettings>({
-    betaMode: true,
-    mockData: true,
-    debugMode: false,
-    analyticsTracking: true,
-    errorLogging: true,
-    userFeedbackCollection: true,
-    performanceMonitoring: true,
-    featureFlags: {
-      newTenderSystem: true,
-      enhancedMap: true,
-      advancedFilters: true,
-      mobileOptimizations: true
+  const [settings, setSettings] = useState<TestingSettings>(() => {
+    // Load settings from localStorage
+    const savedSettings = localStorage.getItem('urbi-testing-settings');
+    if (savedSettings) {
+      return JSON.parse(savedSettings);
     }
+    return {
+      betaMode: true,
+      mockData: true,
+      debugMode: false,
+      analyticsTracking: true,
+      errorLogging: true,
+      userFeedbackCollection: true,
+      performanceMonitoring: true,
+      featureFlags: {
+        newTenderSystem: true,
+        enhancedMap: true,
+        advancedFilters: true,
+        mobileOptimizations: true
+      }
+    };
   });
 
   const [testingStats, setTestingStats] = useState({
@@ -66,14 +72,6 @@ export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }
     completedScenarios: 127,
     avgSessionTime: '24 min'
   });
-
-  useEffect(() => {
-    // Load settings from localStorage
-    const savedSettings = localStorage.getItem('urbi-testing-settings');
-    if (savedSettings) {
-      setSettings(JSON.parse(savedSettings));
-    }
-  }, []);
 
   const updateSetting = (key: keyof TestingSettings, value: boolean) => {
     const newSettings = { ...settings, [key]: value };
@@ -310,7 +308,7 @@ export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }
 
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>Zbieranie feedback'u</Label>
+                        <Label>Zbieranie feedback&apos;u</Label>
                         <div className="text-sm text-muted-foreground">
                           Włącza widget feedback i zbieranie opinii
                         </div>

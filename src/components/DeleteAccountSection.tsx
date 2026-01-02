@@ -42,7 +42,7 @@ export function DeleteAccountSection() {
       // Success - redirect will happen server-side via redirect() in the action
       // Close dialog and let redirect happen
       setOpen(false)
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(err.message || 'Wystąpił błąd podczas usuwania konta')
       setIsLoading(false)
       setOpen(true) // Keep dialog open to show error

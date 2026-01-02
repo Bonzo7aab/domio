@@ -21,7 +21,7 @@ export default function PrivacyPage() {
               <h2 className="text-2xl font-semibold text-slate-900 mb-4">1. Informacje ogólne</h2>
               <p className="text-slate-700 leading-relaxed mb-4">
                 Niniejsza Polityka Prywatności określa zasady przetwarzania i ochrony danych osobowych 
-                użytkowników serwisu Domio (dalej: "Platforma" lub "Serwis") w związku z korzystaniem 
+                użytkowników serwisu Domio (dalej: &quot;Platforma&quot; lub &quot;Serwis&quot;) w związku z korzystaniem 
                 z Platformy zgodnie z Rozporządzeniem Parlamentu Europejskiego i Rady (UE) 2016/679 
                 z dnia 27 kwietnia 2016 r. w sprawie ochrony osób fizycznych w związku z przetwarzaniem 
                 danych osobowych i w sprawie swobodnego przepływu takich danych (RODO).
@@ -143,7 +143,7 @@ export default function PrivacyPage() {
               <ul className="list-disc pl-6 space-y-2 text-slate-700">
                 <li>Dostępu do swoich danych osobowych</li>
                 <li>Sprostowania (poprawienia) danych</li>
-                <li>Usunięcia danych ("prawo do bycia zapomnianym")</li>
+                <li>Usunięcia danych (&quot;prawo do bycia zapomnianym&quot;)</li>
                 <li>Ograniczenia przetwarzania</li>
                 <li>Przenoszenia danych</li>
                 <li>Sprzeciwu wobec przetwarzania</li>

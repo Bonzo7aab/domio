@@ -1,11 +1,10 @@
 "use client";
 
-import { Briefcase, Calendar, Clock, DollarSign, Edit, Euro, FolderKanban, Loader2, MapPin, Plus, Star, Trash2 } from 'lucide-react';
+import { Briefcase, Calendar, Clock, DollarSign, Edit, Euro, FolderKanban, MapPin, Plus, Star, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { fetchContractorPortfolio, fetchPortfolioProjectById, deletePortfolioProject } from '../../../lib/database/contractors';
-import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent } from '../../../components/ui/card';
@@ -25,6 +24,11 @@ interface PortfolioProject {
   budget?: string;
   duration?: string;
   isFeatured?: boolean;
+  category?: string;
+  projectType?: string;
+  completionDate?: string;
+  clientName?: string;
+  clientFeedback?: string;
 }
 
 interface ProjectsContentProps {
@@ -51,7 +55,7 @@ export function ProjectsContent({ platformProjects: initialPlatformProjects, por
     const fullProject = await fetchPortfolioProjectById(supabase, project.id);
     
     if (fullProject) {
-      setEditingProject(fullProject as any);
+      setEditingProject(fullProject);
       setShowPortfolioForm(true);
     } else {
       toast.error('Nie udało się załadować danych projektu');
@@ -91,7 +95,6 @@ export function ProjectsContent({ platformProjects: initialPlatformProjects, por
   const handlePortfolioSuccess = async () => {
     if (!companyId) return;
     
-    const supabase = createClient();
     try {
       const portfolio = await fetchContractorPortfolio(companyId);
       setPortfolioProjects(portfolio || []);

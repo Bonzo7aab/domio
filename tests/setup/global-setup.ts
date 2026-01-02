@@ -47,7 +47,7 @@ async function globalSetup(config: FullConfig) {
   try {
     await page.goto(baseURL, { timeout: 30000 });
     console.log(`✓ Application is accessible at ${baseURL}`);
-  } catch (error) {
+  } catch {
     console.warn(`Warning: Could not access application at ${baseURL}. Make sure the dev server is running.`);
   } finally {
     await browser.close();

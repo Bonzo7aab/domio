@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Switch } from './ui/switch';
 import { Alert, AlertDescription } from './ui/alert';
-import { Edit2, X, Check, Bell, AlertCircle } from 'lucide-react';
+import { Edit2, X, Check, Bell, AlertCircle, Wrench } from 'lucide-react';
 import { useUserProfile } from '../contexts/AuthContext';
 import {
   getNotificationPreferences,
@@ -26,7 +26,11 @@ import {
   getUserAgent
 } from '../lib/push-notifications/client';
 
+// Feature flag: Set to true to enable notification settings functionality
+const NOTIFICATION_SETTINGS_ENABLED = false;
+
 export function NotificationSettings() {
+  // All hooks must be called before any conditional returns
   const { user, isAuthenticated } = useUserProfile();
   const [isEditing, setIsEditing] = useState(false);
   const [success, setSuccess] = useState('');
@@ -54,7 +58,7 @@ export function NotificationSettings() {
 
   // Load preferences from database on mount
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) {
+    if (!NOTIFICATION_SETTINGS_ENABLED || !isAuthenticated || !user?.id) {
       setIsLoadingPreferences(false);
       return;
     }
@@ -92,6 +96,8 @@ export function NotificationSettings() {
 
   // Check push notification support and permission status
   useEffect(() => {
+    if (!NOTIFICATION_SETTINGS_ENABLED) return;
+    
     const checkPushSupport = () => {
       const supported = isPushNotificationSupported();
       setIsPushSupported(supported);
@@ -104,6 +110,36 @@ export function NotificationSettings() {
 
     checkPushSupport();
   }, []);
+
+  // Show work in progress placeholder if feature is disabled
+  if (!NOTIFICATION_SETTINGS_ENABLED) {
+    return (
+      <div className="space-y-4">
+        <Alert>
+          <Wrench className="h-4 w-4" />
+          <AlertDescription>
+            Sekcja ustawień powiadomień jest obecnie w trakcie rozwoju. Funkcjonalność będzie dostępna wkrótce.
+          </AlertDescription>
+        </Alert>
+
+        {/* Notification Settings Section - Work in Progress */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="rounded-full bg-muted p-4 mb-4">
+                <Bell className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Ustawienia powiadomień</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Ta sekcja jest obecnie w trakcie rozwoju. Wkrótce będziesz mógł zarządzać preferencjami powiadomień, 
+                w tym powiadomieniami email, push oraz różnymi typami aktualizacji.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleNotificationChange = async (setting: string, value: boolean) => {
     // Special handling for push notifications
@@ -379,4 +415,3 @@ export function NotificationSettings() {
     </div>
   );
 }
-

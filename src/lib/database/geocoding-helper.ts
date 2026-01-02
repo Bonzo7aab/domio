@@ -258,7 +258,7 @@ export async function batchGeocodeTenders(
 
   try {
     // Get tenders without coordinates
-    const { data: tenders, error: fetchError } = await (supabase as any)
+    const { data: tenders, error: fetchError } = await supabase
       .from('tenders')
       .select('id, title, location, address, latitude, longitude')
       .or('latitude.is.null,longitude.is.null,latitude.eq.0,longitude.eq.0')
@@ -296,6 +296,7 @@ export async function batchGeocodeTenders(
             success++;
             
             if (updateDatabase) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const { error: updateError } = await (supabase as any)
                 .from('tenders')
                 .update({
@@ -358,10 +359,12 @@ export async function checkGeocodingStatus(
       .not('longitude', 'is', null);
 
     // Check tenders
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: totalTenders } = await (supabase as any)
       .from('tenders')
       .select('*', { count: 'exact', head: true });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: tendersWithCoords } = await (supabase as any)
       .from('tenders')
       .select('*', { count: 'exact', head: true })

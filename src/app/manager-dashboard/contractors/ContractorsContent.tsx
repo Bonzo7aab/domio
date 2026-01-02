@@ -51,7 +51,7 @@ export function ContractorsContent({ contractors }: ContractorsContentProps) {
                       <Badge variant="outline">{contractor.currentJob}</Badge>
                     </div>
                     <p className="text-sm text-gray-500 mt-2">
-                      Kliknij "Zobacz profil", aby zobaczyć portfolio wykonawcy
+                      Kliknij &quot;Zobacz profil&quot;, aby zobaczyć portfolio wykonawcy
                     </p>
                   </div>
                   <div className="flex gap-2">

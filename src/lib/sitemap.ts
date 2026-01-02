@@ -14,11 +14,8 @@ import {
   Settings,
   FileText,
   Plus,
-  Search,
   HelpCircle,
   Shield,
-  CheckCircle,
-  Mail,
   Lock
 } from 'lucide-react';
 
@@ -26,7 +23,7 @@ export interface SitemapEntry {
   category: string;
   label: string;
   path: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   description: string;
   keywords: string[];
   requiresAuth?: boolean;

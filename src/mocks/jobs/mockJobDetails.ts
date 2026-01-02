@@ -1,5 +1,5 @@
 // Kompletne szczegółowe dane dla zleceń i przetargów
-export const mockJobDetailsMap: { [key: string]: any } = {
+export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
   // ZLECENIA BEZPOŚREDNIE - NOWE OGŁOSZENIA
   'job-new-1': {
     id: 'job-new-1',

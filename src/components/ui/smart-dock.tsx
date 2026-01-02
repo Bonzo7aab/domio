@@ -329,8 +329,8 @@ function SmartDockItem({
   icon,
   label,
   onClick,
-  mouseLeft,
-  mouseRight,
+  mouseLeft: _mouseLeft,
+  mouseRight: _mouseRight,
   variant = "modern",
   hoverConfig,
 }: DockItemProps & {

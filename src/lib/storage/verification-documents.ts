@@ -25,7 +25,7 @@ export async function uploadVerificationDocument(
   file: File,
   userId: string,
   documentType: string
-): Promise<{ data: UploadResult | null; error: any }> {
+): Promise<{ data: UploadResult | null; error: Error | null }> {
   try {
     // Validate file type
     const fileType = file.type.toLowerCase();
@@ -64,7 +64,7 @@ export async function uploadVerificationDocument(
     const filePath = `${userId}/verification/${documentType}/${fileName}`;
 
     // Upload file to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from(VERIFICATION_DOCUMENTS_BUCKET)
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -108,9 +108,9 @@ export async function uploadVerificationDocuments(
   supabase: SupabaseClient<Database>,
   files: Array<{ file: File; documentType: string }>,
   userId: string
-): Promise<{ data: UploadResult[]; errors: any[] }> {
+): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
-  const errors: any[] = [];
+  const errors: Error[] = [];
 
   for (const { file, documentType } of files) {
     const { data, error } = await uploadVerificationDocument(supabase, file, userId, documentType);
@@ -130,7 +130,7 @@ export async function uploadVerificationDocuments(
 export async function deleteVerificationDocument(
   supabase: SupabaseClient<Database>,
   filePath: string
-): Promise<{ success: boolean; error: any }> {
+): Promise<{ success: boolean; error: Error | null }> {
   try {
     // Extract path from URL if full URL is provided
     let path = filePath;

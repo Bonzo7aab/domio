@@ -240,3 +240,86 @@ export async function deleteAllPushSubscriptions(userId: string): Promise<void> 
   }
 }
 
+/**
+ * Notification database operations
+ */
+type Notification = Database['public']['Tables']['notifications']['Row'];
+
+/**
+ * Get all notifications for a user
+ */
+export async function getNotifications(userId: string): Promise<Notification[]> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching notifications:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
+ * Mark a notification as read
+ */
+export async function markNotificationAsRead(notificationId: string): Promise<void> {
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from('notifications')
+    .update({
+      is_read: true,
+      read_at: new Date().toISOString()
+    })
+    .eq('id', notificationId);
+
+  if (error) {
+    console.error('Error marking notification as read:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark all notifications as read for a user
+ */
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from('notifications')
+    .update({
+      is_read: true,
+      read_at: new Date().toISOString()
+    })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+
+  if (error) {
+    console.error('Error marking all notifications as read:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a notification
+ */
+export async function deleteNotification(notificationId: string): Promise<void> {
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', notificationId);
+
+  if (error) {
+    console.error('Error deleting notification:', error);
+    throw error;
+  }
+}
+

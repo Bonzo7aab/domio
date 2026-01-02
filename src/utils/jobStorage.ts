@@ -114,7 +114,7 @@ const parseBudget = (budget: string, budgetType: string): { salaryMin?: number; 
 };
 
 // Convert form data to Job format
-export const createJobFromFormData = (formData: any): Job => {
+export const createJobFromFormData = (formData: Record<string, unknown>): Job => {
   const now = new Date();
   const coordinates = getCityCoordinates(formData.location);
   const keywords = extractKeywords(formData.title, formData.description, formData.category, formData.subcategory);

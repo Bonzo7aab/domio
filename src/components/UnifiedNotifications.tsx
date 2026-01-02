@@ -1,71 +1,136 @@
-import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, Search, Settings, Star, Trophy, UserCheck, X } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, Search, Star, Trophy, UserCheck, X } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useUserProfile } from '../contexts/AuthContext';
+import { deleteNotification, getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '../lib/database/notifications';
+import { createClient } from '../lib/supabase/client';
+import type { Database } from '../types/database';
+import type { ApplicationNotification, JobNotification, TenderNotification, UnifiedNotification, UnifiedNotificationsProps } from '../types/notification';
 import { Alert, AlertDescription } from './ui/alert';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Label } from './ui/label';
-import { Separator } from './ui/separator';
-import { Switch } from './ui/switch';
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
-// import { useUser } from '../hooks/useUser';
-import { useUserProfile } from '../contexts/AuthContext';
 
-// Job notifications types
-interface JobNotification {
-  id: string;
-  category: 'job';
-  type: 'new_job' | 'saved_search' | 'price_alert' | 'deadline_reminder';
-  title: string;
-  description: string;
-  jobId?: string;
-  searchQuery?: string;
-  timestamp: Date;
-  read: boolean;
-  urgent: boolean;
+type NotificationRow = Database['public']['Tables']['notifications']['Row'];
+
+/**
+ * Map database notification type to component notification category and type
+ */
+function getNotificationCategoryAndType(
+  dbType: NotificationRow['type'],
+  data: Record<string, unknown> | null
+): { category: 'job' | 'application' | 'tender'; type: string } | null {
+  switch (dbType) {
+    // Job notifications
+    case 'new_job':
+      return { category: 'job', type: 'new_job' };
+    case 'deadline_reminder':
+      // Check if it's job-related or tender-related based on data
+      if (data?.jobId) {
+        return { category: 'job', type: 'deadline_reminder' };
+      } else if (data?.tenderId) {
+        return { category: 'tender', type: 'deadline_reminder' };
+      }
+      return { category: 'job', type: 'deadline_reminder' }; // Default to job
+    
+    // Application notifications (for managers)
+    case 'application_received':
+      return { category: 'application', type: 'new_application' };
+    case 'application_status_update':
+      return { category: 'application', type: 'application_update' };
+    case 'job_assigned':
+      return { category: 'application', type: 'contract_signed' };
+    
+    // Tender notifications (for contractors)
+    case 'new_tender':
+      return { category: 'tender', type: 'new_tender' };
+    case 'bid_status_update':
+      return { category: 'tender', type: 'evaluation_started' };
+    case 'tender_awarded':
+      return { category: 'tender', type: 'tender_awarded' };
+    
+    default:
+      // For other types, try to infer from data
+      if (data?.jobId && !data?.tenderId) {
+        return { category: 'job', type: 'new_job' };
+      } else if (data?.tenderId) {
+        return { category: 'tender', type: 'new_tender' };
+      } else if (data?.applicationId) {
+        return { category: 'application', type: 'new_application' };
+      }
+      return null;
+  }
 }
 
-// Application notifications types
-interface ApplicationNotification {
-  id: string;
-  category: 'application';
-  type: 'new_application' | 'application_update' | 'interview_request' | 'contract_signed';
-  title: string;
-  message: string;
-  contractorName: string;
-  contractorAvatar?: string;
-  contractorRating: number;
-  jobTitle: string;
-  timestamp: Date;
-  read: boolean;
-  applicationId: string;
-  jobId: string;
-}
+/**
+ * Transform database notification to component notification format
+ */
+function transformNotification(dbNotification: NotificationRow): UnifiedNotification | null {
+  const data = dbNotification.data as Record<string, unknown> | null;
+  const categoryAndType = getNotificationCategoryAndType(dbNotification.type, data);
+  
+  if (!categoryAndType) {
+    return null;
+  }
 
-// Tender notifications types
-interface TenderNotification {
-  id: string;
-  category: 'tender';
-  type: 'new_tender' | 'deadline_reminder' | 'evaluation_started' | 'tender_awarded' | 'tender_cancelled';
-  title: string;
-  message: string;
-  tenderTitle: string;
-  organizerName: string;
-  estimatedValue?: string;
-  deadline?: Date;
-  timestamp: Date;
-  read: boolean;
-  tenderId: string;
-}
+  const baseNotification = {
+    id: dbNotification.id,
+    timestamp: new Date(dbNotification.created_at),
+    read: dbNotification.is_read,
+    urgent: dbNotification.priority === 'urgent'
+  };
 
-type UnifiedNotification = JobNotification | ApplicationNotification | TenderNotification;
-
-interface UnifiedNotificationsProps {
-  onJobSelect?: (jobId: string) => void;
-  onSearchSelect?: (query: string) => void;
-  onApplicationSelect?: (applicationId: string) => void;
-  onTenderSelect?: (tenderId: string) => void;
+  switch (categoryAndType.category) {
+    case 'job': {
+      const jobNotif: JobNotification = {
+        ...baseNotification,
+        category: 'job',
+        type: categoryAndType.type as JobNotification['type'],
+        title: dbNotification.title,
+        description: dbNotification.message,
+        jobId: data?.jobId || data?.job_id,
+        searchQuery: data?.searchQuery || data?.search_query
+      };
+      return jobNotif;
+    }
+    
+    case 'application': {
+      const appNotif: ApplicationNotification = {
+        ...baseNotification,
+        category: 'application',
+        type: categoryAndType.type as ApplicationNotification['type'],
+        title: dbNotification.title,
+        message: dbNotification.message,
+        contractorName: data?.contractorName || data?.contractor_name || 'Nieznany wykonawca',
+        contractorAvatar: data?.contractorAvatar || data?.contractor_avatar,
+        contractorRating: data?.contractorRating || data?.contractor_rating || 0,
+        jobTitle: data?.jobTitle || data?.job_title || dbNotification.title,
+        applicationId: data?.applicationId || data?.application_id || dbNotification.id,
+        jobId: data?.jobId || data?.job_id || ''
+      };
+      return appNotif;
+    }
+    
+    case 'tender': {
+      const tenderNotif: TenderNotification = {
+        ...baseNotification,
+        category: 'tender',
+        type: categoryAndType.type as TenderNotification['type'],
+        title: dbNotification.title,
+        message: dbNotification.message,
+        tenderTitle: data?.tenderTitle || data?.tender_title || dbNotification.title,
+        organizerName: data?.organizerName || data?.organizer_name || 'Nieznany organizator',
+        estimatedValue: data?.estimatedValue || data?.estimated_value,
+        deadline: data?.deadline ? new Date(data.deadline) : dbNotification.expires_at ? new Date(dbNotification.expires_at) : undefined,
+        tenderId: data?.tenderId || data?.tender_id || dbNotification.id
+      };
+      return tenderNotif;
+    }
+    
+    default:
+      return null;
+  }
 }
 
 export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
@@ -78,166 +143,150 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [isMounted, setIsMounted] = useState(false);
+  const [notifications, setNotifications] = useState<UnifiedNotification[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Ensure consistent hydration by only rendering user-dependent content after mount
   useEffect(() => {
     setIsMounted(true);
   }, []);
-  
-  // Job notifications
-  const [jobNotifications] = useState<JobNotification[]>([
-    {
-      id: 'job-1',
-      category: 'job',
-      type: 'new_job',
-      title: 'Nowe pilne zlecenie: Sprzątanie klatek',
-      description: 'Wspólnota Mieszkaniowa w Warszawie opublikowała pilne zlecenie',
-      jobId: '1',
-      timestamp: new Date(Date.now() - 5 * 60000),
-      read: false,
-      urgent: true
-    },
-    {
-      id: 'job-2',
-      category: 'job',
-      type: 'saved_search',
-      title: 'Nowe wyniki dla "elektryk kraków"',
-      description: '3 nowe zlecenia pasujące do Twojego wyszukiwania',
-      searchQuery: 'elektryk kraków',
-      timestamp: new Date(Date.now() - 30 * 60000),
-      read: false,
-      urgent: false
-    },
-    {
-      id: 'job-3',
-      category: 'job',
-      type: 'price_alert',
-      title: 'Wysokopłatne zlecenie w Twojej okolicy',
-      description: 'Remont elewacji - 120 zł/m² w Krakowie',
-      jobId: '2',
-      timestamp: new Date(Date.now() - 2 * 3600000),
-      read: true,
-      urgent: false
+
+
+  // Fetch notifications from database
+  const fetchNotifications = useCallback(async () => {
+    if (!user?.id) {
+      setNotifications([]);
+      return;
     }
-  ]);
 
-  // Application notifications (only for managers)
-  const [applicationNotifications] = useState<ApplicationNotification[]>([
-    {
-      id: 'app-1',
-      category: 'application',
-      type: 'new_application',
-      title: 'Nowa oferta na zlecenie',
-      message: 'Otrzymano nową ofertę na zlecenie sprzątania klatek schodowych',
-      contractorName: 'Jan Kowalski',
-      contractorAvatar: '',
-      contractorRating: 4.8,
-      jobTitle: 'Sprzątanie klatek schodowych - budynek 5-kondygnacyjny',
-      timestamp: new Date('2024-01-18T14:30:00'),
-      read: false,
-      applicationId: 'app-1',
-      jobId: '1'
-    },
-    {
-      id: 'app-2',
-      category: 'application',
-      type: 'new_application',
-      title: 'Nowa oferta na zlecenie',
-      message: 'Otrzymano nową ofertę na remont elewacji budynku',
-      contractorName: 'Anna Nowak',
-      contractorAvatar: '',
-      contractorRating: 4.6,
-      jobTitle: 'Remont elewacji budynku - 4-piętrowy',
-      timestamp: new Date('2024-01-18T09:15:00'),
-      read: false,
-      applicationId: 'app-2',
-      jobId: '2'
-    }
-  ]);
-
-  // Tender notifications (only for contractors)
-  const [tenderNotifications] = useState<TenderNotification[]>([
-    {
-      id: 'tender-1',
-      category: 'tender',
-      type: 'new_tender',
-      title: 'Nowy przetarg dostępny',
-      message: 'Opublikowano nowy przetarg w Twojej specjalizacji',
-      tenderTitle: 'Kompleksowy remont elewacji budynku mieszkalnego',
-      organizerName: 'Wspólnota Mieszkaniowa "Kwiatowa"',
-      estimatedValue: '450,000 PLN',
-      deadline: new Date('2024-02-15T23:59:59'),
-      timestamp: new Date('2024-01-18T14:30:00'),
-      read: false,
-      tenderId: 'tender-1'
-    },
-    {
-      id: 'tender-2',
-      category: 'tender',
-      type: 'deadline_reminder',
-      title: 'Zbliża się termin składania ofert',
-      message: 'Zostały 3 dni do końca składania ofert w przetargu',
-      tenderTitle: 'Serwis i konserwacja wind w kompleksie mieszkaniowym',
-      organizerName: 'SM "Podgórskie Tarasy"',
-      estimatedValue: '120,000 PLN',
-      deadline: new Date('2024-01-25T23:59:59'),
-      timestamp: new Date('2024-01-22T09:00:00'),
-      read: false,
-      tenderId: 'tender-2'
-    }
-  ]);
-
-  const [settings, setSettings] = useState({
-    newJobs: true,
-    savedSearches: true,
-    priceAlerts: true,
-    deadlineReminders: true,
-    emailNotifications: false,
-    pushNotifications: true
-  });
-
-  // Combine all notifications based on user type
-  const getAllNotifications = (): UnifiedNotification[] => {
-    let notifications: UnifiedNotification[] = [...jobNotifications];
+    setIsLoading(true);
+    setError(null);
     
-    // Only include user-specific notifications after mount to prevent hydration mismatch
-    if (isMounted) {
-      if (user?.userType === 'manager') {
-        notifications = [...notifications, ...applicationNotifications];
-      }
+    try {
+      const dbNotifications = await getNotifications(user.id);
+      const transformed = dbNotifications
+        .map(transformNotification)
+        .filter((n): n is UnifiedNotification => n !== null);
       
-      if (user?.userType === 'contractor') {
-        notifications = [...notifications, ...tenderNotifications];
-      }
+      setNotifications(transformed);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError('Nie udało się załadować powiadomień');
+    } finally {
+      setIsLoading(false);
     }
+  }, [user?.id]);
+
+  // Initial fetch and real-time subscription
+  useEffect(() => {
+    if (!isMounted || !user?.id) {
+      return;
+    }
+
+    fetchNotifications();
+
+    // Set up real-time subscription
+    const supabase = createClient();
+    const channelName = `notifications-${user.id}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (payload: any) => {
+          console.log('Notification change:', payload.eventType);
+          // Refetch notifications on any change
+          fetchNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [isMounted, user?.id, fetchNotifications]);
+
+  // Filter notifications based on user type
+  const getAllNotifications = (): UnifiedNotification[] => {
+    if (!isMounted) {
+      return [];
+    }
+
+    const filtered = [...notifications];
+
+    // Filter by user type - managers see applications, contractors see tenders
+    // But all users see job notifications
+    // The filtering is already done at the database level based on notification type
+    // We just need to ensure we're showing the right categories
     
-    return notifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   };
 
   const allNotifications = getAllNotifications();
   const unreadCount = allNotifications.filter(n => !n.read).length;
 
-  const markAsRead = (notificationId: string) => {
-    // This would update the state of the specific notification type
-    // For now, we'll just log it
-    console.log('Mark as read:', notificationId);
+  const markAsRead = async (notificationId: string) => {
+    try {
+      // Optimistically update UI
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+      );
+      
+      await markNotificationAsRead(notificationId);
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+      // Revert optimistic update on error
+      fetchNotifications();
+    }
   };
 
-  const markAllAsRead = () => {
-    // This would update all notifications as read
-    console.log('Mark all as read');
+  const markAllAsRead = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Optimistically update UI
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      
+      await markAllNotificationsAsRead(user.id);
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
+      // Revert optimistic update on error
+      fetchNotifications();
+    }
   };
 
-  const deleteNotification = (notificationId: string) => {
-    // This would delete the notification
-    console.log('Delete notification:', notificationId);
+  const handleDeleteNotification = async (notificationId: string) => {
+    try {
+      // Optimistically remove from UI
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      await deleteNotification(notificationId);
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      // Revert optimistic update on error
+      fetchNotifications();
+    }
   };
 
-  const handleNotificationClick = (notification: UnifiedNotification) => {
-    markAsRead(notification.id);
+  const handleNotificationClick = async (notification: UnifiedNotification) => {
+    // Mark as read if not already read
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+    
+    // Try to use action_url from database first (would need to fetch original notification)
+    // For now, use the extracted IDs from transformed notification
     
     switch (notification.category) {
-      case 'job':
+      case 'job': {
         const jobNotif = notification as JobNotification;
         if (jobNotif.jobId && onJobSelect) {
           onJobSelect(jobNotif.jobId);
@@ -245,18 +294,24 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
           onSearchSelect(jobNotif.searchQuery);
         }
         break;
-      case 'application':
+      }
+      case 'application': {
         const appNotif = notification as ApplicationNotification;
-        if (onApplicationSelect) {
+        if (onApplicationSelect && appNotif.applicationId) {
           onApplicationSelect(appNotif.applicationId);
+        } else if (appNotif.jobId && onJobSelect) {
+          // Fallback to job if application ID not available
+          onJobSelect(appNotif.jobId);
         }
         break;
-      case 'tender':
+      }
+      case 'tender': {
         const tenderNotif = notification as TenderNotification;
-        if (onTenderSelect) {
+        if (onTenderSelect && tenderNotif.tenderId) {
           onTenderSelect(tenderNotif.tenderId);
         }
         break;
+      }
     }
     
     setIsOpen(false);
@@ -267,7 +322,7 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
     const iconClass = urgent ? 'text-destructive' : 'text-primary';
     
     switch (notification.category) {
-      case 'job':
+      case 'job': {
         const jobNotif = notification as JobNotification;
         switch (jobNotif.type) {
           case 'new_job':
@@ -280,7 +335,8 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
             return <Clock className={`h-4 w-4 ${iconClass}`} />;
         }
         break;
-      case 'application':
+      }
+      case 'application': {
         const appNotif = notification as ApplicationNotification;
         switch (appNotif.type) {
           case 'new_application':
@@ -293,7 +349,8 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
             return <CheckCircle className="h-4 w-4 text-green-600" />;
         }
         break;
-      case 'tender':
+      }
+      case 'tender': {
         const tenderNotif = notification as TenderNotification;
         switch (tenderNotif.type) {
           case 'new_tender':
@@ -308,6 +365,7 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
             return <X className="h-4 w-4 text-red-600" />;
         }
         break;
+      }
     }
     
     return <Bell className={`h-4 w-4 ${iconClass}`} />;
@@ -413,7 +471,7 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                deleteNotification(notification.id);
+                handleDeleteNotification(notification.id);
               }}
               className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:text-destructive"
             >
@@ -526,7 +584,18 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
 
           {/* Notifications List */}
           <div className="max-h-96 overflow-y-auto">
-            {getFilteredNotifications().length === 0 ? (
+            {isLoading ? (
+              <div className="p-6 text-center text-muted-foreground">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p>Ładowanie powiadomień...</p>
+              </div>
+            ) : error ? (
+              <div className="p-6 text-center">
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              </div>
+            ) : getFilteredNotifications().length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">
                 <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>Brak powiadomień</p>
@@ -538,53 +607,6 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
             )}
           </div>
 
-          <Separator />
-
-          {/* Settings */}
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-sm font-medium">Ustawienia powiadomień</Label>
-              <Settings className="h-4 w-4 text-muted-foreground" />
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Nowe zlecenia</Label>
-                <Switch
-                  checked={settings.newJobs}
-                  onCheckedChange={(checked) => 
-                    setSettings(prev => ({ ...prev, newJobs: checked }))
-                  }
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Zapisane wyszukiwania</Label>
-                <Switch
-                  checked={settings.savedSearches}
-                  onCheckedChange={(checked) => 
-                    setSettings(prev => ({ ...prev, savedSearches: checked }))
-                  }
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Alerty cenowe</Label>
-                <Switch
-                  checked={settings.priceAlerts}
-                  onCheckedChange={(checked) => 
-                    setSettings(prev => ({ ...prev, priceAlerts: checked }))
-                  }
-                />
-              </div>
-            </div>
-
-            <Alert className="mt-4">
-              <AlertDescription className="text-xs">
-                Aby otrzymywać powiadomienia email, włącz tę opcję w ustawieniach konta.
-              </AlertDescription>
-            </Alert>
-          </div>
         </CardContent>
         </Card>
       </div>

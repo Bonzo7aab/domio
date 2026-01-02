@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
@@ -20,14 +18,9 @@ import {
   Clock,
   Shield,
   Award,
-  MessageSquare,
   FileText,
   BarChart3,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle,
-  X,
-  Plus
+  AlertCircle
 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -96,7 +89,7 @@ interface BidEvaluation {
 }
 
 export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
-  tenderId,
+  tenderId: _tenderId,
   tenderTitle,
   evaluationCriteria = mockEvaluationCriteria,
   bids: initialBids = mockTenderBids,
@@ -107,7 +100,6 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
   const [bids, setBids] = useState<TenderBid[]>(initialBids);
   const [selectedBidId, setSelectedBidId] = useState<string | null>(null);
   const [evaluationMode, setEvaluationMode] = useState<'overview' | 'detailed' | 'compare'>('overview');
-  const [selectedBidsForComparison, setSelectedBidsForComparison] = useState<string[]>([]);
 
   // Update bids when prop changes
   useEffect(() => {
@@ -119,7 +111,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
   // Calculate automatic scores based on criteria
   const calculateAutomaticScore = (bid: TenderBid, criterion: EvaluationCriterion): number => {
     switch (criterion.type) {
-      case 'price':
+      case 'price': {
         const validPrices = bids.map(b => b.totalPrice).filter(p => p != null && p > 0);
         if (validPrices.length === 0 || !bid.totalPrice || bid.totalPrice <= 0) {
           return 50; // Default score if no valid prices
@@ -127,8 +119,9 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
         const lowestPrice = Math.min(...validPrices);
         const priceScore = (lowestPrice / bid.totalPrice) * 100;
         return Math.min(100, Math.max(0, priceScore));
+      }
 
-      case 'time':
+      case 'time': {
         const validTimelines = bids.map(b => b.proposedTimeline).filter(t => t != null && t > 0);
         if (validTimelines.length === 0 || !bid.proposedTimeline || bid.proposedTimeline <= 0) {
           return 50; // Default score if no valid timelines
@@ -136,6 +129,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
         const shortestTime = Math.min(...validTimelines);
         const timeScore = (shortestTime / bid.proposedTimeline) * 100;
         return Math.min(100, Math.max(0, timeScore));
+      }
 
       default:
         return 75; // Default score for quality/experience criteria
@@ -236,7 +230,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
 
         {/* Navigation */}
         <div className="border-b flex-shrink-0">
-          <Tabs value={evaluationMode} onValueChange={(value) => setEvaluationMode(value as any)}>
+          <Tabs value={evaluationMode} onValueChange={(value) => setEvaluationMode(value as 'overview' | 'detailed' | 'comparison')}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Przegląd ofert</TabsTrigger>
               <TabsTrigger value="detailed">Szczegółowa ocena</TabsTrigger>
@@ -792,7 +786,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
               <div className="border-t p-4 bg-gray-50 mt-6">
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2">
-                    {bids.map((bid, index) => (
+                    {bids.map((bid) => (
                       <Button
                         key={bid.id}
                         variant={selectedBidId === bid.id ? 'default' : 'outline'}

@@ -18,12 +18,13 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Input } from './ui/input';
-import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
+import { getDaysRemaining } from '../utils/tenderHelpers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
-import { fetchTenders } from '../lib/database/jobs';
-import { TenderStatus } from '../types/tender';
+import { fetchTenders, type TenderWithCompany } from '../lib/database/jobs';
+import { TenderStatus, type Tender } from '../types/tender';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 // Types now imported from centralized types folder
 
@@ -75,7 +76,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
       setIsLoading(true);
       try {
         const supabase = createClient();
-        const filters: any = {
+        const filters: Record<string, unknown> = {
           status: statusFilter === 'all' ? undefined : statusFilter,
         };
         
@@ -89,17 +90,17 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
           // Log error details for debugging
           if (error && typeof error === 'object') {
             console.error('Error details:', {
-              message: (error as any)?.message,
-              code: (error as any)?.code,
-              details: (error as any)?.details,
-              hint: (error as any)?.hint,
-              originalError: (error as any)?.originalError
+              message: (error as PostgrestError)?.message,
+              code: (error as PostgrestError)?.code,
+              details: (error as PostgrestError)?.details,
+              hint: (error as PostgrestError)?.hint,
+              originalError: (error as PostgrestError)?.originalError
             });
           }
           setTenders([]);
         } else if (data) {
           // Convert database format to component format
-          const convertedTenders: Tender[] = data.map((t: any) => {
+          const convertedTenders: Tender[] = data.map((t: TenderWithCompany) => {
             // Convert location to string if it's an object
             let locationString: string;
             if (typeof t.location === 'string') {

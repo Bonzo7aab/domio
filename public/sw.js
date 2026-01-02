@@ -4,7 +4,7 @@
 const CACHE_NAME = 'domio-v1';
 
 // Install event - cache static assets
-self.addEventListener('install', (event) => {
+self.addEventListener('install', (_event) => {
   self.skipWaiting(); // Activate immediately
 });
 
@@ -49,7 +49,7 @@ self.addEventListener('push', (event) => {
         actions: data.actions || [],
         timestamp: data.timestamp || Date.now()
       };
-    } catch (e) {
+    } catch (_e) {
       // If JSON parsing fails, try as text
       notificationData.body = event.data.text() || notificationData.body;
     }
@@ -100,7 +100,7 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 // Handle notification action clicks
-self.addEventListener('notificationclose', (event) => {
+self.addEventListener('notificationclose', (_event) => {
   // Optional: Track notification dismissal
   // Could send analytics or mark notification as dismissed
 });

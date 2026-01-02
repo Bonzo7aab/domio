@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Check, Building, User, MapPin, Award, Upload, Phone, Mail, Shield } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, MapPin, Award, Upload, Phone, Mail, Shield, Building } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from './ui/button';
 import { Input } from './ui/input';

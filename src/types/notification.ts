@@ -12,7 +12,7 @@ export interface Notification {
     applicationId?: string;
     tenderId?: string;
     conversationId?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   priority: 'low' | 'medium' | 'high' | 'urgent';
   actionUrl?: string;
@@ -21,3 +21,57 @@ export interface Notification {
 export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'application' | 'tender' | 'message';
 export type NotificationCategory = 'job' | 'application' | 'tender' | 'message' | 'system';
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+// Unified Notifications Types
+export interface JobNotification {
+  id: string;
+  category: 'job';
+  type: 'new_job' | 'saved_search' | 'price_alert' | 'deadline_reminder';
+  title: string;
+  description: string;
+  jobId?: string;
+  searchQuery?: string;
+  timestamp: Date;
+  read: boolean;
+  urgent: boolean;
+}
+
+export interface ApplicationNotification {
+  id: string;
+  category: 'application';
+  type: 'new_application' | 'application_update' | 'interview_request' | 'contract_signed';
+  title: string;
+  message: string;
+  contractorName: string;
+  contractorAvatar?: string;
+  contractorRating: number;
+  jobTitle: string;
+  timestamp: Date;
+  read: boolean;
+  applicationId: string;
+  jobId: string;
+}
+
+export interface TenderNotification {
+  id: string;
+  category: 'tender';
+  type: 'new_tender' | 'deadline_reminder' | 'evaluation_started' | 'tender_awarded' | 'tender_cancelled';
+  title: string;
+  message: string;
+  tenderTitle: string;
+  organizerName: string;
+  estimatedValue?: string;
+  deadline?: Date;
+  timestamp: Date;
+  read: boolean;
+  tenderId: string;
+}
+
+export type UnifiedNotification = JobNotification | ApplicationNotification | TenderNotification;
+
+export interface UnifiedNotificationsProps {
+  onJobSelect?: (jobId: string) => void;
+  onSearchSelect?: (query: string) => void;
+  onApplicationSelect?: (applicationId: string) => void;
+  onTenderSelect?: (tenderId: string) => void;
+}

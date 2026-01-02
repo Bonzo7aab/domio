@@ -15,7 +15,7 @@ envContent.split('\n').forEach(line => {
   }
 });
 
-const supabase = createClient(
+const _supabase = createClient(
   envVars.NEXT_PUBLIC_SUPABASE_URL,
   envVars.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );

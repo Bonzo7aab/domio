@@ -7,20 +7,16 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { 
-  X, 
   Send, 
   Calculator,
-  AlertCircle,
   MapPin,
   Clock,
   Users,
-  Star,
   Building2,
   Briefcase,
   DollarSign
 } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { Alert, AlertDescription } from './ui/alert';
 import { useUserProfile } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -29,10 +25,29 @@ interface JobApplicationModalProps {
   onClose: () => void;
   jobTitle: string;
   companyName: string;
-  jobData?: any; // Full job data for additional info
-  onApplicationSubmit: (applicationData: any) => void | Promise<void>;
-  applicationForm: any;
-  setApplicationForm: (form: any) => void;
+  jobData?: Record<string, unknown>; // Full job data for additional info
+  onApplicationSubmit: (applicationData: {
+    id: string;
+    contractorId: string;
+    contractorName: string;
+    proposedPrice: number;
+    estimatedCompletion: string;
+    coverLetter: string;
+    additionalNotes?: string;
+    submittedAt: Date;
+  }) => void | Promise<void>;
+  applicationForm: {
+    proposedPrice: string;
+    estimatedCompletion: string;
+    coverLetter: string;
+    additionalNotes?: string;
+  };
+  setApplicationForm: (form: {
+    proposedPrice: string;
+    estimatedCompletion: string;
+    coverLetter: string;
+    additionalNotes?: string;
+  }) => void;
   postType?: 'job' | 'tender';
 }
 
@@ -72,7 +87,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
   if (!isOpen) return null;
 
   const handleInputChange = (field: string, value: string) => {
-    setApplicationForm((prev: any) => ({ ...prev, [field]: value }));
+    setApplicationForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }

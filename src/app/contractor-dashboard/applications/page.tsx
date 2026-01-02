@@ -35,7 +35,7 @@ async function getApplicationsData(userId: string) {
       ? parseFloat(app.proposedPrice) || 0 
       : app.proposedPrice || 0;
 
-    const transformedAttachments = (app.attachments || []).map((attachment: any, index: number) => {
+    const transformedAttachments = (app.attachments || []).map((attachment: string | Record<string, unknown>, index: number) => {
       if (typeof attachment === 'string') {
         return {
           id: `attachment-${index}`,

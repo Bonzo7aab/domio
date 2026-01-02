@@ -12,6 +12,7 @@ import { GlobalCommandPalette } from '../components/GlobalCommandPalette'
 import { MobileMenuDock } from '../components/MobileMenuDock'
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration'
 import { CookieConsentBanner } from '../components/CookieConsentBanner'
+import { ScrollbarManager } from '../components/ScrollbarManager'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -49,6 +50,7 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <body className={inter.className}>
+        <ScrollbarManager />
         <ServiceWorkerRegistration />
         <AuthProvider>
           <Suspense fallback={

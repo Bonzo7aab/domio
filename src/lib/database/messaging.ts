@@ -1,4 +1,4 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import type { Conversation, Message } from '../../types/messaging';
 
@@ -26,7 +26,7 @@ export interface MessageData {
   senderId: string;
   content: string;
   messageType: 'text' | 'image' | 'document' | 'system' | 'quote';
-  attachments?: any;
+  attachments?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -35,9 +35,9 @@ export interface MessageData {
 export async function createConversation(
   supabase: SupabaseClient<Database>,
   data: ConversationData
-): Promise<{ data: string | null; error: any }> {
+): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
-    const { data: conversation, error } = await (supabase as any)
+        const { data: conversation, error } = await supabase
       .from('conversations')
       .insert({
         participant_1: data.participant1,
@@ -68,9 +68,9 @@ export async function createConversation(
 export async function sendMessage(
   supabase: SupabaseClient<Database>,
   data: MessageData
-): Promise<{ data: string | null; error: any }> {
+): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
-    const { data: message, error } = await (supabase as any)
+        const { data: message, error } = await supabase
       .from('messages')
       .insert({
         conversation_id: data.conversationId,
@@ -88,7 +88,7 @@ export async function sendMessage(
     }
 
     // Update conversation's last_message_at
-    await (supabase as any)
+        await supabase
       .from('conversations')
       .update({ 
         last_message_at: new Date().toISOString(),
@@ -112,7 +112,7 @@ export async function sendQuoteRequestMessage(
   senderId: string,
   message: string,
   quoteData: QuoteRequestData
-): Promise<{ data: string | null; error: any }> {
+): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
     const attachments = {
       projectType: quoteData.projectType,
@@ -146,12 +146,12 @@ export async function createNotification(
   type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder',
   title: string,
   message: string,
-  data?: any,
+  data?: Record<string, unknown>,
   actionUrl?: string
-): Promise<{ data: string | null; error: any }> {
+): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
     // Insert notification without select first (RLS might block select for other users)
-    const { error: insertError } = await (supabase as any)
+        const { error: insertError } = await supabase
       .from('notifications')
       .insert({
         user_id: userId,
@@ -176,7 +176,7 @@ export async function createNotification(
 
     // Try to get the ID, but if it fails due to RLS, that's okay - the insert succeeded
     try {
-      const { data: notification, error: selectError } = await (supabase as any)
+        const { data: notification, error: selectError } = await supabase
         .from('notifications')
         .select('id')
         .eq('user_id', userId)
@@ -210,12 +210,12 @@ export async function createNotification(
 export async function getContractorUserId(
   supabase: SupabaseClient<Database>,
   contractorCompanyId: string
-): Promise<{ data: string | null; error: any }> {
+): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
     console.log('Looking for contractor user for company ID:', contractorCompanyId);
     
     // First, try to find any active user for this company
-    const { data: userCompanies, error } = await (supabase as any)
+        const { data: userCompanies, error } = await supabase
       .from('user_companies')
       .select('user_id')
       .eq('company_id', contractorCompanyId)
@@ -232,7 +232,7 @@ export async function getContractorUserId(
       console.warn('No active users found for contractor company:', contractorCompanyId);
       
       // Try to find the contractor company details for debugging
-      const { data: company, error: companyError } = await (supabase as any)
+        const { data: company, error: companyError } = await supabase
         .from('companies')
         .select('id, name, type, email, phone')
         .eq('id', contractorCompanyId)
@@ -249,7 +249,7 @@ export async function getContractorUserId(
     }
 
     // Find primary user or use the first one
-    const primaryUser = userCompanies.find((uc: any) => uc.is_primary);
+    const primaryUser = userCompanies.find((uc: { is_primary: boolean }) => uc.is_primary);
     const userId = primaryUser?.user_id || userCompanies[0]?.user_id;
     
     console.log('Found contractor user:', userId);
@@ -266,12 +266,12 @@ export async function getContractorUserId(
 export async function getManagerUserId(
   supabase: SupabaseClient<Database>,
   managerCompanyId: string
-): Promise<{ data: string | null; error: any }> {
+): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
     console.log('Looking for manager user for company ID:', managerCompanyId);
     
     // First, try to find any active user for this company
-    const { data: userCompanies, error } = await (supabase as any)
+        const { data: userCompanies, error } = await supabase
       .from('user_companies')
       .select('user_id')
       .eq('company_id', managerCompanyId)
@@ -288,7 +288,7 @@ export async function getManagerUserId(
       console.warn('No active users found for manager company:', managerCompanyId);
       
       // Try to find the manager company details for debugging
-      const { data: company, error: companyError } = await (supabase as any)
+        const { data: company, error: companyError } = await supabase
         .from('companies')
         .select('id, name, type, email, phone')
         .eq('id', managerCompanyId)
@@ -304,7 +304,7 @@ export async function getManagerUserId(
     }
 
     // Find primary user or use the first one
-    const primaryUser = userCompanies.find((uc: any) => uc.is_primary);
+    const primaryUser = userCompanies.find((uc: { is_primary: boolean }) => uc.is_primary);
     const userId = primaryUser?.user_id || userCompanies[0]?.user_id;
     
     console.log('Found manager user:', userId);
@@ -325,7 +325,7 @@ export async function submitQuoteRequest(
   contractorName: string,
   message: string,
   quoteData: QuoteRequestData
-): Promise<{ success: boolean; error: any; note?: string }> {
+): Promise<{ success: boolean; error: PostgrestError | null; note?: string }> {
   try {
     // 1. Find the user profile ID that represents the contractor company
     const contractorUserResult = await getContractorUserId(supabase, contractorCompanyId);
@@ -415,9 +415,9 @@ export async function findExistingConversation(
   supabase: SupabaseClient<Database>,
   participant1: string,
   participant2: string
-): Promise<{ data: string | null; error: any }> {
+): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
-    const { data: conversation, error } = await (supabase as any)
+        const { data: conversation, error } = await supabase
       .from('conversations')
       .select('id')
       .or(`and(participant_1.eq.${participant1},participant_2.eq.${participant2}),and(participant_1.eq.${participant2},participant_2.eq.${participant1})`)
@@ -438,7 +438,7 @@ export async function findExistingConversation(
     // If no data, conversation doesn't exist
     return { data: conversation?.id || null, error: null };
   } catch (err) {
-    const error = err as any;
+    const error = err as Error;
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = error?.code || error?.error?.code;
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
@@ -458,10 +458,10 @@ export async function findConversationByJob(
   participant1: string,
   participant2: string,
   isTender: boolean = false
-): Promise<{ data: string | null; error: any }> {
+): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
     const jobField = isTender ? 'tender_id' : 'job_id';
-    const { data: conversation, error } = await (supabase as any)
+        const { data: conversation, error } = await supabase
       .from('conversations')
       .select('id')
       .eq(jobField, jobId)
@@ -483,7 +483,7 @@ export async function findConversationByJob(
     // If no data, conversation doesn't exist
     return { data: conversation?.id || null, error: null };
   } catch (err) {
-    const error = err as any;
+    const error = err as Error;
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = error?.code || error?.error?.code;
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
@@ -500,9 +500,9 @@ export async function findConversationByJob(
 export async function fetchUserConversations(
   supabase: SupabaseClient<Database>,
   userId: string
-): Promise<{ data: Conversation[] | null; error: any }> {
+): Promise<{ data: Conversation[] | null; error: PostgrestError | null }> {
   try {
-    const { data: conversations, error } = await (supabase as any)
+        const { data: conversations, error } = await supabase
       .from('conversations')
       .select(`
         id,
@@ -546,7 +546,7 @@ export async function fetchUserConversations(
     }
 
     // Transform to Conversation format
-    const transformedConversations: Conversation[] = (conversations || []).map((conv: any) => {
+    const transformedConversations: Conversation[] = (conversations || []).map((conv: Record<string, unknown>) => {
       const otherParticipant = conv.participant_1_profile?.id === userId 
         ? conv.participant_2_profile 
         : conv.participant_1_profile;
@@ -598,9 +598,9 @@ export async function fetchUserConversations(
 export async function fetchConversationMessages(
   supabase: SupabaseClient<Database>,
   conversationId: string
-): Promise<{ data: Message[] | null; error: any }> {
+): Promise<{ data: Message[] | null; error: PostgrestError | null }> {
   try {
-    const { data: messages, error } = await (supabase as any)
+        const { data: messages, error } = await supabase
       .from('messages')
       .select(`
         id,
@@ -625,7 +625,7 @@ export async function fetchConversationMessages(
     }
 
     // Transform to Message format
-    const transformedMessages: Message[] = (messages || []).map((msg: any) => ({
+    const transformedMessages: Message[] = (messages || []).map((msg: Record<string, unknown>) => ({
       id: msg.id,
       senderId: msg.sender_id,
       senderName: `${msg.sender_profile?.first_name || ''} ${msg.sender_profile?.last_name || ''}`.trim(),
@@ -634,7 +634,7 @@ export async function fetchConversationMessages(
       timestamp: new Date(msg.created_at),
       read: false, // TODO: Implement read status
       type: msg.message_type === 'quote' ? 'text' : 'text', // Map to supported types
-      attachments: msg.attachments ? Object.values(msg.attachments).map((att: any) => ({
+      attachments: msg.attachments ? Object.values(msg.attachments as Record<string, unknown>).map((att: Record<string, unknown>) => ({
         id: att.id || '',
         name: att.name || '',
         url: att.url || '',
@@ -657,10 +657,10 @@ export async function markMessagesAsRead(
   supabase: SupabaseClient<Database>,
   conversationId: string,
   userId: string
-): Promise<{ data: boolean; error: any }> {
+): Promise<{ data: boolean; error: PostgrestError | null }> {
   try {
     // First, get all unread messages in this conversation
-    const { data: messages, error: messagesError } = await (supabase as any)
+        const { data: messages, error: messagesError } = await supabase
       .from('messages')
       .select('id')
       .eq('conversation_id', conversationId)
@@ -676,13 +676,13 @@ export async function markMessagesAsRead(
     }
 
     // Insert read status for each message
-    const readStatusInserts = messages.map((msg: any) => ({
+    const readStatusInserts = messages.map((msg: Record<string, unknown>) => ({
       message_id: msg.id,
       user_id: userId,
       read_at: new Date().toISOString()
     }));
 
-    const { error: insertError } = await (supabase as any)
+        const { error: insertError } = await supabase
       .from('message_read_status')
       .upsert(readStatusInserts, { 
         onConflict: 'message_id,user_id',

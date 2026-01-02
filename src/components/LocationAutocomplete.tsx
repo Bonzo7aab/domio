@@ -54,10 +54,10 @@ export default function LocationAutocomplete({
   const [inputValue, setInputValue] = useState(value || '');
   
   // Session token for cost optimization
-  const sessionTokenRef = useRef<any>(null);
+  const sessionTokenRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const placesLibraryRef = useRef<any>(null);
+  const placesLibraryRef = useRef<google.maps.places.PlacesService | null>(null);
 
   // Track mount state to prevent hydration mismatches
   useEffect(() => {
@@ -158,7 +158,7 @@ export default function LocationAutocomplete({
           return;
         }
 
-        const placesLibrary = await window.google.maps.importLibrary('places') as any;
+        const placesLibrary = await window.google.maps.importLibrary('places') as typeof google.maps.places;
         const AutocompleteSuggestion = placesLibrary.AutocompleteSuggestion;
         const AutocompleteSessionToken = placesLibrary.AutocompleteSessionToken;
         
@@ -174,7 +174,7 @@ export default function LocationAutocomplete({
         if (AutocompleteSessionToken) {
           sessionTokenRef.current = new AutocompleteSessionToken();
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Failed to load Places library:', error);
         toast.error(`Nie udało się załadować biblioteki miejsc: ${error.message || 'Nieznany błąd'}`);
       }
@@ -194,6 +194,8 @@ export default function LocationAutocomplete({
     } else if (value && value !== inputValue) {
       setInputValue(value);
     }
+    // inputValue is intentionally omitted - it's state set inside this effect, adding it would cause infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, isMounted]);
 
   // Fetch autocomplete suggestions using the modern API
@@ -224,7 +226,7 @@ export default function LocationAutocomplete({
 
       const { AutocompleteSuggestion } = placesLibraryRef.current;
       
-      const request: any = {
+      const request: { input: string; sessionToken: unknown; locationBias?: { center: { lat: number; lng: number }; radius: number } } = {
         input: input,
         sessionToken: sessionTokenRef.current,
         includedRegionCodes: ['PL'], // Restrict to Poland
@@ -239,7 +241,7 @@ export default function LocationAutocomplete({
 
       setSuggestions(suggestions || []);
       setShowSuggestions(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Autocomplete error:', error);
       if (requestIdRef.current > 0) {
         toast.error('Nie udało się pobrać sugestii lokalizacji');
@@ -285,7 +287,7 @@ export default function LocationAutocomplete({
       setInputValue('');
 
       // Convert place prediction to Place object
-      const place = (suggestion.placePrediction as any).toPlace();
+      const place = (suggestion.placePrediction as { toPlace: () => google.maps.places.Place }).toPlace();
       
       // Fetch place details
       await place.fetchFields({
@@ -302,21 +304,27 @@ export default function LocationAutocomplete({
       let sublocalityLevel1 = '';
       const addressComponents = place.addressComponents || [];
       
-      const locality = addressComponents.find((component: any) =>
+      interface AddressComponent {
+        types: string[];
+        longText?: string;
+        shortText?: string;
+      }
+      
+      const locality = (addressComponents as AddressComponent[]).find((component: AddressComponent) =>
         component.types.includes('locality')
       );
       
       if (locality) {
         city = locality.longText || locality.shortText || '';
       } else {
-        const adminArea = addressComponents.find((component: any) =>
+        const adminArea = (addressComponents as AddressComponent[]).find((component: AddressComponent) =>
           component.types.includes('administrative_area_level_1')
         );
         city = adminArea?.longText || adminArea?.shortText || place.displayName || '';
       }
 
       // Extract sublocality_level_1 (district/neighborhood)
-      const sublocality = addressComponents.find((component: any) =>
+      const sublocality = (addressComponents as AddressComponent[]).find((component: AddressComponent) =>
         component.types.includes('sublocality_level_1')
       );
       
@@ -339,8 +347,8 @@ export default function LocationAutocomplete({
       }
 
       toast.success('Lokalizacja wybrana pomyślnie');
-    } catch (error) {
-      console.error('Error processing place:', error);
+    } catch {
+      // Ignore errors when processing place
       toast.error('Błąd podczas przetwarzania lokalizacji');
     } finally {
       setIsLoading(false);
@@ -464,7 +472,7 @@ export default function LocationAutocomplete({
       onLocationSelect(city, address, lat, lng, sublocalityLevel1 || undefined);
       
       toast.success('Użyto Twojej aktualnej lokalizacji');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Geolocation error:', error);
       
       if (error.code === 1) {

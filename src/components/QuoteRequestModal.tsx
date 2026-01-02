@@ -7,7 +7,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Calendar, DollarSign, MapPin, Clock, FileText, Send, Loader2 } from 'lucide-react';
+import { DollarSign, MapPin, Clock, FileText, Send, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
@@ -65,7 +65,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 }) => {
   const { user } = useUserProfile();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userJobs, setUserJobs] = useState<any[]>([]);
+  const [userJobs, setUserJobs] = useState<Array<{ id: string; title: string; company: string }>>([]);
   const [formData, setFormData] = useState({
     projectType: '',
     budgetRange: '',
@@ -83,7 +83,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
       
       try {
         const supabase = createClient();
-        const { data: jobs, error } = await (supabase as any)
+        const { data: jobs, error } = await supabase
           .from('jobs')
           .select('id, title, company')
           .eq('created_by', user.id)

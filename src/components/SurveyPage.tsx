@@ -11,9 +11,9 @@ interface SurveyPageProps {
 
 export function SurveyPage({ onBack }: SurveyPageProps) {
   const [surveyCompleted, setSurveyCompleted] = useState(false);
-  const [surveyData, setSurveyData] = useState<any>(null);
+  const [surveyData, setSurveyData] = useState<Record<string, unknown> | null>(null);
 
-  const handleSurveyComplete = (data: any) => {
+  const handleSurveyComplete = (data: Record<string, unknown>) => {
     setSurveyData(data);
     setSurveyCompleted(true);
     

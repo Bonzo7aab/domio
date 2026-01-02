@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { ArrowLeft, Upload, MapPin, Calendar, FileText, Phone, Mail, Building, X, File, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Upload, MapPin, FileText, Phone, Mail, Building, X, File, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
@@ -446,7 +446,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
             // All files failed
             throw new Error('Nie udało się przesłać żadnego pliku. Spróbuj ponownie.');
           }
-        } catch (uploadError: any) {
+        } catch (uploadError: unknown) {
           console.error('Error uploading attachments:', uploadError);
           throw new Error(uploadError?.message || 'Błąd podczas przesyłania plików');
         } finally {
@@ -556,7 +556,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       setTimeout(() => {
         onBack();
       }, 1500);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Błąd podczas zapisywania zlecenia:', error);
       
       // Clean up uploaded files if job creation failed
@@ -693,7 +693,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
                         disabled
                         className="bg-gray-100"
                       />
-                      <p className="text-xs text-gray-500 mt-1">(automatycznie ustawione dla kategorii "Inne")</p>
+                      <p className="text-xs text-gray-500 mt-1">(automatycznie ustawione dla kategorii &quot;Inne&quot;)</p>
                     </div>
                   ) : (
                     <Select 
@@ -1000,6 +1000,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
                         >
                           {previewUrl ? (
                             <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden border border-gray-300">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={previewUrl}
                                 alt={file.name}

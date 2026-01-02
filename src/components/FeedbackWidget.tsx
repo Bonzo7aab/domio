@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Input } from './ui/input';
@@ -67,7 +67,7 @@ export const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({
     setIsSubmitting(false);
   };
 
-  const selectedType = feedbackTypes.find(type => type.value === feedbackType);
+  const _selectedType = feedbackTypes.find(type => type.value === feedbackType);
 
   return (
     <>
@@ -97,10 +97,10 @@ export const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Feedback Type */}
             <div className="space-y-2">
-              <Label htmlFor="feedbackType">Typ feedback'u</Label>
+              <Label htmlFor="feedbackType">Typ feedback&apos;u</Label>
               <Select value={feedbackType} onValueChange={setFeedbackType} required>
                 <SelectTrigger>
-                  <SelectValue placeholder="Wybierz typ feedback'u" />
+                  <SelectValue placeholder="Wybierz typ feedback&apos;u" />
                 </SelectTrigger>
                 <SelectContent>
                   {feedbackTypes.map((type) => {

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import GoogleMap, { MapMarker } from './GoogleMap';
-import { geocodeAddress, getCurrentLocation, calculateDistance } from '../lib/google-maps/geocoding';
+import { getCurrentLocation, calculateDistance } from '../lib/google-maps/geocoding';
 import { extractCity, extractSublocality } from '../utils/locationMapping';
 import type { Job } from '../types/job';
 import { MapLegend } from './MapLegend';
@@ -57,12 +57,12 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   selectedJobId,
   onJobSelect,
   hoveredJobId,
-  onJobHover,
+  onJobHover: _onJobHover,
   userLocation,
   onLocationChange,
   onCityNameChange,
   searchRadius = 25,
-  onRadiusChange,
+  onRadiusChange: _onRadiusChange,
   filters,
   onFiltersChange,
   showCitySelector: externalShowCitySelector = false,
@@ -77,8 +77,8 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   const [showJobClusters] = useState(true); // Always show all jobs
   const [mapCenter, setMapCenter] = useState({ lat: 52.1394, lng: 21.0458 }); // Ursynów, Warsaw
   const [mapZoom, setMapZoom] = useState(13); // District-level view
-  const [showMapFilters, setShowMapFilters] = useState(true);
-  const [showMapLegend, setShowMapLegend] = useState(true);
+  const [_showMapFilters] = useState(true);
+  const [_showMapLegend] = useState(true);
   const [selectedCityName, setSelectedCityName] = useState<string | null>(null);
 
   // Function to find city name from coordinates
@@ -133,7 +133,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
       }
       
       setIsGettingLocation(false);
-    } catch (error) {
+    } catch (_error) {
       setIsGettingLocation(false);
       
       toast.info('Wybierz miasto', {
@@ -165,16 +165,19 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   // Deep equality check helper for filters
   const filtersRef = useRef<FilterState | undefined>(filters);
   const filtersStringRef = useRef<string>('');
+  const [filtersChanged, setFiltersChanged] = useState(false);
   
-  // Check if filters actually changed using JSON stringification (simple deep equality)
-  const filtersChanged = useMemo(() => {
+  // Update refs and check if filters changed using useEffect
+  useEffect(() => {
     const filtersString = JSON.stringify(filters);
-    if (filtersString === filtersStringRef.current) {
-      return false;
+    const currentString = filtersStringRef.current;
+    if (filtersString !== currentString) {
+      filtersStringRef.current = filtersString;
+      filtersRef.current = filters;
+      setFiltersChanged(true);
+    } else {
+      setFiltersChanged(false);
     }
-    filtersStringRef.current = filtersString;
-    filtersRef.current = filters;
-    return true;
   }, [filters]);
 
   // Filter jobs by radius if user location is available
@@ -240,8 +243,8 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   }, []);
 
   const filterByBudget = useCallback((job: Job, budgetRanges?: string[], budgetMin?: number | null, budgetMax?: number | null): boolean => {
-    const jobBudgetMin = (job as any).budget_min;
-    const jobBudgetMax = (job as any).budget_max;
+    const jobBudgetMin = ('budget_min' in job ? job.budget_min : undefined) as number | undefined;
+    const jobBudgetMax = ('budget_max' in job ? job.budget_max : undefined) as number | undefined;
     const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
     const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
     
@@ -354,6 +357,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
     });
     
     return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredJobs, filtersChanged, filterByPostType, filterByCategory, filterByLocation, filterByBudget]);
 
   // Convert jobs to map markers
@@ -383,7 +387,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   }, [filteredByMapFilters, selectedJobId, hoveredJobId, onJobSelect]);
 
   // Handle map clicks
-  const handleMapClick = (event: google.maps.MapMouseEvent) => {
+  const handleMapClick = (_event: google.maps.MapMouseEvent) => {
     // Map click handler - can be used for future functionality
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, Edit, Euro, Eye, Loader2, MessageSquare, Send, Star } from 'lucide-react';
+import { CheckCircle, Edit, Euro, Eye, MessageSquare, Send, Star } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';

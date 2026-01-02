@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     // Initialize VAPID keys
     try {
       initializeVAPID();
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'VAPID keys not configured. Please set VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY environment variables.' },
         { status: 500 }

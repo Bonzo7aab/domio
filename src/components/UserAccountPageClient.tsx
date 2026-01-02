@@ -11,7 +11,6 @@ import { ProfileForm } from './ProfileForm';
 import { CompanyManagementForm } from './CompanyManagementForm';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Tabs, TabsContent } from './ui/tabs';
 import { cn } from './ui/utils';
@@ -131,11 +130,6 @@ export function UserAccountPageClient({
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3 mb-1.5 sm:mb-2">
                   <h1 className="text-lg sm:text-2xl md:text-3xl font-bold break-words">{user.firstName} {user.lastName}</h1>
-                  {!user.isVerified && (
-                    <Badge variant="destructive" className="text-[10px] sm:text-xs md:text-sm">
-                      Ważne
-                    </Badge>
-                  )}
                 </div>
                 <p className="text-gray-600 mb-1.5 sm:mb-2 md:mb-1 text-xs sm:text-sm md:text-base break-words">{user.email}</p>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-500">
@@ -146,8 +140,13 @@ export function UserAccountPageClient({
                     </span>
                   </div>
                   <div className="flex items-center">
-                    <Shield className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
-                    <span>
+                    <Shield className={cn(
+                      "h-3 w-3 md:h-4 md:w-4 flex-shrink-0",
+                      !user.isVerified && "text-destructive"
+                    )} />
+                    <span className={cn(
+                      !user.isVerified && "text-destructive font-medium"
+                    )}>
                       {user.isVerified ? 'Zweryfikowany' : 'Niezweryfikowany'}
                     </span>
                   </div>

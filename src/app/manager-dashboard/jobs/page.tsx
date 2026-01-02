@@ -6,6 +6,7 @@ import { Button } from '../../../components/ui/button';
 import { JobsContent } from './JobsContent';
 import { budgetFromDatabase } from '../../../types/budget';
 import Link from 'next/link';
+import type { JobWithCompany } from '../../../lib/database/jobs';
 
 async function getJobsData(userId: string) {
   const supabase = await createClient();
@@ -40,11 +41,12 @@ async function getJobsData(userId: string) {
   }
 
   // Get all job IDs to count applications
-  const jobIds = (jobsData || []).map((job: any) => job.id);
+  const jobIds = (jobsData || []).map((job: { id: string }) => job.id);
 
   // Count applications for each job
   const applicationCounts: { [key: string]: number } = {};
   if (jobIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: applicationsData } = await (supabase as any)
       .from('job_applications')
       .select('job_id')
@@ -61,7 +63,7 @@ async function getJobsData(userId: string) {
   }
 
   // Format jobs for display
-  const jobs = (jobsData || []).map((job: any) => {
+  const jobs = (jobsData || []).map((job: JobWithCompany) => {
     const location = typeof job.location === 'string' 
       ? job.location 
       : job.location?.city || 'Nieznana lokalizacja';

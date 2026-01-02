@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Star, Shield, CheckCircle, Users, Briefcase, Filter, Search, SlidersHorizontal, Loader2, ThumbsUp, MessageCircle, Calendar } from 'lucide-react';
+import { ArrowLeft, MapPin, Star, Shield, CheckCircle, Users, Briefcase, Search, SlidersHorizontal, Loader2, MessageCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -43,14 +43,14 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expandedContractor, setExpandedContractor] = useState<string | null>(null);
-  const [contractorReviews, setContractorReviews] = useState<{[key: string]: any[]}>({});
-  const [contractorRatings, setContractorRatings] = useState<{[key: string]: any}>({});
+  const [_expandedContractor] = useState<string | null>(null);
+  const [contractorReviews, setContractorReviews] = useState<{[key: string]: Array<Record<string, unknown>>}>({});
+  const [contractorRatings, setContractorRatings] = useState<{[key: string]: Record<string, unknown>}>({});
   const [currentLimit, setCurrentLimit] = useState(6);
   const [hasMoreContractors, setHasMoreContractors] = useState(false);
 
   // Load reviews for a specific contractor
-  const loadContractorReviews = async (contractorId: string) => {
+  const _loadContractorReviews = async (contractorId: string) => {
     try {
       const [reviews, ratings] = await Promise.all([
         fetchContractorReviews(contractorId, 3), // Load first 3 reviews

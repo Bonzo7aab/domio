@@ -14,8 +14,6 @@ import {
   AlertCircle, 
   CheckCircle,
   Calculator,
-  Calendar,
-  Users
 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -216,7 +214,7 @@ export const JobApplicationForm: React.FC<JobApplicationFormProps> = ({
       onSubmit(application);
       toast.success('Aplikacja została wysłana pomyślnie!');
       onClose();
-    } catch (error) {
+    } catch (_error) {
       toast.error('Wystąpił błąd podczas wysyłania aplikacji');
     } finally {
       setIsSubmitting(false);

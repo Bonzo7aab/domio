@@ -1,4 +1,4 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import { createNotification, findExistingConversation, createConversation, sendMessage } from './messaging';
 
@@ -10,7 +10,7 @@ export async function submitQuestion(
   jobId: string,
   askerId: string,
   question: string
-): Promise<{ success: boolean; error: any; questionId?: string }> {
+): Promise<{ success: boolean; error: PostgrestError | null; questionId?: string }> {
   try {
     // 1. Verify session and get the authenticated user ID
     // This ensures asker_id matches auth.uid() for RLS policies
@@ -38,7 +38,7 @@ export async function submitQuestion(
 
     // Try to find it as a job first
     try {
-      const { data: jobData, error: jobError } = await (supabase as any)
+      const { data: jobData, error: jobError } = await supabase
         .from('jobs')
         .select('id, title, manager_id')
         .eq('id', jobId)
@@ -56,7 +56,7 @@ export async function submitQuestion(
     // If not a job, try as a tender
     if (!isJob) {
       try {
-        const { data: tenderData, error: tenderError } = await (supabase as any)
+        const { data: tenderData, error: tenderError } = await supabase
           .from('tenders')
           .select('id, title, manager_id')
           .eq('id', jobId)
@@ -88,7 +88,7 @@ export async function submitQuestion(
       sessionUserId: sessionData.session?.user?.id
     });
 
-    const insertPayload: any = {
+    const insertPayload: Record<string, unknown> = {
       asker_id: authenticatedUserId, // Use session user ID to match auth.uid()
       question: question.trim(),
       is_public: true,
@@ -104,10 +104,10 @@ export async function submitQuestion(
     console.log('Insert payload:', insertPayload);
 
     // Try insert with select first
-    let questionDataArray: any[] | null = null;
-    let questionError: any = null;
+    let questionDataArray: Array<Record<string, unknown>> | null = null;
+    let questionError: PostgrestError | null = null;
 
-    const insertResult = await (supabase as any)
+    const insertResult = await supabase
       .from('questions')
       .insert(insertPayload)
       .select('id');
@@ -123,7 +123,7 @@ export async function submitQuestion(
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Try to find the question we just inserted
-      const { data: foundQuestion, error: findError } = await (supabase as any)
+      const { data: foundQuestion, error: findError } = await supabase
         .from('questions')
         .select('id')
         .eq('job_id', jobId)

@@ -12,7 +12,7 @@ import {
   CommandSeparator,
 } from './ui/command';
 import { useUserProfile } from '../contexts/AuthContext';
-import { sitemapEntries, getFilteredSitemap, getSitemapByCategory, type SitemapEntry } from '../lib/sitemap';
+import { getFilteredSitemap, getSitemapByCategory, type SitemapEntry } from '../lib/sitemap';
 
 export function GlobalCommandPalette() {
   const [open, setOpen] = useState(false);
@@ -55,7 +55,7 @@ export function GlobalCommandPalette() {
     setOpen(false);
   };
 
-  const runCommand = (value: string) => {
+  const _runCommand = (value: string) => {
     // Find the entry that matches the selected value
     const entry = filteredEntries.find(e => e.label === value);
     if (entry) {

@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/types/database';
 import { TEST_USER_PREFIX } from '../config/constants';
@@ -95,7 +95,7 @@ export async function deleteTestUser(email: string) {
     return;
   }
 
-  const user = users.users.find((u: any) => u.email === email);
+  const user = users.users.find((u: { email?: string }) => u.email === email);
 
   if (user) {
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id);
@@ -119,7 +119,7 @@ export async function cleanupTestUsers() {
       return;
     }
 
-    const testUsers = users.users.filter((u: any) => u.email?.startsWith(TEST_USER_PREFIX));
+    const testUsers = users.users.filter((u: { email?: string }) => u.email?.startsWith(TEST_USER_PREFIX));
 
     for (const user of testUsers) {
       if (user.id) {
@@ -226,7 +226,7 @@ export async function clearAuthState(page: Page) {
         // Ignore - sessionStorage not accessible
       }
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     // SecurityError or other errors when page context doesn't support storage access
     // This is expected when clearAuthState is called before page.goto()
     // Cookies are already cleared, which is sufficient

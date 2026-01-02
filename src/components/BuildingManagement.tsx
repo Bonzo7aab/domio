@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, MapPin, Loader2, X, Check, AlertCircle, Upload, Image as ImageIcon } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, MapPin, Loader2, X, Check, Upload } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -73,6 +73,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
   // Fetch buildings on mount and when companyId changes
   useEffect(() => {
     loadBuildings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
   const loadBuildings = async () => {
@@ -270,7 +271,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
           images: imageUrls.length > 0 ? imageUrls : undefined,
         };
 
-        const { data, error: updateError } = await updateBuilding(
+        const { data: _data, error: updateError } = await updateBuilding(
           supabase,
           editingBuilding.id,
           buildingData
@@ -463,7 +464,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
               Nie masz jeszcze dodanych budynków
             </p>
             <p className="text-xs text-muted-foreground">
-              Kliknij "Dodaj budynek" aby dodać pierwszy budynek
+              Kliknij &quot;Dodaj budynek&quot; aby dodać pierwszy budynek
             </p>
           </div>
         ) : (
@@ -508,6 +509,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                       <div className="grid grid-cols-3 gap-2">
                         {building.images.slice(0, 3).map((imageUrl, index) => (
                           <div key={index} className="relative aspect-video rounded-md overflow-hidden border">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={imageUrl}
                               alt={`${building.name} - zdjęcie ${index + 1}`}
@@ -741,6 +743,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                     <div className="grid grid-cols-3 gap-2">
                       {existingImages.map((url, index) => (
                         <div key={index} className="relative group">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={url}
                             alt={`Budynek ${index + 1}`}
@@ -768,6 +771,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                     <div className="grid grid-cols-3 gap-2">
                       {imagePreviews.map((preview, index) => (
                         <div key={index} className="relative group">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={preview}
                             alt={`Podgląd ${index + 1}`}
@@ -841,7 +845,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Usunąć budynek?</AlertDialogTitle>
             <AlertDialogDescription>
-              Czy na pewno chcesz usunąć budynek "{deletingBuilding?.name}"? 
+              Czy na pewno chcesz usunąć budynek &quot;{deletingBuilding?.name}&quot;? 
               Ta operacja jest nieodwracalna.
             </AlertDialogDescription>
           </AlertDialogHeader>

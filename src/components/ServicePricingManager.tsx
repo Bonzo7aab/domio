@@ -432,7 +432,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
         <Card>
           <CardContent className="text-center py-8">
             <p className="text-sm text-gray-600 mb-3">
-              Nie masz jeszcze dodanych usług. Kliknij "Dodaj usługę" powyżej, aby rozpocząć.
+              Nie masz jeszcze dodanych usług. Kliknij &quot;Dodaj usługę&quot; powyżej, aby rozpocząć.
             </p>
           </CardContent>
         </Card>

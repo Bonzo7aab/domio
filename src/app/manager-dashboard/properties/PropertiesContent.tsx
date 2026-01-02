@@ -21,7 +21,7 @@ export function PropertiesContent({ buildings }: PropertiesContentProps) {
           <h3 className="text-lg font-medium mb-2">Brak zarejestrowanych budynków</h3>
           <p className="text-gray-600 mb-4">Nie posiadasz jeszcze zarejestrowanych budynków w portfolio.</p>
           <p className="text-sm text-gray-500">
-            Przejdź do sekcji "Firma" w ustawieniach konta, aby dodać budynki.
+            Przejdź do sekcji &quot;Firma&quot; w ustawieniach konta, aby dodać budynki.
           </p>
         </CardContent>
       </Card>

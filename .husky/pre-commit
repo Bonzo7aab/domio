@@ -1,0 +1,3 @@
+npm run lint:check
+# Skip e2e tests in pre-commit to speed up commits
+# npm run test:e2e

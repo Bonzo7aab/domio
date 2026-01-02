@@ -19,7 +19,7 @@ export default async function ManagerDashboardLayout({
   }
 
   // Fetch company data
-  const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
+  const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);
   
   // Get user email from auth user
   const userEmail = user.email;

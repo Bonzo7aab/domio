@@ -16,7 +16,10 @@ export const JobStorageDebug: React.FC = () => {
   };
   
   useEffect(() => {
-    loadJobs();
+    // Use setTimeout to avoid synchronous setState in effect
+    setTimeout(() => {
+      loadJobs();
+    }, 0);
     
     // Listen for storage changes (when new jobs are added)
     const handleStorageChange = (e: StorageEvent) => {

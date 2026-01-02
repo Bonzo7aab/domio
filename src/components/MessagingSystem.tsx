@@ -1,6 +1,5 @@
 import {
   CheckCheck,
-  Info,
   Paperclip,
   Phone,
   Search,
@@ -84,7 +83,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
   const [newMessage, setNewMessage] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [jobData, setJobData] = useState<any>(null);
+  const [jobData, setJobData] = useState<{ id: string; title: string; company: string } | null>(null);
   const [isLoadingJob, setIsLoadingJob] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
 
