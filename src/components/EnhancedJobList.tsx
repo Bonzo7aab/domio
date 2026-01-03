@@ -12,6 +12,7 @@ import { extractCity, extractSublocality, getProvinceForCity } from '../utils/lo
 import { isTenderEndingSoon } from '../utils/tenderHelpers';
 import { isJobExpired } from '../utils/jobHelpers';
 import type { Job } from '../types/job';
+import type { Budget } from '../types/budget';
 
 interface EnhancedJobListProps {
   jobs?: Job[]; // Jobs data from parent
@@ -171,7 +172,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
       jobsToReturn = [...jobs];
     } else if (!isLoadingJobs) {
       // Use stored jobs as fallback
-      jobsToReturn = [...storedJobs];
+      jobsToReturn = [...(storedJobs as unknown as Job[])];
     }
     
     // Aggressive deduplication using Map (O(n) instead of O(n²))
@@ -443,11 +444,23 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
           return parseTime(b.postedTime) - parseTime(a.postedTime);
         });
       case 'salary-high':
-        return sorted.sort((a, b) => (b.salaryMax || 0) - (a.salaryMax || 0));
+        return sorted.sort((a, b) => {
+          const aMax = (a.budget as { max?: number })?.max || (a.budget as { budget_max?: number })?.budget_max || 0;
+          const bMax = (b.budget as { max?: number })?.max || (b.budget as { budget_max?: number })?.budget_max || 0;
+          return bMax - aMax;
+        });
       case 'salary-low':
-        return sorted.sort((a, b) => (a.salaryMin || 0) - (b.salaryMin || 0));
+        return sorted.sort((a, b) => {
+          const aMin = (a.budget as { min?: number })?.min || (a.budget as { budget_min?: number })?.budget_min || 0;
+          const bMin = (b.budget as { min?: number })?.min || (b.budget as { budget_min?: number })?.budget_min || 0;
+          return aMin - bMin;
+        });
       case 'budget':
-        return sorted.sort((a, b) => (b.budgetTotal || 0) - (a.budgetTotal || 0));
+        return sorted.sort((a, b) => {
+          const aBudget = (a.budget as { max?: number; total?: number })?.max || (a.budget as { max?: number; total?: number })?.total || 0;
+          const bBudget = (b.budget as { max?: number; total?: number })?.max || (b.budget as { max?: number; total?: number })?.total || 0;
+          return bBudget - aBudget;
+        });
       case 'applications':
         return sorted.sort((a, b) => {
           const aApplications = a.applications ?? a.metrics?.applications ?? 0;
@@ -484,7 +497,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     
     const locations = filteredJobs.map(job => job.location);
     const locationCounts = locations.reduce((acc, location) => {
-      acc[location] = (acc[location] || 0) + 1;
+      const key = typeof location === 'string' ? location : (location as { city?: string }).city || 'Unknown';
+      acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     
@@ -550,7 +564,12 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
         },
         deadline: job.deadline
       };
-      addBookmark(bookmarkData);
+      addBookmark({
+        ...bookmarkData,
+        budget: typeof bookmarkData.budget === 'object' && 'min' in bookmarkData.budget && 'max' in bookmarkData.budget
+          ? bookmarkData.budget as Budget
+          : String(bookmarkData.budget || '')
+      });
       setBookmarkedJobs(prev => [...prev, jobId]);
       // Optimistically increment bookmark count
       setBookmarkCountUpdates(prev => ({

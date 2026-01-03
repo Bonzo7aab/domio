@@ -63,7 +63,18 @@ async function getJobsData(userId: string) {
   }
 
   // Format jobs for display
-  const jobs = (jobsData || []).map((job: JobWithCompany) => {
+  const jobs = (jobsData || []).map((job: {
+    id: string;
+    title: string;
+    budget_min: number | null;
+    budget_max: number | null;
+    budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
+    currency: string;
+    deadline: string | null;
+    status: string;
+    job_categories: { name: string } | null;
+    location: string | { city?: string } | null;
+  }) => {
     const location = typeof job.location === 'string' 
       ? job.location 
       : job.location?.city || 'Nieznana lokalizacja';

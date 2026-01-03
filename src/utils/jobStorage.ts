@@ -116,49 +116,49 @@ const parseBudget = (budget: string, budgetType: string): { salaryMin?: number; 
 // Convert form data to Job format
 export const createJobFromFormData = (formData: Record<string, unknown>): Job => {
   const now = new Date();
-  const coordinates = getCityCoordinates(formData.location);
-  const keywords = extractKeywords(formData.title, formData.description, formData.category, formData.subcategory);
-  const budgetInfo = parseBudget(formData.budget, formData.budgetType);
+  const coordinates = getCityCoordinates(formData.location as string);
+  const keywords = extractKeywords(formData.title as string, formData.description as string, formData.category as string, formData.subcategory as string);
+  const budgetInfo = parseBudget(formData.budget as string, formData.budgetType as string);
   
   const job: Job = {
     id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: formData.title,
-    company: formData.organizationName || 'Organizacja',
-    location: formData.location,
-    type: getJobType(formData.category, formData.budgetType),
+    title: formData.title as string,
+    company: (formData.organizationName as string) || 'Organizacja',
+    location: (typeof formData.location === 'string' ? formData.location : (typeof formData.location === 'object' && formData.location !== null && 'city' in formData.location ? String((formData.location as { city: string }).city) : '')) as string,
+    type: getJobType(formData.category as string, formData.budgetType as string),
     postType: 'job',
-    salary: formatSalary(formData.budget, formData.budgetType),
-    description: formData.description,
+    salary: formatSalary(formData.budget as string, formData.budgetType as string),
+    description: formData.description as string,
     searchKeywords: keywords,
     postedTime: 'Właśnie teraz',
     applications: 0,
     visits_count: 0,
     bookmarks_count: 0,
     verified: true,
-    urgent: formData.urgency === 'high',
+    urgent: (formData.urgency as string) === 'high',
     premium: false,
     hasInsurance: true,
-    deadline: formData.deadline || 'Do uzgodnienia',
-    budget: formData.budget || 'Do negocjacji',
-    category: formData.category,
-    subcategory: formData.subcategory,
-    clientType: formData.organizationType || 'Inne',
+    deadline: (formData.deadline as string) || 'Do uzgodnienia',
+    budget: (formData.budget as string) || 'Do negocjacji',
+    category: formData.category as string,
+    subcategory: formData.subcategory as string,
+    clientType: (formData.organizationType as string) || 'Inne',
     completedJobs: 0,
     certificates: [],
     popularity: Math.floor(Math.random() * 50) + 1,
     lat: coordinates.lat,
     lng: coordinates.lng,
     // Form specific fields
-    address: formData.address,
-    budgetType: formData.budgetType,
-    urgency: formData.urgency,
-    contactName: formData.contactName,
-    contactPhone: formData.contactPhone,
-    contactEmail: formData.contactEmail,
-    organizationType: formData.organizationType,
-    organizationName: formData.organizationName,
-    requirements: formData.requirements,
-    additionalInfo: formData.additionalInfo,
+    address: formData.address as string | undefined,
+    budgetType: formData.budgetType as 'fixed' | 'hourly' | 'negotiable' | undefined,
+    urgency: formData.urgency as 'low' | 'medium' | 'high' | undefined,
+    contactName: formData.contactName as string | undefined,
+    contactPhone: formData.contactPhone as string | undefined,
+    contactEmail: formData.contactEmail as string | undefined,
+    organizationType: formData.organizationType as string | undefined,
+    organizationName: formData.organizationName as string | undefined,
+    requirements: formData.requirements as string | undefined,
+    additionalInfo: formData.additionalInfo as string | undefined,
     ...budgetInfo
   };
   

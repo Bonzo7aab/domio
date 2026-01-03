@@ -279,7 +279,7 @@ export async function batchGeocodeTenders(
     for (let i = 0; i < tenders.length; i += batchSize) {
       const batch = tenders.slice(i, i + batchSize);
       
-      for (const tender of batch) {
+      for (const tender of batch as Array<Record<string, unknown>>) {
         processed++;
         const fullAddress = [tender.address, tender.location].filter(Boolean).join(', ');
         
@@ -297,7 +297,8 @@ export async function batchGeocodeTenders(
             
             if (updateDatabase) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const { error: updateError } = await (supabase as any)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { error: updateError } = await (supabase as unknown as SupabaseClient<Database>)
                 .from('tenders')
                 .update({
                   latitude: result.latitude,

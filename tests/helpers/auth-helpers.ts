@@ -230,7 +230,8 @@ export async function clearAuthState(page: Page) {
     // SecurityError or other errors when page context doesn't support storage access
     // This is expected when clearAuthState is called before page.goto()
     // Cookies are already cleared, which is sufficient
-    if (e.name !== 'SecurityError' && !e.message?.includes('localStorage') && !e.message?.includes('sessionStorage')) {
+    const err = e as Error;
+    if (err.name !== 'SecurityError' && !err.message?.includes('localStorage') && !err.message?.includes('sessionStorage')) {
       // Re-throw unexpected errors
       throw e;
     }

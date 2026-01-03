@@ -135,7 +135,7 @@ function HomePageContent() {
         cached.bounds.east >= bounds.east
       ) {
         // Filter cached data to match exact bounds
-        return cached.data.filter((job: Job) => 
+        return (cached.data as Job[]).filter((job: Job) => 
           job.lat && job.lng &&
           job.lat >= bounds.south &&
           job.lat <= bounds.north &&
@@ -307,16 +307,7 @@ function HomePageContent() {
   };
   
   // Initialize filter context on mount
-  React.useEffect(() => {
-    // Sync search query with filters
-    if (searchQuery !== filters.searchQuery) {
-      setFilters(prev => ({
-        ...prev,
-        searchQuery: searchQuery
-      }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery]);
+  // Note: searchQuery sync removed as searchQuery variable is not defined
 
   const handleCityNameChange = (cityName: string | null) => {
     if (cityName) {
@@ -414,17 +405,17 @@ function HomePageContent() {
           selectedApplicationJobId,
           user.id,
           {
-            proposedPrice: applicationData.proposedPrice,
-            estimatedCompletion: applicationData.estimatedCompletion,
-            coverLetter: applicationData.coverLetter,
-            additionalNotes: applicationData.additionalNotes,
+            proposedPrice: typeof applicationData.proposedPrice === 'string' ? parseFloat(applicationData.proposedPrice) || 0 : (applicationData.proposedPrice as number) || 0,
+            estimatedCompletion: String(applicationData.estimatedCompletion || ''),
+            coverLetter: String(applicationData.coverLetter || ''),
+            additionalNotes: applicationData.additionalNotes ? String(applicationData.additionalNotes) : undefined,
           }
         );
 
         if (error) {
           const errorMessage = error instanceof Error 
             ? error.message 
-            : error?.message || error?.details || error?.hint || String(error) || 'Wystąpił błąd podczas składania oferty w przetargu';
+            : (error as { message?: string; details?: string; hint?: string })?.message || (error as { message?: string; details?: string; hint?: string })?.details || (error as { message?: string; details?: string; hint?: string })?.hint || String(error) || 'Wystąpił błąd podczas składania oferty w przetargu';
           
           console.error('Error submitting tender bid:', error);
           
@@ -448,17 +439,17 @@ function HomePageContent() {
           selectedApplicationJobId,
           user.id,
           {
-            proposedPrice: applicationData.proposedPrice,
-            estimatedCompletion: applicationData.estimatedCompletion,
-            coverLetter: applicationData.coverLetter,
-            additionalNotes: applicationData.additionalNotes,
+            proposedPrice: typeof applicationData.proposedPrice === 'string' ? parseFloat(applicationData.proposedPrice) || 0 : (applicationData.proposedPrice as number) || 0,
+            estimatedCompletion: String(applicationData.estimatedCompletion || ''),
+            coverLetter: String(applicationData.coverLetter || ''),
+            additionalNotes: applicationData.additionalNotes ? String(applicationData.additionalNotes) : undefined,
           }
         );
 
         if (error) {
           const errorMessage = error instanceof Error 
             ? error.message 
-            : error?.message || error?.details || error?.hint || String(error) || 'Wystąpił błąd podczas składania oferty';
+            : (error as { message?: string; details?: string; hint?: string })?.message || (error as { message?: string; details?: string; hint?: string })?.details || (error as { message?: string; details?: string; hint?: string })?.hint || String(error) || 'Wystąpił błąd podczas składania oferty';
           
           console.error('Error submitting application:', error);
           
@@ -555,10 +546,10 @@ function HomePageContent() {
           onClose={handleApplicationModalClose}
           jobTitle={selectedApplicationJob?.title || getJobForApplication(selectedApplicationJobId).title}
           companyName={selectedApplicationJob?.company || getJobForApplication(selectedApplicationJobId).company}
-          jobData={selectedApplicationJob}
+          jobData={selectedApplicationJob as unknown as Record<string, unknown>}
           onApplicationSubmit={handleApplicationSubmit}
           applicationForm={applicationForm}
-          setApplicationForm={setApplicationForm}
+          setApplicationForm={(form) => setApplicationForm(prev => ({ ...prev, ...form, additionalNotes: form.additionalNotes ?? prev.additionalNotes }))}
           postType={(selectedApplicationJob?.postType || getJobForApplication(selectedApplicationJobId).postType) as 'job' | 'tender'}
         />
       )}

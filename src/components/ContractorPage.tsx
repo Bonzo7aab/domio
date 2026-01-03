@@ -484,10 +484,11 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   };
 
   const handleStartConversation = async (applicationId: string) => {
-    if (!user?.id || !supabase) {
+    if (!user?.id) {
       toast.error('Musisz być zalogowany aby rozpocząć konwersację');
       return;
     }
+    const supabase = createClient();
 
     // Find the application in allApplications
     const application = allApplications.find(app => app.id === applicationId);
@@ -629,10 +630,10 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
         };
       }
       return {
-        id: attachment.id || `attachment-${index}`,
-        name: attachment.name || attachment.filename || 'Załącznik',
-        type: attachment.type || attachment.content_type || 'file',
-        url: attachment.url || attachment.path || attachment.file_path || ''
+        id: String(attachment.id || `attachment-${index}`),
+        name: String(attachment.name || attachment.filename || 'Załącznik'),
+        type: String(attachment.type || attachment.content_type || 'file'),
+        url: String(attachment.url || attachment.path || attachment.file_path || '')
       };
     });
 
@@ -759,7 +760,20 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
     const fullProject = await fetchPortfolioProjectById(supabase, project.id);
     
     if (fullProject) {
-      setEditingProject(fullProject);
+      setEditingProject({
+        ...fullProject,
+        year: fullProject.completionDate ? new Date(fullProject.completionDate).getFullYear() : new Date().getFullYear(),
+        description: fullProject.description || '',
+        images: fullProject.images || [],
+        budget: fullProject.budget || '',
+        duration: fullProject.duration || '',
+        category: fullProject.category || '',
+        location: fullProject.location || '',
+        projectType: fullProject.projectType || '',
+        clientName: fullProject.clientName || '',
+        clientFeedback: fullProject.clientFeedback || '',
+        isFeatured: fullProject.isFeatured ?? false,
+      });
       setShowPortfolioForm(true);
     } else {
       toast.error('Nie udało się załadować danych projektu');

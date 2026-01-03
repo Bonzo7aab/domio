@@ -916,7 +916,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
 
   return (
     <div className={className} style={style}>
-      <Wrapper apiKey={googleMapsConfig.apiKey} libraries={googleMapsConfig.libraries as ('places' | 'geometry' | 'drawing' | 'visualization')[]} render={render} />
+      <Wrapper apiKey={googleMapsConfig.apiKey} libraries={[...googleMapsConfig.libraries] as ('places' | 'geometry' | 'drawing' | 'visualization')[]} render={render} />
     </div>
   );
 };

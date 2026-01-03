@@ -30,7 +30,7 @@ export async function uploadPortfolioImage(
     if (!isValidType) {
       return {
         data: null,
-        error: { message: 'Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF' }
+        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF')
       };
     }
 
@@ -38,7 +38,7 @@ export async function uploadPortfolioImage(
     if (file.size > MAX_FILE_SIZE) {
       return {
         data: null,
-        error: { message: 'Plik jest zbyt duży. Maksymalny rozmiar: 10MB' }
+        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB')
       };
     }
 
@@ -125,7 +125,7 @@ export async function uploadPortfolioImages(
   projectId: string
 ): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
-  const errors: Error[] = [];
+  const errors: unknown[] = [];
 
   for (const file of files) {
     const { data, error } = await uploadPortfolioImage(supabase, file, userId, projectId);

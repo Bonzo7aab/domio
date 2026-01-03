@@ -432,8 +432,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
 
           if (uploadResult.errors.length > 0) {
             // Some files failed to upload
-            const errorMessages = uploadResult.errors.map(e => 
-              `${e.file}: ${e.error?.message || 'Błąd przesyłania'}`
+            const errorMessages = uploadResult.errors.map((e: unknown) => 
+              `${(e as { file?: string }).file || 'Nieznany plik'}: ${((e as { error?: { message?: string } }).error?.message) || 'Błąd przesyłania'}`
             ).join(', ');
             toast.error(`Niektóre pliki nie zostały przesłane: ${errorMessages}`);
           }
@@ -448,7 +448,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
           }
         } catch (uploadError: unknown) {
           console.error('Error uploading attachments:', uploadError);
-          throw new Error(uploadError?.message || 'Błąd podczas przesyłania plików');
+          throw new Error((uploadError instanceof Error ? uploadError.message : (uploadError as { message?: string })?.message) || 'Błąd podczas przesyłania plików');
         } finally {
           setIsUploading(false);
         }
@@ -570,7 +570,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         }
       }
       
-      toast.error(error?.message || 'Wystąpił błąd podczas publikowania zlecenia');
+      toast.error((error instanceof Error ? error.message : (error as { message?: string })?.message) || 'Wystąpił błąd podczas publikowania zlecenia');
     } finally {
       setIsSubmitting(false);
       setIsUploading(false);

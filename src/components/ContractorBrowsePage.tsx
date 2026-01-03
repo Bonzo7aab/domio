@@ -344,7 +344,7 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
         {!loading && !error && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayContractors.map((contractor) => {
-              const isExpanded = expandedContractor === contractor.id;
+              const isExpanded = _expandedContractor === contractor.id;
               const reviews = contractorReviews[contractor.id] || [];
               const ratings = contractorRatings[contractor.id];
               
@@ -463,16 +463,16 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
                                   {[...Array(5)].map((_, i) => (
                                     <Star 
                                       key={i} 
-                                      className={`w-3 h-3 ${i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
+                                      className={`w-3 h-3 ${i < (typeof review.rating === 'number' ? review.rating : 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
                                     />
                                   ))}
                                 </div>
-                                <span className="font-medium">{review.reviewerName}</span>
+                                <span className="font-medium">{String(review.reviewerName || '')}</span>
                                 <span className="text-gray-500">
-                                  {new Date(review.createdAt).toLocaleDateString('pl-PL')}
+                                  {new Date(String(review.createdAt || '')).toLocaleDateString('pl-PL')}
                                 </span>
                               </div>
-                              <p className="text-gray-600 line-clamp-2">{review.comment}</p>
+                              <p className="text-gray-600 line-clamp-2">{String(review.comment || '')}</p>
                             </div>
                           ))}
                         </div>

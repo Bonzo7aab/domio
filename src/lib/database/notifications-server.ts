@@ -47,11 +47,11 @@ export async function createNotificationWithPush(
         type: options.type,
         title: options.title,
         message: options.message,
-        data: options.data || null,
+        data: (options.data || null) as Record<string, unknown> | null,
         action_url: options.actionUrl || null,
         priority: options.priority || 'normal',
         expires_at: options.expiresAt?.toISOString() || null
-      })
+      } as { id?: string; [key: string]: unknown })
       .select('id')
       .single();
 
@@ -64,7 +64,7 @@ export async function createNotificationWithPush(
       };
     }
 
-    const notificationId = notification?.id || null;
+    const notificationId = ((notification as { id?: string } | null)?.id) || null;
 
     // Send push notification if enabled
     let pushSent = false;

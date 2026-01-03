@@ -7,7 +7,7 @@
 
 import { shouldUseMockData } from '../config/data-source';
 import { createClient } from '../supabase/client';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import type { Job } from '../../types/job';
 
@@ -16,7 +16,9 @@ import {
   fetchJobsAndTenders as dbFetchJobsAndTenders, 
   fetchJobById as dbFetchJobById,
   fetchTenderById as dbFetchTenderById,
-  type JobFilters as DBJobFilters 
+  type JobFilters as DBJobFilters,
+  type JobWithCompany,
+  type TenderWithCompany
 } from '../database/jobs';
 import { 
   fetchContractors as dbFetchContractors,
@@ -37,7 +39,8 @@ import {
   getTenderById as mockGetTenderById 
 } from '../../mocks/tenders/mockTenders';
 import { 
-  getMessagesByConversationId as mockGetMessagesByConversationId
+  getMessagesByConversationId as mockGetMessagesByConversationId,
+  mockConversations
 } from '../../mocks/messaging/mockMessaging';
 import { getMockBrowseContractors } from '../../mocks/contractors/mockContractors';
 import { getMockBrowseManagers } from '../../mocks/managers/mockManagers';
@@ -92,20 +95,25 @@ async function fetchDataFromDB<T>(
 /**
  * Mock fetch function for jobs and tenders
  */
-function mockFetchJobsAndTenders(filters: DBJobFilters = {}): Job[] {
+function mockFetchJobsAndTenders(filters: DBJobFilters = {}): { data: Job[]; error: null } {
   // Convert mock data map to array format
-  const mockItems = Object.values(mockJobDetailsMap);
+  const mockItems = Object.values(mockJobDetailsMap) as unknown as Job[];
   
   // Apply basic filters
   let filtered = mockItems;
   
   if (filters.searchQuery) {
     const query = filters.searchQuery.toLowerCase();
-    filtered = filtered.filter((item: Job) => 
-      item.title?.toLowerCase().includes(query) ||
-      item.description?.toLowerCase().includes(query) ||
-      item.location?.toLowerCase().includes(query)
-    );
+    filtered = filtered.filter((item: Job) => {
+      const locationStr = typeof item.location === 'string' 
+        ? item.location.toLowerCase()
+        : item.location?.city?.toLowerCase() || '';
+      return (
+        item.title?.toLowerCase().includes(query) ||
+        item.description?.toLowerCase().includes(query) ||
+        locationStr.includes(query)
+      );
+    });
   }
   
   if (filters.postType && filters.postType !== 'all') {
@@ -141,12 +149,12 @@ export async function getJobsAndTenders(filters: DBJobFilters = {}) {
 /**
  * Mock fetch function for single job
  */
-function mockFetchJobById(jobId: string): { data: Job | null; error: string | null } {
+function mockFetchJobById(jobId: string): { data: JobWithCompany | null; error: PostgrestError | null } {
   const mockJob = mockJobDetailsMap[jobId];
   if (mockJob && mockJob.postType === 'job') {
-    return { data: mockJob, error: null };
+    return { data: mockJob as unknown as JobWithCompany, error: null };
   }
-  return { data: null, error: 'Job not found' };
+  return { data: null, error: new Error('Job not found') as PostgrestError };
 }
 
 /**
@@ -165,19 +173,19 @@ export async function getJobById(jobId: string) {
 /**
  * Mock fetch function for single tender
  */
-function mockFetchTenderById(tenderId: string): { data: Job | null; error: string | null } {
+function mockFetchTenderById(tenderId: string): { data: TenderWithCompany | null; error: PostgrestError | null } {
   // Check mockJobDetailsMap first (has detailed format)
   const mockTenderFromMap = mockJobDetailsMap[tenderId];
   if (mockTenderFromMap && mockTenderFromMap.postType === 'tender') {
-    return { data: mockTenderFromMap, error: null };
+    return { data: mockTenderFromMap as unknown as TenderWithCompany, error: null };
   }
   
   // Fallback to simple mock tenders
   const mockTender = mockGetTenderById(tenderId);
   if (mockTender) {
-    return { data: mockTender, error: null };
+    return { data: mockTender as unknown as TenderWithCompany, error: null };
   }
-  return { data: null, error: 'Tender not found' };
+  return { data: null, error: new Error('Tender not found') as PostgrestError };
 }
 
 /**
@@ -228,11 +236,10 @@ function mockFetchManagers(filters: DBManagerFilters = {}) {
  * @returns Managers data
  */
 export async function getManagers(filters: DBManagerFilters = {}) {
-  return fetchData(
-    dbFetchManagers,
-    mockFetchManagers,
-    filters
-  );
+  if (shouldUseMockData()) {
+    return mockFetchManagers(filters);
+  }
+  return dbFetchManagers(filters);
 }
 
 // ============================================================================

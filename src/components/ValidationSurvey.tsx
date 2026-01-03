@@ -32,6 +32,17 @@ interface SurveyData {
   responses: Record<string, string | number | string[]>;
 }
 
+interface Question {
+  id: string;
+  title: string;
+  type: 'radio' | 'checkbox' | 'select' | 'slider' | 'textarea' | 'ranking';
+  options?: string[];
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
 export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [userType, setUserType] = useState<UserType | null>(null);
@@ -69,7 +80,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
   };
 
   // Pytania dla zarządców
-  const managerQuestions = [
+  const managerQuestions: Question[] = [
     {
       id: 'current_challenges',
       title: 'Jakie są Twoje największe wyzwania przy znajdowaniu wykonawców?',
@@ -206,7 +217,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
   ];
 
   // Pytania dla wykonawców
-  const contractorQuestions = [
+  const contractorQuestions: Question[] = [
     {
       id: 'current_challenges',
       title: 'Jakie są Twoje największe wyzwania przy znajdowaniu zleceń?',
@@ -378,23 +389,12 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
     onComplete(finalData);
   };
 
-  interface Question {
-    id: string;
-    title: string;
-    type: 'radio' | 'checkbox' | 'select' | 'slider' | 'textarea';
-    options?: string[];
-    placeholder?: string;
-    min?: number;
-    max?: number;
-    step?: number;
-  }
-
   const renderQuestion = (question: Question) => {
     switch (question.type) {
       case 'radio':
         return (
           <RadioGroup
-            value={surveyData.responses[question.id] || ''}
+            value={String(surveyData.responses[question.id] || '')}
             onValueChange={(value) => updateResponse(question.id, value)}
           >
             {question.options.map((option: string) => (
@@ -407,7 +407,9 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
         );
 
       case 'checkbox': {
-        const selectedOptions = surveyData.responses[question.id] || [];
+        const selectedOptions = (Array.isArray(surveyData.responses[question.id]) 
+          ? surveyData.responses[question.id] 
+          : []) as string[];
         return (
           <div className="space-y-3">
             {question.options.map((option: string) => (
@@ -432,7 +434,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
       case 'select':
         return (
           <Select
-            value={surveyData.responses[question.id] || ''}
+            value={String(surveyData.responses[question.id] || '')}
             onValueChange={(value) => updateResponse(question.id, value)}
           >
             <SelectTrigger>
@@ -449,11 +451,19 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
         );
 
       case 'slider': {
-        const value = surveyData.responses[question.id] || [question.min || 0];
+        const rawValue = surveyData.responses[question.id];
+        let value: number[];
+        if (Array.isArray(rawValue)) {
+          value = rawValue.map(v => Number(v));
+        } else if (rawValue !== undefined) {
+          value = [Number(rawValue)];
+        } else {
+          value = [question.min || 0];
+        }
         return (
           <div className="space-y-4">
             <Slider
-              value={Array.isArray(value) ? value : [value]}
+              value={value}
               onValueChange={(newValue) => updateResponse(question.id, newValue[0])}
               max={question.max}
               min={question.min}
@@ -462,7 +472,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
             />
             <div className="text-center">
               <Badge variant="outline">
-                Wartość: {Array.isArray(value) ? value[0] : value}
+                Wartość: {value[0]}
                 {question.id === 'business_growth' && '%'}
               </Badge>
             </div>
@@ -474,14 +484,17 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
         return (
           <Textarea
             placeholder={question.placeholder}
-            value={surveyData.responses[question.id] || ''}
+            value={String(surveyData.responses[question.id] || '')}
             onChange={(e) => updateResponse(question.id, e.target.value)}
             rows={4}
           />
         );
 
-      case 'ranking':
+      case 'ranking': {
         // Simplified ranking - would need more complex implementation
+        const rankingOptions = (Array.isArray(surveyData.responses[question.id]) 
+          ? surveyData.responses[question.id] 
+          : []) as string[];
         return (
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>Zaznacz najważniejsze czynniki (możesz wybrać kilka):</p>
@@ -490,12 +503,11 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
                 <div key={option} className="flex items-center space-x-2">
                   <Checkbox
                     id={option}
-                    checked={(surveyData.responses[question.id] || []).includes(option)}
+                    checked={rankingOptions.includes(option)}
                     onCheckedChange={(checked) => {
-                      const current = surveyData.responses[question.id] || [];
                       const updated = checked
-                        ? [...current, option]
-                        : current.filter((item: string) => item !== option);
+                        ? [...rankingOptions, option]
+                        : rankingOptions.filter((item: string) => item !== option);
                       updateResponse(question.id, updated);
                     }}
                   />
@@ -505,6 +517,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
             </div>
           </div>
         );
+      }
 
       default:
         return null;

@@ -43,7 +43,7 @@ export function DeleteAccountSection() {
       // Close dialog and let redirect happen
       setOpen(false)
     } catch (err: unknown) {
-      setError(err.message || 'Wystąpił błąd podczas usuwania konta')
+      setError((err instanceof Error ? err.message : String(err)) || 'Wystąpił błąd podczas usuwania konta')
       setIsLoading(false)
       setOpen(true) // Keep dialog open to show error
     }

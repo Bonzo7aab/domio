@@ -363,7 +363,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
           toast.error('Nie udało się załadować ofert');
           setApplications([]);
         } else {
-          setApplications(applicationsData || []);
+          setApplications((applicationsData || []) as Array<{ id: string; contractor_id: string; job_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>);
         }
       } catch (err) {
         console.error('Error loading applications:', err);
@@ -445,7 +445,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
           toast.error('Nie udało się załadować ofert');
           setTenderBids([]);
         } else {
-          setTenderBids(bidsData || []);
+          setTenderBids((bidsData || []) as Array<{ id: string; contractor_id: string; tender_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>);
         }
       } catch (err) {
         console.error('Error loading tender bids:', err);
@@ -509,10 +509,21 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
           .limit(5);
         
         // Format jobs for display
-        const formattedJobs = (jobsData || []).map((job: JobWithCompany) => {
+        const formattedJobs = (jobsData || []).map((job: {
+          id: string;
+          title: string;
+          budget_min: number | null;
+          budget_max: number | null;
+          budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
+          currency: string;
+          deadline: string;
+          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed';
+          job_categories: { name: string } | null;
+          location: string | { city?: string };
+        }) => {
           const location = typeof job.location === 'string' 
             ? job.location 
-            : job.location?.city || 'Nieznana lokalizacja';
+            : (job.location as { city?: string })?.city || 'Nieznana lokalizacja';
           
           return {
             id: job.id,
@@ -620,18 +631,18 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         }
 
         // Get all job IDs to count applications
-        const jobIds = (jobsData || []).map((job: JobWithCompany) => job.id);
+        const jobIds = (jobsData || []).map((job: { id: string }) => job.id);
 
         // Count applications for each job (all statuses)
         const applicationCounts: { [key: string]: number } = {};
         if (jobIds.length > 0) {
           const { data: applicationsData } = await supabase
-            .from('job_applications')
+            .from('job_applications' as never)
             .select('job_id')
             .in('job_id', jobIds);
 
           if (applicationsData) {
-            for (const app of applicationsData) {
+            for (const app of applicationsData as Array<{ job_id: string }>) {
               const jobId = app.job_id;
               if (jobId) {
                 applicationCounts[jobId] = (applicationCounts[jobId] || 0) + 1;
@@ -644,10 +655,21 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         const { budgetFromDatabase } = await import('../types/budget');
 
         // Format jobs for display
-        const formattedJobs = (jobsData || []).map((job: JobWithCompany) => {
+        const formattedJobs = (jobsData || []).map((job: {
+          id: string;
+          title: string;
+          budget_min: number | null;
+          budget_max: number | null;
+          budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
+          currency: string;
+          deadline: string;
+          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed';
+          job_categories: { name: string } | null;
+          location: string | { city?: string };
+        }) => {
           const location = typeof job.location === 'string' 
             ? job.location 
-            : job.location?.city || 'Nieznana lokalizacja';
+            : (job.location as { city?: string })?.city || 'Nieznana lokalizacja';
 
           // Format budget
           const budget = budgetFromDatabase({
@@ -779,7 +801,32 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     }
   };
 
-  const handleTenderSubmit = async (tender: Record<string, unknown>, tenderId?: string) => {
+  const handleTenderSubmit = async (tender: {
+    title: string;
+    description: string;
+    category: string;
+    location: string;
+    estimatedValue: string;
+    currency: string;
+    submissionDeadline: Date;
+    evaluationDeadline: Date;
+    requirements: string[];
+    evaluationCriteria: Array<{ id: string; name: string; description: string; weight: number; type: 'price' | 'quality' | 'time' | 'experience' | 'other' }>;
+    documents: Array<{ id: string; name: string; type: 'specification' | 'requirements' | 'drawings' | 'other'; file: File }>;
+    isPublic: boolean;
+    allowQuestions: boolean;
+    questionsDeadline?: Date;
+    minimumExperience: number;
+    requiredCertificates: string[];
+    insuranceRequired: string;
+    advancePayment: boolean;
+    performanceBond: boolean;
+    status?: 'draft' | 'active';
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    projectDuration?: string;
+  }, tenderId?: string) => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby utworzyć przetarg');
       return;
@@ -793,7 +840,32 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       
       if (isEditing) {
         // Update existing tender
-        const { data: updatedTender, error: updateError } = await updateTender(supabase, tenderId, tender);
+        const { data: updatedTender, error: updateError } = await updateTender(supabase, tenderId, tender as {
+          title: string;
+          description: string;
+          category: string;
+          location: string;
+          estimatedValue: string;
+          currency: string;
+          submissionDeadline: Date;
+          evaluationDeadline: Date;
+          requirements: string[];
+          evaluationCriteria: Array<Record<string, unknown>>;
+          documents?: Array<Record<string, unknown>>;
+          isPublic: boolean;
+          allowQuestions: boolean;
+          questionsDeadline?: Date;
+          minimumExperience: number;
+          requiredCertificates: string[];
+          insuranceRequired: string;
+          advancePayment: boolean;
+          performanceBond: boolean;
+          status?: 'draft' | 'active';
+          address?: string;
+          latitude?: number;
+          longitude?: number;
+          projectDuration?: string;
+        });
         
         if (updateError) {
           toast.error('Nie udało się zaktualizować przetargu: ' + (updateError.message || 'Nieznany błąd'));
@@ -815,7 +887,32 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
 
         // Save tender to database
         const { data: savedTender, error: saveError } = await createTender(supabase, {
-          ...tender,
+          ...(tender as {
+            title: string;
+            description: string;
+            category: string;
+            location: string;
+            estimatedValue: string;
+            currency: string;
+            submissionDeadline: Date;
+            evaluationDeadline: Date;
+            requirements: string[];
+            evaluationCriteria: Array<Record<string, unknown>>;
+            documents?: Array<Record<string, unknown>>;
+            isPublic: boolean;
+            allowQuestions: boolean;
+            questionsDeadline?: Date;
+            minimumExperience: number;
+            requiredCertificates: string[];
+            insuranceRequired: string;
+            advancePayment: boolean;
+            performanceBond: boolean;
+            status?: 'draft' | 'active';
+            address?: string;
+            latitude?: number;
+            longitude?: number;
+            projectDuration?: string;
+          }),
           managerId: user.id,
           companyId: company.id,
         });
@@ -1216,7 +1313,33 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
                       { id: 'time', name: 'Termin realizacji', description: 'Czas wykonania prac', weight: 20, type: 'time' },
                       { id: 'warranty', name: 'Gwarancja', description: 'Okres gwarancji i serwis', weight: 10, type: 'quality' }
                     ]}
-                    bids={tenderBids}
+                    bids={(tenderBids as unknown) as Array<{
+                      id: string;
+                      contractorId: string;
+                      contractorName: string;
+                      contractorCompany: string;
+                      contractorAvatar?: string;
+                      contractorRating: number;
+                      contractorCompletedJobs: number;
+                      totalPrice: number;
+                      currency: string;
+                      proposedTimeline: number;
+                      proposedStartDate: Date;
+                      guaranteePeriod: number;
+                      description: string;
+                      technicalProposal: string;
+                      attachments: Array<{ id: string; name: string; type: string; url: string; size: number }>;
+                      criteriaResponses: Array<{ criterionId: string; response: string }>;
+                      submittedAt: Date;
+                      status: 'submitted' | 'under_review' | 'shortlisted' | 'rejected' | 'awarded';
+                      evaluation?: {
+                        criteriaScores: Record<string, number>;
+                        totalScore: number;
+                        evaluatorNotes: string;
+                        evaluatedAt: Date;
+                        evaluatorId: string;
+                      };
+                    }>}
                     onClose={() => {
                       setShowBidEvaluation(false);
                       setSelectedTenderId(null);

@@ -87,7 +87,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
   if (!isOpen) return null;
 
   const handleInputChange = (field: string, value: string) => {
-    setApplicationForm((prev) => ({ ...prev, [field]: value }));
+    setApplicationForm({ ...applicationForm, [field]: value });
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -219,7 +219,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
               {jobData?.location && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
                   <MapPin className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm text-gray-700 font-medium truncate">{formatLocation(jobData.location)}</span>
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium truncate">{formatLocation(jobData.location as string | { city: string; sublocality_level_1?: string })}</span>
                 </div>
               )}
               
@@ -227,7 +227,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
               {jobData?.salary && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 rounded-md border border-green-100">
                   <DollarSign className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm text-green-700 font-medium">{jobData.salary}</span>
+                  <span className="text-xs sm:text-sm text-green-700 font-medium">{String((jobData as { salary?: string | number }).salary || '')}</span>
                 </div>
               )}
               
@@ -235,7 +235,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
               {jobData?.postedTime && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
                   <Clock className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{jobData.postedTime}</span>
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{String((jobData as { postedTime?: string | number }).postedTime || '')}</span>
                 </div>
               )}
               
@@ -243,14 +243,14 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
               {jobData?.applications && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
                   <Users className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{jobData.applications} {jobData.applications === 1 ? 'oferta' : 'oferty'}</span>
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{(jobData as { applications?: number }).applications || 0} {((jobData as { applications?: number }).applications || 0) === 1 ? 'oferta' : 'oferty'}</span>
                 </div>
               )}
               
               {/* Visits */}
-              {jobData?.visits_count !== undefined && jobData.visits_count > 0 && (
+              {(jobData as { visits_count?: number }).visits_count !== undefined && ((jobData as { visits_count?: number }).visits_count || 0) > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
-                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{jobData.visits_count} wyświetleń</span>
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{(jobData as { visits_count?: number }).visits_count || 0} wyświetleń</span>
                 </div>
               )}
             </div>
@@ -260,12 +260,12 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
               <div className="flex flex-wrap gap-2 mb-2">
                 {jobData?.category && (
                   <Badge variant="outline" className="text-xs px-2.5 py-1">
-                    {jobData.category}
+                    {String((jobData as { category?: string }).category || '')}
                   </Badge>
                 )}
                 {jobData?.type && (
                   <Badge variant="outline" className="text-xs px-2.5 py-1">
-                    {jobData.type}
+                    {String((jobData as { type?: string }).type || '')}
                   </Badge>
                 )}
                 {postType === 'tender' && (
@@ -280,7 +280,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
             {jobData?.description && (
               <div>
                 <p className="text-sm text-gray-700 line-clamp-3">
-                  {jobData.description}
+                  {String((jobData as { description?: string }).description || '')}
                 </p>
               </div>
             )}

@@ -34,13 +34,12 @@ interface JobsContentProps {
 }
 
 export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
-  const _router = useRouter();
+  const router = useRouter();
   const [jobDetailsData, setJobDetailsData] = useState<JobWithCompany | null>(null);
   const [isLoadingJobDetails, setIsLoadingJobDetails] = useState(false);
   const [showJobDetailsDialog, setShowJobDetailsDialog] = useState(false);
 
   const handleViewJobDetails = async (jobId: string) => {
-    setSelectedJobForDetails(jobId);
     setShowJobDetailsDialog(true);
     setIsLoadingJobDetails(true);
     
@@ -113,7 +112,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
                         </Button>
                         <Button 
                           size="sm"
-                          onClick={() => setSelectedJobForApplications(job.id)}
+                          onClick={() => router.push(`/manager-dashboard/jobs/${job.id}/applications`)}
                         >
                           Zobacz oferty
                         </Button>
@@ -137,7 +136,6 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
       <Dialog open={showJobDetailsDialog} onOpenChange={(open) => {
         setShowJobDetailsDialog(open);
         if (!open) {
-          setSelectedJobForDetails(null);
           setJobDetailsData(null);
         }
       }}>

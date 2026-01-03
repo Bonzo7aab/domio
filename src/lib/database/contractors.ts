@@ -156,7 +156,8 @@ export async function fetchContractors(
   try {
     // Use type assertion to avoid "Type instantiation is excessively deep" error
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabaseClient = supabase as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabaseClient = supabase as unknown as SupabaseClient<Database>;
     let query = supabaseClient
       .from('companies')
       .select(`
@@ -205,7 +206,7 @@ export async function fetchContractors(
 
     // Fetch ratings for all contractors
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const contractorIds = ((data || []) as any[]).map((company: { id: string }) => company.id);
+    const contractorIds = ((data || []) as Array<{ id: string }>).map((company: { id: string }) => company.id);
     let ratingsMap: { [key: string]: { company_id: string; average_rating: number; total_reviews: number } } = {};
     
     if (contractorIds.length > 0) {
@@ -259,7 +260,7 @@ export async function fetchContractors(
 
     // Transform data to BrowseContractor format
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let contractors: BrowseContractor[] = ((data || []) as any[]).map((company: Record<string, unknown>) => {
+    let contractors: BrowseContractor[] = ((data || []) as Array<Record<string, unknown>>).map((company: Record<string, unknown>) => {
       const companyId = String(company.id ?? '');
       const ratings = ratingsMap[companyId];
       
@@ -403,7 +404,8 @@ export async function fetchContractorsByWorkHistory(
     let acceptedApplications: ApplicationWithJob[] = [];
     if (jobIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: applications, error: appsError } = await (supabase as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: applications, error: appsError } = await (supabase as unknown as SupabaseClient<Database>)
         .from('job_applications')
         .select(`
           company_id,
@@ -433,7 +435,8 @@ export async function fetchContractorsByWorkHistory(
     let acceptedBids: BidWithTender[] = [];
     if (tenderIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: bids, error: bidsError } = await (supabase as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: bids, error: bidsError } = await (supabase as unknown as SupabaseClient<Database>)
         .from('tender_bids')
         .select(`
           company_id,
@@ -578,7 +581,7 @@ export async function fetchContractorsByWorkHistory(
 
     // Format contractors for display
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const contractors = ((companies || []) as any[]).map((company: Record<string, unknown>) => {
+    const contractors = ((companies || []) as Array<Record<string, unknown>>).map((company: Record<string, unknown>) => {
       const companyId = String(company.id ?? '');
       const ratings = ratingsMap[companyId] || {};
       const profileData = (company.profile_data as Record<string, unknown>) || {};
@@ -827,26 +830,33 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
         proposed_price,
         proposed_timeline,
         cover_letter,
-        experience,
-        attachments,
-        certificates,
-        notes,
-        reviewed_at,
         status,
-        submitted_at,
-        jobs (
+        created_at,
+        job:jobs (
+          id,
           title,
+          description,
           location,
-          companies (
+          budget_min,
+          budget_max,
+          budget_type,
+          currency,
+          deadline,
+          urgency,
+          category:job_categories (
+            id,
             name
           ),
-          job_categories (
-            name
+          company:companies (
+            id,
+            name,
+            logo_url,
+            is_verified
           )
         )
       `)
-      .eq('company_id', contractorId)
-      .order('submitted_at', { ascending: false });
+      .eq('contractor_id', contractorId)
+      .order('created_at', { ascending: false });
 
     // Helper function to convert days to readable format
     const formatTimeline = (days: number | null | undefined): string | undefined => {
@@ -868,11 +878,11 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
       return `${months} ${months === 1 ? 'miesiąc' : 'miesiące'} ${remainingDays} ${remainingDays === 1 ? 'dzień' : 'dni'}`;
     };
 
-    const formattedApplications: ContractorApplication[] = applications?.map(app => ({
+    const formattedApplications: ContractorApplication[] = ((applications as Array<Record<string, unknown>>) || []).map((app: Record<string, unknown>) => ({
       id: app.id,
       jobId: app.job_id,
-      jobTitle: app.jobs?.title || '',
-      companyName: app.jobs?.companies?.name || '',
+      jobTitle: app.job?.title || '',
+      companyName: app.job?.company?.name || '',
       status: app.status || 'pending',
       appliedAt: app.submitted_at,
       proposedPrice: app.proposed_price,
@@ -916,7 +926,7 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
       .eq('company_id', contractorId)
       .order('submitted_at', { ascending: false });
 
-    const formattedBids: ContractorBid[] = bids?.map(bid => ({
+    const formattedBids: ContractorBid[] = ((bids as Array<Record<string, unknown>>) || []).map((bid: Record<string, unknown>) => ({
       id: bid.id,
       tenderId: bid.tender_id,
       tenderTitle: bid.tenders?.title || '',
@@ -940,7 +950,7 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
       .select('*')
       .eq('company_id', contractorId);
 
-    const formattedCertificates: Certificate[] = certificates?.map(cert => ({
+    const formattedCertificates: Certificate[] = ((certificates as Array<Record<string, unknown>>) || []).map((cert: Record<string, unknown>) => ({
       id: cert.id,
       name: cert.name,
       type: cert.type,

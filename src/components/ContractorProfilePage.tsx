@@ -46,26 +46,27 @@ const convertContractorToPageFormat = (contractor: Record<string, unknown>) => {
   // Get all unique services from all categories
   const allServices = [
     ...new Set([
-      ...(contractor.services?.primary || []),
-      ...(contractor.services?.secondary || []),
-      ...(contractor.services?.specializations || [])
+      ...((contractor.services as { primary?: string[]; secondary?: string[]; specializations?: string[] })?.primary || []),
+      ...((contractor.services as { primary?: string[]; secondary?: string[]; specializations?: string[] })?.secondary || []),
+      ...((contractor.services as { primary?: string[]; secondary?: string[]; specializations?: string[] })?.specializations || [])
     ])
   ];
 
   // Get service pricing from contractor profile
-  const servicePricing = contractor.pricing?.servicePricing || {};
+  const servicePricing = ((contractor.pricing as { servicePricing?: Record<string, unknown> })?.servicePricing || {}) as Record<string, unknown>;
 
   // Helper to determine service category
   const getServiceCategory = (serviceName: string): 'primary' | 'secondary' | 'specialization' | null => {
-    if (contractor.services?.primary?.includes(serviceName)) return 'primary';
-    if (contractor.services?.secondary?.includes(serviceName)) return 'secondary';
-    if (contractor.services?.specializations?.includes(serviceName)) return 'specialization';
+    const services = contractor.services as { primary?: string[]; secondary?: string[]; specializations?: string[] } | undefined;
+    if (services?.primary?.includes(serviceName)) return 'primary';
+    if (services?.secondary?.includes(serviceName)) return 'secondary';
+    if (services?.specializations?.includes(serviceName)) return 'specialization';
     return null;
   };
 
   // Map services with their pricing and additional info
   const servicesWithPricing = allServices.map((serviceName: string) => {
-    const pricing = servicePricing[serviceName];
+    const pricing = servicePricing[serviceName] as ServicePricing | undefined;
     const category = getServiceCategory(serviceName);
     return {
       name: serviceName,
@@ -80,50 +81,50 @@ const convertContractorToPageFormat = (contractor: Record<string, unknown>) => {
     name: contractor.companyName,
     logo: contractor.avatar || '/api/placeholder/150/150',
     coverImage: contractor.coverImage || '/api/placeholder/800/300',
-    slogan: contractor.services?.specializations?.[0] || contractor.services?.primary?.[0] || 'Profesjonalne usługi budowlane',
-    description: `${contractor.companyName} działa na rynku od ${contractor.businessInfo?.yearEstablished || new Date().getFullYear()} roku. ${contractor.services?.primary?.length > 0 ? `Specjalizujemy się w ${contractor.services.primary.join(', ').toLowerCase()}.` : ''} Posiadamy ${contractor.experience?.completedProjects || 0} zakończonych projektów i średnią ocenę ${contractor.rating?.overall || 0} gwiazdek.`,
-    location: contractor.location?.city || 'Warszawa',
-    rating: contractor.rating?.overall || 0,
-    reviewCount: contractor.rating?.reviewsCount || 0,
-    completedJobs: contractor.experience?.completedProjects || 0,
-    verified: contractor.verification?.status === 'verified',
-    hasInsurance: contractor.insurance?.hasOC || false,
+    slogan: ((contractor.services as { primary?: string[]; secondary?: string[]; specializations?: string[] })?.specializations?.[0]) || ((contractor.services as { primary?: string[]; secondary?: string[]; specializations?: string[] })?.primary?.[0]) || 'Profesjonalne usługi budowlane',
+    description: `${contractor.companyName} działa na rynku od ${((contractor.businessInfo as { yearEstablished?: number })?.yearEstablished) || new Date().getFullYear()} roku. ${((contractor.services as { primary?: string[]; secondary?: string[]; specializations?: string[] })?.primary?.length || 0) > 0 ? `Specjalizujemy się w ${((contractor.services as { primary?: string[]; secondary?: string[]; specializations?: string[] })?.primary || []).join(', ').toLowerCase()}.` : ''} Posiadamy ${((contractor.experience as { completedProjects?: number })?.completedProjects) || 0} zakończonych projektów i średnią ocenę ${((contractor.rating as { overall?: number })?.overall) || 0} gwiazdek.`,
+    location: ((contractor.location as { city?: string })?.city) || 'Warszawa',
+    rating: ((contractor.rating as { overall?: number })?.overall) || 0,
+    reviewCount: ((contractor.rating as { reviewsCount?: number })?.reviewsCount) || 0,
+    completedJobs: ((contractor.experience as { completedProjects?: number })?.completedProjects) || 0,
+    verified: ((contractor.verification as { status?: string })?.status) === 'verified',
+    hasInsurance: ((contractor.insurance as { hasOC?: boolean })?.hasOC) || false,
     isPremium: contractor.plan === 'pro',
-    founded: contractor.businessInfo?.yearEstablished || new Date().getFullYear(),
-    employees: contractor.businessInfo?.employeeCount || '1-5',
-    website: contractor.contactInfo?.website || '',
-    phone: contractor.contactInfo?.phone || '',
-    email: contractor.contactInfo?.email || '',
-    address: contractor.contactInfo?.address || '',
-    specialties: [...(contractor.services?.primary || []), ...(contractor.services?.secondary || [])].slice(0, 5),
-    certificates: contractor.experience?.certifications || [],
+    founded: ((contractor.businessInfo as { yearEstablished?: number })?.yearEstablished) || new Date().getFullYear(),
+    employees: ((contractor.businessInfo as { employeeCount?: string })?.employeeCount) || '1-5',
+    website: ((contractor.contactInfo as { website?: string })?.website) || '',
+    phone: ((contractor.contactInfo as { phone?: string })?.phone) || '',
+    email: ((contractor.contactInfo as { email?: string })?.email) || '',
+    address: ((contractor.contactInfo as { address?: string })?.address) || '',
+    specialties: [...((contractor.services as { primary?: string[]; secondary?: string[] })?.primary || []), ...((contractor.services as { primary?: string[]; secondary?: string[] })?.secondary || [])].slice(0, 5),
+    certificates: ((contractor.experience as { certifications?: string[] })?.certifications) || [],
     services: servicesWithPricing,
-    portfolio: contractor.portfolio.featuredProjects.map(project => ({
+    portfolio: ((contractor.portfolio as { featuredProjects?: Array<{ title: string; images?: string[]; description?: string; year?: number }> })?.featuredProjects || []).map(project => ({
       title: project.title,
-      image: project.images[0] || '/api/placeholder/400/300',
-      description: project.description,
-      date: project.year.toString()
+      image: project.images?.[0] || '/api/placeholder/400/300',
+      description: project.description || '',
+      date: (project.year || new Date().getFullYear()).toString()
     })),
     team: [
       {
         name: contractor.name,
         position: 'Właściciel/Kierownik',
         image: contractor.avatar || '/api/placeholder/150/150',
-        experience: `${contractor.experience.yearsInBusiness} lat doświadczenia`
+        experience: `${((contractor.experience as { yearsInBusiness?: number })?.yearsInBusiness) || 5} lat doświadczenia`
       }
     ],
-    reviews: contractor.reviews.map(review => ({
-      author: review.author,
-      rating: review.rating,
-      text: review.comment,
-      date: review.date,
-      project: review.project
+    reviews: ((contractor.reviews as Array<{ author?: string; rating?: number; comment?: string; date?: string }>) || []).map(review => ({
+      author: review.author || '',
+      rating: review.rating || 0,
+      text: review.comment || '',
+      date: review.date || '',
+      project: (review as { project?: string }).project || ''
     })),
     stats: {
-      projectsCompleted: contractor.experience.completedProjects,
-      clientSatisfaction: contractor.stats.onTimeCompletion,
-      repeatClients: contractor.stats.rehireRate,
-      avgResponseTime: contractor.stats.responseTime
+      projectsCompleted: ((contractor.experience as { completedProjects?: number })?.completedProjects) || 0,
+      clientSatisfaction: ((contractor.stats as { onTimeCompletion?: number })?.onTimeCompletion) || 0,
+      repeatClients: ((contractor.stats as { rehireRate?: number })?.rehireRate) || 0,
+      avgResponseTime: ((contractor.stats as { responseTime?: string })?.responseTime) || '0h'
     }
   };
 };
@@ -146,12 +147,12 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
         const contractorData = await fetchContractorById(contractorId);
         
         if (contractorData) {
-          const formattedContractor = convertContractorToPageFormat(contractorData);
-          setContractor(formattedContractor);
+          const formattedContractor = convertContractorToPageFormat(contractorData as unknown as Record<string, unknown>);
+          setContractor(formattedContractor as unknown as ContractorProfile);
           
           // Load rating summary immediately
           const ratingData = await fetchContractorRatingSummary(contractorId);
-          setRatingSummary(ratingData);
+          setRatingSummary(ratingData as unknown as ContractorProfile['rating']);
         }
       } catch (error) {
         console.error('Error loading contractor:', error);
@@ -205,8 +206,8 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
             fetchContractorReviews(contractorId, 20), // Load more reviews for profile page
             fetchContractorRatingSummary(contractorId)
           ]);
-          setReviews(reviewsData);
-          setRatingSummary(ratingData);
+          setReviews(reviewsData as unknown as ContractorProfile['reviews']);
+          setRatingSummary(ratingData as unknown as ContractorProfile['rating']);
         } catch (error) {
           console.error('Error loading reviews:', error);
         } finally {
@@ -281,7 +282,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                   </CardHeader>
                   <CardContent>
                     <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
-                      {contractor.description || 'Brak opisu firmy. Wykonawca nie dodał jeszcze informacji o swojej działalności.'}
+                      {(contractor as unknown as { description?: string }).description || 'Brak opisu firmy. Wykonawca nie dodał jeszcze informacji o swojej działalności.'}
                     </p>
                   </CardContent>
                 </Card>
@@ -297,7 +298,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl sm:text-3xl font-bold text-primary">{contractor.stats.projectsCompleted > 0 ? contractor.stats.projectsCompleted : '—'}</div>
+                        <div className="text-2xl sm:text-3xl font-bold text-primary">{((contractor as unknown as { stats?: { projectsCompleted?: number } }).stats?.projectsCompleted || 0) > 0 ? (contractor as unknown as { stats?: { projectsCompleted?: number } }).stats?.projectsCompleted : '—'}</div>
                       </CardContent>
                     </Card>
 
@@ -308,7 +309,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                         <Star className="h-4 w-4 text-green-600 fill-green-600" />
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl sm:text-3xl font-bold text-green-700">{contractor.stats.clientSatisfaction > 0 ? `${contractor.stats.clientSatisfaction}%` : '—'}</div>
+                        <div className="text-2xl sm:text-3xl font-bold text-green-700">{((contractor as unknown as { stats?: { clientSatisfaction?: number } }).stats?.clientSatisfaction || 0) > 0 ? `${(contractor as unknown as { stats?: { clientSatisfaction?: number } }).stats?.clientSatisfaction}%` : '—'}</div>
                       </CardContent>
                     </Card>
 
@@ -319,19 +320,19 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                         <Users className="h-4 w-4 text-muted-foreground" />
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl sm:text-3xl font-bold text-primary">{contractor.stats.repeatClients > 0 ? `${contractor.stats.repeatClients}%` : '—'}</div>
+                        <div className="text-2xl sm:text-3xl font-bold text-primary">{((contractor as unknown as { stats?: { repeatClients?: number } }).stats?.repeatClients || 0) > 0 ? `${(contractor as unknown as { stats?: { repeatClients?: number } }).stats?.repeatClients}%` : '—'}</div>
                       </CardContent>
                     </Card>
 
                     {/* Response Time Stat */}
-                    {contractor.stats.avgResponseTime && (
+                    {(contractor as unknown as { stats?: { avgResponseTime?: string } }).stats?.avgResponseTime && (
                       <Card className="hover:shadow-md transition-shadow">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                           <CardTitle className="text-xs sm:text-sm font-medium">Średni czas odpowiedzi</CardTitle>
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                          <div className="text-lg sm:text-xl font-bold text-primary">{contractor.stats.avgResponseTime}</div>
+                          <div className="text-lg sm:text-xl font-bold text-primary">{(contractor as unknown as { stats?: { avgResponseTime?: string } }).stats?.avgResponseTime}</div>
                         </CardContent>
                       </Card>
                     )}
@@ -339,13 +340,13 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                 </div>
 
                 {/* Certificates */}
-                {contractor.certificates && contractor.certificates.length > 0 && (
+                {((contractor as unknown as { certificates?: string[] }).certificates?.length || 0) > 0 && (
                   <div>
                     <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Certyfikaty i uprawnienia</h3>
                     <Card>
                       <CardContent className="pt-4 sm:pt-6">
                         <div className="flex flex-wrap gap-2">
-                          {contractor.certificates.map((cert: string, index: number) => (
+                          {((contractor as unknown as { certificates?: string[] }).certificates || []).map((cert: string, index: number) => (
                             <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 text-xs py-1.5 px-3">
                               <Award className="w-3 h-3 mr-1.5" />
                               {cert}
@@ -364,41 +365,41 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                   <CardTitle className="text-base sm:text-lg">Kontakt</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4">
-                  {contractor.phone && (
+                  {(contractor as unknown as { phone?: string }).phone && (
                     <div className="flex items-center space-x-2 sm:space-x-3">
                       <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-medium text-sm sm:text-base truncate">{contractor.phone}</div>
+                        <div className="font-medium text-sm sm:text-base truncate">{(contractor as unknown as { phone?: string }).phone}</div>
                         <div className="text-xs sm:text-sm text-gray-500">Telefon</div>
                       </div>
                     </div>
                   )}
                   
-                  {contractor.email && (
+                  {(contractor as unknown as { email?: string }).email && (
                     <div className="flex items-center space-x-2 sm:space-x-3">
                       <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-medium text-sm sm:text-base truncate">{contractor.email}</div>
+                        <div className="font-medium text-sm sm:text-base truncate">{(contractor as unknown as { email?: string }).email}</div>
                         <div className="text-xs sm:text-sm text-gray-500">Email</div>
                       </div>
                     </div>
                   )}
                   
-                  {contractor.address && (
+                  {(contractor as unknown as { address?: string }).address && (
                     <div className="flex items-center space-x-2 sm:space-x-3">
                       <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-medium text-sm sm:text-base truncate">{contractor.address}</div>
+                        <div className="font-medium text-sm sm:text-base truncate">{(contractor as unknown as { address?: string }).address}</div>
                         <div className="text-xs sm:text-sm text-gray-500">Adres</div>
                       </div>
                     </div>
                   )}
                   
-                  {contractor.website && (
+                  {(contractor as unknown as { website?: string }).website && (
                     <div className="flex items-center space-x-2 sm:space-x-3">
                       <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-medium text-sm sm:text-base truncate">{contractor.website}</div>
+                        <div className="font-medium text-sm sm:text-base truncate">{(contractor as unknown as { website?: string }).website}</div>
                         <div className="text-xs sm:text-sm text-gray-500">Strona internetowa</div>
                       </div>
                     </div>
@@ -417,7 +418,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
         {activeTab === 'services' && (
           <div id="services" className="scroll-mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {((contractor.services as Array<Record<string, unknown>>) || []).map((service: Record<string, unknown>, index: number) => (
+              {((contractor as unknown as { services?: Array<{ name?: string; description?: string; price?: string; pricing?: unknown; category?: string | null }> }).services || []).map((service, index: number) => (
                 <Card key={index}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-sm sm:text-base">
@@ -474,7 +475,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                             {project.category && (
                               <Badge variant="secondary">{project.category}</Badge>
                             )}
-                            {project.isFeatured && (
+                            {((project as { isFeatured?: boolean }).isFeatured) && (
                               <Badge variant="default">Wyróżniony</Badge>
                             )}
                           </div>
@@ -482,27 +483,27 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                         <CardContent className="space-y-3">
                           <p className="text-gray-600 text-sm">{project.description}</p>
                           
-                          {project.location && (
+                          {(project as { location?: string }).location && (
                             <div className="flex items-center text-sm text-gray-500">
                               <MapPin className="w-4 h-4 mr-1" />
-                              <span>{project.location}</span>
+                              <span>{(project as { location?: string }).location || ''}</span>
                             </div>
                           )}
                           
-                          {project.budget && (
+                          {(project as { budget?: string }).budget && (
                             <div className="text-sm">
-                              <span className="font-medium text-green-600">{project.budget}</span>
-                              {project.duration && (
+                              <span className="font-medium text-green-600">{(project as { budget?: string }).budget}</span>
+                              {(project as { duration?: string }).duration && (
                                 <span className="text-gray-500 ml-2">• {project.duration}</span>
                               )}
                             </div>
                           )}
                           
-                          {project.clientFeedback && (
+                          {(project as { clientFeedback?: string }).clientFeedback && (
                             <div className="bg-gray-50 p-3 rounded-lg">
-                              <p className="text-sm text-gray-700 italic">&quot;{project.clientFeedback}&quot;</p>
-                              {project.clientName && (
-                                <p className="text-xs text-gray-500 mt-1">- {project.clientName}</p>
+                              <p className="text-sm text-gray-700 italic">&quot;{(project as { clientFeedback?: string }).clientFeedback}&quot;</p>
+                              {(project as { clientName?: string }).clientName && (
+                                <p className="text-xs text-gray-500 mt-1">- {(project as { clientName?: string }).clientName}</p>
                               )}
                             </div>
                           )}
@@ -528,7 +529,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
         {activeTab === 'team' && (
           <div id="team" className="scroll-mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {((contractor.team as Array<Record<string, unknown>>) || []).map((member: Record<string, unknown>, index: number) => (
+              {((contractor as unknown as { team?: Array<{ name?: string; position?: string; image?: string; experience?: string }> }).team || []).map((member, index: number) => (
                 <Card key={index}>
                   <CardContent className="pt-4 sm:pt-6 text-center">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 rounded-full bg-primary/10 flex items-center justify-center">
@@ -549,7 +550,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
           <div id="reviews" className="scroll-mt-4">
             <div className="space-y-4 sm:space-y-6">
               {/* Rating Summary */}
-              {ratingSummary && ratingSummary.totalReviews > 0 && (
+              {ratingSummary && ((ratingSummary as unknown as { totalReviews?: number }).totalReviews || 0) > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -561,14 +562,14 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="text-center">
                         <div className="text-4xl font-bold text-primary mb-2">
-                          {ratingSummary.averageRating.toFixed(1)}
+                          {((ratingSummary as unknown as { averageRating?: number }).averageRating || 0).toFixed(1)}
                         </div>
                         <div className="flex justify-center mb-2">
                           {[...Array(5)].map((_, i) => (
                             <Star 
                               key={i} 
                               className={`w-6 h-6 ${
-                                i < Math.floor(ratingSummary.averageRating)
+                                i < Math.floor((ratingSummary as unknown as { averageRating?: number }).averageRating || 0)
                                   ? 'text-yellow-400 fill-yellow-400'
                                   : 'text-gray-300'
                               }`} 
@@ -576,12 +577,12 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                           ))}
                         </div>
                         <div className="text-sm text-gray-600">
-                          {ratingSummary.totalReviews} {ratingSummary.totalReviews === 1 ? 'opinia' : 'opinii'}
+                          {(ratingSummary as unknown as { totalReviews?: number }).totalReviews} {((ratingSummary as unknown as { totalReviews?: number }).totalReviews || 0) === 1 ? 'opinia' : 'opinii'}
                         </div>
                       </div>
                       
                       <div className="space-y-2">
-                        {Object.entries(ratingSummary.categoryRatings || {}).map(([category, rating]) => {
+                        {Object.entries((ratingSummary as unknown as { categoryRatings?: Record<string, number> }).categoryRatings || {}).map(([category, rating]) => {
                           if (Number(rating) === 0) return null;
                           return (
                             <div key={category} className="flex items-center justify-between">
@@ -601,14 +602,14 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                       </div>
                     </div>
                     
-                    {Object.keys(ratingSummary.ratingBreakdown || {}).length > 0 && (
+                    {Object.keys((ratingSummary as unknown as { ratingBreakdown?: Record<string, number> }).ratingBreakdown || {}).length > 0 && (
                       <div className="mt-6 pt-6 border-t">
                         <div className="text-sm font-semibold mb-3">Rozkład ocen:</div>
                         <div className="space-y-2">
                           {[5, 4, 3, 2, 1].map((stars) => {
-                            const count = ratingSummary.ratingBreakdown[stars.toString() as keyof typeof ratingSummary.ratingBreakdown] || 0;
-                            const percentage = ratingSummary.totalReviews > 0 
-                              ? (count / ratingSummary.totalReviews) * 100 
+                            const count = ((ratingSummary as unknown as { ratingBreakdown?: Record<string, number> }).ratingBreakdown?.[stars.toString()]) || 0;
+                            const percentage = ((ratingSummary as unknown as { totalReviews?: number }).totalReviews || 0) > 0 
+                              ? (count / ((ratingSummary as unknown as { totalReviews?: number }).totalReviews || 1)) * 100 
                               : 0;
                             return (
                               <div key={stars} className="flex items-center gap-2">
@@ -633,14 +634,14 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
               ) : (
                 <div className="space-y-4">
                   {reviews.length > 0 ? (
-                    reviews.map((review: Record<string, unknown>, index: number) => (
-                      <Card key={review.id || index}>
+                    reviews.map((review, index: number) => (
+                      <Card key={(review as { id?: string }).id || index}>
                         <CardContent className="pt-6">
                           <div className="flex items-start justify-between mb-4">
                             <div>
-                              <h4 className="font-medium">{review.reviewerName}</h4>
+                              <h4 className="font-medium">{(review as { reviewerName?: string; author?: string }).reviewerName || (review as { reviewerName?: string; author?: string }).author || ''}</h4>
                               <p className="text-sm text-gray-600">
-                                {review.reviewerType === 'manager' ? 'Zarządca' : 'Klient prywatny'}
+                                {((review as { reviewerType?: string; authorType?: string }).reviewerType || (review as { reviewerType?: string; authorType?: string }).authorType) === 'manager' ? 'Zarządca' : 'Klient prywatny'}
                               </p>
                             </div>
                             <div className="flex items-center space-x-1">
@@ -648,7 +649,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                                 <Star 
                                   key={i} 
                                   className={`w-4 h-4 ${
-                                    i < review.rating 
+                                    i < ((review as { rating?: number }).rating || 0) 
                                       ? 'text-yellow-400 fill-yellow-400' 
                                       : 'text-gray-300'
                                   }`} 
@@ -657,18 +658,18 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                             </div>
                           </div>
                           
-                          {review.title && (
-                            <h5 className="font-medium text-gray-900 mb-2">{review.title}</h5>
+                          {(review as { title?: string }).title && (
+                            <h5 className="font-medium text-gray-900 mb-2">{(review as { title?: string }).title}</h5>
                           )}
                           
-                          <p className="text-gray-700 mb-3">{review.comment}</p>
+                          <p className="text-gray-700 mb-3">{(review as { comment?: string; text?: string }).comment || (review as { comment?: string; text?: string }).text || ''}</p>
                           
                           {/* Category Ratings */}
-                          {review.categories && Object.keys(review.categories).length > 0 && (
+                          {(review as { categories?: Record<string, number> }).categories && Object.keys((review as { categories?: Record<string, number> }).categories || {}).length > 0 && (
                             <div className="mb-3 p-3 bg-gray-50 rounded-lg">
                               <div className="text-sm font-medium mb-2">Szczegółowe oceny:</div>
                               <div className="grid grid-cols-2 gap-2">
-                                {Object.entries(review.categories).map(([category, rating]) => (
+                                {Object.entries((review as { categories?: Record<string, number> }).categories || {}).map(([category, rating]) => (
                                   <div key={category} className="flex items-center justify-between text-xs">
                                     <span>{getCategoryLabel(category)}:</span>
                                     <div className="flex items-center space-x-1">
@@ -682,11 +683,11 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                           )}
                           
                           <div className="flex items-center justify-between text-sm text-gray-500">
-                            <span>{new Date(review.createdAt).toLocaleDateString('pl-PL')}</span>
+                            <span>{new Date(String((review as { createdAt?: string; date?: string }).createdAt || (review as { createdAt?: string; date?: string }).date || '')).toLocaleDateString('pl-PL')}</span>
                             <div className="flex items-center space-x-2">
                               <Button variant="ghost" size="sm" className="h-8 px-2">
                                 <ThumbsUp className="w-3 h-3 mr-1" />
-                                {review.helpfulCount || 0}
+                                {(review as { helpfulCount?: number; helpful?: number }).helpfulCount || (review as { helpfulCount?: number; helpful?: number }).helpful || 0}
                               </Button>
                             </div>
                           </div>

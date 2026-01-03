@@ -440,7 +440,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
 
         {/* Map Filters - Only visible when expanded and on desktop */}
         {/* Note: Use allJobs (not bounds-filtered) for filters to show accurate counts */}
-        {isExpanded && showMapFilters && onFiltersChange && (
+        {isExpanded && _showMapFilters && onFiltersChange && (
           <div className="absolute top-28 left-4 z-[1001] w-80 hidden md:block">
             <JobFilters 
               onFilterChange={onFiltersChange}
@@ -453,14 +453,14 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
         )}
 
         {/* Map Legend - Only visible when expanded */}
-        {isExpanded && showMapLegend && (
+        {isExpanded && _showMapLegend && (
           <div className="absolute bottom-8 right-16 z-[1000] hidden md:block">
             <MapLegend />
           </div>
         )}
         
         {/* Map Legend - Mobile version (top right, collapsed by default) */}
-        {isExpanded && showMapLegend && (
+        {isExpanded && _showMapLegend && (
           <div className="absolute top-4 right-4 z-[1000] md:hidden">
             <MapLegend initialExpanded={false} />
           </div>

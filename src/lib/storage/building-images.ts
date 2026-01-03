@@ -29,7 +29,7 @@ export async function uploadBuildingImage(
     if (!isValidType) {
       return {
         data: null,
-        error: { message: 'Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP' }
+        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP')
       };
     }
 
@@ -37,7 +37,7 @@ export async function uploadBuildingImage(
     if (file.size > MAX_FILE_SIZE) {
       return {
         data: null,
-        error: { message: 'Plik jest zbyt duży. Maksymalny rozmiar: 5MB' }
+        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 5MB')
       };
     }
 

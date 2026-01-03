@@ -36,7 +36,7 @@ export async function uploadVerificationDocument(
     if (!isValidType) {
       return {
         data: null,
-        error: { message: 'Nieprawidłowy typ pliku. Dozwolone: PDF, JPG, PNG' }
+        error: new Error('Nieprawidłowy typ pliku. Dozwolone: PDF, JPG, PNG')
       };
     }
 
@@ -44,7 +44,7 @@ export async function uploadVerificationDocument(
     if (file.size > MAX_FILE_SIZE) {
       return {
         data: null,
-        error: { message: 'Plik jest zbyt duży. Maksymalny rozmiar: 10MB' }
+        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB')
       };
     }
 
@@ -110,7 +110,7 @@ export async function uploadVerificationDocuments(
   userId: string
 ): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
-  const errors: Error[] = [];
+  const errors: unknown[] = [];
 
   for (const { file, documentType } of files) {
     const { data, error } = await uploadVerificationDocument(supabase, file, userId, documentType);

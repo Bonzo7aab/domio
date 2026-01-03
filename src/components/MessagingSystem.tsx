@@ -83,7 +83,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
   const [newMessage, setNewMessage] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [jobData, setJobData] = useState<{ id: string; title: string; company: string } | null>(null);
+  const [jobData, setJobData] = useState<{ id: string; title: string; company: string; location?: string | { city?: string }; salary?: string } | null>(null);
   const [isLoadingJob, setIsLoadingJob] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
 
@@ -142,7 +142,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
         // Try to fetch as job first
         const { data: job, error: jobError } = await getJobById(currentConversation.jobId);
         if (job && !jobError) {
-          setJobData({ ...job, postType: 'job' });
+          setJobData({ id: job.id, title: job.title || '', company: ((job as unknown) as { company?: string }).company || '' });
           setIsLoadingJob(false);
           return;
         }
@@ -150,7 +150,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
         // If not found as job, try as tender
         const { data: tender, error: tenderError } = await getTenderById(currentConversation.jobId);
         if (tender && !tenderError) {
-          setJobData({ ...tender, postType: 'tender' });
+          setJobData({ id: tender.id, title: tender.title || '', company: ((tender as unknown) as { company?: string }).company || '' });
           setIsLoadingJob(false);
           return;
         }
@@ -535,7 +535,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
                                 <span className="text-xs sm:text-sm text-gray-700 font-medium truncate">
                                   {typeof jobData.company === 'string' 
                                     ? jobData.company 
-                                    : jobData.company?.name || 'Unknown'}
+                                    : ((jobData.company as unknown) as { name?: string })?.name || 'Unknown'}
                                 </span>
                               </div>
                             )}

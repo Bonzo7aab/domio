@@ -86,6 +86,42 @@ export interface JobWithCompany {
   } | null;
 }
 
+// Helper types for tables not yet in Database type
+interface JobApplicationRow {
+  id: string;
+  job_id: string;
+  contractor_id: string;
+  company_id: string | null;
+  status: string;
+  [key: string]: unknown;
+}
+
+interface TenderRow {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  latitude: number | null;
+  longitude: number | null;
+  estimated_value: number;
+  currency: string;
+  status: string;
+  submission_deadline: string;
+  evaluation_deadline: string | null;
+  views_count: number;
+  bids_count: number;
+  [key: string]: unknown;
+}
+
+interface TenderBidRow {
+  id: string;
+  tender_id: string;
+  contractor_id: string;
+  company_id: string | null;
+  status: string;
+  [key: string]: unknown;
+}
+
 export interface TenderWithCompany {
   id: string;
   title: string;
@@ -144,7 +180,7 @@ export async function fetchJobs(
           slug
         )
       `)
-      .eq('status', filters.status || 'active')
+      .eq('status', (filters.status || 'active') as 'active' | 'paused' | 'cancelled' | 'draft' | 'completed')
       .eq('is_public', true);
 
     // Apply filters
@@ -287,12 +323,12 @@ export async function fetchJobs(
       const { data: countsData, error: countsError } = await supabase
         .from('job_applications')
         .select('job_id')
-        .in('job_id', jobIds);
+        .in('job_id', jobIds) as { data: JobApplicationRow[] | null; error: PostgrestError | null };
 
       if (!countsError && countsData) {
         // Count applications per job
         const countsMap: { [key: string]: number } = {};
-        countsData.forEach((app: { job_id: string }) => {
+        countsData?.forEach((app: JobApplicationRow) => {
           countsMap[app.job_id] = (countsMap[app.job_id] || 0) + 1;
         });
 
@@ -320,7 +356,8 @@ export async function fetchTenders(
 ): Promise<{ data: TenderWithCompany[] | null; error: PostgrestError | null }> {
   try {
     // Type assertion needed as tenders table may not be in generated types yet
-    let query = supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (supabase as unknown as { from: (table: string) => { select: (columns: string) => Promise<{ data: TenderRow[] | null; error: PostgrestError | null }> } })
       .from('tenders')
       .select(`
         *,
@@ -478,33 +515,33 @@ export async function fetchTenders(
 
     // Calculate bids_count dynamically if not already accurate
     if (data && data.length > 0) {
-      const tenderIds = data.map((tender: TenderWithCompany) => tender.id);
+      const tenderIds = (data || []).map((tender: TenderWithCompany) => tender.id);
       
       // Fetch counts for all tenders at once
       const { data: countsData, error: countsError } = await supabase
         .from('tender_bids')
         .select('tender_id')
-        .in('tender_id', tenderIds);
+        .in('tender_id', tenderIds) as { data: TenderBidRow[] | null; error: PostgrestError | null };
 
       if (!countsError && countsData) {
         // Count bids per tender
         const countsMap: { [key: string]: number } = {};
-        countsData.forEach((bid: { tender_id: string }) => {
+        countsData?.forEach((bid: TenderBidRow) => {
           countsMap[bid.tender_id] = (countsMap[bid.tender_id] || 0) + 1;
         });
 
         // Update bids_count for each tender
         data.forEach((tender: TenderWithCompany) => {
-          tender.bids_count = countsMap[tender.id] || 0;
+          (tender as TenderWithCompany & { bids_count: number }).bids_count = countsMap[tender.id] || 0;
         });
       }
     }
 
-    return { data: data as JobWithCompany[], error };
+    return { data: data as unknown as TenderWithCompany[], error };
   } catch (err) {
     console.error('Exception fetching tenders:', err);
     const errorMessage = err instanceof Error ? err.message : String(err);
-    return { data: null, error: { message: errorMessage, originalError: err } };
+    return { data: null, error: new Error(errorMessage) as PostgrestError };
   }
 }
 
@@ -737,11 +774,11 @@ export async function fetchJobById(
       data.applications_count = count;
     }
 
-    return { data: data as number, error: null };
+    return { data: data as JobWithCompany, error: null };
   } catch (err) {
     const error = err as PostgrestError | Error;
     // Handle "not found" error (PGRST116) as a normal case
-    const errorCode = error?.code || error?.error?.code;
+    const errorCode = (error as PostgrestError)?.code || ((error as unknown as { error?: { code?: string } })?.error?.code);
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
       return { data: null, error: null };
     }
@@ -800,15 +837,15 @@ export async function fetchTenderById(
       .select('*', { count: 'exact', head: true })
       .eq('tender_id', tenderId);
 
-    if (!countsError && count !== null) {
-      result.data.bids_count = count;
+    if (!countsError && count !== null && result.data) {
+      (result.data as unknown as { bids_count?: number }).bids_count = count;
     }
 
-    return { data: result.data as TenderWithCompany, error: null };
+    return { data: result.data as unknown as TenderWithCompany, error: null };
   } catch (err) {
     const error = err as PostgrestError | Error;
     // Handle "not found" error (PGRST116) as a normal case
-    const errorCode = error?.code || error?.error?.code;
+    const errorCode = (error as PostgrestError)?.code || ((error as unknown as { error?: { code?: string } })?.error?.code);
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
       return { data: null, error: null };
     }
@@ -834,7 +871,7 @@ export async function incrementJobViews(
 
     // Handle "not found" error (PGRST116) - job doesn't exist
       if (fetchError && (fetchError as PostgrestError).code === 'PGRST116') {
-      return { data: null, error: new Error('Job not found') };
+      return { data: null, error: new Error('Job not found') as PostgrestError };
     }
 
     if (fetchError) {
@@ -842,7 +879,7 @@ export async function incrementJobViews(
     }
 
     if (!currentJob) {
-      return { data: null, error: new Error('Job not found') };
+      return { data: null, error: new Error('Job not found') as PostgrestError };
     }
 
     const newViewsCount = (currentJob.views_count || 0) + 1;
@@ -880,8 +917,8 @@ export async function incrementTenderViews(
       .single();
 
     // Handle "not found" error (PGRST116) - tender doesn't exist
-    if (fetchError && fetchError.code === 'PGRST116') {
-      return { data: null, error: new Error('Tender not found') };
+    if (fetchError && (fetchError as PostgrestError).code === 'PGRST116') {
+      return { data: null, error: new Error('Tender not found') as PostgrestError };
     }
 
     if (fetchError) {
@@ -889,10 +926,10 @@ export async function incrementTenderViews(
     }
 
     if (!currentTender) {
-      return { data: null, error: new Error('Tender not found') };
+      return { data: null, error: new Error('Tender not found') as PostgrestError };
     }
 
-    const newViewsCount = (currentTender.views_count || 0) + 1;
+    const newViewsCount = ((currentTender as unknown as { views_count?: number })?.views_count || 0) + 1;
 
     // Increment and update
     const { error: updateError } = await supabase
@@ -1102,9 +1139,10 @@ export async function createTender(
     if (isCustomCategory) {
       // First, try exact match with the custom category name (case-insensitive)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: customMatch, error: customError } = await (supabase as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: customMatch, error: customError } = await (supabase as unknown as SupabaseClient<Database>)
         .from('job_categories')
-        .select('id, name')
+        .select('id, name, slug')
         .ilike('name', tenderData.category)
         .eq('is_active', true)
         .maybeSingle();
@@ -1116,7 +1154,7 @@ export async function createTender(
         // If custom category doesn't exist, try partial match
         const { data: partialCustomMatch, error: partialCustomError } = await supabase
           .from('job_categories')
-          .select('id, name')
+          .select('id, name, slug')
           .ilike('name', `%${tenderData.category}%`)
           .eq('is_active', true)
           .limit(1)
@@ -1137,7 +1175,7 @@ export async function createTender(
       // Try exact match with mapped name
       const { data: mappedMatch, error: mappedError } = await supabase
         .from('job_categories')
-        .select('id, name')
+        .select('id, name, slug')
         .ilike('name', searchCategoryName)
         .eq('is_active', true)
         .maybeSingle();
@@ -1149,7 +1187,7 @@ export async function createTender(
         // If exact match fails, try partial match
         const { data: partialMatch, error: partialError } = await supabase
           .from('job_categories')
-          .select('id, name')
+          .select('id, name, slug')
           .ilike('name', `%${searchCategoryName}%`)
           .eq('is_active', true)
           .limit(1)
@@ -1180,7 +1218,7 @@ export async function createTender(
       
       return { 
         data: null, 
-        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) 
+        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) as PostgrestError
       };
     }
 
@@ -1212,8 +1250,8 @@ export async function createTender(
     }
 
     // Insert tender
-    const { data: insertedTender, error: insertError } = await supabase
-      .from('tenders')
+      const { data: insertedTender, error: insertError } = await supabase
+        .from('tenders')
       .insert({
         title: tenderData.title,
         description: tenderData.description,
@@ -1267,13 +1305,13 @@ export async function createTender(
       });
       return { 
         data: null, 
-        error: insertError instanceof Error 
+        error: (insertError instanceof Error 
           ? insertError 
-          : new Error(insertError?.message || insertError?.details || insertError?.hint || 'Unknown database error')
+          : new Error(((insertError as unknown as { message?: string; details?: string; hint?: string })?.message || (insertError as unknown as { message?: string; details?: string; hint?: string })?.details || (insertError as unknown as { message?: string; details?: string; hint?: string })?.hint || 'Unknown database error')) as string) as PostgrestError
       };
     }
 
-    return { data: insertedTender as TenderWithCompany, error: null };
+    return { data: insertedTender as unknown as TenderWithCompany, error: null };
   } catch (err) {
     console.error('Error creating tender:', err);
     return { data: null, error: err };
@@ -1325,14 +1363,14 @@ export async function updateTender(
     if (fetchError || !existingTender) {
       return { 
         data: null, 
-        error: new Error('Przetarg nie został znaleziony') 
+        error: new Error('Przetarg nie został znaleziony') as PostgrestError 
       };
     }
 
-    if (existingTender.status !== 'draft') {
+    if ((existingTender as unknown as { status?: string })?.status !== 'draft') {
       return { 
         data: null, 
-        error: new Error('Tylko przetargi w statusie szkicu mogą być edytowane') 
+        error: new Error('Tylko przetargi w statusie szkicu mogą być edytowane') as PostgrestError 
       };
     }
 
@@ -1406,7 +1444,7 @@ export async function updateTender(
       
       return { 
         data: null, 
-        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) 
+        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) as PostgrestError
       };
     }
 
@@ -1466,7 +1504,7 @@ export async function updateTender(
       return { data: null, error: updateError };
     }
 
-    return { data: updatedTender as TenderWithCompany, error: null };
+    return { data: updatedTender as unknown as TenderWithCompany, error: null };
   } catch (err) {
     console.error('Error updating tender:', err);
     return { data: null, error: err };
@@ -1585,7 +1623,7 @@ export async function createJob(
       
       return { 
         data: null, 
-        error: new Error(`Category "${jobData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) 
+        error: new Error(`Category "${jobData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) as PostgrestError 
       };
     }
 
@@ -1702,7 +1740,7 @@ export async function createJob(
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return { data: insertedJob as any, error: null };
+    return { data: insertedJob as JobWithCompany, error: null };
   } catch (err) {
     console.error('Error creating job:', err);
     return { data: null, error: err };
@@ -1814,9 +1852,9 @@ export async function createJobApplication(
       console.error('Error fetching contractor company:', companyError);
       return { 
         data: null, 
-        error: companyError instanceof Error 
+        error: (companyError instanceof Error 
           ? companyError 
-          : new Error(companyError?.message || 'Failed to fetch contractor company')
+          : new Error(((companyError as unknown as { message?: string })?.message || 'Failed to fetch contractor company') as string)) as PostgrestError
       };
     }
     
@@ -1826,7 +1864,7 @@ export async function createJobApplication(
       // #endregion
       return { 
         data: null, 
-        error: new Error('Contractor must have a company to submit applications')
+        error: new Error('Contractor must have a company to submit applications') as PostgrestError
       };
     }
     
@@ -1848,7 +1886,7 @@ export async function createJobApplication(
       // #endregion
       return {
         data: null,
-        error: new Error('Proposed price must be greater than 0')
+        error: new Error('Proposed price must be greater than 0') as PostgrestError
       };
     }
     
@@ -1859,7 +1897,7 @@ export async function createJobApplication(
       // #endregion
       return {
         data: null,
-        error: new Error('Cover letter is required')
+        error: new Error('Cover letter is required') as PostgrestError
       };
     }
     
@@ -1925,35 +1963,35 @@ export async function createJobApplication(
       // #endregion
       return { 
         data: null, 
-        error: insertError instanceof Error 
+        error: (insertError instanceof Error 
           ? insertError 
-          : new Error(error?.message || error?.details || error?.hint || 'Unknown database error')
+          : new Error(((insertError as unknown as { message?: string; details?: string; hint?: string })?.message || (insertError as unknown as { message?: string; details?: string; hint?: string })?.details || (insertError as unknown as { message?: string; details?: string; hint?: string })?.hint || 'Unknown database error') as string)) as PostgrestError
       };
     }
     
     // Verify that data was actually inserted
-    if (!insertedApplication || !insertedApplication.id) {
+    if (!insertedApplication || !(insertedApplication as unknown as { id?: string })?.id) {
       console.error('Application insert returned no data:', {
         insertedApplication,
         insertData
       });
       return {
         data: null,
-        error: new Error('Application was not created - no data returned from database')
+        error: new Error('Application was not created - no data returned from database') as PostgrestError
       };
     }
     
     console.log('Job application created successfully:', {
-      id: insertedApplication.id,
-      job_id: insertedApplication.job_id,
-      contractor_id: insertedApplication.contractor_id,
-      company_id: insertedApplication.company_id,
-      status: insertedApplication.status
+      id: (insertedApplication as unknown as JobApplicationRow)?.id,
+      job_id: (insertedApplication as unknown as JobApplicationRow)?.job_id,
+      contractor_id: (insertedApplication as unknown as JobApplicationRow)?.contractor_id,
+      company_id: (insertedApplication as unknown as JobApplicationRow)?.company_id,
+      status: (insertedApplication as unknown as JobApplicationRow)?.status
     });
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1939',message:'createJobApplication success',data:{insertedApplicationId:insertedApplication?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1939',message:'createJobApplication success',data:{insertedApplicationId:(insertedApplication as unknown as { id?: string })?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
-    return { data: insertedApplication, error: null };
+    return { data: insertedApplication as unknown as JobApplicationRow, error: null };
   } catch (err) {
     console.error('Error creating job application:', err);
     // #region agent log
@@ -1961,9 +1999,9 @@ export async function createJobApplication(
     // #endregion
     return { 
       data: null, 
-      error: err instanceof Error 
+      error: (err instanceof Error 
         ? err 
-        : new Error(err?.message || String(err) || 'Unknown error occurred')
+        : new Error(((err as unknown as { message?: string })?.message || String(err) || 'Unknown error occurred') as string)) as PostgrestError
     };
   }
 }
@@ -2019,7 +2057,7 @@ export async function fetchJobApplicationsByJobId(
     
     // Transform to Application type format
     const formattedApplications = await Promise.all(
-      ((applications || []) as Record<string, unknown>[]).map(async (app: Record<string, unknown>) => {
+      ((applications as JobApplicationRow[]) || []).map(async (app: JobApplicationRow) => {
         // Fetch contractor profile for additional data (rating, completed jobs, location)
         const { fetchContractorById } = await import('./contractors');
         const contractorProfile = await fetchContractorById(app.company?.id || '');
@@ -2098,16 +2136,16 @@ export async function createTenderBid(
       console.error('Error fetching contractor company:', companyError);
       return { 
         data: null, 
-        error: companyError instanceof Error 
+        error: (companyError instanceof Error 
           ? companyError 
-          : new Error(companyError?.message || 'Failed to fetch contractor company')
+          : new Error(((companyError as unknown as { message?: string })?.message || 'Failed to fetch contractor company') as string)) as PostgrestError
       };
     }
     
     if (!company) {
       return { 
         data: null, 
-        error: new Error('Contractor must have a company to submit bids')
+        error: new Error('Contractor must have a company to submit bids') as PostgrestError
       };
     }
     
@@ -2124,14 +2162,14 @@ export async function createTenderBid(
       console.error('Error checking for existing bids:', checkError);
       return {
         data: null,
-        error: new Error('Failed to check for existing bids')
+        error: new Error('Failed to check for existing bids') as PostgrestError
       };
     }
     
     if (existingBids && existingBids.length > 0) {
       return {
         data: null,
-        error: new Error('Już złożyłeś ofertę na ten przetarg. Nie możesz złożyć więcej niż jednej oferty na ten sam przetarg.')
+        error: new Error('Już złożyłeś ofertę na ten przetarg. Nie możesz złożyć więcej niż jednej oferty na ten sam przetarg.') as PostgrestError
       };
     }
     
@@ -2178,20 +2216,20 @@ export async function createTenderBid(
       });
       return { 
         data: null, 
-        error: insertError instanceof Error 
+        error: (insertError instanceof Error 
           ? insertError 
-          : new Error(error?.message || error?.details || error?.hint || 'Unknown database error')
+          : new Error(((insertError as unknown as { message?: string; details?: string; hint?: string })?.message || (insertError as unknown as { message?: string; details?: string; hint?: string })?.details || (insertError as unknown as { message?: string; details?: string; hint?: string })?.hint || 'Unknown database error') as string)) as PostgrestError
       };
     }
     
-    return { data: insertedBid, error: null };
+    return { data: insertedBid as unknown as TenderBidRow, error: null };
   } catch (err) {
     console.error('Error creating tender bid:', err);
     return { 
       data: null, 
-      error: err instanceof Error 
+      error: (err instanceof Error 
         ? err 
-        : new Error(err?.message || String(err) || 'Unknown error occurred')
+        : new Error(((err as unknown as { message?: string })?.message || String(err) || 'Unknown error occurred') as string)) as PostgrestError
     };
   }
 }
@@ -2248,7 +2286,7 @@ export async function fetchTenderBidsByTenderId(
     
     // Transform to TenderBid type format
     const formattedBids = await Promise.all(
-      ((bids || []) as Record<string, unknown>[]).map(async (bid: Record<string, unknown>) => {
+      ((bids as TenderBidRow[]) || []).map(async (bid: TenderBidRow) => {
         // Fetch contractor profile for additional data
         const { fetchContractorById } = await import('./contractors');
         const contractorProfile = await fetchContractorById(bid.company?.id || '');
@@ -2312,7 +2350,7 @@ export async function cancelJobApplication(
     if (companyError || !company) {
       return { 
         data: null, 
-        error: new Error('Contractor must have a company to cancel applications')
+        error: new Error('Contractor must have a company to cancel applications') as PostgrestError
       };
     }
 
@@ -2327,30 +2365,30 @@ export async function cancelJobApplication(
       console.error('Error fetching application:', fetchError);
       return {
         data: null,
-        error: new Error('Application not found')
+        error: new Error('Application not found') as PostgrestError
       };
     }
 
     if (!application) {
       return {
         data: null,
-        error: new Error('Application not found')
+        error: new Error('Application not found') as PostgrestError
       };
     }
 
     // Check that application belongs to contractor's company
-    if (application.company_id !== company.id) {
+    if ((application as unknown as { company_id?: string })?.company_id !== company.id) {
       return {
         data: null,
-        error: new Error('You do not have permission to cancel this application')
+        error: new Error('You do not have permission to cancel this application') as PostgrestError
       };
     }
 
     // Check that status is not 'accepted' or 'rejected'
-    if (application.status === 'accepted' || application.status === 'rejected') {
+    if ((application as unknown as { status?: string })?.status === 'accepted' || (application as unknown as { status?: string })?.status === 'rejected') {
       return {
         data: null,
-        error: new Error('Cannot cancel an application that has already been accepted or rejected')
+        error: new Error('Cannot cancel an application that has already been accepted or rejected') as PostgrestError
       };
     }
 
@@ -2382,11 +2420,11 @@ export async function cancelJobApplication(
       // Extract error message from various error object structures
       const errorMessage = updateError instanceof Error 
         ? updateError.message 
-        : updateError?.message || updateError?.details || updateError?.hint || updateError?.code || 'Failed to cancel application';
+        : ((updateError as unknown as { message?: string; details?: string; hint?: string; code?: string })?.message || (updateError as unknown as { message?: string; details?: string; hint?: string; code?: string })?.details || (updateError as unknown as { message?: string; details?: string; hint?: string; code?: string })?.hint || (updateError as unknown as { message?: string; details?: string; hint?: string; code?: string })?.code || 'Failed to cancel application') as string;
       
       return {
         data: null,
-        error: new Error(errorMessage)
+        error: new Error(errorMessage) as PostgrestError
       };
     }
 
@@ -2394,20 +2432,20 @@ export async function cancelJobApplication(
     if (!updateData || updateData.length === 0) {
       return {
         data: null,
-        error: new Error('Application not found or could not be updated. Make sure the database migration has been run to allow "cancelled" status.')
+        error: new Error('Application not found or could not be updated. Make sure the database migration has been run to allow "cancelled" status.') as PostgrestError
       };
     }
 
-    const data = updateData[0];
+    const data = (updateData as unknown as Array<Record<string, unknown>>)?.[0];
 
     return { data, error: null };
   } catch (err) {
     console.error('Error in cancelJobApplication:', err);
     return {
       data: null,
-      error: err instanceof Error 
+      error: (err instanceof Error 
         ? err 
-        : new Error('An unexpected error occurred while cancelling the application')
+        : new Error('An unexpected error occurred while cancelling the application')) as PostgrestError
     };
   }
 }
@@ -2429,7 +2467,7 @@ export async function cancelTenderBid(
     if (companyError || !company) {
       return { 
         data: null, 
-        error: new Error('Contractor must have a company to cancel bids')
+        error: new Error('Contractor must have a company to cancel bids') as PostgrestError
       };
     }
 
@@ -2444,30 +2482,30 @@ export async function cancelTenderBid(
       console.error('Error fetching bid:', fetchError);
       return {
         data: null,
-        error: new Error('Bid not found')
+        error: new Error('Bid not found') as PostgrestError
       };
     }
 
     if (!bid) {
       return {
         data: null,
-        error: new Error('Bid not found')
+        error: new Error('Bid not found') as PostgrestError
       };
     }
 
     // Check that bid belongs to contractor's company
-    if (bid.company_id !== company.id) {
+    if ((bid as unknown as { company_id?: string })?.company_id !== company.id) {
       return {
         data: null,
-        error: new Error('You do not have permission to cancel this bid')
+        error: new Error('You do not have permission to cancel this bid') as PostgrestError
       };
     }
 
     // Check that status is not 'accepted' or 'rejected'
-    if (bid.status === 'accepted' || bid.status === 'rejected') {
+    if ((bid as unknown as { status?: string })?.status === 'accepted' || (bid as unknown as { status?: string })?.status === 'rejected') {
       return {
         data: null,
-        error: new Error('Cannot cancel a bid that has already been accepted or rejected')
+        error: new Error('Cannot cancel a bid that has already been accepted or rejected') as PostgrestError
       };
     }
 
@@ -2499,11 +2537,11 @@ export async function cancelTenderBid(
       // Extract error message from various error object structures
       const errorMessage = updateError instanceof Error 
         ? updateError.message 
-        : updateError?.message || updateError?.details || updateError?.hint || updateError?.code || 'Failed to cancel bid';
+        : ((updateError as unknown as { message?: string; details?: string; hint?: string; code?: string })?.message || (updateError as unknown as { message?: string; details?: string; hint?: string; code?: string })?.details || (updateError as unknown as { message?: string; details?: string; hint?: string; code?: string })?.hint || (updateError as unknown as { message?: string; details?: string; hint?: string; code?: string })?.code || 'Failed to cancel bid') as string;
       
       return {
         data: null,
-        error: new Error(errorMessage)
+        error: new Error(errorMessage) as PostgrestError
       };
     }
 
@@ -2511,20 +2549,20 @@ export async function cancelTenderBid(
     if (!updateData || updateData.length === 0) {
       return {
         data: null,
-        error: new Error('Bid not found or could not be updated. Make sure the database migration has been run to allow "cancelled" status.')
+        error: new Error('Bid not found or could not be updated. Make sure the database migration has been run to allow "cancelled" status.') as PostgrestError
       };
     }
 
-    const data = updateData[0];
+    const data = (updateData as unknown as Array<Record<string, unknown>>)?.[0];
 
     return { data, error: null };
   } catch (err) {
     console.error('Error in cancelTenderBid:', err);
     return {
       data: null,
-      error: err instanceof Error 
+      error: (err instanceof Error 
         ? err 
-        : new Error('An unexpected error occurred while cancelling the bid')
+        : new Error('An unexpected error occurred while cancelling the bid')) as PostgrestError
     };
   }
 }
@@ -2580,12 +2618,12 @@ export async function fetchJobsByWorkHistory(
       return [];
     }
 
-    if (!acceptedApplications || acceptedApplications.length === 0) {
+    if (!acceptedApplications || (acceptedApplications as unknown as { length?: number })?.length === 0) {
       return [];
     }
 
     // Step 3: Get distinct job IDs that have accepted applications
-    const jobIdsWithApplications: string[] = Array.from(new Set<string>(acceptedApplications.map((app: { job_id: string }) => app.job_id)));
+    const jobIdsWithApplications: string[] = Array.from(new Set<string>(((acceptedApplications as JobApplicationRow[]) || []).map((app: JobApplicationRow) => app.job_id)));
 
     if (jobIdsWithApplications.length === 0) {
       return [];
@@ -2621,8 +2659,8 @@ export async function fetchJobsByWorkHistory(
 
     // Step 5: Count accepted applications for each job
     const applicationCounts: { [key: string]: number } = {};
-    for (const app of acceptedApplications) {
-      const jobId = app.job_id;
+    for (const app of (acceptedApplications as JobApplicationRow[]) || []) {
+      const jobId = (app as JobApplicationRow)?.job_id;
       if (jobId) {
         applicationCounts[jobId] = (applicationCounts[jobId] || 0) + 1;
       }
@@ -2632,26 +2670,26 @@ export async function fetchJobsByWorkHistory(
     const formattedJobs = jobsData.map((job: Record<string, unknown>) => {
       const location = typeof job.location === 'string' 
         ? job.location 
-        : job.location?.city || 'Nieznana lokalizacja';
+        : ((job.location as unknown as { city?: string })?.city || 'Nieznana lokalizacja') as string;
 
       // Format budget
       const budget = budgetFromDatabase({
-        budget_min: job.budget_min ?? null,
-        budget_max: job.budget_max ?? null,
-        budget_type: (job.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
-        currency: job.currency || 'PLN',
+        budget_min: (job.budget_min as number) ?? null,
+        budget_max: (job.budget_max as number) ?? null,
+        budget_type: ((job.budget_type || 'fixed') as string) as 'fixed' | 'hourly' | 'negotiable' | 'range',
+        currency: (job.currency as string) || 'PLN',
       });
       const budgetStr = formatBudget(budget);
 
       return {
-        id: job.id,
-        title: job.title,
-        category: job.job_categories?.name || 'Inne',
-        status: job.status || 'active',
+        id: job.id as string,
+        title: job.title as string,
+        category: (((job.job_categories as unknown as { name?: string })?.name as string) || 'Inne') as string,
+        status: (job.status as string) || 'active',
         budget: budgetStr,
-        applications: applicationCounts[job.id] || 0,
-        deadline: job.deadline || '',
-        address: location
+        applications: applicationCounts[job.id as string] || 0,
+        deadline: (job.deadline as string) || '',
+        address: location as string
       };
     });
 

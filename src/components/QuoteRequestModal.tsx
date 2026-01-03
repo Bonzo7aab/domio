@@ -83,12 +83,14 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
       
       try {
         const supabase = createClient();
-        const { data: jobs, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const queryResult = await (supabase as unknown as ReturnType<typeof createClient>)
           .from('jobs')
           .select('id, title, company')
           .eq('created_by', user.id)
           .order('created_at', { ascending: false })
           .limit(10);
+        const { data: jobs, error } = queryResult as { data: Array<{ id: string; title: string; company: string }> | null; error: unknown };
 
         if (!error && jobs) {
           setUserJobs(jobs);

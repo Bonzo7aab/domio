@@ -803,7 +803,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           // Extract error message from various error object structures
           const errorMessage = error instanceof Error 
             ? error.message 
-            : error?.message || error?.details || error?.hint || String(error) || 'Wystąpił błąd podczas składania oferty w przetargu';
+            : (error as { message?: string; details?: string; hint?: string })?.message || (error as { message?: string; details?: string; hint?: string })?.details || (error as { message?: string; details?: string; hint?: string })?.hint || String(error) || 'Wystąpił błąd podczas składania oferty w przetargu';
           
           console.error('Error submitting tender bid:', {
             error,
@@ -857,14 +857,14 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         );
 
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:844',message:'after createJobApplication call',data:{hasData:!!data,hasError:!!error,errorMessage:error instanceof Error ? error.message : error?.message || String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobPage.tsx:844',message:'after createJobApplication call',data:{hasData:!!data,hasError:!!error,errorMessage:error instanceof Error ? error.message : (error as { message?: string })?.message || String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
         // #endregion
 
         if (error) {
           // Extract error message from various error object structures
           const errorMessage = error instanceof Error 
             ? error.message 
-            : error?.message || error?.details || error?.hint || String(error) || 'Wystąpił błąd podczas składania oferty';
+            : (error as { message?: string; details?: string; hint?: string })?.message || (error as { message?: string; details?: string; hint?: string })?.details || (error as { message?: string; details?: string; hint?: string })?.hint || String(error) || 'Wystąpił błąd podczas składania oferty';
           
           console.error('Error submitting application:', {
             error,
@@ -1576,7 +1576,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         companyName={job.company}
         onApplicationSubmit={handleApplicationFormSubmit}
         applicationForm={applicationForm}
-        setApplicationForm={setApplicationForm}
+        setApplicationForm={(form) => setApplicationForm(prev => ({ ...prev, ...form, additionalNotes: form.additionalNotes ?? prev.additionalNotes }))}
         postType={job.postType}
       />
 

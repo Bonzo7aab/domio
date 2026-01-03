@@ -120,7 +120,31 @@ export default function TendersPage() {
     }
   };
 
-  const handleTenderSubmit = async (tender: Record<string, unknown>, tenderId?: string) => {
+  const handleTenderSubmit = (tender: {
+    title: string;
+    description: string;
+    category: string;
+    location: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    estimatedValue: string;
+    currency: string;
+    submissionDeadline: Date;
+    evaluationDeadline: Date;
+    requirements: string[];
+    evaluationCriteria: Array<{ id: string; name: string; description: string; weight: number; type: string }>;
+    documents: Array<{ id: string; name: string; type: string; file: File }>;
+    isPublic: boolean;
+    allowQuestions: boolean;
+    questionsDeadline?: Date;
+    minimumExperience: number;
+    requiredCertificates: string[];
+    insuranceRequired: string;
+    advancePayment: boolean;
+    performanceBond: boolean;
+    status?: 'draft' | 'active';
+  }, tenderId?: string): void => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby utworzyć przetarg');
       return;
@@ -133,7 +157,8 @@ export default function TendersPage() {
       return;
     }
 
-    try {
+    (async () => {
+      try {
       const supabase = createClient();
       
       // Check if we're editing or creating
@@ -141,7 +166,32 @@ export default function TendersPage() {
       
       if (isEditing) {
         // Update existing tender
-        const { error: updateError } = await updateTender(supabase, tenderId, tender);
+        const { error: updateError } = await updateTender(supabase, tenderId, tender as {
+          title: string;
+          description: string;
+          category: string;
+          location: string;
+          estimatedValue: string;
+          currency: string;
+          submissionDeadline: Date;
+          evaluationDeadline: Date;
+          requirements: string[];
+          evaluationCriteria: Array<Record<string, unknown>>;
+          documents?: Array<Record<string, unknown>>;
+          isPublic: boolean;
+          allowQuestions: boolean;
+          questionsDeadline?: Date;
+          minimumExperience: number;
+          requiredCertificates: string[];
+          insuranceRequired: string;
+          advancePayment: boolean;
+          performanceBond: boolean;
+          status?: 'draft' | 'active';
+          address?: string;
+          latitude?: number;
+          longitude?: number;
+          projectDuration?: string;
+        });
         
         if (updateError) {
           toast.error('Nie udało się zaktualizować przetargu: ' + (updateError.message || 'Nieznany błąd'));
@@ -163,7 +213,32 @@ export default function TendersPage() {
 
         // Save tender to database
         const { error: saveError } = await createTender(supabase, {
-          ...tender,
+          ...(tender as {
+            title: string;
+            description: string;
+            category: string;
+            location: string | { city: string; country?: string; postalCode?: string };
+            estimatedValue: string;
+            currency: string;
+            submissionDeadline: Date;
+            evaluationDeadline: Date;
+            requirements: string[];
+            evaluationCriteria: Array<Record<string, unknown>>;
+            documents?: Array<Record<string, unknown>>;
+            isPublic: boolean;
+            allowQuestions: boolean;
+            questionsDeadline?: Date;
+            minimumExperience: number;
+            requiredCertificates: string[];
+            insuranceRequired: string;
+            advancePayment: boolean;
+            performanceBond: boolean;
+            status?: 'draft' | 'active';
+            address?: string;
+            latitude?: number;
+            longitude?: number;
+            projectDuration?: string;
+          }),
           managerId: user.id,
           companyId: company.id,
         });
@@ -187,7 +262,8 @@ export default function TendersPage() {
     } catch (error) {
       toast.error('Wystąpił błąd podczas zapisywania przetargu');
       console.error('Error in handleTenderSubmit:', error);
-    }
+      }
+    })();
   };
 
   const handleTenderSelect = (tenderId: string) => {

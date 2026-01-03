@@ -56,7 +56,18 @@ async function getOverviewData(userId: string) {
   const completedJobsCount = completedJobsResult.count || 0;
 
   // Format recent jobs
-  const recentJobs = (recentJobsResult.data || []).map((job: { location: string | { city?: string }; budget_min?: number | null; budget_max?: number | null; currency?: string; title: string; status: string; applications_count?: number }) => {
+  const recentJobs = (recentJobsResult.data || []).map((job: {
+    id: string;
+    title: string;
+    budget_min: number | null;
+    budget_max: number | null;
+    budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
+    currency: string;
+    deadline: string | null;
+    status: string;
+    job_categories: { name: string } | null;
+    location: string | { city?: string } | null;
+  }) => {
     const location = typeof job.location === 'string' 
       ? job.location 
       : job.location?.city || 'Nieznana lokalizacja';

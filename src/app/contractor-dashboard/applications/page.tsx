@@ -45,10 +45,10 @@ async function getApplicationsData(userId: string) {
         };
       }
       return {
-        id: attachment.id || `attachment-${index}`,
-        name: attachment.name || attachment.filename || 'Załącznik',
-        type: attachment.type || attachment.content_type || 'file',
-        url: attachment.url || attachment.path || attachment.file_path || ''
+        id: String(attachment.id || `attachment-${index}`),
+        name: String(attachment.name || attachment.filename || 'Załącznik'),
+        type: String(attachment.type || attachment.content_type || 'file'),
+        url: String(attachment.url || attachment.path || attachment.file_path || '')
       };
     });
 

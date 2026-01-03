@@ -54,10 +54,10 @@ export default function LocationAutocomplete({
   const [inputValue, setInputValue] = useState(value || '');
   
   // Session token for cost optimization
-  const sessionTokenRef = useRef<string | null>(null);
+  const sessionTokenRef = useRef<unknown | null>(null);
   const requestIdRef = useRef(0);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const placesLibraryRef = useRef<google.maps.places.PlacesService | null>(null);
+  const placesLibraryRef = useRef<{ AutocompleteSuggestion?: unknown; AutocompleteSessionToken?: new () => unknown } | null>(null);
 
   // Track mount state to prevent hydration mismatches
   useEffect(() => {
@@ -176,7 +176,7 @@ export default function LocationAutocomplete({
         }
       } catch (error: unknown) {
         console.error('Failed to load Places library:', error);
-        toast.error(`Nie udało się załadować biblioteki miejsc: ${error.message || 'Nieznany błąd'}`);
+        toast.error(`Nie udało się załadować biblioteki miejsc: ${(error instanceof Error ? error.message : String(error)) || 'Nieznany błąd'}`);
       }
     };
 
@@ -226,13 +226,13 @@ export default function LocationAutocomplete({
 
       const { AutocompleteSuggestion } = placesLibraryRef.current;
       
-      const request: { input: string; sessionToken: unknown; locationBias?: { center: { lat: number; lng: number }; radius: number } } = {
+      const request: { input: string; sessionToken: unknown; locationBias?: { center: { lat: number; lng: number }; radius: number }; includedRegionCodes?: string[] } = {
         input: input,
         sessionToken: sessionTokenRef.current,
         includedRegionCodes: ['PL'], // Restrict to Poland
       };
 
-      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+      const { suggestions } = await (AutocompleteSuggestion as { fetchAutocompleteSuggestions: (req: typeof request) => Promise<{ suggestions: AutocompleteSuggestion[] }> }).fetchAutocompleteSuggestions(request);
 
       // Check if this request is still the latest
       if (requestId !== requestIdRef.current) {
@@ -287,7 +287,7 @@ export default function LocationAutocomplete({
       setInputValue('');
 
       // Convert place prediction to Place object
-      const place = (suggestion.placePrediction as { toPlace: () => google.maps.places.Place }).toPlace();
+      const place = ((suggestion.placePrediction as unknown) as { toPlace: () => google.maps.places.Place }).toPlace();
       
       // Fetch place details
       await place.fetchFields({
@@ -475,11 +475,11 @@ export default function LocationAutocomplete({
     } catch (error: unknown) {
       console.error('Geolocation error:', error);
       
-      if (error.code === 1) {
+      if ((error as { code?: number }).code === 1) {
         toast.error('Dostęp do lokalizacji został odrzucony. Sprawdź ustawienia przeglądarki.');
-      } else if (error.code === 2) {
+      } else if ((error as { code?: number }).code === 2) {
         toast.error('Nie udało się określić lokalizacji. Sprawdź połączenie z internetem.');
-      } else if (error.code === 3) {
+      } else if ((error as { code?: number }).code === 3) {
         toast.error('Przekroczono limit czasu oczekiwania na lokalizację.');
       } else {
         toast.error('Wystąpił błąd podczas pobierania lokalizacji');

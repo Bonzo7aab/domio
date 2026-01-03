@@ -56,7 +56,10 @@ const JobCard = React.memo(function JobCard({
   const handleApplyClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (onApplyClick) {
-      onApplyClick(job.id, job);
+      onApplyClick(job.id, {
+        ...job,
+        postType: job.postType || 'job'
+      } as Job);
     }
   }, [job, onApplyClick]);
 

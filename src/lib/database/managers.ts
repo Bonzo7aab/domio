@@ -97,65 +97,69 @@ export async function fetchManagers(filters: ManagerFilters = {}): Promise<Brows
 
     // Fetch ratings for all managers
     const managerIds = (data || []).map(company => company.id);
-    let ratingsMap: { [key: string]: number } = {};
+    let ratingsMap: { [key: string]: { average_rating: number; total_reviews: number } } = {};
     
     if (managerIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: ratingsData } = await (supabase as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: ratingsData } = await (supabase as unknown as SupabaseClient<Database>)
         .from('company_ratings')
         .select('company_id, average_rating, total_reviews')
         .in('company_id', managerIds);
       
       if (ratingsData) {
-        ratingsMap = ratingsData.reduce((acc: { [key: string]: number }, rating: { company_id: string; average_rating: number }) => {
-          acc[rating.company_id] = rating;
+        ratingsMap = ((ratingsData as Array<Record<string, unknown>>) || []).reduce((acc: { [key: string]: { average_rating: number; total_reviews: number } }, rating: Record<string, unknown>) => {
+          acc[rating.company_id] = {
+            average_rating: rating.average_rating || 0,
+            total_reviews: rating.total_reviews || 0
+          };
           return acc;
         }, {});
       }
     }
 
     // Transform data to BrowseManager format
-    let managers: BrowseManager[] = (data || []).map((company: Record<string, unknown>) => {
-      const ratings = ratingsMap[company.id];
-      const managerData = company.manager_data || {};
-      const experienceData = company.experience_data || {};
-      const statsData = company.stats_data || {};
+    let managers: BrowseManager[] = ((data || []) as Array<Record<string, unknown>>).map((company: Record<string, unknown>) => {
+      const ratings = ratingsMap[company.id as string];
+      const managerData = (company.manager_data || {}) as Record<string, unknown>;
+      const experienceData = (company.experience_data || {}) as Record<string, unknown>;
+      const statsData = (company.stats_data || {}) as Record<string, unknown>;
       
       return {
-        id: company.id,
-        name: company.name,
-        short_name: company.short_name,
-        city: company.city || '',
-        avatar_url: company.avatar_url,
-        plan_type: company.plan_type || 'basic',
-        last_active: company.last_active || company.updated_at || new Date().toISOString(),
-        is_verified: company.is_verified,
-        verification_level: company.verification_level || 'none',
-        founded_year: company.founded_year,
-        employee_count: company.employee_count,
-        buildings_count: managerData.buildings_count || 0,
-        units_count: managerData.units_count || 0,
-        total_area: managerData.total_area || 0,
-        organization_type: managerData.organization_type || company.type,
-        primary_needs: managerData.primary_needs || [],
-        frequent_services: managerData.frequent_services || [],
-        managed_property_types: managerData.managed_property_types || [],
-        years_active: experienceData.years_active || 0,
-        published_jobs: experienceData.published_jobs || 0,
-        completed_projects: experienceData.completed_projects || 0,
-        active_contractors: experienceData.active_contractors || 0,
-        average_response_time: statsData.average_response_time || '',
-        payment_punctuality: statsData.payment_punctuality || 0,
-        project_completion_rate: statsData.project_completion_rate || 0,
-        contractor_retention_rate: statsData.contractor_retention_rate || 0,
-        rating: ratings?.average_rating || 0,
-        review_count: ratings?.total_reviews || 0,
-        phone: company.phone,
-        email: company.email,
-        website: company.website,
-        address: company.address
+        id: company.id as string,
+        name: company.name as string,
+        short_name: company.short_name as string | undefined,
+        city: (company.city as string) || '',
+        avatar_url: company.avatar_url as string | undefined,
+        plan_type: ((company.plan_type || 'basic') as string) as 'basic' | 'pro' | 'premium',
+        last_active: (company.last_active || company.updated_at || new Date().toISOString()) as string,
+        is_verified: (company.is_verified as boolean) || false,
+        verification_level: ((company.verification_level || 'none') as string),
+        founded_year: company.founded_year as number | undefined,
+        employee_count: company.employee_count as string | undefined,
+        buildings_count: (managerData.buildings_count || 0) as number,
+        units_count: (managerData.units_count || 0) as number,
+        total_area: (managerData.total_area || 0) as number,
+        organization_type: ((managerData.organization_type || company.type) as string),
+        primary_needs: (managerData.primary_needs || []) as string[],
+        frequent_services: (managerData.frequent_services || []) as string[],
+        managed_property_types: (managerData.managed_property_types || []) as string[],
+        years_active: (experienceData.years_active || 0) as number,
+        published_jobs: (experienceData.published_jobs || 0) as number,
+        completed_projects: (experienceData.completed_projects || 0) as number,
+        active_contractors: (experienceData.active_contractors || 0) as number,
+        average_response_time: (statsData.average_response_time || '') as string,
+        payment_punctuality: (statsData.payment_punctuality || 0) as number,
+        project_completion_rate: (statsData.project_completion_rate || 0) as number,
+        contractor_retention_rate: (statsData.contractor_retention_rate || 0) as number,
+        rating: (ratings?.average_rating || 0) as number,
+        review_count: (ratings?.total_reviews || 0) as number,
+        phone: company.phone as string | undefined,
+        email: company.email as string | undefined,
+        website: company.website as string | undefined,
+        address: company.address as string | undefined
       };
-    });
+    }) as BrowseManager[];
 
     // Apply sorting
     switch (sortBy) {
@@ -363,11 +367,11 @@ export async function fetchManagerById(
       },
       reviews: (reviewsData || []).map((review: Record<string, unknown>) => ({
         id: review.id,
-        author: review.user_profiles ? 
-          `${review.user_profiles.first_name} ${review.user_profiles.last_name}` : 
+        author: (review.user_profiles as { first_name?: string; last_name?: string } | null) ? 
+          `${((review.user_profiles as { first_name?: string; last_name?: string }).first_name || '')} ${((review.user_profiles as { first_name?: string; last_name?: string }).last_name || '')}` : 
           'Anonimowy użytkownik',
-        authorCompany: review.user_profiles?.user_type === 'manager' ? 'Wspólnota mieszkaniowa' : 'Firma wykonawcza',
-        rating: review.rating,
+        authorCompany: ((review.user_profiles as { user_type?: string } | null)?.user_type === 'manager') ? 'Wspólnota mieszkaniowa' : 'Firma wykonawcza',
+        rating: (review.rating as number) || 0,
         title: review.title || '',
         date: review.created_at,
         project: review.job_id ? 'Projekt remontowy' : 'Współpraca',

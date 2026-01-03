@@ -57,33 +57,34 @@ export async function createBuilding(
     if (!insertData.name || !insertData.street_address || !insertData.city) {
       return { 
         data: null, 
-        error: { message: 'Nazwa, adres ulicy i miasto są wymagane' } 
+        error: new Error('Nazwa, adres ulicy i miasto są wymagane') as PostgrestError
       };
     }
 
     // Validate year_built if provided
     if (insertData.year_built !== null) {
       const currentYear = new Date().getFullYear();
-      if (insertData.year_built < 1800 || insertData.year_built > currentYear) {
+      const yearBuilt = Number(insertData.year_built);
+      if (yearBuilt < 1800 || yearBuilt > currentYear) {
         return { 
           data: null, 
-          error: { message: `Rok budowy musi być między 1800 a ${currentYear}` } 
+          error: new Error(`Rok budowy musi być między 1800 a ${currentYear}`) as PostgrestError
         };
       }
     }
 
     // Validate numeric fields
-    if (insertData.units_count !== null && insertData.units_count < 0) {
+    if (insertData.units_count !== null && Number(insertData.units_count) < 0) {
       return { 
         data: null, 
-        error: { message: 'Liczba jednostek nie może być ujemna' } 
+        error: new Error('Liczba jednostek nie może być ujemna') as PostgrestError
       };
     }
 
-    if (insertData.floors_count !== null && insertData.floors_count < 0) {
+    if (insertData.floors_count !== null && Number(insertData.floors_count) < 0) {
       return { 
         data: null, 
-        error: { message: 'Liczba pięter nie może być ujemna' } 
+        error: new Error('Liczba pięter nie może być ujemna') as PostgrestError
       };
     }
 
@@ -133,33 +134,34 @@ export async function updateBuilding(
     if (!updateData.name || !updateData.street_address || !updateData.city) {
       return { 
         data: null, 
-        error: { message: 'Nazwa, adres ulicy i miasto są wymagane' } 
+        error: new Error('Nazwa, adres ulicy i miasto są wymagane') as PostgrestError
       };
     }
 
     // Validate year_built if provided
     if (updateData.year_built !== null) {
       const currentYear = new Date().getFullYear();
-      if (updateData.year_built < 1800 || updateData.year_built > currentYear) {
+      const yearBuilt = Number(updateData.year_built);
+      if (yearBuilt < 1800 || yearBuilt > currentYear) {
         return { 
           data: null, 
-          error: { message: `Rok budowy musi być między 1800 a ${currentYear}` } 
+          error: new Error(`Rok budowy musi być między 1800 a ${currentYear}`) as PostgrestError
         };
       }
     }
 
     // Validate numeric fields
-    if (updateData.units_count !== null && updateData.units_count < 0) {
+    if (updateData.units_count !== null && Number(updateData.units_count) < 0) {
       return { 
         data: null, 
-        error: { message: 'Liczba jednostek nie może być ujemna' } 
+        error: new Error('Liczba jednostek nie może być ujemna') as PostgrestError
       };
     }
 
-    if (updateData.floors_count !== null && updateData.floors_count < 0) {
+    if (updateData.floors_count !== null && Number(updateData.floors_count) < 0) {
       return { 
         data: null, 
-        error: { message: 'Liczba pięter nie może być ujemna' } 
+        error: new Error('Liczba pięter nie może być ujemna') as PostgrestError
       };
     }
 

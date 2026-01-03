@@ -18,7 +18,7 @@ export async function submitQuestion(
     
     if (sessionError || !sessionData.session) {
       console.error('No active session:', sessionError);
-      return { success: false, error: new Error('Brak aktywnej sesji. Proszę się zalogować ponownie.') };
+      return { success: false, error: new Error('Brak aktywnej sesji. Proszę się zalogować ponownie.') as PostgrestError };
     }
 
     const authenticatedUserId = sessionData.session.user.id;
@@ -62,10 +62,10 @@ export async function submitQuestion(
           .eq('id', jobId)
           .limit(1);
         
-        if (!tenderError && tenderData && tenderData.length > 0) {
+        if (!tenderError && tenderData && Array.isArray(tenderData) && tenderData.length > 0) {
           isTender = true;
-          managerId = tenderData[0].manager_id;
-          title = tenderData[0].title;
+          managerId = (tenderData[0] as Record<string, unknown>)?.manager_id as string;
+          title = (tenderData[0] as Record<string, unknown>)?.title as string;
         }
       } catch (err) {
         console.warn('Error checking if ID is a tender:', err);
@@ -73,7 +73,7 @@ export async function submitQuestion(
     }
 
     if (!isJob && !isTender) {
-      return { success: false, error: new Error('Ogłoszenie nie istnieje') };
+      return { success: false, error: new Error('Ogłoszenie nie istnieje') as PostgrestError };
     }
 
     // 3. Insert the question into the database
@@ -112,7 +112,7 @@ export async function submitQuestion(
       .insert(insertPayload)
       .select('id');
 
-    questionDataArray = insertResult.data;
+    questionDataArray = (insertResult.data || []) as Array<Record<string, unknown>>;
     questionError = insertResult.error;
 
     // If select fails but insert might have succeeded, try to query the question back
@@ -135,7 +135,7 @@ export async function submitQuestion(
       
       if (!findError && foundQuestion) {
         console.log('Found question after insert:', foundQuestion);
-        questionDataArray = [foundQuestion];
+        questionDataArray = [foundQuestion] as Array<Record<string, unknown>>;
         questionError = null;
       }
     }
@@ -159,22 +159,22 @@ export async function submitQuestion(
       
       // Check if it's a foreign key constraint error (job doesn't exist)
       if (questionError.code === '23503' || questionError.message?.includes('foreign key')) {
-        return { success: false, error: new Error('Ogłoszenie nie istnieje') };
+        return { success: false, error: new Error('Ogłoszenie nie istnieje') as PostgrestError };
       }
       
       // Check if it's an RLS policy violation
       if (questionError.code === '42501' || questionError.message?.includes('policy') || questionError.message?.includes('permission') || questionError.message?.includes('row-level security')) {
-        return { success: false, error: new Error('Brak uprawnień do dodania pytania. Sprawdź czy jesteś zalogowany.') };
+        return { success: false, error: new Error('Brak uprawnień do dodania pytania. Sprawdź czy jesteś zalogowany.') as PostgrestError };
       }
       
       // Return a more descriptive error
       const errorMessage = questionError.message || questionError.code || 'Nieznany błąd podczas zapisywania pytania';
-      return { success: false, error: new Error(errorMessage) };
+      return { success: false, error: new Error(errorMessage) as PostgrestError };
     }
 
     if (!questionDataArray || questionDataArray.length === 0) {
       console.error('No question data returned from insert');
-      return { success: false, error: new Error('Failed to create question') };
+      return { success: false, error: new Error('Failed to create question') as PostgrestError };
     }
 
     const questionData = Array.isArray(questionDataArray) ? questionDataArray[0] : questionDataArray;
@@ -248,7 +248,7 @@ export async function submitQuestion(
           'Nowe pytanie dotyczące ogłoszenia',
           `Otrzymałeś nowe pytanie dotyczące ogłoszenia: ${title}`,
           {
-            questionId: questionData.id,
+            questionId: ((questionData as Record<string, unknown>)?.id as string) || '',
             [isJob ? 'jobId' : 'tenderId']: jobId,
             title: title,
           },
@@ -265,7 +265,7 @@ export async function submitQuestion(
       }
     }
 
-    return { success: true, error: null, questionId: questionData.id };
+    return { success: true, error: null, questionId: ((questionData as Record<string, unknown>)?.id as string) || '' };
   } catch (err) {
     console.error('Error submitting question:', err);
     return { success: false, error: err };

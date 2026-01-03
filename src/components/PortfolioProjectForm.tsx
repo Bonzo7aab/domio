@@ -253,7 +253,7 @@ export default function PortfolioProjectForm({
           );
 
           if (uploadError || !uploadResult) {
-            const errorMessage = uploadError?.message || uploadError?.details || uploadError?.hint || JSON.stringify(uploadError) || 'Nieznany błąd';
+            const errorMessage = (uploadError instanceof Error ? uploadError.message : (uploadError as { message?: string; details?: string; hint?: string })?.message) || (uploadError as { message?: string; details?: string; hint?: string })?.details || (uploadError as { message?: string; details?: string; hint?: string })?.hint || JSON.stringify(uploadError) || 'Nieznany błąd';
             console.error('Error uploading image:', { uploadError, imageName: image.name, projectId: savedProjectId });
             toast.error(`Nie udało się przesłać obrazu: ${image.name}. ${errorMessage}`);
             failedCount++;

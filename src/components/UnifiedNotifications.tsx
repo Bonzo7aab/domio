@@ -89,8 +89,8 @@ function transformNotification(dbNotification: NotificationRow): UnifiedNotifica
         type: categoryAndType.type as JobNotification['type'],
         title: dbNotification.title,
         description: dbNotification.message,
-        jobId: data?.jobId || data?.job_id,
-        searchQuery: data?.searchQuery || data?.search_query
+        jobId: (data?.jobId || data?.job_id) as string | undefined,
+        searchQuery: (data?.searchQuery || data?.search_query) as string | undefined
       };
       return jobNotif;
     }
@@ -102,12 +102,12 @@ function transformNotification(dbNotification: NotificationRow): UnifiedNotifica
         type: categoryAndType.type as ApplicationNotification['type'],
         title: dbNotification.title,
         message: dbNotification.message,
-        contractorName: data?.contractorName || data?.contractor_name || 'Nieznany wykonawca',
-        contractorAvatar: data?.contractorAvatar || data?.contractor_avatar,
-        contractorRating: data?.contractorRating || data?.contractor_rating || 0,
-        jobTitle: data?.jobTitle || data?.job_title || dbNotification.title,
-        applicationId: data?.applicationId || data?.application_id || dbNotification.id,
-        jobId: data?.jobId || data?.job_id || ''
+        contractorName: (data?.contractorName || data?.contractor_name || 'Nieznany wykonawca') as string,
+        contractorAvatar: (data?.contractorAvatar || data?.contractor_avatar) as string | undefined,
+        contractorRating: (data?.contractorRating || data?.contractor_rating || 0) as number,
+        jobTitle: (data?.jobTitle || data?.job_title || dbNotification.title) as string,
+        applicationId: (data?.applicationId || data?.application_id || dbNotification.id) as string,
+        jobId: (data?.jobId || data?.job_id || '') as string
       };
       return appNotif;
     }
@@ -119,11 +119,11 @@ function transformNotification(dbNotification: NotificationRow): UnifiedNotifica
         type: categoryAndType.type as TenderNotification['type'],
         title: dbNotification.title,
         message: dbNotification.message,
-        tenderTitle: data?.tenderTitle || data?.tender_title || dbNotification.title,
-        organizerName: data?.organizerName || data?.organizer_name || 'Nieznany organizator',
-        estimatedValue: data?.estimatedValue || data?.estimated_value,
-        deadline: data?.deadline ? new Date(data.deadline) : dbNotification.expires_at ? new Date(dbNotification.expires_at) : undefined,
-        tenderId: data?.tenderId || data?.tender_id || dbNotification.id
+        tenderTitle: (data?.tenderTitle || data?.tender_title || dbNotification.title) as string,
+        organizerName: (data?.organizerName || data?.organizer_name || 'Nieznany organizator') as string,
+        estimatedValue: (data?.estimatedValue || data?.estimated_value) as string | undefined,
+        deadline: data?.deadline ? new Date(data.deadline as string | number) : dbNotification.expires_at ? new Date(dbNotification.expires_at) : undefined,
+        tenderId: (data?.tenderId || data?.tender_id || dbNotification.id) as string
       };
       return tenderNotif;
     }

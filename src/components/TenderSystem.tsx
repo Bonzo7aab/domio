@@ -38,7 +38,7 @@ interface TenderSystemProps {
   onBack?: () => void;
 }
 
-interface Tender {
+interface LocalTender {
   id: string;
   title: string;
   description: string;
@@ -64,7 +64,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
   onBack
 }) => {
   const { user } = useUserProfile();
-  const [tenders, setTenders] = useState<Tender[]>([]);
+  const [tenders, setTenders] = useState<LocalTender[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<TenderStatus | 'all'>('all');
@@ -94,13 +94,13 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
               code: (error as PostgrestError)?.code,
               details: (error as PostgrestError)?.details,
               hint: (error as PostgrestError)?.hint,
-              originalError: (error as PostgrestError)?.originalError
+              originalError: (error as PostgrestError & { originalError?: unknown })?.originalError
             });
           }
           setTenders([]);
         } else if (data) {
           // Convert database format to component format
-          const convertedTenders: Tender[] = data.map((t: TenderWithCompany) => {
+          const convertedTenders: LocalTender[] = data.map((t: TenderWithCompany) => {
             // Convert location to string if it's an object
             let locationString: string;
             if (typeof t.location === 'string') {
@@ -124,7 +124,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
               bidCount: t.bids_count || 0,
               createdBy: t.company?.name || 'Unknown',
               category: t.category?.name || 'Inne',
-              winnerName: t.winner_name || undefined,
+              winnerName: ((t as { winner_name?: string }).winner_name) || undefined,
             };
           });
           setTenders(convertedTenders);

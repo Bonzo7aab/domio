@@ -213,7 +213,7 @@ export async function upsertUserCompany(
 
       if (!updatedCompany) {
         console.error('[upsertUserCompany] Company was not updated but no error was returned');
-        return { data: null, error: new Error('Company was not updated but no error was returned') };
+        return { data: null, error: new Error('Company was not updated but no error was returned') as PostgrestError };
       }
 
       console.log('[upsertUserCompany] Company updated successfully:', updatedCompany.id);
@@ -262,15 +262,15 @@ export async function upsertUserCompany(
         });
         return { 
           data: null, 
-          error: createError instanceof Error 
+          error: (createError instanceof Error 
             ? createError 
-            : new Error(createErrorDetails?.message || createErrorDetails?.details || createErrorDetails?.hint || 'Unknown database error')
+            : new Error(createErrorDetails?.message || createErrorDetails?.details || createErrorDetails?.hint || 'Unknown database error')) as PostgrestError
         };
       }
 
       if (!newCompany) {
         console.error('[upsertUserCompany] Company was not created but no error was returned');
-        return { data: null, error: new Error('Company was not created but no error was returned') };
+        return { data: null, error: new Error('Company was not created but no error was returned') as PostgrestError };
       }
 
       console.log('[upsertUserCompany] Company created successfully:', newCompany.id);
@@ -306,9 +306,9 @@ export async function upsertUserCompany(
         });
         return { 
           data: null, 
-          error: relationError instanceof Error 
+          error: (relationError instanceof Error 
             ? relationError 
-            : new Error(relationError?.message || relationError?.details || relationError?.hint || 'Failed to create user-company relationship')
+            : new Error(relationError?.message || relationError?.details || relationError?.hint || 'Failed to create user-company relationship')) as PostgrestError
         };
       }
 
@@ -323,7 +323,7 @@ export async function upsertUserCompany(
 
       if (verifyResult.error || !verifyResult.data) {
         console.error('[upsertUserCompany] Verification failed - company not found after insert:', verifyResult.error);
-        return { data: null, error: new Error('Company was created but could not be verified') };
+        return { data: null, error: new Error('Company was created but could not be verified') as PostgrestError };
       }
 
       console.log('[upsertUserCompany] Company verified successfully:', verifyResult.data.id);
@@ -344,13 +344,11 @@ export async function deleteUserCompany(
 ): Promise<{ success: boolean; error: PostgrestError | null }> {
   try {
     // First delete the relationship
-    const deleteResult = await supabase
+    const { error: relationError } = await (supabase
       .from('user_companies')
       .delete()
       .eq('user_id', userId)
-      .eq('company_id', companyId);
-    
-    const { error: relationError } = deleteResult;
+      .eq('company_id', companyId));
 
     if (relationError) {
       return { success: false, error: relationError };

@@ -2,6 +2,52 @@ import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import type { Conversation, Message } from '../../types/messaging';
 
+// Helper types for tables not yet in Database type
+interface ConversationRow {
+  id: string;
+  participant_1: string;
+  participant_2: string;
+  subject: string;
+  job_id: string | null;
+  tender_id: string | null;
+  last_message_at: string;
+  [key: string]: unknown;
+}
+
+interface MessageRow {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  message_type: string;
+  attachments: Record<string, unknown> | null;
+  sender_profile?: {
+    first_name?: string;
+    last_name?: string;
+    avatar_url?: string | null;
+  };
+  [key: string]: unknown;
+}
+
+interface UserCompanyRow {
+  user_id: string;
+  company_id: string;
+  is_primary: boolean;
+  [key: string]: unknown;
+}
+
+interface NotificationRow {
+  id: string;
+  [key: string]: unknown;
+}
+
+interface MessageReadStatusRow {
+  message_id: string;
+  user_id: string;
+  read_at: string;
+  [key: string]: unknown;
+}
+
 export interface QuoteRequestData {
   projectType: string;
   budgetRange: {
@@ -55,7 +101,7 @@ export async function createConversation(
       return { data: null, error };
     }
 
-    return { data: conversation?.id || null, error: null };
+    return { data: (conversation as unknown as ConversationRow)?.id || null, error: null };
   } catch (err) {
     console.error('Error creating conversation:', err);
     return { data: null, error: err };
@@ -96,7 +142,7 @@ export async function sendMessage(
       })
       .eq('id', data.conversationId);
 
-    return { data: message?.id || null, error: null };
+    return { data: (message as unknown as MessageRow)?.id || null, error: null };
   } catch (err) {
     console.error('Error sending message:', err);
     return { data: null, error: err };
@@ -127,7 +173,7 @@ export async function sendQuoteRequestMessage(
       senderId,
       content: message,
       messageType: 'quote',
-      attachments,
+      attachments: attachments as Record<string, unknown> | null,
     });
   } catch (err) {
     console.error('Error sending quote request message:', err);
@@ -158,10 +204,10 @@ export async function createNotification(
         type,
         title,
         message,
-        data: data || null,
+        data: (data || null) as Record<string, unknown> | null,
         action_url: actionUrl || null,
         priority: 'normal',
-      });
+      } as NotificationRow);
 
     if (insertError) {
       console.error('Error creating notification (insert):', {
@@ -192,7 +238,7 @@ export async function createNotification(
         return { data: null, error: null };
       }
 
-      return { data: notification?.id || null, error: null };
+      return { data: (notification as unknown as NotificationRow)?.id || null, error: null };
     } catch (selectErr) {
       console.warn('Error selecting notification ID:', selectErr);
       // Insert succeeded, so return success
@@ -249,8 +295,8 @@ export async function getContractorUserId(
     }
 
     // Find primary user or use the first one
-    const primaryUser = userCompanies.find((uc: { is_primary: boolean }) => uc.is_primary);
-    const userId = primaryUser?.user_id || userCompanies[0]?.user_id;
+    const primaryUser = ((userCompanies as UserCompanyRow[]) || []).find((uc: UserCompanyRow) => uc.is_primary);
+    const userId = primaryUser?.user_id || (userCompanies as UserCompanyRow[])?.[0]?.user_id;
     
     console.log('Found contractor user:', userId);
     return { data: userId || null, error: null };
@@ -304,8 +350,8 @@ export async function getManagerUserId(
     }
 
     // Find primary user or use the first one
-    const primaryUser = userCompanies.find((uc: { is_primary: boolean }) => uc.is_primary);
-    const userId = primaryUser?.user_id || userCompanies[0]?.user_id;
+    const primaryUser = ((userCompanies as UserCompanyRow[]) || []).find((uc: UserCompanyRow) => uc.is_primary);
+    const userId = primaryUser?.user_id || (userCompanies as UserCompanyRow[])?.[0]?.user_id;
     
     console.log('Found manager user:', userId);
     return { data: userId || null, error: null };
@@ -334,7 +380,7 @@ export async function submitQuoteRequest(
     if (contractorUserResult.error) {
       return { 
         success: false, 
-        error: new Error('Nie można znaleźć profilu użytkownika wykonawcy') 
+        error: new Error('Nie można znaleźć profilu użytkownika wykonawcy') as PostgrestError 
       };
     }
 
@@ -436,9 +482,9 @@ export async function findExistingConversation(
     }
 
     // If no data, conversation doesn't exist
-    return { data: conversation?.id || null, error: null };
+    return { data: (conversation as unknown as ConversationRow)?.id || null, error: null };
   } catch (err) {
-    const error = err as Error;
+    const error = err as unknown as { code?: string; error?: { code?: string } };
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = error?.code || error?.error?.code;
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
@@ -481,9 +527,9 @@ export async function findConversationByJob(
     }
 
     // If no data, conversation doesn't exist
-    return { data: conversation?.id || null, error: null };
+    return { data: (conversation as unknown as ConversationRow)?.id || null, error: null };
   } catch (err) {
-    const error = err as Error;
+    const error = err as unknown as { code?: string; error?: { code?: string } };
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = error?.code || error?.error?.code;
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
@@ -546,7 +592,7 @@ export async function fetchUserConversations(
     }
 
     // Transform to Conversation format
-    const transformedConversations: Conversation[] = (conversations || []).map((conv: Record<string, unknown>) => {
+    const transformedConversations: Conversation[] = ((conversations as ConversationRow[]) || []).map((conv: ConversationRow) => {
       const otherParticipant = conv.participant_1_profile?.id === userId 
         ? conv.participant_2_profile 
         : conv.participant_1_profile;
@@ -607,7 +653,7 @@ export async function fetchConversationMessages(
         sender_id,
         content,
         message_type,
-        attachments,
+        attachments: attachments as Record<string, unknown> | null,
         created_at,
         sender_profile:user_profiles!messages_sender_id_fkey(
           id,
@@ -625,23 +671,23 @@ export async function fetchConversationMessages(
     }
 
     // Transform to Message format
-    const transformedMessages: Message[] = (messages || []).map((msg: Record<string, unknown>) => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      senderName: `${msg.sender_profile?.first_name || ''} ${msg.sender_profile?.last_name || ''}`.trim(),
-      senderAvatar: msg.sender_profile?.avatar_url || '',
-      content: msg.content,
-      timestamp: new Date(msg.created_at),
+    const transformedMessages: Message[] = ((messages as MessageRow[]) || []).map((msg: MessageRow) => ({
+      id: msg.id as string,
+      senderId: msg.sender_id as string,
+      senderName: `${(msg.sender_profile as { first_name?: string; last_name?: string })?.first_name || ''} ${(msg.sender_profile as { first_name?: string; last_name?: string })?.last_name || ''}`.trim(),
+      senderAvatar: (msg.sender_profile as { avatar_url?: string | null })?.avatar_url || '',
+      content: msg.content as string,
+      timestamp: new Date(msg.created_at as string),
       read: false, // TODO: Implement read status
       type: msg.message_type === 'quote' ? 'text' : 'text', // Map to supported types
       attachments: msg.attachments ? Object.values(msg.attachments as Record<string, unknown>).map((att: Record<string, unknown>) => ({
-        id: att.id || '',
-        name: att.name || '',
-        url: att.url || '',
-        type: att.type || 'other',
-        size: att.size || 0
+        id: (att.id as string) || '',
+        name: (att.name as string) || '',
+        url: (att.url as string) || '',
+        type: ((att.type as string) || 'other') as 'image' | 'document' | 'other',
+        size: (att.size as number) || 0
       })) : undefined
-    }));
+    })) as Message[];
 
     return { data: transformedMessages, error: null };
   } catch (err) {
@@ -676,8 +722,8 @@ export async function markMessagesAsRead(
     }
 
     // Insert read status for each message
-    const readStatusInserts = messages.map((msg: Record<string, unknown>) => ({
-      message_id: msg.id,
+    const readStatusInserts = ((messages as MessageRow[]) || []).map((msg: MessageRow) => ({
+      message_id: msg.id as string,
       user_id: userId,
       read_at: new Date().toISOString()
     }));

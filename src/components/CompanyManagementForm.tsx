@@ -262,7 +262,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
       if (saveError) {
         const errorMessage = saveError instanceof Error 
           ? saveError.message 
-          : saveError?.message || saveError?.details || saveError?.hint || 'Wystąpił błąd podczas zapisywania';
+          : (saveError as { message?: string; details?: string; hint?: string })?.message || (saveError as { message?: string; details?: string; hint?: string })?.details || (saveError as { message?: string; details?: string; hint?: string })?.hint || 'Wystąpił błąd podczas zapisywania';
         setError(errorMessage);
       } else {
         setSuccess('Dane firmy zostały zapisane pomyślnie');

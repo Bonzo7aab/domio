@@ -230,7 +230,7 @@ export const BidEvaluationPanel: React.FC<BidEvaluationPanelProps> = ({
 
         {/* Navigation */}
         <div className="border-b flex-shrink-0">
-          <Tabs value={evaluationMode} onValueChange={(value) => setEvaluationMode(value as 'overview' | 'detailed' | 'comparison')}>
+          <Tabs value={evaluationMode} onValueChange={(value) => setEvaluationMode(value as 'overview' | 'detailed' | 'compare')}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Przegląd ofert</TabsTrigger>
               <TabsTrigger value="detailed">Szczegółowa ocena</TabsTrigger>

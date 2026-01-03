@@ -249,7 +249,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
 
             if (uploadErrors.length > 0) {
               console.error('Some images failed to upload:', uploadErrors);
-              const errorMessages = uploadErrors.map(e => e.error?.message || 'Nieznany błąd').join(', ');
+              const errorMessages = uploadErrors.map(e => (e as { error?: { message?: string } }).error?.message || 'Nieznany błąd').join(', ');
               setError(`${uploadErrors.length} ${uploadErrors.length === 1 ? 'obraz nie został' : 'obrazów nie zostało'} przesłanych: ${errorMessages}`);
             }
 
@@ -331,7 +331,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
 
             if (uploadErrors.length > 0) {
               console.error('Some images failed to upload:', uploadErrors);
-              const errorMessages = uploadErrors.map(e => e.error?.message || 'Nieznany błąd').join(', ');
+              const errorMessages = uploadErrors.map(e => (e as { error?: { message?: string } }).error?.message || 'Nieznany błąd').join(', ');
               setError(`Budynek został utworzony, ale ${uploadErrors.length} ${uploadErrors.length === 1 ? 'obraz nie został' : 'obrazów nie zostało'} przesłanych: ${errorMessages}`);
             }
 

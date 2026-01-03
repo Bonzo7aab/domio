@@ -50,23 +50,23 @@ export async function verifyDatabaseCoordinates(
       errors.push(`Failed to fetch tenders: ${allTendersError.message}`);
     }
 
-    const tendersWithCoords = allTenders?.filter(tender => 
+    const tendersWithCoords = ((allTenders as Array<Record<string, unknown>>) || []).filter((tender: Record<string, unknown>) => 
       tender.latitude && tender.longitude && 
       tender.latitude !== 0 && tender.longitude !== 0 &&
       tender.latitude >= -90 && tender.latitude <= 90 &&
       tender.longitude >= -180 && tender.longitude <= 180
-    ) || [];
+    );
 
-    const tendersMissingCoords = allTenders?.filter(tender => 
+    const tendersMissingCoords = ((allTenders as Array<Record<string, unknown>>) || []).filter((tender: Record<string, unknown>) => 
       !tender.latitude || !tender.longitude || 
       tender.latitude === 0 || tender.longitude === 0
-    ) || [];
+    );
 
-    const tendersInvalidCoords = allTenders?.filter(tender => 
+    const tendersInvalidCoords = ((allTenders as Array<Record<string, unknown>>) || []).filter((tender: Record<string, unknown>) => 
       tender.latitude && tender.longitude && 
       (tender.latitude < -90 || tender.latitude > 90 || 
        tender.longitude < -180 || tender.longitude > 180)
-    ) || [];
+    );
 
     // Log details for missing coordinates
     if (jobsMissingCoords.length > 0) {
@@ -74,7 +74,7 @@ export async function verifyDatabaseCoordinates(
     }
 
     if (tendersMissingCoords.length > 0) {
-      console.warn('Tenders missing coordinates:', tendersMissingCoords.map(t => ({ id: t.id, title: t.title, location: t.location })));
+      console.warn('Tenders missing coordinates:', tendersMissingCoords.map((t: Record<string, unknown>) => ({ id: t.id, title: t.title, location: t.location })));
     }
 
     if (jobsInvalidCoords.length > 0) {
@@ -83,7 +83,7 @@ export async function verifyDatabaseCoordinates(
     }
 
     if (tendersInvalidCoords.length > 0) {
-      console.error('Tenders with invalid coordinates:', tendersInvalidCoords.map(t => ({ id: t.id, title: t.title, lat: t.latitude, lng: t.longitude })));
+      console.error('Tenders with invalid coordinates:', tendersInvalidCoords.map((t: Record<string, unknown>) => ({ id: t.id, title: t.title, lat: t.latitude, lng: t.longitude })));
       errors.push(`${tendersInvalidCoords.length} tenders have invalid coordinates`);
     }
 
@@ -95,7 +95,7 @@ export async function verifyDatabaseCoordinates(
         invalidCoordinates: jobsInvalidCoords.length
       },
       tenders: {
-        total: allTenders?.length || 0,
+        total: Array.isArray(allTenders) ? allTenders.length : 0,
         withCoordinates: tendersWithCoords.length,
         missingCoordinates: tendersMissingCoords.length,
         invalidCoordinates: tendersInvalidCoords.length

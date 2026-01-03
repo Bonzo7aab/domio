@@ -85,7 +85,32 @@ export default function TenderCreationPage({ onBack }: TenderCreationPageProps) 
 
       // Save tender to database
       const { data: savedTender, error: saveError } = await createTender(supabase, {
-        ...tender,
+        ...(tender as {
+          title: string;
+          description: string;
+          category: string;
+          location: string;
+          estimatedValue: string;
+          currency: string;
+          submissionDeadline: Date;
+          evaluationDeadline: Date;
+          requirements: string[];
+          evaluationCriteria: Array<{ id: string; name: string; description: string; weight: number; type: 'price' | 'quality' | 'time' | 'experience' | 'other' }>;
+          documents: Array<{ id: string; name: string; type: 'specification' | 'requirements' | 'drawings' | 'other'; file: File }>;
+          isPublic: boolean;
+          allowQuestions: boolean;
+          questionsDeadline?: Date;
+          minimumExperience: number;
+          requiredCertificates: string[];
+          insuranceRequired: string;
+          advancePayment: boolean;
+          performanceBond: boolean;
+          status?: 'draft' | 'active';
+          address?: string;
+          latitude?: number;
+          longitude?: number;
+          projectDuration?: string;
+        }),
         managerId: user.id,
         companyId: company.id,
       });

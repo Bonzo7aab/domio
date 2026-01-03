@@ -13,7 +13,7 @@ export function SurveyPage({ onBack }: SurveyPageProps) {
   const [surveyCompleted, setSurveyCompleted] = useState(false);
   const [surveyData, setSurveyData] = useState<Record<string, unknown> | null>(null);
 
-  const handleSurveyComplete = (data: Record<string, unknown>) => {
+  const handleSurveyComplete = (data: { userType: 'manager' | 'contractor'; personalInfo: { name: string; email: string; phone: string; company: string; position: string; experience: string }; responses: Record<string, string | number | string[]> }) => {
     setSurveyData(data);
     setSurveyCompleted(true);
     
@@ -51,13 +51,13 @@ export function SurveyPage({ onBack }: SurveyPageProps) {
 Dziękujemy za wypełnienie ankiety Urbi.eu!
 
 Typ użytkownika: ${surveyData.userType === 'manager' ? 'Zarządca Nieruchomości' : 'Wykonawca'}
-Data wypełnienia: ${new Date(surveyData.submittedAt).toLocaleDateString('pl-PL')}
+Data wypełnienia: ${new Date(surveyData.submittedAt as string | number | Date).toLocaleDateString('pl-PL')}
 
 Dane kontaktowe:
-- Imię: ${surveyData.personalInfo.name || 'Nie podano'}
-- Email: ${surveyData.personalInfo.email || 'Nie podano'}
-- Telefon: ${surveyData.personalInfo.phone || 'Nie podano'}
-- Firma: ${surveyData.personalInfo.company || 'Nie podano'}
+- Imię: ${((surveyData.personalInfo as { name?: string })?.name) || 'Nie podano'}
+- Email: ${((surveyData.personalInfo as { email?: string })?.email) || 'Nie podano'}
+- Telefon: ${((surveyData.personalInfo as { phone?: string })?.phone) || 'Nie podano'}
+- Firma: ${((surveyData.personalInfo as { company?: string })?.company) || 'Nie podano'}
 
 Skontaktujemy się z Państwem wkrótce!
 

@@ -209,11 +209,11 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
           : [''],
         evaluationCriteria: initialData.evaluation_criteria && Array.isArray(initialData.evaluation_criteria)
           ? initialData.evaluation_criteria.map((criterion: Record<string, unknown>) => ({
-              id: criterion.id || `criterion-${Date.now()}-${Math.random()}`,
-              name: criterion.name || '',
-              description: criterion.description || '',
-              weight: criterion.weight || 0,
-              type: criterion.type || 'quality'
+              id: (criterion.id as string) || `criterion-${Date.now()}-${Math.random()}`,
+              name: (criterion.name as string) || '',
+              description: (criterion.description as string) || '',
+              weight: (criterion.weight as number) || 0,
+              type: ((criterion.type as 'price' | 'quality' | 'time' | 'experience' | 'other') || 'quality') as 'price' | 'quality' | 'time' | 'experience' | 'other'
             }))
           : defaultCriteria,
         documents: [], // Documents from DB are not File objects, so we start fresh

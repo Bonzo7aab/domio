@@ -9,11 +9,41 @@ import { Card, CardContent } from '../../../../components/ui/card';
 import { Button } from '../../../../components/ui/button';
 import BidEvaluationPanel from '../../../../components/BidEvaluationPanel';
 
+// Import or define TenderBid type to match BidEvaluationPanel expectations
+// Since the component doesn't export the type, we'll use a compatible type
+type TenderBid = {
+  id: string;
+  contractorId: string;
+  contractorName: string;
+  contractorCompany: string;
+  contractorAvatar?: string;
+  contractorRating: number;
+  contractorCompletedJobs: number;
+  totalPrice: number;
+  currency: string;
+  proposedTimeline: number;
+  proposedStartDate: Date;
+  guaranteePeriod: number;
+  description: string;
+  technicalProposal: string;
+  attachments: Array<{ id: string; name: string; type: string; url: string; size: number }>;
+  criteriaResponses: Array<{ criterionId: string; response: string }>;
+  submittedAt: Date;
+  status: 'submitted' | 'under_review' | 'shortlisted' | 'rejected' | 'awarded';
+  evaluation?: {
+    criteriaScores: Record<string, number>;
+    totalScore: number;
+    evaluatorNotes: string;
+    evaluatedAt: Date;
+    evaluatorId: string;
+  };
+}
+
 export default function TenderBidEvaluationPage() {
   const params = useParams();
   const router = useRouter();
   const tenderId = params.id as string;
-  const [tenderBids, setTenderBids] = useState<Array<Record<string, unknown>>>([]);
+  const [tenderBids, setTenderBids] = useState<TenderBid[]>([]);
   const [isLoadingTenderBids, setIsLoadingTenderBids] = useState(false);
   const [selectedTenderData, setSelectedTenderData] = useState<{ title: string } | null>(null);
 
@@ -51,7 +81,7 @@ export default function TenderBidEvaluationPage() {
           toast.error('Nie udało się załadować ofert');
           setTenderBids([]);
         } else {
-          setTenderBids(bidsData || []);
+          setTenderBids((bidsData || []) as unknown as TenderBid[]);
         }
       } catch (err) {
         console.error('Error loading tender bids:', err);

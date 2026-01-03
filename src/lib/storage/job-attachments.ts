@@ -40,7 +40,7 @@ export async function uploadJobAttachment(
     if (!isValidType) {
       return {
         data: null,
-        error: { message: 'Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX' }
+        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX')
       };
     }
 
@@ -48,7 +48,7 @@ export async function uploadJobAttachment(
     if (file.size > MAX_FILE_SIZE) {
       return {
         data: null,
-        error: { message: 'Plik jest zbyt duży. Maksymalny rozmiar: 10MB' }
+        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB')
       };
     }
 
@@ -116,7 +116,7 @@ export async function uploadJobAttachments(
   jobId?: string
 ): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
-  const errors: Error[] = [];
+  const errors: unknown[] = [];
 
   for (const file of files) {
     const { data, error } = await uploadJobAttachment(supabase, file, userId, jobId);
@@ -180,7 +180,7 @@ export async function deleteJobAttachments(
   supabase: SupabaseClient<Database>,
   paths: string[]
 ): Promise<{ success: boolean; errors: unknown[] }> {
-  const errors: Error[] = [];
+  const errors: unknown[] = [];
   
   for (const path of paths) {
     const { error } = await deleteJobAttachment(supabase, path);
