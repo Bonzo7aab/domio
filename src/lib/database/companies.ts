@@ -344,18 +344,20 @@ export async function deleteUserCompany(
 ): Promise<{ success: boolean; error: PostgrestError | null }> {
   try {
     // First delete the relationship
-    const { error: relationError } = await (supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: relationError } = await (supabase as any)
       .from('user_companies')
       .delete()
       .eq('user_id', userId)
-      .eq('company_id', companyId));
+      .eq('company_id', companyId);
 
     if (relationError) {
       return { success: false, error: relationError };
     }
 
     // Check if company has other users
-    const checkResult = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const checkResult = await (supabase as any)
       .from('user_companies')
       .select('id')
       .eq('company_id', companyId)
@@ -369,7 +371,8 @@ export async function deleteUserCompany(
 
     // If no other users, delete the company
     if (!otherUsers || otherUsers.length === 0) {
-      const { error: deleteError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: deleteError } = await (supabase as any)
         .from('companies')
         .delete()
         .eq('id', companyId);

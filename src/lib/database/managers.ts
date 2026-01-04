@@ -101,20 +101,19 @@ export async function fetchManagers(filters: ManagerFilters = {}): Promise<Brows
     
     if (managerIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: ratingsData } = await (supabase as unknown as SupabaseClient<Database>)
+      const { data: ratingsData } = await (supabase as any)
         .from('company_ratings')
         .select('company_id, average_rating, total_reviews')
         .in('company_id', managerIds);
       
       if (ratingsData) {
         ratingsMap = ((ratingsData as Array<Record<string, unknown>>) || []).reduce((acc: { [key: string]: { average_rating: number; total_reviews: number } }, rating: Record<string, unknown>) => {
-          acc[rating.company_id] = {
-            average_rating: rating.average_rating || 0,
-            total_reviews: rating.total_reviews || 0
+          acc[String(rating.company_id ?? '')] = {
+            average_rating: Number(rating.average_rating ?? 0),
+            total_reviews: Number(rating.total_reviews ?? 0)
           };
           return acc;
-        }, {});
+        }, {}) as { [key: string]: { average_rating: number; total_reviews: number } };
       }
     }
 

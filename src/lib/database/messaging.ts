@@ -83,7 +83,8 @@ export async function createConversation(
   data: ConversationData
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
-        const { data: conversation, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: conversation, error } = await (supabase as any)
       .from('conversations')
       .insert({
         participant_1: data.participant1,
@@ -116,7 +117,8 @@ export async function sendMessage(
   data: MessageData
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
-        const { data: message, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: message, error } = await (supabase as any)
       .from('messages')
       .insert({
         conversation_id: data.conversationId,
@@ -134,7 +136,8 @@ export async function sendMessage(
     }
 
     // Update conversation's last_message_at
-        await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
       .from('conversations')
       .update({ 
         last_message_at: new Date().toISOString(),
@@ -173,7 +176,7 @@ export async function sendQuoteRequestMessage(
       senderId,
       content: message,
       messageType: 'quote',
-      attachments: attachments as Record<string, unknown> | null,
+      attachments: (attachments ? [attachments] : null) as Array<Record<string, unknown>> | null,
     });
   } catch (err) {
     console.error('Error sending quote request message:', err);
@@ -197,7 +200,8 @@ export async function createNotification(
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
     // Insert notification without select first (RLS might block select for other users)
-        const { error: insertError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: insertError } = await (supabase as any)
       .from('notifications')
       .insert({
         user_id: userId,
@@ -207,7 +211,7 @@ export async function createNotification(
         data: (data || null) as Record<string, unknown> | null,
         action_url: actionUrl || null,
         priority: 'normal',
-      } as NotificationRow);
+      } as unknown as NotificationRow);
 
     if (insertError) {
       console.error('Error creating notification (insert):', {
@@ -222,7 +226,8 @@ export async function createNotification(
 
     // Try to get the ID, but if it fails due to RLS, that's okay - the insert succeeded
     try {
-        const { data: notification, error: selectError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: notification, error: selectError } = await (supabase as any)
         .from('notifications')
         .select('id')
         .eq('user_id', userId)
@@ -261,7 +266,8 @@ export async function getContractorUserId(
     console.log('Looking for contractor user for company ID:', contractorCompanyId);
     
     // First, try to find any active user for this company
-        const { data: userCompanies, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: userCompanies, error } = await (supabase as any)
       .from('user_companies')
       .select('user_id')
       .eq('company_id', contractorCompanyId)
@@ -317,7 +323,8 @@ export async function getManagerUserId(
     console.log('Looking for manager user for company ID:', managerCompanyId);
     
     // First, try to find any active user for this company
-        const { data: userCompanies, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: userCompanies, error } = await (supabase as any)
       .from('user_companies')
       .select('user_id')
       .eq('company_id', managerCompanyId)
@@ -463,7 +470,8 @@ export async function findExistingConversation(
   participant2: string
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
-        const { data: conversation, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: conversation, error } = await (supabase as any)
       .from('conversations')
       .select('id')
       .or(`and(participant_1.eq.${participant1},participant_2.eq.${participant2}),and(participant_1.eq.${participant2},participant_2.eq.${participant1})`)
@@ -484,7 +492,7 @@ export async function findExistingConversation(
     // If no data, conversation doesn't exist
     return { data: (conversation as unknown as ConversationRow)?.id || null, error: null };
   } catch (err) {
-    const error = err as unknown as { code?: string; error?: { code?: string } };
+    const error = err as unknown as { code?: string; error?: { code?: string }; message?: string };
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = error?.code || error?.error?.code;
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
@@ -507,7 +515,8 @@ export async function findConversationByJob(
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
     const jobField = isTender ? 'tender_id' : 'job_id';
-        const { data: conversation, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: conversation, error } = await (supabase as any)
       .from('conversations')
       .select('id')
       .eq(jobField, jobId)
@@ -529,7 +538,7 @@ export async function findConversationByJob(
     // If no data, conversation doesn't exist
     return { data: (conversation as unknown as ConversationRow)?.id || null, error: null };
   } catch (err) {
-    const error = err as unknown as { code?: string; error?: { code?: string } };
+    const error = err as unknown as { code?: string; error?: { code?: string }; message?: string };
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = error?.code || error?.error?.code;
     if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
@@ -548,7 +557,8 @@ export async function fetchUserConversations(
   userId: string
 ): Promise<{ data: Conversation[] | null; error: PostgrestError | null }> {
   try {
-        const { data: conversations, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: conversations, error } = await (supabase as any)
       .from('conversations')
       .select(`
         id,
@@ -593,41 +603,41 @@ export async function fetchUserConversations(
 
     // Transform to Conversation format
     const transformedConversations: Conversation[] = ((conversations as ConversationRow[]) || []).map((conv: ConversationRow) => {
-      const otherParticipant = conv.participant_1_profile?.id === userId 
+      const otherParticipant = (conv.participant_1_profile as Record<string, unknown>)?.id === userId 
         ? conv.participant_2_profile 
         : conv.participant_1_profile;
       
-      const currentUser = conv.participant_1_profile?.id === userId 
+      const currentUser = (conv.participant_1_profile as Record<string, unknown>)?.id === userId 
         ? conv.participant_1_profile 
         : conv.participant_2_profile;
 
       return {
-        id: conv.id,
+        id: String(conv.id ?? ''),
         participants: [
           {
-            id: currentUser?.id || '',
-            name: `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
-            avatar: currentUser?.avatar_url || '',
-            userType: currentUser?.user_type === 'manager' ? 'manager' : 'contractor',
-            phone: currentUser?.phone || undefined,
+            id: String((currentUser as Record<string, unknown>)?.id ?? ''),
+            name: `${String((currentUser as Record<string, unknown>)?.first_name ?? '')} ${String((currentUser as Record<string, unknown>)?.last_name ?? '')}`.trim(),
+            avatar: String((currentUser as Record<string, unknown>)?.avatar_url ?? ''),
+            userType: (currentUser as Record<string, unknown>)?.user_type === 'manager' ? 'manager' : 'contractor',
+            phone: (currentUser as Record<string, unknown>)?.phone as string | undefined,
             isOnline: false // TODO: Implement online status
           },
           {
-            id: otherParticipant?.id || '',
-            name: `${otherParticipant?.first_name || ''} ${otherParticipant?.last_name || ''}`.trim(),
-            avatar: otherParticipant?.avatar_url || '',
-            userType: otherParticipant?.user_type === 'manager' ? 'manager' : 'contractor',
-            phone: otherParticipant?.phone || undefined,
+            id: String((otherParticipant as Record<string, unknown>)?.id ?? ''),
+            name: `${String((otherParticipant as Record<string, unknown>)?.first_name ?? '')} ${String((otherParticipant as Record<string, unknown>)?.last_name ?? '')}`.trim(),
+            avatar: String((otherParticipant as Record<string, unknown>)?.avatar_url ?? ''),
+            userType: (otherParticipant as Record<string, unknown>)?.user_type === 'manager' ? 'manager' : 'contractor',
+            phone: (otherParticipant as Record<string, unknown>)?.phone as string | undefined,
             isOnline: false // TODO: Implement online status
           }
         ],
         lastMessage: undefined, // Will be populated separately
         unreadCount: 0, // Will be calculated separately
-        jobId: conv.job_id || conv.tender_id, // Support both jobs and tenders
-        jobTitle: conv.job?.title || conv.tender?.title, // Support both jobs and tenders
-        subject: conv.subject || undefined,
-        createdAt: new Date(conv.created_at),
-        updatedAt: new Date(conv.updated_at)
+        jobId: String(conv.job_id ?? conv.tender_id ?? ''),
+        jobTitle: String((conv.job as Record<string, unknown>)?.title ?? (conv.tender as Record<string, unknown>)?.title ?? ''),
+        subject: conv.subject ? String(conv.subject) : undefined,
+        createdAt: new Date(String(conv.created_at ?? '')),
+        updatedAt: new Date(String(conv.updated_at ?? ''))
       };
     });
 
@@ -646,7 +656,8 @@ export async function fetchConversationMessages(
   conversationId: string
 ): Promise<{ data: Message[] | null; error: PostgrestError | null }> {
   try {
-        const { data: messages, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: messages, error } = await (supabase as any)
       .from('messages')
       .select(`
         id,
@@ -706,7 +717,8 @@ export async function markMessagesAsRead(
 ): Promise<{ data: boolean; error: PostgrestError | null }> {
   try {
     // First, get all unread messages in this conversation
-        const { data: messages, error: messagesError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: messages, error: messagesError } = await (supabase as any)
       .from('messages')
       .select('id')
       .eq('conversation_id', conversationId)
@@ -728,7 +740,8 @@ export async function markMessagesAsRead(
       read_at: new Date().toISOString()
     }));
 
-        const { error: insertError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: insertError } = await (supabase as any)
       .from('message_read_status')
       .upsert(readStatusInserts, { 
         onConflict: 'message_id,user_id',

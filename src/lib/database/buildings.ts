@@ -36,7 +36,7 @@ export async function createBuilding(
   buildingData: BuildingFormData
 ): Promise<{ data: Building | null; error: PostgrestError | null }> {
   try {
-    const insertData: Record<string, unknown> = {
+    const insertData: Database['public']['Tables']['buildings']['Insert'] = {
       company_id: companyId,
       name: buildingData.name.trim(),
       street_address: buildingData.street_address.trim(),

@@ -320,7 +320,8 @@ export async function fetchJobs(
       const jobIds = data.map((job: JobWithCompany) => job.id);
       
       // Fetch counts for all jobs at once
-      const { data: countsData, error: countsError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: countsData, error: countsError } = await (supabase as any)
         .from('job_applications')
         .select('job_id')
         .in('job_id', jobIds) as { data: JobApplicationRow[] | null; error: PostgrestError | null };
@@ -357,7 +358,7 @@ export async function fetchTenders(
   try {
     // Type assertion needed as tenders table may not be in generated types yet
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query = (supabase as unknown as { from: (table: string) => { select: (columns: string) => Promise<{ data: TenderRow[] | null; error: PostgrestError | null }> } })
+    let query = (supabase as any)
       .from('tenders')
       .select(`
         *,
@@ -518,7 +519,8 @@ export async function fetchTenders(
       const tenderIds = (data || []).map((tender: TenderWithCompany) => tender.id);
       
       // Fetch counts for all tenders at once
-      const { data: countsData, error: countsError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: countsData, error: countsError } = await (supabase as any)
         .from('tender_bids')
         .select('tender_id')
         .in('tender_id', tenderIds) as { data: TenderBidRow[] | null; error: PostgrestError | null };
@@ -765,7 +767,8 @@ export async function fetchJobById(
     }
 
     // Calculate applications_count dynamically if job exists
-    const { count, error: countsError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { count, error: countsError } = await (supabase as any)
       .from('job_applications')
       .select('*', { count: 'exact', head: true })
       .eq('job_id', jobId);
@@ -796,7 +799,8 @@ export async function fetchTenderById(
 ): Promise<{ data: TenderWithCompany | null; error: PostgrestError | null }> {
   try {
     // Type assertion needed as tenders table may not be in generated types yet
-    const result = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await (supabase as any)
       .from('tenders')
       .select(`
         *,
@@ -832,7 +836,8 @@ export async function fetchTenderById(
     }
 
     // Calculate bids_count dynamically if tender exists
-    const { count, error: countsError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { count, error: countsError } = await (supabase as any)
       .from('tender_bids')
       .select('*', { count: 'exact', head: true })
       .eq('tender_id', tenderId);
@@ -910,7 +915,8 @@ export async function incrementTenderViews(
 ): Promise<{ data: { views_count: number } | null; error: PostgrestError | null }> {
   try {
     // Fetch current views_count
-    const { data: currentTender, error: fetchError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: currentTender, error: fetchError } = await (supabase as any)
       .from('tenders')
       .select('views_count')
       .eq('id', tenderId)
@@ -932,7 +938,8 @@ export async function incrementTenderViews(
     const newViewsCount = ((currentTender as unknown as { views_count?: number })?.views_count || 0) + 1;
 
     // Increment and update
-    const { error: updateError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase as any)
       .from('tenders')
       .update({ views_count: newViewsCount })
       .eq('id', tenderId);
@@ -1250,7 +1257,8 @@ export async function createTender(
     }
 
     // Insert tender
-      const { data: insertedTender, error: insertError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: insertedTender, error: insertError } = await (supabase as any)
         .from('tenders')
       .insert({
         title: tenderData.title,
@@ -1307,7 +1315,7 @@ export async function createTender(
         data: null, 
         error: (insertError instanceof Error 
           ? insertError 
-          : new Error(((insertError as unknown as { message?: string; details?: string; hint?: string })?.message || (insertError as unknown as { message?: string; details?: string; hint?: string })?.details || (insertError as unknown as { message?: string; details?: string; hint?: string })?.hint || 'Unknown database error')) as string) as PostgrestError
+          : new Error(String((insertError as unknown as { message?: string; details?: string; hint?: string })?.message || (insertError as unknown as { message?: string; details?: string; hint?: string })?.details || (insertError as unknown as { message?: string; details?: string; hint?: string })?.hint || 'Unknown database error'))) as PostgrestError
       };
     }
 
@@ -1354,7 +1362,8 @@ export async function updateTender(
 ): Promise<{ data: TenderWithCompany | null; error: PostgrestError | null }> {
   try {
     // First, verify the tender exists and is in draft status
-    const { data: existingTender, error: fetchError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existingTender, error: fetchError } = await (supabase as any)
       .from('tenders')
       .select('id, status')
       .eq('id', tenderId)
@@ -1460,7 +1469,8 @@ export async function updateTender(
     })) : null;
 
     // Update tender
-    const { data: updatedTender, error: updateError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: updatedTender, error: updateError } = await (supabase as any)
       .from('tenders')
       .update({
         title: tenderData.title,
@@ -1710,9 +1720,11 @@ export async function createJob(
     });
 
     // Insert job
-    const { data: insertedJob, error: insertError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: insertedJob, error: insertError } = await (supabase as any)
       .from('jobs')
-      .insert(insertData)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .insert(insertData as any)
       .select(`
         *,
         company:companies!jobs_company_id_fkey (
@@ -1933,7 +1945,8 @@ export async function createJobApplication(
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1881',message:'before database insert',data:{insertData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
-    const { data: insertedApplication, error: insertError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: insertedApplication, error: insertError } = await (supabase as any)
       .from('job_applications')
       .insert(insertData)
       .select()
@@ -2015,7 +2028,8 @@ export async function fetchJobApplicationsByJobId(
 ): Promise<{ data: Record<string, unknown>[] | null; error: PostgrestError | null }> {
   try {
     // Use type assertion since job_applications may not be in generated types
-    const { data: applications, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: applications, error } = await (supabase as any)
       .from('job_applications')
       .select(`
         id,
@@ -2060,12 +2074,12 @@ export async function fetchJobApplicationsByJobId(
       ((applications as JobApplicationRow[]) || []).map(async (app: JobApplicationRow) => {
         // Fetch contractor profile for additional data (rating, completed jobs, location)
         const { fetchContractorById } = await import('./contractors');
-        const contractorProfile = await fetchContractorById(app.company?.id || '');
+        const contractorProfile = await fetchContractorById(String((app.company as Record<string, unknown>)?.id ?? ''));
         
         // Convert proposed_timeline (days) back to readable string
         let proposedTimeline = 'Nie określono';
         if (app.proposed_timeline) {
-          const days = app.proposed_timeline;
+          const days = Number(app.proposed_timeline);
           if (days < 7) {
             proposedTimeline = `${days} ${days === 1 ? 'dzień' : 'dni'}`;
           } else if (days < 30) {
@@ -2082,10 +2096,10 @@ export async function fetchJobApplicationsByJobId(
           jobId: app.job_id,
           contractorId: app.contractor_id,
           contractorName: app.contractor 
-            ? `${app.contractor.first_name || ''} ${app.contractor.last_name || ''}`.trim() 
+            ? `${String((app.contractor as Record<string, unknown>).first_name ?? '')} ${String((app.contractor as Record<string, unknown>).last_name ?? '')}`.trim() 
             : 'Nieznany wykonawca',
-          contractorCompany: app.company?.name || 'Nieznana firma',
-          contractorAvatar: app.contractor?.avatar_url || app.company?.logo_url || '',
+          contractorCompany: String((app.company as Record<string, unknown>)?.name ?? 'Nieznana firma'),
+          contractorAvatar: String((app.contractor as Record<string, unknown>)?.avatar_url ?? (app.company as Record<string, unknown>)?.logo_url ?? ''),
           contractorRating: contractorProfile?.rating?.overall || 0,
           contractorCompletedJobs: contractorProfile?.experience?.completedProjects || 0,
           contractorLocation: contractorProfile?.location?.city || 'Nieznana lokalizacja',
@@ -2099,8 +2113,8 @@ export async function fetchJobApplicationsByJobId(
           attachments: (app.attachments as Array<Record<string, unknown>>) || [],
           certificates: (app.certificates as string[]) || [],
           status: (app.status as 'submitted' | 'under_review' | 'accepted' | 'rejected') || 'submitted',
-          submittedAt: new Date(app.submitted_at),
-          lastUpdated: app.reviewed_at ? new Date(app.reviewed_at) : new Date(app.submitted_at),
+          submittedAt: new Date(String(app.submitted_at ?? '')),
+          lastUpdated: app.reviewed_at ? new Date(String(app.reviewed_at)) : new Date(String(app.submitted_at ?? '')),
           reviewNotes: app.notes || undefined,
         };
       })
@@ -2150,7 +2164,8 @@ export async function createTenderBid(
     }
     
     // Check if a non-cancelled bid already exists for this tender and company
-    const { data: existingBids, error: checkError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existingBids, error: checkError } = await (supabase as any)
       .from('tender_bids')
       .select('id, status')
       .eq('tender_id', tenderId)
@@ -2194,7 +2209,8 @@ export async function createTenderBid(
     }
     
     // Insert bid (using type assertion since tender_bids may not be in generated types)
-    const { data: insertedBid, error: insertError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: insertedBid, error: insertError } = await (supabase as any)
       .from('tender_bids')
       .insert(insertData)
       .select()
@@ -2243,7 +2259,8 @@ export async function fetchTenderBidsByTenderId(
 ): Promise<{ data: Record<string, unknown>[] | null; error: PostgrestError | null }> {
   try {
     // Use type assertion since tender_bids may not be in generated types
-    const { data: bids, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: bids, error } = await (supabase as any)
       .from('tender_bids')
       .select(`
         id,
@@ -2289,37 +2306,37 @@ export async function fetchTenderBidsByTenderId(
       ((bids as TenderBidRow[]) || []).map(async (bid: TenderBidRow) => {
         // Fetch contractor profile for additional data
         const { fetchContractorById } = await import('./contractors');
-        const contractorProfile = await fetchContractorById(bid.company?.id || '');
+        const contractorProfile = await fetchContractorById(String((bid.company as Record<string, unknown>)?.id ?? ''));
         
         // Convert proposed_timeline (days) to number
-        const proposedTimeline = bid.proposed_timeline || 0;
+        const proposedTimeline = Number(bid.proposed_timeline ?? 0);
         
         return {
           id: bid.id,
           contractorId: bid.contractor_id,
           contractorName: bid.contractor 
-            ? `${bid.contractor.first_name || ''} ${bid.contractor.last_name || ''}`.trim() 
+            ? `${String((bid.contractor as Record<string, unknown>).first_name ?? '')} ${String((bid.contractor as Record<string, unknown>).last_name ?? '')}`.trim() 
             : 'Nieznany wykonawca',
-          contractorCompany: bid.company?.name || 'Nieznana firma',
-          contractorAvatar: bid.contractor?.avatar_url || bid.company?.logo_url || '',
+          contractorCompany: String((bid.company as Record<string, unknown>)?.name ?? 'Nieznana firma'),
+          contractorAvatar: String((bid.contractor as Record<string, unknown>)?.avatar_url ?? (bid.company as Record<string, unknown>)?.logo_url ?? ''),
           contractorRating: contractorProfile?.rating?.overall || 0,
           contractorCompletedJobs: contractorProfile?.experience?.completedProjects || 0,
           totalPrice: bid.bid_amount || 0,
           currency: 'PLN',
           proposedTimeline: proposedTimeline,
-          proposedStartDate: bid.proposed_start_date ? new Date(bid.proposed_start_date) : new Date(),
+          proposedStartDate: bid.proposed_start_date ? new Date(String(bid.proposed_start_date)) : new Date(),
           guaranteePeriod: 12, // Default, could be extracted from bid if available
-          description: bid.technical_proposal || '',
-          technicalProposal: bid.technical_proposal || '',
+          description: String(bid.technical_proposal ?? ''),
+          technicalProposal: String(bid.technical_proposal ?? ''),
           attachments: (bid.attachments as Array<Record<string, unknown>>) || [],
           criteriaResponses: [], // Would need to be extracted from bid if stored separately
-          submittedAt: new Date(bid.submitted_at),
+          submittedAt: new Date(String(bid.submitted_at ?? '')),
           status: (bid.status as 'submitted' | 'under_review' | 'shortlisted' | 'rejected' | 'awarded') || 'submitted',
           evaluation: bid.evaluation_score || bid.evaluation_notes ? {
             criteriaScores: {},
             totalScore: bid.evaluation_score || 0,
             evaluatorNotes: bid.evaluation_notes || '',
-            evaluatedAt: bid.evaluated_at ? new Date(bid.evaluated_at) : new Date(),
+            evaluatedAt: bid.evaluated_at ? new Date(String(bid.evaluated_at)) : new Date(),
             evaluatorId: '',
           } : undefined,
         };
@@ -2355,7 +2372,8 @@ export async function cancelJobApplication(
     }
 
     // First, fetch the application to check ownership and current status
-    const { data: application, error: fetchError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: application, error: fetchError } = await (supabase as any)
       .from('job_applications')
       .select('id, company_id, status')
       .eq('id', applicationId)
@@ -2394,7 +2412,8 @@ export async function cancelJobApplication(
 
     // Update status to 'cancelled'
     // Filter by both contractor_id (for RLS policy) and company_id (for validation)
-    const { data: updateData, error: updateError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: updateData, error: updateError } = await (supabase as any)
       .from('job_applications')
       .update({ 
         status: 'cancelled',
@@ -2472,7 +2491,8 @@ export async function cancelTenderBid(
     }
 
     // First, fetch the bid to check ownership and current status
-    const { data: bid, error: fetchError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: bid, error: fetchError } = await (supabase as any)
       .from('tender_bids')
       .select('id, company_id, status')
       .eq('id', bidId)
@@ -2511,7 +2531,8 @@ export async function cancelTenderBid(
 
     // Update status to 'cancelled'
     // Filter by both contractor_id (for RLS policy) and company_id (for validation)
-    const { data: updateData, error: updateError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: updateData, error: updateError } = await (supabase as any)
       .from('tender_bids')
       .update({ 
         status: 'cancelled',
@@ -2607,7 +2628,8 @@ export async function fetchJobsByWorkHistory(
     }
 
     // Step 2: Get accepted applications for these jobs
-    const { data: acceptedApplications, error: appsError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: acceptedApplications, error: appsError } = await (supabase as any)
       .from('job_applications')
       .select('job_id')
       .in('job_id', jobIds)

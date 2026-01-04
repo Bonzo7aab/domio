@@ -56,7 +56,8 @@ export async function submitQuestion(
     // If not a job, try as a tender
     if (!isJob) {
       try {
-        const { data: tenderData, error: tenderError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: tenderData, error: tenderError } = await (supabase as any)
           .from('tenders')
           .select('id, title, manager_id')
           .eq('id', jobId)
@@ -107,7 +108,8 @@ export async function submitQuestion(
     let questionDataArray: Array<Record<string, unknown>> | null = null;
     let questionError: PostgrestError | null = null;
 
-    const insertResult = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const insertResult = await (supabase as any)
       .from('questions')
       .insert(insertPayload)
       .select('id');
@@ -123,7 +125,8 @@ export async function submitQuestion(
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Try to find the question we just inserted
-      const { data: foundQuestion, error: findError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: foundQuestion, error: findError } = await (supabase as any)
         .from('questions')
         .select('id')
         .eq('job_id', jobId)

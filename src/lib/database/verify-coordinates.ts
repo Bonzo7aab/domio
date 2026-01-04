@@ -42,7 +42,8 @@ export async function verifyDatabaseCoordinates(
     ) || [];
 
     // Check tenders
-    const { data: allTenders, error: allTendersError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: allTenders, error: allTendersError } = await (supabase as any)
       .from('tenders')
       .select('id, title, location, latitude, longitude');
 
@@ -52,9 +53,9 @@ export async function verifyDatabaseCoordinates(
 
     const tendersWithCoords = ((allTenders as Array<Record<string, unknown>>) || []).filter((tender: Record<string, unknown>) => 
       tender.latitude && tender.longitude && 
-      tender.latitude !== 0 && tender.longitude !== 0 &&
-      tender.latitude >= -90 && tender.latitude <= 90 &&
-      tender.longitude >= -180 && tender.longitude <= 180
+      Number(tender.latitude) !== 0 && Number(tender.longitude) !== 0 &&
+      Number(tender.latitude) >= -90 && Number(tender.latitude) <= 90 &&
+      Number(tender.longitude) >= -180 && Number(tender.longitude) <= 180
     );
 
     const tendersMissingCoords = ((allTenders as Array<Record<string, unknown>>) || []).filter((tender: Record<string, unknown>) => 
@@ -64,8 +65,8 @@ export async function verifyDatabaseCoordinates(
 
     const tendersInvalidCoords = ((allTenders as Array<Record<string, unknown>>) || []).filter((tender: Record<string, unknown>) => 
       tender.latitude && tender.longitude && 
-      (tender.latitude < -90 || tender.latitude > 90 || 
-       tender.longitude < -180 || tender.longitude > 180)
+      (Number(tender.latitude) < -90 || Number(tender.latitude) > 90 || 
+        Number(tender.longitude) < -180 || Number(tender.longitude) > 180)
     );
 
     // Log details for missing coordinates

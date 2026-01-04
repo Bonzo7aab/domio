@@ -156,8 +156,7 @@ export async function fetchContractors(
   try {
     // Use type assertion to avoid "Type instantiation is excessively deep" error
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabaseClient = supabase as unknown as SupabaseClient<Database>;
+    const supabaseClient = supabase as any;
     let query = supabaseClient
       .from('companies')
       .select(`
@@ -404,8 +403,7 @@ export async function fetchContractorsByWorkHistory(
     let acceptedApplications: ApplicationWithJob[] = [];
     if (jobIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: applications, error: appsError } = await (supabase as unknown as SupabaseClient<Database>)
+      const { data: applications, error: appsError } = await (supabase as any)
         .from('job_applications')
         .select(`
           company_id,
@@ -435,8 +433,7 @@ export async function fetchContractorsByWorkHistory(
     let acceptedBids: BidWithTender[] = [];
     if (tenderIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: bids, error: bidsError } = await (supabase as unknown as SupabaseClient<Database>)
+      const { data: bids, error: bidsError } = await (supabase as any)
         .from('tender_bids')
         .select(`
           company_id,
@@ -580,8 +577,7 @@ export async function fetchContractorsByWorkHistory(
     };
 
     // Format contractors for display
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const contractors = ((companies || []) as Array<Record<string, unknown>>).map((company: Record<string, unknown>) => {
+    const contractors = ((companies || []) as unknown as Array<Record<string, unknown>>).map((company: Record<string, unknown>) => {
       const companyId = String(company.id ?? '');
       const ratings = ratingsMap[companyId] || {};
       const profileData = (company.profile_data as Record<string, unknown>) || {};
@@ -822,7 +818,8 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
     }
 
     // Fetch applications with complete job details
-    const { data: applications } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: applications } = await (supabase as any)
       .from('job_applications')
       .select(`
         id,
@@ -879,28 +876,29 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
     };
 
     const formattedApplications: ContractorApplication[] = ((applications as Array<Record<string, unknown>>) || []).map((app: Record<string, unknown>) => ({
-      id: app.id,
-      jobId: app.job_id,
-      jobTitle: app.job?.title || '',
-      companyName: app.job?.company?.name || '',
-      status: app.status || 'pending',
-      appliedAt: app.submitted_at,
-      proposedPrice: app.proposed_price,
-      estimatedCompletion: formatTimeline(app.proposed_timeline),
-      coverLetter: app.cover_letter,
-      experience: app.experience || '',
-      attachments: app.attachments || [],
-      certificates: app.certificates || [],
-      notes: app.notes || undefined,
-      reviewedAt: app.reviewed_at || undefined,
-      jobLocation: typeof app.jobs?.location === 'string' 
-        ? app.jobs.location 
-        : app.jobs?.location?.city || 'Nieznana lokalizacja',
-      jobCategory: app.jobs?.job_categories?.name || 'Inne usługi'
+      id: String(app.id ?? ''),
+      jobId: String(app.job_id ?? ''),
+      jobTitle: String((app.job as Record<string, unknown>)?.title ?? ''),
+      companyName: String(((app.job as Record<string, unknown>)?.company as Record<string, unknown>)?.name ?? ''),
+      status: String(app.status ?? 'pending') as 'submitted' | 'under_review' | 'shortlisted' | 'accepted' | 'rejected' | 'cancelled' | 'pending',
+      appliedAt: String(app.submitted_at ?? ''),
+      proposedPrice: app.proposed_price != null ? String(app.proposed_price) : undefined,
+      estimatedCompletion: formatTimeline(app.proposed_timeline as number | null | undefined),
+      coverLetter: String(app.cover_letter ?? ''),
+      experience: String(app.experience ?? ''),
+      attachments: (app.attachments as Array<Record<string, unknown>>) || [],
+      certificates: (app.certificates as string[]) || [],
+      notes: app.notes as string | undefined,
+      reviewedAt: app.reviewed_at as string | undefined,
+      jobLocation: typeof (app.jobs as Record<string, unknown>)?.location === 'string' 
+        ? (app.jobs as Record<string, unknown>).location as string
+        : String(((app.jobs as Record<string, unknown>)?.location as Record<string, unknown>)?.city ?? 'Nieznana lokalizacja'),
+      jobCategory: String(((app.jobs as Record<string, unknown>)?.job_categories as Record<string, unknown>)?.name ?? 'Inne usługi')
     })) || [];
 
     // Fetch bids with more details for applications view
-    const { data: bids } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: bids } = await (supabase as any)
       .from('tender_bids')
       .select(`
         id,
@@ -927,38 +925,39 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
       .order('submitted_at', { ascending: false });
 
     const formattedBids: ContractorBid[] = ((bids as Array<Record<string, unknown>>) || []).map((bid: Record<string, unknown>) => ({
-      id: bid.id,
-      tenderId: bid.tender_id,
-      tenderTitle: bid.tenders?.title || '',
-      companyName: bid.tenders?.companies?.name || '',
-      status: bid.status || 'pending',
-      bidAmount: bid.bid_amount || '',
-      submittedAt: bid.submitted_at,
-      validUntil: bid.valid_until || '',
-      location: typeof bid.tenders?.location === 'string' 
-        ? bid.tenders.location 
-        : bid.tenders?.location?.city || 'Nieznana lokalizacja',
-      category: bid.tenders?.job_categories?.name || 'Przetarg',
-      proposedTimeline: bid.proposed_timeline || undefined,
-      technicalProposal: bid.technical_proposal || undefined,
-      reviewedAt: bid.evaluated_at || undefined // Use evaluated_at for tender_bids
+      id: String(bid.id ?? ''),
+      tenderId: String(bid.tender_id ?? ''),
+      tenderTitle: String((bid.tenders as Record<string, unknown>)?.title ?? ''),
+      companyName: String(((bid.tenders as Record<string, unknown>)?.companies as Record<string, unknown>)?.name ?? ''),
+      status: String(bid.status ?? 'pending') as 'submitted' | 'under_review' | 'shortlisted' | 'accepted' | 'rejected' | 'cancelled' | 'pending',
+      bidAmount: String(bid.bid_amount ?? ''),
+      submittedAt: String(bid.submitted_at ?? ''),
+      validUntil: String(bid.valid_until ?? ''),
+      location: typeof (bid.tenders as Record<string, unknown>)?.location === 'string' 
+        ? (bid.tenders as Record<string, unknown>).location as string
+        : String(((bid.tenders as Record<string, unknown>)?.location as Record<string, unknown>)?.city ?? 'Nieznana lokalizacja'),
+      category: String(((bid.tenders as Record<string, unknown>)?.job_categories as Record<string, unknown>)?.name ?? 'Przetarg'),
+      proposedTimeline: bid.proposed_timeline as number | undefined,
+      technicalProposal: bid.technical_proposal as string | undefined,
+      reviewedAt: bid.evaluated_at as string | undefined // Use evaluated_at for tender_bids
     })) || [];
 
     // Fetch certificates
-    const { data: certificates } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: certificates } = await (supabase as any)
       .from('certificates')
       .select('*')
       .eq('company_id', contractorId);
 
     const formattedCertificates: Certificate[] = ((certificates as Array<Record<string, unknown>>) || []).map((cert: Record<string, unknown>) => ({
-      id: cert.id,
-      name: cert.name,
-      type: cert.type,
-      number: cert.number,
-      issuer: cert.issuer,
-      issueDate: cert.issue_date,
-      expiryDate: cert.expiry_date,
-      isVerified: cert.is_verified
+      id: String(cert.id ?? ''),
+      name: String(cert.name ?? ''),
+      type: String(cert.type ?? ''),
+      number: String(cert.number ?? ''),
+      issuer: String(cert.issuer ?? ''),
+      issueDate: String(cert.issue_date ?? ''),
+      expiryDate: String(cert.expiry_date ?? ''),
+      isVerified: Boolean(cert.is_verified ?? false)
     })) || [];
 
     // Calculate stats

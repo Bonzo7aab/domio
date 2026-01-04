@@ -40,8 +40,10 @@ export async function createNotificationWithPush(
 
   try {
     // Create notification in database
-    const { data: notification, error: notificationError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: notification, error: notificationError } = await (supabase as any)
       .from('notifications')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert({
         user_id: options.userId,
         type: options.type,
