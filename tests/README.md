@@ -4,6 +4,40 @@ This directory contains end-to-end tests for the Domio application using Playwri
 
 ## Setup
 
+### Option 1: Local Supabase (Recommended) ⭐
+
+**Best for:** Development, testing, complete isolation from production
+
+1. **Install Docker Desktop** (if not already installed)
+   - macOS: https://docs.docker.com/desktop/install/mac-install/
+   - Or: `brew install --cask docker`
+
+2. **Set up local Supabase:**
+   ```bash
+   npm run supabase:setup
+   ```
+
+3. **Apply database migrations:**
+   ```bash
+   npm run supabase:migrate-local
+   ```
+
+4. **Configure environment variables:**
+   - Copy `tests/env.local.example.txt` to `.env.test.local`
+   - Get connection details: `npm run supabase:start`
+   - Copy the API URL, anon key, and service_role key to `.env.test.local`
+
+5. **Install Playwright browsers:**
+   ```bash
+   npx playwright install
+   ```
+
+**See [supabase/README.md](../supabase/README.md) for detailed local Supabase documentation.**
+
+### Option 2: Cloud Test Project
+
+**Best for:** CI/CD, when Docker is not available
+
 1. **Install dependencies:**
    ```bash
    npm install
@@ -15,16 +49,21 @@ This directory contains end-to-end tests for the Domio application using Playwri
    ```
 
 3. **Configure environment variables:**
-   - Copy `.env.test.example` to `.env.test.local`
-   - Fill in your Supabase credentials:
-     - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
-     - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Your Supabase publishable key
-     - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (required for test user cleanup)
+   - Copy `tests/env.example.txt` to `.env.test.local`
+   - Fill in your **test** Supabase project credentials (NOT production!):
+     - `NEXT_PUBLIC_SUPABASE_URL` - Your test Supabase project URL
+     - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Your test project publishable key
+     - `SUPABASE_SERVICE_ROLE_KEY` - Your test project service role key
 
 ## Running Tests
 
 ### Run all tests
 ```bash
+# With local Supabase (automatically starts if needed)
+npm run test:e2e:local
+
+# Or manually start Supabase first
+npm run supabase:start
 npm run test:e2e
 ```
 
@@ -141,7 +180,19 @@ test('my test', async ({ page }) => {
 
 ### Tests fail with "Missing environment variable"
 
-Make sure you've created `.env.test.local` with all required variables. Check `.env.test.example` for the required variables.
+Make sure you've created `.env.test.local` with all required variables. 
+- For local Supabase: Use `tests/env.local.example.txt` as template
+- For cloud test project: Use `tests/env.example.txt` as template
+
+### Local Supabase not starting
+
+If you see Docker errors:
+1. Ensure Docker Desktop is installed and running
+2. Check Docker is accessible: `docker --version`
+3. Try restarting Docker Desktop
+4. Run setup again: `npm run supabase:setup`
+
+For more troubleshooting, see [supabase/README.md](../supabase/README.md)
 
 ### Tests fail with "Could not access application"
 

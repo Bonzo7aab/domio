@@ -13,6 +13,25 @@ async function globalSetup(config: FullConfig) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
   }
 
+  // Detect if using local Supabase
+  const isLocal = supabaseUrl?.includes('localhost') || 
+                  supabaseUrl?.includes('127.0.0.1') ||
+                  supabaseUrl?.includes(':54321');
+  
+  if (isLocal) {
+    console.log('✓ Using local Supabase instance (isolated test database)');
+    console.log('  This is safe - no risk to production data!');
+  } else {
+    console.warn('⚠️  Using remote Supabase instance');
+    console.warn('  Ensure this is a TEST project, not production!');
+    
+    // Safety check: warn if it looks like production
+    if (!supabaseUrl.includes('test') && !supabaseUrl.includes('localhost')) {
+      console.warn('  ⚠️  WARNING: This does not appear to be a test project URL!');
+      console.warn('  Consider using local Supabase: npm run supabase:setup');
+    }
+  }
+
   if (!serviceRoleKey) {
     console.warn('Warning: SUPABASE_SERVICE_ROLE_KEY not set. Test user cleanup may not work.');
   }
