@@ -34,15 +34,14 @@ export function RegisterPage() {
   const [selectedUserType, setSelectedUserType] = useState<'contractor' | 'manager'>(defaultUserType);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
   return (
-    <div className="min-h-screen bg-slate-50 py-16">
+    <div className="min-h-screen bg-slate-50 py-16" data-testid="register-page">
       <div className="container mx-auto px-4">
         <div className="max-w-md mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2" data-testid="register-heading">
               Utwórz konto
             </h1>
             <p className="text-slate-600">
@@ -51,9 +50,9 @@ export function RegisterPage() {
           </div>
 
           {/* Alerts */}
-          {(error || formError) && (
+          {error && (
             <Alert variant="destructive" className="mb-6">
-              <AlertDescription>{error || formError}</AlertDescription>
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
           

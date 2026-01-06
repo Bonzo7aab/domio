@@ -15,7 +15,6 @@ import {
   Eye,
   AlertTriangle,
   Info,
-  CheckCircle,
   ArrowLeft
 } from 'lucide-react';
 import { getDataSourceConfig } from '../lib/config/data-source';
@@ -64,7 +63,7 @@ export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }
     };
   });
 
-  const [testingStats, setTestingStats] = useState({
+  const [testingStats] = useState({
     activeTesters: 8,
     feedbackSubmissions: 23,
     bugsReported: 5,

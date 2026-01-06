@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createClient } = require('@supabase/supabase-js');
 
 // Read .env.local
 const envPath = path.join(__dirname, '.env.local');
@@ -15,10 +14,11 @@ envContent.split('\n').forEach(line => {
   }
 });
 
-const _supabase = createClient(
-  envVars.NEXT_PUBLIC_SUPABASE_URL,
-  envVars.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+// Supabase client not used in this script - SQL is run manually via dashboard
+// const supabase = createClient(
+//   envVars.NEXT_PUBLIC_SUPABASE_URL,
+//   envVars.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// );
 
 console.log('🗺️  Populating database with 6 Ursynów jobs...\n');
 

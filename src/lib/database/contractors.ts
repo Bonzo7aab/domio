@@ -204,7 +204,6 @@ export async function fetchContractors(
     }
 
     // Fetch ratings for all contractors
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const contractorIds = ((data || []) as Array<{ id: string }>).map((company: { id: string }) => company.id);
     let ratingsMap: { [key: string]: { company_id: string; average_rating: number; total_reviews: number } } = {};
     
@@ -258,7 +257,6 @@ export async function fetchContractors(
     };
 
     // Transform data to BrowseContractor format
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let contractors: BrowseContractor[] = ((data || []) as Array<Record<string, unknown>>).map((company: Record<string, unknown>) => {
       const companyId = String(company.id ?? '');
       const ratings = ratingsMap[companyId];

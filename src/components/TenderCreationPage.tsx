@@ -84,7 +84,7 @@ export default function TenderCreationPage({ onBack }: TenderCreationPageProps) 
       }
 
       // Save tender to database
-      const { data: savedTender, error: saveError } = await createTender(supabase, {
+      const { error: saveError } = await createTender(supabase, {
         ...(tender as {
           title: string;
           description: string;

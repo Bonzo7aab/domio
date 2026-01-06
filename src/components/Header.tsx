@@ -79,9 +79,6 @@ export function Header({ initialUser }: HeaderProps) {
     router.push('/contractors')
   }
 
-  const _handlePricingClick = () => {
-    router.push('/pricing')
-  }
 
   const handleLoginClick = () => {
     router.push('/user-type-selection')

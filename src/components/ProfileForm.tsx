@@ -5,11 +5,9 @@ import { Mail, Phone, Edit2, X, Check } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { updateUserAction } from '../lib/auth/actions';
 import type { AuthUser } from '../types/auth';
-import { Separator } from './ui/separator';
 
 interface ProfileFormProps {
   user: AuthUser;
@@ -63,7 +61,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
         setIsEditingPersonal(false);
         setTimeout(() => setSuccess(''), 3000);
       }
-    } catch (err) {
+    } catch {
       setError('Wystąpił błąd podczas aktualizacji');
     } finally {
       setIsLoading(false);
@@ -89,7 +87,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
         setIsEditingContact(false);
         setTimeout(() => setSuccess(''), 3000);
       }
-    } catch (err) {
+    } catch {
       setError('Wystąpił błąd podczas aktualizacji');
     } finally {
       setIsLoading(false);

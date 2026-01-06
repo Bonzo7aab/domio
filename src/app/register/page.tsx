@@ -1,36 +1,50 @@
 'use client'
 
+import { Suspense, useEffect } from 'react';
+import React from 'react';
 import { RegisterPage } from '../../components/RegisterPage';
 import { useUserProfile } from '../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+
+function LoadingState({ label }: { label: string }) {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center" data-testid="auth-loading">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-2 text-sm text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Register() {
+  return (
+    <Suspense fallback={<LoadingState label="Ładowanie strony rejestracji..." />}>
+      <RegisterContent />
+    </Suspense>
+  );
+}
+
+function RegisterContent() {
   const { user, isLoading } = useUserProfile();
   const router = useRouter();
 
   // Redirect to homepage if already logged in
+  // Note: Middleware also handles this, but client-side redirect ensures tests pass
   useEffect(() => {
     if (!isLoading && user) {
-      router.push('/');
+      router.replace('/');
     }
   }, [user, isLoading, router]);
 
   // Show loading while checking auth
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Sprawdzanie...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Sprawdzanie..." />;
   }
 
-  // Don't render register page if user is authenticated (will redirect)
+  // Don't render register page if user is authenticated (will redirect via useEffect or middleware)
   if (user) {
-    return null;
+    return <LoadingState label="Przekierowywanie..." />;
   }
 
   return (

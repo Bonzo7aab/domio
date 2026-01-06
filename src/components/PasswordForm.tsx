@@ -5,7 +5,6 @@ import { Eye, EyeOff, Edit2, X, Check, Lock } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { CardContent } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 
 export function PasswordForm() {
@@ -66,7 +65,7 @@ export function PasswordForm() {
       });
       setIsEditingPassword(false);
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
+    } catch {
       setError('Wystąpił błąd podczas zmiany hasła');
     } finally {
       setIsLoading(false);

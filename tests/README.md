@@ -114,11 +114,37 @@ tests/
 
 Tests use the Supabase admin API to create and clean up test users. All test users are created with email addresses prefixed with `test-playwright-` to make them easily identifiable.
 
+### Test Isolation Best Practices
+
+**IMPORTANT**: For reliable tests, always create unique test data per test. This prevents race conditions and cross-test interference.
+
+#### ✅ Recommended: Use Unique Users Per Test
+
+```typescript
+import { createUniqueTestUsers } from '../helpers/offer-helpers';
+
+test('my test', async ({ page }) => {
+  // Create unique users for this test
+  const { contractor, manager } = await createUniqueTestUsers();
+  
+  // Use contractor.email, contractor.password, contractor.user.id, contractor.company.id
+  // Use manager.email, manager.password, manager.user.id, manager.company.id
+  
+  // Test code here...
+  
+  // Cleanup is handled automatically by afterEach hook
+});
+```
+
+#### ❌ Deprecated: Pool Users (Avoid)
+
+Pool users (`getPoolContractorUser()`, `getPoolManagerUser()`) are deprecated and can cause race conditions in parallel tests. They're kept for backward compatibility only.
+
 ### Automatic Cleanup
 
-- Test users are automatically cleaned up after each test suite completes
-- Global teardown runs after all tests to clean up any remaining test users
-- Individual tests clean up their own test users in `finally` blocks
+- **afterEach hooks**: All test files have `afterEach` hooks that automatically clean up test data
+- **finally blocks**: Tests also clean up in `finally` blocks as a backup
+- **Global teardown**: Runs after all tests to clean up any remaining test users
 
 ### Manual Cleanup
 
@@ -149,25 +175,80 @@ test('my test', async ({ authenticatedPage }) => {
 
 ### Creating Test Users
 
+#### For Simple Tests (Single User)
+
 ```typescript
 import { createTestUser, deleteTestUser } from '../helpers/auth-helpers';
 
-test('my test', async ({ page }) => {
-  const email = `test-${Date.now()}@example.com`;
-  const password = 'TestPassword123!';
-  
-  await createTestUser(email, password, 'contractor');
-  
-  try {
+test.describe('My Tests', () => {
+  const testData: { userEmails: string[] } = { userEmails: [] };
+
+  test.beforeEach(() => {
+    testData.userEmails = [];
+  });
+
+  test.afterEach(async () => {
+    for (const email of testData.userEmails) {
+      await deleteTestUser(email).catch(() => {});
+    }
+  });
+
+  test('my test', async ({ page }) => {
+    const email = `test-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
+    const password = 'TestPassword123!';
+    
+    await createTestUser(email, password, 'contractor');
+    testData.userEmails.push(email);
+    
     // Your test code here
-  } finally {
-    await deleteTestUser(email);
-  }
+    // Cleanup happens automatically in afterEach
+  });
+});
+```
+
+#### For Tests Requiring Multiple Users (Contractor + Manager)
+
+```typescript
+import { createUniqueTestUsers, cleanupTestData } from '../helpers/offer-helpers';
+
+test.describe('My Tests', () => {
+  const testData = {
+    jobIds: [],
+    tenderIds: [],
+    companyIds: [],
+    userEmails: [],
+  };
+
+  test.afterEach(async () => {
+    await cleanupTestData(
+      testData.jobIds,
+      testData.tenderIds,
+      testData.companyIds,
+      testData.userEmails
+    );
+    // Reset arrays
+    Object.keys(testData).forEach(key => {
+      testData[key as keyof typeof testData] = [];
+    });
+  });
+
+  test('my test', async ({ page }) => {
+    const { contractor, manager } = await createUniqueTestUsers();
+    testData.userEmails.push(contractor.email, manager.email);
+    testData.companyIds.push(contractor.company.id, manager.company.id);
+    
+    // Create test job
+    const job = await createTestJob(manager.user.id, manager.company.id);
+    testData.jobIds.push(job.id);
+    
+    // Your test code here
+  });
 });
 ```
 
 ### Helper Functions
 
+#### Authentication Helpers (`helpers/auth-helpers.ts`)
 - `loginViaUI(page, email, password)` - Login via UI
 - `logoutViaUI(page)` - Logout via UI
 - `clearAuthState(page)` - Clear all auth cookies and storage
@@ -175,6 +256,18 @@ test('my test', async ({ page }) => {
 - `createTestUser(email, password, userType)` - Create test user
 - `deleteTestUser(email)` - Delete test user
 - `cleanupTestUsers()` - Clean up all test users
+
+#### Test Data Helpers (`helpers/offer-helpers.ts`)
+- `createUniqueTestUsers()` - **Recommended**: Create unique contractor and manager with companies
+- `createTestJob(managerId, companyId, jobData?)` - Create test job
+- `createTestTender(managerId, companyId, tenderData?)` - Create test tender
+- `createTestCompany(userId, companyData?)` - Create test company
+- `cleanupTestData(jobIds, tenderIds, companyIds, userEmails)` - Clean up test data
+- `getPoolContractorUser()` - **Deprecated**: Use `createUniqueTestUsers()` instead
+- `getPoolManagerUser()` - **Deprecated**: Use `createUniqueTestUsers()` instead
+
+#### Transaction Helpers (`helpers/db-transaction-helpers.ts`) - Optional
+- `withTransaction(testFn)` - Execute test within a database transaction (requires database setup)
 
 ## Troubleshooting
 
@@ -238,12 +331,71 @@ Example GitHub Actions workflow:
 
 ## Best Practices
 
-1. **Isolation**: Each test should be independent and clean up after itself
-2. **Unique Data**: Use timestamps or UUIDs to create unique test data
-3. **Cleanup**: Always clean up test users in `finally` blocks
-4. **Wait for Navigation**: Always wait for navigation after form submissions
-5. **Assertions**: Test both UI state and authentication state (cookies, redirects)
-6. **Error Cases**: Test validation and error scenarios comprehensively
+### Test Isolation
+
+1. **Unique Test Data**: Always create unique test data per test using `createUniqueTestUsers()` or unique identifiers
+   ```typescript
+   const email = `test-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
+   ```
+
+2. **No Shared State**: Never share test data between tests (no pool users in new tests)
+
+3. **Cleanup**: Use both `afterEach` hooks and `finally` blocks for reliable cleanup
+
+4. **Test Serialization**: Use `test.describe.serial()` for tests that verify state changes or have dependencies
+   ```typescript
+   test.describe.serial('Critical State Validation', () => {
+     test('should prevent duplicate bids', async ({ page }) => {
+       // This test runs sequentially, not in parallel
+     });
+   });
+   ```
+
+### Test Reliability
+
+1. **Wait for Navigation**: Always wait for navigation after form submissions
+   ```typescript
+   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+   ```
+
+2. **Unique Identifiers**: Use `${Date.now()}-${Math.random().toString(36).substring(7)}` for unique test data
+
+3. **Error Handling**: Handle navigation errors gracefully
+   ```typescript
+   try {
+     await page.goto('/some-page');
+   } catch (error) {
+     // Retry logic or error handling
+   }
+   ```
+
+4. **Assertions**: Test both UI state and authentication state (cookies, redirects)
+
+5. **Timeouts**: Use appropriate timeouts for flaky operations (default is 60 seconds)
+
+### Test Configuration
+
+- **Parallel Execution**: Disabled (`fullyParallel: false`) to prevent race conditions
+- **Workers**: Limited to 1-2 workers locally, 1 in CI
+- **Global Timeout**: 60 seconds per test
+- **Retries**: Only in CI (2 retries)
+
+### When to Run Tests
+
+- **Before Committing**: Run full test suite
+- **During Development**: Run only the file you're working on
+- **After Major Changes**: Run full suite
+- **In CI/CD**: Always run all tests
+
+### Troubleshooting Flaky Tests
+
+If tests are flaky:
+
+1. **Check for shared state**: Ensure tests use unique data
+2. **Verify cleanup**: Check that `afterEach` hooks are running
+3. **Increase timeouts**: For slow operations
+4. **Use serialization**: For tests that modify shared state
+5. **Check test isolation**: Ensure tests don't depend on each other
 
 
 

@@ -55,14 +55,6 @@ export function GlobalCommandPalette() {
     setOpen(false);
   };
 
-  const _runCommand = (value: string) => {
-    // Find the entry that matches the selected value
-    const entry = filteredEntries.find(e => e.label === value);
-    if (entry) {
-      handleSelect(entry);
-    }
-  };
-
   return (
     <CommandDialog 
       open={open} 

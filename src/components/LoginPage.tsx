@@ -55,12 +55,12 @@ export function LoginPage({ searchParams }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-16">
+    <div className="min-h-screen bg-slate-50 py-16" data-testid="login-page">
       <div className="container mx-auto px-4">
         <div className="max-w-md mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2" data-testid="login-heading">
               Zaloguj się
             </h1>
             <p className="text-slate-600">

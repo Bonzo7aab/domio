@@ -363,8 +363,6 @@ const MapComponent: React.FC<{
               }
 
               // Update marker visibility based on new bounds
-              // Note: updateMarkerVisibility is defined below, but called here in a callback
-              // This is safe because the callback executes after the function is defined
               if (markerPoolRef.current && currentBoundsRef.current) {
                 const bounds = currentBoundsRef.current;
                 const pool = markerPoolRef.current;
@@ -431,31 +429,6 @@ const MapComponent: React.FC<{
       }
     }
   }, [mapRef, map, center, zoom, onMapClick, onBoundsChanged, markers, isMobile]);
-
-  // Helper function to update marker visibility based on bounds
-  const _updateMarkerVisibility = useCallback((mapInstance: google.maps.Map, markerData: MapMarker[]) => {
-    if (!markerPoolRef.current || !currentBoundsRef.current) return;
-
-    const bounds = currentBoundsRef.current;
-    const pool = markerPoolRef.current;
-    const activeMarkers = pool.getActiveMarkers();
-
-    // Update visibility for all markers
-    markerData.forEach((markerConfig) => {
-      const isVisible = isMarkerInBounds(markerConfig.position, bounds);
-      const marker = activeMarkers.get(markerConfig.id);
-
-      if (marker) {
-        if (isVisible && !marker.map) {
-          // Marker should be visible but isn't - add it back
-          marker.map = mapInstance;
-        } else if (!isVisible && marker.map) {
-          // Marker should be hidden - remove from map
-          marker.map = null;
-        }
-      }
-    });
-  }, []);
 
   // Update map center and zoom when props change
   useEffect(() => {
@@ -562,7 +535,7 @@ const MapComponent: React.FC<{
     let mapBounds: google.maps.LatLngBounds | null = null;
     try {
       mapBounds = map.getBounds();
-    } catch (_e) {
+    } catch {
       // Map might not be ready yet
       console.debug('Map bounds not available yet');
     }

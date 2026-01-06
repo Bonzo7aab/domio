@@ -43,19 +43,25 @@ async function globalSetup(config: FullConfig) {
       await cleanupTestUsers();
     } catch (error) {
       console.warn('Failed to cleanup test users during setup:', error);
+      // Don't fail setup if cleanup fails - tests can still run
     }
   }
 
-  // Initialize test user pool
+  // Initialize test user pool (deprecated - kept for backward compatibility)
+  // Note: New tests should use createUniqueTestUsers() instead for better isolation
   if (serviceRoleKey) {
     try {
       await initializePool();
+      console.warn('⚠️  Pool users initialized (deprecated).');
+      console.warn('  Consider migrating tests to use createUniqueTestUsers() for better test isolation.');
     } catch (error) {
       console.error('Failed to initialize test user pool:', error);
-      throw error;
+      // Don't fail setup - pool users are optional and deprecated
+      console.warn('  Continuing without pool users. Tests using createUniqueTestUsers() will still work.');
     }
   } else {
     console.warn('Warning: Cannot initialize test user pool without SUPABASE_SERVICE_ROLE_KEY');
+    console.warn('  Tests using createUniqueTestUsers() will still work.');
   }
 
   // Verify the app is accessible

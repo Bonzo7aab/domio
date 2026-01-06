@@ -1,4 +1,4 @@
-import type { Budget, BudgetInput } from './budget';
+import type { Budget } from './budget';
 
 export interface Job {
   // Core identifiers

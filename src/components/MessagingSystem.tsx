@@ -8,9 +8,7 @@ import {
   MapPin,
   Clock,
   ExternalLink,
-  Gavel,
   ArrowLeft,
-  Calendar,
   Briefcase
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
@@ -25,7 +23,6 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Textarea } from './ui/textarea';
-import { Card, CardContent } from './ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { getJobById, getTenderById } from '../lib/data';
 import { useRouter } from 'next/navigation';
@@ -47,7 +44,7 @@ interface MessagingSystemProps {
 export const MessagingSystem: React.FC<MessagingSystemProps> = ({
   onClose,
   initialConversationId,
-  initialRecipientId,
+  initialRecipientId: _initialRecipientId,
   isFullPage = false,
   initialConversations,
   initialMessages,
@@ -82,7 +79,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
   }, [isMobile, initialConversationId]);
   const [newMessage, setNewMessage] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [isTyping] = useState(false);
   const [jobData, setJobData] = useState<{ id: string; title: string; company: string; location?: string | { city?: string }; salary?: string } | null>(null);
   const [isLoadingJob, setIsLoadingJob] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
@@ -104,7 +101,6 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
   }, []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingAttachmentsRef = useRef<MessageAttachment[]>([]);
   const router = useRouter();

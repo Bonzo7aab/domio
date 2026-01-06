@@ -78,6 +78,7 @@ async function fetchData<T, TArgs extends unknown[] = unknown[]>(
  * @param args - Arguments to pass to database function (after supabase client)
  * @returns Data from database
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function fetchDataFromDB<T>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dbFetch: (supabase: any, ...args: any[]) => Promise<T>,

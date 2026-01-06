@@ -166,6 +166,14 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:129',message:'after onApplicationSubmit call',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
       // #endregion
+      
+      // Wait a brief moment to ensure toast is displayed before closing modal
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Close modal after successful submission
+      // The parent component (JobPage) will handle showing the success toast
+      // We close the modal here to ensure it closes even if parent doesn't
+      onClose();
     } catch (error) {
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:131',message:'error in handleSubmit',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
@@ -248,7 +256,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
               )}
               
               {/* Visits */}
-              {(jobData as { visits_count?: number }).visits_count !== undefined && ((jobData as { visits_count?: number }).visits_count || 0) > 0 && (
+              {jobData && (jobData as { visits_count?: number }).visits_count !== undefined && ((jobData as { visits_count?: number }).visits_count || 0) > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
                   <span className="text-xs sm:text-sm text-gray-700 font-medium">{(jobData as { visits_count?: number }).visits_count || 0} wyświetleń</span>
                 </div>
@@ -316,8 +324,15 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                   </div>
                   <div>
                     <Label htmlFor="estimatedCompletion">Czas realizacji *</Label>
-                    <Select onValueChange={(value) => handleInputChange('estimatedCompletion', value)}>
-                      <SelectTrigger className={errors.estimatedCompletion ? 'border-red-500' : ''}>
+                    <Select 
+                      value={applicationForm.estimatedCompletion}
+                      onValueChange={(value) => handleInputChange('estimatedCompletion', value)}
+                    >
+                      <SelectTrigger 
+                        id="estimatedCompletion"
+                        className={errors.estimatedCompletion ? 'border-red-500' : ''}
+                        aria-label="Czas realizacji"
+                      >
                         <SelectValue placeholder="Wybierz czas realizacji" />
                       </SelectTrigger>
                       <SelectContent>

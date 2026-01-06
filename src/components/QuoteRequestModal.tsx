@@ -7,7 +7,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { DollarSign, MapPin, Clock, FileText, Send, Loader2 } from 'lucide-react';
+import { DollarSign, MapPin, Send, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';

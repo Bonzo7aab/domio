@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from 'react';
-import { Award, Building, Calendar, CheckCircle, Clock, MapPin, Phone, Shield, Star, Users } from 'lucide-react';
+import { Award, Calendar, CheckCircle, Clock, MapPin, Shield, Star, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { useUserProfile } from '../../contexts/AuthContext';
 import { createClient } from '../../lib/supabase/client';
@@ -20,13 +19,16 @@ interface ManagerProfileHeaderProps {
 export function ManagerProfileHeader({ profile }: ManagerProfileHeaderProps) {
   const router = useRouter();
   const { user } = useUserProfile();
-  const [showPhoneNumber, setShowPhoneNumber] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showPhoneNumber, setShowPhoneNumber] = useState(false);
 
-  const handleBack = () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleBack = () => {
     router.push('/managers');
   };
 
-  const handleStartConversation = async () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleStartConversation = async () => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby rozpocząć konwersację');
       router.push(`/login?redirectTo=${encodeURIComponent(window.location.pathname)}`);
@@ -148,7 +150,8 @@ export function ManagerProfileHeader({ profile }: ManagerProfileHeaderProps) {
     specialties: profile.services?.primaryNeeds?.slice(0, 5) || [],
   };
 
-  const getOrganizationTypeLabel = (type: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _getOrganizationTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       'wspólnota': 'Wspólnota mieszkaniowa',
       'spółdzielnia': 'Spółdzielnia mieszkaniowa',

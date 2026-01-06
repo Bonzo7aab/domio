@@ -13,7 +13,6 @@ import {
   Building,
   Clock,
   FileText,
-  Download,
   X
 } from 'lucide-react';
 

@@ -32,7 +32,7 @@ import JobFilters from './JobFilters';
 export function MobileMenuDock() {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated } = useUserProfile();
+  const { isAuthenticated } = useUserProfile();
   const { isMapExpanded, setIsMapExpanded } = useLayoutContext();
   const { filters, setFilters, primaryLocation, onLocationChangeRequest } = useFilterContext();
   const { loadedJobs } = useJobsContext();

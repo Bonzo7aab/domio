@@ -114,7 +114,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
         setHasCompany(false);
         setCompanyId(null);
       }
-    } catch (_err) {
+    } catch {
       if (isMounted.current) {
         setHasCompany(false);
         setCompanyId(null);
@@ -237,7 +237,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
 
     try {
       const supabase = createClient();
-      const { data: _savedCompany, error: saveError } = await upsertUserCompany(
+      const { error: saveError } = await upsertUserCompany(
         supabase,
         user.id,
         {
@@ -271,7 +271,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
         await loadCompany();
         setTimeout(() => setSuccess(''), 3000);
       }
-    } catch (_err) {
+    } catch {
       setError('Wystąpił błąd podczas zapisywania');
     } finally {
       setIsLoading(false);

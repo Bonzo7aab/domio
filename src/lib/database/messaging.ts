@@ -41,6 +41,7 @@ interface NotificationRow {
   [key: string]: unknown;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface MessageReadStatusRow {
   message_id: string;
   user_id: string;

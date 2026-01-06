@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Check, MapPin, Award, Upload, Phone, Mail, Shield, Building } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, MapPin, Award, Shield, Building } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
@@ -79,7 +79,8 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
     propertyTypes: []
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isLoadingCompany, setIsLoadingCompany] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isLoadingCompany, setIsLoadingCompany] = useState(true);
 
   // Fetch and pre-fill company data
   useEffect(() => {

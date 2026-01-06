@@ -1,40 +1,51 @@
 import { test, expect } from '@playwright/test';
 import { createTestUser, loginViaUI, clearAuthState } from '../helpers/auth-helpers';
 import {
-  getPoolContractorUser,
-  getPoolManagerUser,
+  createUniqueTestUsers,
   createTestJob,
   createTestTender,
   cleanupTestData,
 } from '../helpers/offer-helpers';
 
 test.describe('Contractor Making Offers', () => {
+  // Track test data for cleanup
+  const testData: { jobIds: string[]; tenderIds: string[]; companyIds: string[]; userEmails: string[] } = {
+    jobIds: [],
+    tenderIds: [],
+    companyIds: [],
+    userEmails: [],
+  };
+
   test.beforeEach(async ({ page }) => {
     await clearAuthState(page);
+    // Reset test data tracking
+    testData.jobIds = [];
+    testData.tenderIds = [];
+    testData.companyIds = [];
+    testData.userEmails = [];
+  });
+
+  test.afterEach(async () => {
+    // Cleanup after each test to ensure no leftover data
+    await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
   });
 
   test.describe('Regular Job Offer Submission', () => {
     test('should successfully submit offer on regular job with all required fields', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser();
-        const poolManager = await getPoolManagerUser();
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testJob = await createTestJob(poolManager.user.id, poolManager.company.id, {
-          title: `Test Job for Offer ${Date.now()}`,
+        const testJob = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job for Offer ${Date.now()}-${Math.random().toString(36).substring(7)}`,
           description: 'This is a test job for submitting offers',
         });
-        jobIds.push(testJob.id);
+        testData.jobIds.push(testJob.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to job page with error handling for interrupted navigation
         try {
@@ -126,28 +137,24 @@ test.describe('Contractor Making Offers', () => {
         await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
       } finally {
         // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, []);
       }
     });
 
     test('should successfully submit offer with optional additional notes', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(1);
-        const poolManager = await getPoolManagerUser(1);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testJob = await createTestJob(poolManager.user.id, poolManager.company.id);
-        jobIds.push(testJob.id);
+        const testJob = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        });
+        testData.jobIds.push(testJob.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to job page with error handling for interrupted navigation
         try {
@@ -217,33 +224,27 @@ test.describe('Contractor Making Offers', () => {
         // Verify form closes after success
         await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
   });
 
   test.describe('Tender Bid Submission', () => {
     test('should successfully submit bid on tender with all required fields', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser();
-        const poolManager = await getPoolManagerUser();
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testTender = await createTestTender(poolManager.user.id, poolManager.company.id, {
-          title: `Test Tender for Bid ${Date.now()}`,
+        const testTender = await createTestTender(manager.user.id, manager.company.id, {
+          title: `Test Tender for Bid ${Date.now()}-${Math.random().toString(36).substring(7)}`,
         });
-        tenderIds.push(testTender.id);
+        testData.tenderIds.push(testTender.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to tender page (tenders use same route structure as jobs) with error handling
         try {
@@ -299,29 +300,25 @@ test.describe('Contractor Making Offers', () => {
         // Verify form closes after success
         await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
 
     test('should successfully submit bid with optional additional notes', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(1);
-        const poolManager = await getPoolManagerUser(1);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testTender = await createTestTender(poolManager.user.id, poolManager.company.id);
-        tenderIds.push(testTender.id);
+        const testTender = await createTestTender(manager.user.id, manager.company.id, {
+          title: `Test Tender ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        });
+        testData.tenderIds.push(testTender.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to tender page with error handling
         try {
@@ -374,37 +371,41 @@ test.describe('Contractor Making Offers', () => {
         // Submit form
         await page.getByRole('button', { name: /wyślij ofertę w przetargu/i }).click();
 
-        // Verify success
-        await expect(page.getByText(/oferta w przetargu została złożona pomyślnie/i)).toBeVisible({ timeout: 10000 });
+        // Wait for loading state to appear (button shows "Wysyłanie...")
+        await page.waitForTimeout(500);
+
+        // Wait for success message (toast) - sonner toasts use [data-sonner-toast]
+        await expect(
+          page.locator('[data-sonner-toast]').filter({ hasText: /oferta w przetargu została złożona pomyślnie/i }).first()
+        ).toBeVisible({ timeout: 20000 });
+
+        // Verify form closes after success
         await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
   });
 
   test.describe('Validation Tests', () => {
     test('should prevent submission when contractor has no company', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-      const userEmails: string[] = [];
-
       try {
         // This test needs a contractor WITHOUT company, so create a new one
-        // But use pool manager for the job
-        const poolManager = await getPoolManagerUser();
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique manager for the job
+        const { manager } = await createUniqueTestUsers();
+        testData.userEmails.push(manager.email);
+        testData.companyIds.push(manager.company.id);
 
         const contractorEmail = `test-no-company-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
         const contractorPassword = 'TestPassword123!';
         await createTestUser(contractorEmail, contractorPassword, 'contractor');
-        userEmails.push(contractorEmail);
+        testData.userEmails.push(contractorEmail);
 
-        const testJob = await createTestJob(poolManager.user.id, poolManager.company.id);
-        jobIds.push(testJob.id);
+        const testJob = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        });
+        testData.jobIds.push(testJob.id);
 
         // Login as contractor
         await loginViaUI(page, contractorEmail, contractorPassword);
@@ -447,28 +448,25 @@ test.describe('Contractor Making Offers', () => {
 
         expect(hasError).toBe(true);
       } finally {
-        await cleanupTestData(jobIds, tenderIds, companyIds, userEmails);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
 
     test('should prevent submission with missing required fields', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(2);
-        const poolManager = await getPoolManagerUser(2);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testJob = await createTestJob(poolManager.user.id, poolManager.company.id);
-        jobIds.push(testJob.id);
+        const testJob = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        });
+        testData.jobIds.push(testJob.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to job page with error handling for interrupted navigation
         try {
@@ -512,29 +510,25 @@ test.describe('Contractor Making Offers', () => {
           )
         ).first()).toBeVisible({ timeout: 5000 });
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
 
     test('should prevent submission with invalid price (0 or negative)', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(0);
-        const poolManager = await getPoolManagerUser(0);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testJob = await createTestJob(poolManager.user.id, poolManager.company.id);
-        jobIds.push(testJob.id);
+        const testJob = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        });
+        testData.jobIds.push(testJob.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to job page with error handling for interrupted navigation
         try {
@@ -589,29 +583,27 @@ test.describe('Contractor Making Offers', () => {
           page.getByText(/wypełnij wszystkie wymagane pola/i)
         ).first()).toBeVisible({ timeout: 5000 });
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
 
-    test('should prevent duplicate bids on same tender', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
+    // Serialize critical tests that verify state changes or have dependencies
+    test.describe.serial('Critical State Validation', () => {
+      test('should prevent duplicate bids on same tender', async ({ page }) => {
+        try {
+          // Create unique users for this test to avoid race conditions
+          const { contractor, manager } = await createUniqueTestUsers();
+          testData.userEmails.push(contractor.email, manager.email);
+          testData.companyIds.push(contractor.company.id, manager.company.id);
 
-      try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(1);
-        const poolManager = await getPoolManagerUser(1);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
-
-        const testTender = await createTestTender(poolManager.user.id, poolManager.company.id);
-        tenderIds.push(testTender.id);
+          const testTender = await createTestTender(manager.user.id, manager.company.id, {
+            title: `Test Tender ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          });
+          testData.tenderIds.push(testTender.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to tender page with error handling
         try {
@@ -689,36 +681,33 @@ test.describe('Contractor Making Offers', () => {
           expect(isDisabled).toBe(true);
         }
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
+    });
     });
 
     test('should allow multiple applications on different jobs', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(2);
-        const poolManager = await getPoolManagerUser(2);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testJob1 = await createTestJob(poolManager.user.id, poolManager.company.id, {
-          title: `Test Job 1 ${Date.now()}`,
+        const uniqueId1 = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const uniqueId2 = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const testJob1 = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job 1 ${uniqueId1}`,
         });
-        jobIds.push(testJob1.id);
+        testData.jobIds.push(testJob1.id);
 
-        const testJob2 = await createTestJob(poolManager.user.id, poolManager.company.id, {
-          title: `Test Job 2 ${Date.now()}`,
+        const testJob2 = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job 2 ${uniqueId2}`,
         });
-        jobIds.push(testJob2.id);
+        testData.jobIds.push(testJob2.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Submit offer on first job with error handling
         try {
@@ -758,11 +747,14 @@ test.describe('Contractor Making Offers', () => {
         );
 
         await page.getByRole('button', { name: /wyślij ofertę/i }).click();
+        
+        // Wait for loading state
+        await page.waitForTimeout(500);
+        
+        // Wait for success message (toast) - sonner toasts use [data-sonner-toast]
         await expect(
-          page.getByText(/oferta została złożona pomyślnie/i).or(
-            page.locator('[role="status"]').filter({ hasText: /oferta/i })
-          )
-        ).toBeVisible({ timeout: 15000 });
+          page.locator('[data-sonner-toast]').filter({ hasText: /oferta została złożona pomyślnie/i }).first()
+        ).toBeVisible({ timeout: 20000 });
 
         // Submit offer on second job with error handling
         try {
@@ -802,33 +794,36 @@ test.describe('Contractor Making Offers', () => {
         );
 
         await page.getByRole('button', { name: /wyślij ofertę/i }).click();
-        await expect(page.getByText(/oferta została złożona pomyślnie/i)).toBeVisible({ timeout: 10000 });
+        
+        // Wait for loading state
+        await page.waitForTimeout(500);
+        
+        // Wait for success message (toast) - sonner toasts use [data-sonner-toast]
+        await expect(
+          page.locator('[data-sonner-toast]').filter({ hasText: /oferta została złożona pomyślnie/i }).first()
+        ).toBeVisible({ timeout: 20000 });
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
   });
 
   test.describe('UI Interaction Tests', () => {
     test('should display form fields correctly', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(0);
-        const poolManager = await getPoolManagerUser(0);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testJob = await createTestJob(poolManager.user.id, poolManager.company.id);
-        jobIds.push(testJob.id);
+        const testJob = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        });
+        testData.jobIds.push(testJob.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to job page with error handling for interrupted navigation
         try {
@@ -872,29 +867,25 @@ test.describe('Contractor Making Offers', () => {
         await expect(page.getByRole('button', { name: /anuluj/i })).toBeVisible();
         await expect(page.getByRole('button', { name: /wyślij ofertę/i })).toBeVisible();
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
 
     test('should show loading state during submission', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(1);
-        const poolManager = await getPoolManagerUser(1);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testJob = await createTestJob(poolManager.user.id, poolManager.company.id);
-        jobIds.push(testJob.id);
+        const testJob = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        });
+        testData.jobIds.push(testJob.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to job page with error handling for interrupted navigation
         try {
@@ -964,29 +955,25 @@ test.describe('Contractor Making Offers', () => {
         // Loading state should appear (either disabled button or loading text)
         expect(hasLoadingState).toBe(true);
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
 
     test('should allow canceling form submission', async ({ page }) => {
-      const jobIds: string[] = [];
-      const companyIds: string[] = [];
-      const tenderIds: string[] = [];
-
       try {
-        // Use pool users instead of creating new ones
-        const poolContractor = await getPoolContractorUser(2);
-        const poolManager = await getPoolManagerUser(2);
-        
-        // Don't add pool user companies to cleanup - they're shared resources
-        // companyIds.push(poolManager.company.id);
+        // Create unique users for this test to avoid race conditions
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
 
-        const testJob = await createTestJob(poolManager.user.id, poolManager.company.id);
-        jobIds.push(testJob.id);
+        const testJob = await createTestJob(manager.user.id, manager.company.id, {
+          title: `Test Job ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        });
+        testData.jobIds.push(testJob.id);
 
         // Login as contractor
-        await loginViaUI(page, poolContractor.email, poolContractor.password);
+        await loginViaUI(page, contractor.email, contractor.password);
 
         // Navigate to job page with error handling for interrupted navigation
         try {
@@ -1028,8 +1015,8 @@ test.describe('Contractor Making Offers', () => {
         // Form should close
         await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
       } finally {
-        // Clean up jobs/tenders/companies but not pool users
-        await cleanupTestData(jobIds, tenderIds, companyIds, []);
+        // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });
   });

@@ -8,7 +8,7 @@ import { useEffect } from 'react';
  * This component should be included in the root layout
  */
 export function ServiceWorkerRegistration() {
-  const { isSupported, isLoading, error } = useServiceWorker();
+  const { error } = useServiceWorker();
 
   useEffect(() => {
     if (error) {

@@ -11,7 +11,6 @@ import { Card, CardContent } from './ui/card';
 import { 
   Upload, 
   X, 
-  Image as ImageIcon,
   Calendar,
   MapPin,
   DollarSign,
@@ -101,7 +100,7 @@ export default function PortfolioProjectForm({
   });
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>(initialData?.images || []);
-  const [existingImageIds, setExistingImageIds] = useState<string[]>([]); // Track existing image file IDs
+  // Track existing image file IDs (removed unused state)
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (field: string, value: string | boolean) => {

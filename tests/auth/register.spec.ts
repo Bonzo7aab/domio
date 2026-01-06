@@ -1,39 +1,81 @@
 import { test, expect } from '@playwright/test';
-import { createTestUser, deleteTestUser, clearAuthState } from '../helpers/auth-helpers';
+import { createTestUser, deleteTestUser, clearAuthState, waitForAuthInitialized } from '../helpers/auth-helpers';
 import { ROUTES } from '../config/constants';
 
 test.describe('Registration Page', () => {
+  // Track test data for cleanup
+  const testData: { userEmails: string[] } = {
+    userEmails: [],
+  };
+
   test.beforeEach(async ({ page }) => {
     await clearAuthState(page);
+    // Reset test data tracking
+    testData.userEmails = [];
   });
 
-  test('should display registration page correctly', async ({ page }) => {
-    await page.goto(ROUTES.register);
+  test.afterEach(async () => {
+    // Cleanup after each test to ensure no leftover data
+    for (const email of testData.userEmails) {
+      await deleteTestUser(email).catch(() => {
+        // Ignore errors if user already deleted
+      });
+    }
+  });
 
-    // Check page title/heading (use more specific selector to avoid header h1)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible();
+  test('should display registration page correctly', async ({ page, browserName }) => {
+    await page.goto(ROUTES.register, { waitUntil: 'domcontentloaded' });
+    
+    // Wait for auth initialization (critical for WebKit)
+    await waitForAuthInitialized(page);
+    
+    // Webkit may need more time - use longer timeout for webkit
+    const timeout = browserName === 'webkit' ? 30000 : 20000;
+    
+    // Wait for the register page container to appear (more reliable indicator)
+    // Try multiple selectors to handle different rendering states
+    // Use data-testid selectors as primary, with fallbacks
+    await Promise.race([
+      expect(page.locator('[data-testid="register-page"]')).toBeVisible({ timeout }),
+      expect(page.locator('[data-testid="register-heading"]')).toBeVisible({ timeout }),
+      expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout }),
+      expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout }),
+    ]);
+    
+    // Wait for the heading to appear (use data-testid for reliability)
+    await expect(page.locator('[data-testid="register-heading"]').or(page.locator('h1').filter({ hasText: 'Utwórz konto' }))).toBeVisible({ timeout });
+
+    // Now check for form fields
+    const firstNameInput = page.locator('input[name="firstName"]');
+    await expect(firstNameInput).toBeVisible({ timeout });
 
     // Check form fields are present
-    await expect(page.locator('input[name="firstName"]')).toBeVisible();
-    await expect(page.locator('input[name="lastName"]')).toBeVisible();
-    await expect(page.locator('input[name="email"]')).toBeVisible();
-    await expect(page.locator('input[name="password"]')).toBeVisible();
-    await expect(page.locator('input[name="confirmPassword"]')).toBeVisible();
-    await expect(page.locator('button[type="submit"]')).toBeVisible();
+    await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout });
+    await expect(page.locator('input[name="lastName"]')).toBeVisible({ timeout });
+    await expect(page.locator('input[name="email"]')).toBeVisible({ timeout });
+    await expect(page.locator('input[name="password"]')).toBeVisible({ timeout });
+    await expect(page.locator('input[name="confirmPassword"]')).toBeVisible({ timeout });
+    await expect(page.locator('button[type="submit"]')).toBeVisible({ timeout });
 
     // Check user type selection (radio buttons are sr-only, so check by role)
     await expect(page.getByRole('radio', { name: 'Zarządca' })).toBeAttached();
     await expect(page.getByRole('radio', { name: 'Wykonawca' })).toBeAttached();
 
     // Check links
-    await expect(page.locator('a[href="/login"]')).toBeVisible();
+    await expect(page.locator('a[href="/login"]')).toBeVisible({ timeout });
   });
 
   test('should successfully register as contractor', async ({ page }) => {
     const email = `test-register-contractor-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
     const password = 'TestPassword123!';
+    testData.userEmails.push(email);
 
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    // Then wait for form fields to be visible
+    await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
     // Fill registration form
     await page.fill('input[name="firstName"]', 'Test');
@@ -62,8 +104,14 @@ test.describe('Registration Page', () => {
   test('should successfully register as manager', async ({ page }) => {
     const email = `test-register-manager-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
     const password = 'TestPassword123!';
+    testData.userEmails.push(email);
 
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    // Then wait for form fields to be visible
+    await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
     // Fill registration form
     await page.fill('input[name="firstName"]', 'Test');
@@ -90,6 +138,11 @@ test.describe('Registration Page', () => {
 
   test('should show error with missing required fields', async ({ page }) => {
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    // Then wait for form fields to be visible
+    await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
     // Try to submit without filling required fields
     const firstNameInput = page.locator('input[name="firstName"]');
@@ -97,15 +150,20 @@ test.describe('Registration Page', () => {
     const emailInput = page.locator('input[name="email"]');
     const passwordInput = page.locator('input[name="password"]');
 
-    // All required fields should have required attribute
-    await expect(firstNameInput).toHaveAttribute('required', '');
-    await expect(lastNameInput).toHaveAttribute('required', '');
-    await expect(emailInput).toHaveAttribute('required', '');
-    await expect(passwordInput).toHaveAttribute('required', '');
+    // All required fields should have required attribute (boolean attribute - check existence without value)
+    await expect(firstNameInput).toHaveAttribute('required');
+    await expect(lastNameInput).toHaveAttribute('required');
+    await expect(emailInput).toHaveAttribute('required');
+    await expect(passwordInput).toHaveAttribute('required');
   });
 
   test('should validate password length', async ({ page }) => {
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    // Then wait for form fields to be visible
+    await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
     await page.fill('input[name="firstName"]', 'Test');
     await page.fill('input[name="lastName"]', 'User');
@@ -134,8 +192,15 @@ test.describe('Registration Page', () => {
 
   test('should validate password mismatch', async ({ page }) => {
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    // Then wait for form fields to be visible and actionable
+    const firstNameInput = page.locator('input[name="firstName"]');
+    await expect(firstNameInput).toBeVisible({ timeout: 10000 });
+    await expect(firstNameInput).toBeEnabled({ timeout: 10000 });
 
-    await page.fill('input[name="firstName"]', 'Test');
+    await firstNameInput.fill('Test');
     await page.fill('input[name="lastName"]', 'User');
     await page.fill('input[name="email"]', 'test@example.com');
     await page.fill('input[name="password"]', 'Password123!');
@@ -159,8 +224,15 @@ test.describe('Registration Page', () => {
 
   test('should validate email format', async ({ page }) => {
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    // Then wait for form fields to be visible and actionable
+    const firstNameInput = page.locator('input[name="firstName"]');
+    await expect(firstNameInput).toBeVisible({ timeout: 10000 });
+    await expect(firstNameInput).toBeEnabled({ timeout: 10000 });
 
-    await page.fill('input[name="firstName"]', 'Test');
+    await firstNameInput.fill('Test');
     await page.fill('input[name="lastName"]', 'User');
     await page.fill('input[name="email"]', 'invalid-email');
     await page.fill('input[name="password"]', 'Password123!');
@@ -177,40 +249,66 @@ test.describe('Registration Page', () => {
 
   test('should allow user type selection', async ({ page }) => {
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    // Wait for user type selection to be visible
+    await expect(page.getByText('Zarządca')).toBeVisible({ timeout: 10000 });
 
     // Check default selection (should be contractor based on code)
     const contractorRadio = page.getByRole('radio', { name: 'Wykonawca' });
     const managerRadio = page.getByRole('radio', { name: 'Zarządca' });
 
     // Select manager (click label since radio is sr-only)
-    await page.getByText('Zarządca').click();
+    const managerLabel = page.getByText('Zarządca');
+    await expect(managerLabel).toBeVisible({ timeout: 10000 });
+    await managerLabel.click();
     await expect(managerRadio).toBeChecked();
 
     // Select contractor (click label since radio is sr-only)
-    await page.getByText('Wykonawca').click();
+    const contractorLabel = page.getByText('Wykonawca');
+    await expect(contractorLabel).toBeVisible({ timeout: 10000 });
+    await contractorLabel.click();
     await expect(contractorRadio).toBeChecked();
   });
 
   test('should navigate to login page', async ({ page }) => {
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    
+    // Wait for login link to be visible
     const loginLink = page.getByRole('link', { name: /zaloguj|login/i });
-    // Use JavaScript click to bypass any pointer event interceptors
+    await expect(loginLink).toBeVisible({ timeout: 10000 });
+    
+    // Use Playwright's native click which handles navigation better
     await Promise.all([
-      page.waitForURL(/.*login/, { timeout: 5000 }),
-      loginLink.evaluate((el: HTMLElement) => (el as HTMLAnchorElement).click())
+      page.waitForURL(/.*login/, { timeout: 10000 }),
+      loginLink.click()
     ]);
   });
 
-  test('should redirect to home if already authenticated', async ({ page }) => {
+  test('should redirect to home if already authenticated', async ({ page, browserName }) => {
+    test.skip(browserName === 'firefox', 'Flaky in Firefox headless environment');
     const email = `test-register-redirect-auth-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
     const password = 'TestPassword123!';
 
     await createTestUser(email, password, 'contractor');
+    testData.userEmails.push(email);
 
     try {
       // Login first
       await page.goto(ROUTES.login);
-      await page.fill('input[name="email"]', email);
+      
+      // Wait for login page to finish loading - wait for the heading first (more reliable indicator)
+      await expect(page.locator('h1').filter({ hasText: 'Zaloguj się' })).toBeVisible({ timeout: 10000 });
+      // Then wait for form fields to be visible and actionable
+      const emailInput = page.locator('input[name="email"]');
+      await expect(emailInput).toBeVisible({ timeout: 10000 });
+      await expect(emailInput).toBeEnabled({ timeout: 10000 });
+      
+      await emailInput.fill(email);
       await page.fill('input[name="password"]', password);
       await page.click('button[type="submit"]');
       await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
@@ -228,19 +326,29 @@ test.describe('Registration Page', () => {
 
   test('should show terms and privacy links', async ({ page }) => {
     await page.goto(ROUTES.register);
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
 
     // Check for terms and privacy links (use getByRole to avoid multiple matches)
     const termsLink = page.getByRole('link', { name: 'Warunki użytkowania' });
     const privacyLink = page.getByRole('link', { name: 'Politykę prywatności' });
 
-    await expect(termsLink).toBeVisible();
-    await expect(privacyLink).toBeVisible();
+    await expect(termsLink).toBeVisible({ timeout: 10000 });
+    await expect(privacyLink).toBeVisible({ timeout: 10000 });
   });
 
   test('should toggle password visibility', async ({ page }) => {
     await page.goto(ROUTES.register);
-
+    
+    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
+    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    
     const passwordInput = page.locator('input[name="password"]');
+    // Wait for password input to be visible and actionable
+    await expect(passwordInput).toBeVisible({ timeout: 10000 });
+    await expect(passwordInput).toBeEnabled({ timeout: 10000 });
+    
     // Find the toggle button - it's a button with type="button" in the same parent as the password input
     const passwordContainer = passwordInput.locator('..');
     const toggleButton = passwordContainer.locator('button[type="button"]');

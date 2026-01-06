@@ -900,6 +900,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         // #endregion
       }
 
+      // Close modal and reset form after successful submission
       setShowApplicationForm(false);
       
       // Reset form

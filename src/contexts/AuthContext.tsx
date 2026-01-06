@@ -28,7 +28,7 @@ export default function AuthProvider({
   const supabase = createClient()
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true) // Start as loading until we check session
 
   // Fetch user profile from the database
   const fetchUserProfile = useCallback(async (authUser: User): Promise<AuthUser | null> => {
@@ -101,9 +101,8 @@ export default function AuthProvider({
   useEffect(() => {
     let mounted = true
 
-    // Get initial session
-    const getInitialSession = async () => {
-      setIsLoading(true)
+    // Get initial session on mount
+    const initializeSession = async () => {
       try {
         const { data } = await supabase.auth.getSession()
         if (!mounted) return
@@ -111,23 +110,24 @@ export default function AuthProvider({
         setSession(data.session)
         
         if (data.session?.user) {
-          // Fetch user profile for initial session
+          setIsLoading(true)
           const userProfile = await fetchUserProfile(data.session.user)
-          if (mounted) {
-            setUser(userProfile)
-          }
+          if (!mounted) return
+          setUser(userProfile)
+          setIsLoading(false)
+        } else {
+          setUser(null)
+          setIsLoading(false)
         }
       } catch (error) {
-        console.error('Error getting initial session:', error)
-      } finally {
+        console.error('Error initializing session:', error)
         if (mounted) {
           setIsLoading(false)
         }
       }
     }
 
-    // Note: The onAuthStateChange listener below will handle SIGNED_IN events
-    // and fetch the user profile automatically, so we don't need additional checks here
+    initializeSession()
 
     // Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

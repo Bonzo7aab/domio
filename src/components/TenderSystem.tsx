@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
 import { fetchTenders, type TenderWithCompany } from '../lib/database/jobs';
-import { TenderStatus, type Tender } from '../types/tender';
+import { TenderStatus } from '../types/tender';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 // Types now imported from centralized types folder

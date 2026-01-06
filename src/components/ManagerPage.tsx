@@ -45,7 +45,7 @@ interface ManagerPageProps {
   onTenderFormOpened?: () => void;
 }
 
-export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, onTenderFormOpened }: ManagerPageProps) {
+export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTenderForm, onTenderFormOpened }: ManagerPageProps) {
   const { user, isLoading } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,15 +63,17 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanyData | null>(null);
-  const [isLoadingCompany, setIsLoadingCompany] = useState(false);
   // Priority 3: Prevent concurrent fetches
   const isFetchingRef = React.useRef(false);
   // Track client-side mount to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
   // Applications state
-  const [applications, setApplications] = useState<Array<{ id: string; contractor_id: string; job_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
-  const [isLoadingApplications, setIsLoadingApplications] = useState(false);
-  const [selectedJobData, setSelectedJobData] = useState<{ title: string; budget: string } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_applications, setApplications] = useState<Array<{ id: string; contractor_id: string; job_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isLoadingApplications, setIsLoadingApplications] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_selectedJobData, setSelectedJobData] = useState<{ title: string; budget: string } | null>(null);
   // Tender bids state
   const [tenderBids, setTenderBids] = useState<Array<{ id: string; contractor_id: string; tender_id: string; proposed_price: number; proposed_timeline: string; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
   const [isLoadingTenderBids, setIsLoadingTenderBids] = useState(false);
@@ -306,13 +308,6 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     };
   }, [user?.id]);
 
-  const handleStatusChange = (applicationId: string, status: string, notes?: string) => {
-    // In real app, this would update the application in the backend
-  };
-
-  const handleStartConversation = (contractorId: string) => {
-    // In real app, this would open messaging interface
-  };
 
   // Fetch applications when a job is selected
   useEffect(() => {
@@ -472,7 +467,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         setLoadingOverview(true);
         
         // Fetch buildings count for stats
-        const { data: buildingsData, error: buildingsError } = await fetchCompanyBuildings(supabase, companyId);
+        const { data: buildingsData } = await fetchCompanyBuildings(supabase, companyId);
         const buildingsCount = buildingsData?.length || 0;
         const totalUnits = buildingsData?.reduce((sum, b) => sum + (b.units_count || 0), 0) || 0;
         
@@ -840,7 +835,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
       
       if (isEditing) {
         // Update existing tender
-        const { data: updatedTender, error: updateError } = await updateTender(supabase, tenderId, tender as {
+        const { error: updateError } = await updateTender(supabase, tenderId, tender as {
           title: string;
           description: string;
           category: string;
@@ -886,7 +881,7 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
         }
 
         // Save tender to database
-        const { data: savedTender, error: saveError } = await createTender(supabase, {
+        const { error: saveError } = await createTender(supabase, {
           ...(tender as {
             title: string;
             description: string;
@@ -945,12 +940,12 @@ export default function ManagerPage({ onBack, onPostJob, shouldOpenTenderForm, o
     // Stay in tenders tab to view bids
   };
 
-  const handleAwardTender = (bidId: string, notes: string) => {
+  const handleAwardTender = (_bidId: string, _notes: string) => {
     // In real app, this would award the tender
     setShowBidEvaluation(false);
   };
 
-  const handleRejectBid = (bidId: string, reason: string) => {
+  const handleRejectBid = (_bidId: string, _reason: string) => {
     // In real app, this would reject the bid
   };
 

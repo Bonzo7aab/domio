@@ -7,7 +7,6 @@ import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Progress } from './ui/progress';
 import { fetchContractorById, fetchContractorReviews, fetchContractorRatingSummary, fetchContractorPortfolio } from '../lib/database/contractors';
-import { createClient } from '../lib/supabase/client';
 import { QuoteRequestModal } from './QuoteRequestModal';
 import { ServicePricing, ContractorProfile } from '../types/contractor';
 import { getCategoryLabel } from './contractor-dashboard/shared/utils';
@@ -143,7 +142,6 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
   useEffect(() => {
     async function loadContractor() {
       try {
-        const _supabase = createClient();
         const contractorData = await fetchContractorById(contractorId);
         
         if (contractorData) {

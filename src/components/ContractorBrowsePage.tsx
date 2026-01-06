@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { BrowseContractor, ContractorFilters, fetchContractorReviews, fetchContractorRatingSummary } from '../lib/database/contractors';
+import { BrowseContractor, ContractorFilters } from '../lib/database/contractors';
 import { getContractors } from '../lib/data';
 
 interface ContractorBrowsePageProps {
@@ -44,32 +44,12 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [_expandedContractor] = useState<string | null>(null);
-  const [contractorReviews, setContractorReviews] = useState<{[key: string]: Array<Record<string, unknown>>}>({});
-  const [contractorRatings, setContractorRatings] = useState<{[key: string]: Record<string, unknown>}>({});
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_contractorReviews, _setContractorReviews] = useState<{[key: string]: Array<Record<string, unknown>>}>({});
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_contractorRatings, _setContractorRatings] = useState<{[key: string]: Record<string, unknown>}>({});
   const [currentLimit, setCurrentLimit] = useState(6);
   const [hasMoreContractors, setHasMoreContractors] = useState(false);
-
-  // Load reviews for a specific contractor
-  const _loadContractorReviews = async (contractorId: string) => {
-    try {
-      const [reviews, ratings] = await Promise.all([
-        fetchContractorReviews(contractorId, 3), // Load first 3 reviews
-        fetchContractorRatingSummary(contractorId)
-      ]);
-      
-      setContractorReviews(prev => ({
-        ...prev,
-        [contractorId]: reviews
-      }));
-      
-      setContractorRatings(prev => ({
-        ...prev,
-        [contractorId]: ratings
-      }));
-    } catch (err) {
-      console.error('Error loading contractor reviews:', err);
-    }
-  };
 
   // Fetch contractors from database
   useEffect(() => {

@@ -133,7 +133,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
       }
       
       setIsGettingLocation(false);
-    } catch (_error) {
+    } catch {
       setIsGettingLocation(false);
       
       toast.info('Wybierz miasto', {

@@ -579,13 +579,6 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     }
   }, [bookmarkedJobs]);
 
-  const _handleClearSearch = useCallback(() => {
-    setSearchQuery('');
-    if (onClearSearch) {
-      onClearSearch();
-    }
-  }, [onClearSearch]);
-
   const handleLoadMore = useCallback(() => {
     setLoadedCount(prev => prev + 10);
   }, []);

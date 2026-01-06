@@ -291,7 +291,7 @@ export async function cleanupPool(): Promise<void> {
             .from('companies')
             .delete()
             .eq('id', user.companyId);
-        } catch (_error) {
+        } catch {
           // Ignore errors if company doesn't exist
         }
       }

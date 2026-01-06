@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Star, Building, Phone, Mail, Award, ExternalLink, FileText, Users, Clock, CheckCircle, Briefcase } from 'lucide-react';
+import { MapPin, Star, Building, Phone, Mail, Award, ExternalLink, Users, Clock, CheckCircle, Briefcase } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -13,7 +13,6 @@ import { mockManagerDetailsMap } from '../mocks';
 import { getCategoryLabel } from './contractor-dashboard/shared/utils';
 import { createClient } from '../lib/supabase/client';
 import { formatBudget, budgetFromDatabase } from '../types/budget';
-import type { JobWithCompany, TenderWithCompany } from '../lib/database/jobs';
 
 interface ManagerProfilePageProps {
   managerId: string;

@@ -67,8 +67,6 @@ export const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({
     setIsSubmitting(false);
   };
 
-  const _selectedType = feedbackTypes.find(type => type.value === feedbackType);
-
   return (
     <>
       {/* Floating Feedback Button */}

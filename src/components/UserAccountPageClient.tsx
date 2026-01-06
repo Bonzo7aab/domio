@@ -16,7 +16,7 @@ import { Tabs, TabsContent } from './ui/tabs';
 import { cn } from './ui/utils';
 
 export function UserAccountPageClient({ 
-  onBack, 
+  onBack: _onBack, 
   onVerificationClick, 
   onManagerDashboardClick, 
   onContractorDashboardClick 

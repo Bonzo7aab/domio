@@ -13,9 +13,12 @@ export default async function ContractorDashboardLayout({
   const supabase = await createClient();
   
   // Check authentication
+  // Note: Middleware should handle redirects, but this is a fallback
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
+    // Use the actual pathname from the request (middleware should have already redirected)
+    // This is a fallback in case middleware doesn't catch it
     redirect('/login?redirectTo=/contractor-dashboard');
   }
 

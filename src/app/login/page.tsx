@@ -1,13 +1,14 @@
  'use client'
 
 import { Suspense, useEffect } from 'react';
+import React from 'react';
 import { LoginPage } from '../../components/LoginPage';
 import { useUserProfile } from '../../contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function LoadingState({ label }: { label: string }) {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="min-h-screen bg-background flex items-center justify-center" data-testid="auth-loading">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
         <p className="mt-2 text-sm text-muted-foreground">{label}</p>
@@ -31,9 +32,10 @@ function LoginContent() {
   const redirectTo = searchParams?.get('redirectTo') || '/';
 
   // Redirect to homepage if already logged in
+  // Note: Middleware also handles this, but client-side redirect ensures tests pass
   useEffect(() => {
     if (!isLoading && user) {
-      router.push(redirectTo);
+      router.replace(redirectTo);
     }
   }, [user, isLoading, router, redirectTo]);
 
@@ -42,9 +44,9 @@ function LoginContent() {
     return <LoadingState label="Sprawdzanie..." />;
   }
 
-  // Don't render login page if user is authenticated (will redirect)
+  // Don't render login page if user is authenticated (will redirect via useEffect or middleware)
   if (user) {
-    return null;
+    return <LoadingState label="Przekierowywanie..." />;
   }
 
   return (

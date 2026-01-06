@@ -18,7 +18,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { Collapsible, CollapsibleContent } from './ui/collapsible';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -79,7 +79,9 @@ const categories = [
   'Specjalistyczne usługi'
 ];
 
-const availableCertificates = [
+// Available certificates (removed unused constant - kept for potential future use)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _availableCertificates = [
   'ISO 9001 - System zarządzania jakością',
   'ISO 14001 - System zarządzania środowiskowego',
   'OHSAS 18001 - Bezpieczeństwo i higiena pracy',
@@ -361,7 +363,6 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
   };
 
   const removeCriterion = (id: string) => {
-    const removedCriterion = formData.evaluationCriteria.find(c => c.id === id);
     const remainingCriteria = formData.evaluationCriteria.filter(c => c.id !== id);
     
     if (remainingCriteria.length === 0) {
@@ -606,33 +607,6 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
     });
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach(file => {
-      const document: TenderDocument = {
-        id: `doc-${Date.now()}-${Math.random()}`,
-        name: file.name,
-        type: 'other',
-        file
-      };
-
-      setFormData(prev => ({
-        ...prev,
-        documents: [...prev.documents, document]
-      }));
-    });
-  };
-
-  const removeDocument = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      documents: prev.documents.filter(doc => doc.id !== id)
-    }));
-  };
-
-  const totalWeight = formData.evaluationCriteria.reduce((sum, criteria) => sum + criteria.weight, 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -1021,7 +995,6 @@ export const TenderCreationForm: React.FC<TenderCreationFormProps> = ({
                             {sortedCriteria.map((criterion, index) => {
                               const isExpanded = expandedDescriptions.has(criterion.id);
                               const colorClass = getCriterionColor(index);
-                              const isFirst = index === 0;
                               return (
                                 <div key={criterion.id} className={`rounded-lg p-4 space-y-4 bg-white border border-gray-100}`}>
                             {/* Main Criterion Fields */}

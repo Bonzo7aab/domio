@@ -49,7 +49,7 @@ self.addEventListener('push', (event) => {
         actions: data.actions || [],
         timestamp: data.timestamp || Date.now()
       };
-    } catch (_e) {
+    } catch {
       // If JSON parsing fails, try as text
       notificationData.body = event.data.text() || notificationData.body;
     }

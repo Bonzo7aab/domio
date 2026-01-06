@@ -9,15 +9,26 @@ async function globalTeardown(_config: FullConfig) {
 
   if (serviceRoleKey) {
     try {
-      // Clean up pool users first
-      await cleanupPool();
-      console.log('✓ Pool users cleaned up');
+      // Clean up pool users first (deprecated, but still cleanup for safety)
+      try {
+        await cleanupPool();
+        console.log('✓ Pool users cleaned up');
+      } catch (error) {
+        console.warn('Failed to cleanup pool users (non-critical):', error);
+        // Continue with other cleanup even if pool cleanup fails
+      }
       
       // Clean up any leftover test users
-      await cleanupTestUsers();
-      console.log('✓ Test users cleaned up');
+      try {
+        await cleanupTestUsers();
+        console.log('✓ Test users cleaned up');
+      } catch (error) {
+        console.warn('Failed to cleanup test users (non-critical):', error);
+        // Don't fail teardown if cleanup has issues
+      }
     } catch (error) {
-      console.warn('Failed to cleanup test users during teardown:', error);
+      console.warn('Unexpected error during teardown:', error);
+      // Don't throw - teardown should be resilient
     }
   } else {
     console.warn('Warning: SUPABASE_SERVICE_ROLE_KEY not set. Skipping test user cleanup.');

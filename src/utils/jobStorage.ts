@@ -89,7 +89,7 @@ const extractKeywords = (title: string, description: string, category: string, s
 };
 
 // Parse budget string to get min/max values
-const parseBudget = (budget: string, budgetType: string): { salaryMin?: number; salaryMax?: number; budgetTotal?: number } => {
+const parseBudget = (budget: string, _budgetType: string): { salaryMin?: number; salaryMax?: number; budgetTotal?: number } => {
   const cleanBudget = budget.replace(/[^0-9-]/g, '');
   
   if (cleanBudget.includes('-')) {
@@ -115,7 +115,6 @@ const parseBudget = (budget: string, budgetType: string): { salaryMin?: number; 
 
 // Convert form data to Job format
 export const createJobFromFormData = (formData: Record<string, unknown>): Job => {
-  const now = new Date();
   const coordinates = getCityCoordinates(formData.location as string);
   const keywords = extractKeywords(formData.title as string, formData.description as string, formData.category as string, formData.subcategory as string);
   const budgetInfo = parseBudget(formData.budget as string, formData.budgetType as string);

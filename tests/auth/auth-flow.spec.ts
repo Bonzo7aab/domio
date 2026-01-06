@@ -3,8 +3,24 @@ import { createTestUser, deleteTestUser, clearAuthState, getAuthState } from '..
 import { ROUTES } from '../config/constants';
 
 test.describe('End-to-End Authentication Flows', () => {
+  // Track test data for cleanup
+  const testData: { userEmails: string[] } = {
+    userEmails: [],
+  };
+
   test.beforeEach(async ({ page }) => {
     await clearAuthState(page);
+    // Reset test data tracking
+    testData.userEmails = [];
+  });
+
+  test.afterEach(async () => {
+    // Cleanup after each test to ensure no leftover data
+    for (const email of testData.userEmails) {
+      await deleteTestUser(email).catch(() => {
+        // Ignore errors if user already deleted
+      });
+    }
   });
 
   test('should complete full registration to login to protected route flow', async ({ page }) => {

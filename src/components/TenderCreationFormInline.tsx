@@ -14,7 +14,6 @@ import {
   Plus, 
   Minus,
   FileText, 
-  AlertCircle, 
   CheckCircle,
   Calculator,
   Award,
@@ -26,7 +25,6 @@ import {
   ChevronUp,
   X
 } from 'lucide-react';
-import { Alert, AlertDescription } from './ui/alert';
 import { toast } from 'sonner';
 import { TenderWithCompany } from '../lib/database/jobs';
 import LocationAutocomplete from './LocationAutocomplete';
@@ -383,7 +381,6 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
   };
 
   const removeCriterion = (id: string) => {
-    const removedCriterion = formData.evaluationCriteria.find(c => c.id === id);
     const remainingCriteria = formData.evaluationCriteria.filter(c => c.id !== id);
     
     if (remainingCriteria.length === 0) {
@@ -628,8 +625,6 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
     });
   };
 
-  const totalWeight = formData.evaluationCriteria.reduce((sum, criteria) => sum + criteria.weight, 0);
-
   return (
     <div className="max-w-4xl mx-auto">
       {/* Progress Bar */}
@@ -766,7 +761,7 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
                 <div>
                   <LocationAutocomplete
                     value={formData.location}
-                    onLocationSelect={(location, address, lat, lng, sublocalityLevel1) => {
+                    onLocationSelect={(location, address, lat, lng, _sublocalityLevel1) => {
                       setFormData(prev => ({ 
                         ...prev, 
                         location: address,

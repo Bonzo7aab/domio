@@ -96,6 +96,7 @@ interface JobApplicationRow {
   [key: string]: unknown;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface TenderRow {
   id: string;
   title: string;
@@ -1145,8 +1146,6 @@ export async function createTender(
     // For predefined categories, use the mapped name
     if (isCustomCategory) {
       // First, try exact match with the custom category name (case-insensitive)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: customMatch, error: customError } = await (supabase as unknown as SupabaseClient<Database>)
         .from('job_categories')
         .select('id, name, slug')
@@ -1751,7 +1750,6 @@ export async function createJob(
       return { data: null, error: insertError };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return { data: insertedJob as JobWithCompany, error: null };
   } catch (err) {
     console.error('Error creating job:', err);

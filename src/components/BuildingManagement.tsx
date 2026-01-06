@@ -271,7 +271,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
           images: imageUrls.length > 0 ? imageUrls : undefined,
         };
 
-        const { data: _data, error: updateError } = await updateBuilding(
+        const { error: updateError } = await updateBuilding(
           supabase,
           editingBuilding.id,
           buildingData

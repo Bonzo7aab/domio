@@ -6,7 +6,6 @@ import { Button } from '../../../components/ui/button';
 import { JobsContent } from './JobsContent';
 import { budgetFromDatabase } from '../../../types/budget';
 import Link from 'next/link';
-import type { JobWithCompany } from '../../../lib/database/jobs';
 
 async function getJobsData(userId: string) {
   const supabase = await createClient();

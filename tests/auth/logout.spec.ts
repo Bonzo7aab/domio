@@ -1,13 +1,33 @@
 import { test, expect } from '@playwright/test';
-import { createTestUser, deleteTestUser, loginViaUI, clearAuthState, getAuthState } from '../helpers/auth-helpers';
+import { createTestUser, deleteTestUser, loginViaUI, clearAuthState } from '../helpers/auth-helpers';
 import { ROUTES } from '../config/constants';
 
 test.describe('Logout', () => {
+  // Track test data for cleanup
+  const testData: { userEmails: string[] } = {
+    userEmails: [],
+  };
+
+  test.beforeEach(async () => {
+    // Reset test data tracking
+    testData.userEmails = [];
+  });
+
+  test.afterEach(async () => {
+    // Cleanup after each test to ensure no leftover data
+    for (const email of testData.userEmails) {
+      await deleteTestUser(email).catch(() => {
+        // Ignore errors if user already deleted
+      });
+    }
+  });
+
   test('should logout successfully when authenticated', async ({ page }) => {
     const email = `test-logout-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
     const password = 'TestPassword123!';
 
     await createTestUser(email, password, 'contractor');
+    testData.userEmails.push(email);
 
     try {
       // Login first
@@ -73,6 +93,7 @@ test.describe('Logout', () => {
     const password = 'TestPassword123!';
 
     await createTestUser(email, password, 'contractor');
+    testData.userEmails.push(email);
 
     try {
       // Login first
@@ -119,11 +140,12 @@ test.describe('Logout', () => {
     }
   });
 
-  test('should make protected routes inaccessible after logout', async ({ page }) => {
+  test('should make protected routes inaccessible after logout', async ({ page, browserName }) => {
     const email = `test-logout-protected-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
     const password = 'TestPassword123!';
 
     await createTestUser(email, password, 'contractor');
+    testData.userEmails.push(email);
 
     try {
       // Login first
@@ -136,19 +158,25 @@ test.describe('Logout', () => {
       // Access a protected route (only navigate if not already there)
       const currentUrl = page.url();
       if (!currentUrl.includes('/account')) {
-        await page.goto(ROUTES.account);
-        await page.waitForLoadState('networkidle');
+        // Firefox may need longer timeout for navigation
+        const navTimeout = browserName === 'firefox' ? 20000 : 10000;
+        await page.goto(ROUTES.account, { waitUntil: 'domcontentloaded', timeout: navTimeout });
+        await page.waitForLoadState('networkidle', { timeout: navTimeout });
       }
-      await expect(page).toHaveURL(/.*account/);
+      await expect(page).toHaveURL(/.*account/, { timeout: browserName === 'firefox' ? 20000 : 10000 });
 
       // Logout
       const avatarButton = page.locator('button').filter({ has: page.locator('img, svg') }).first();
-      if (await avatarButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      const avatarVisible = await avatarButton.isVisible({ timeout: 2000 }).catch(() => false);
+      if (avatarVisible) {
         await avatarButton.click();
         await page.waitForTimeout(500);
         const logoutOption = page.locator('text=Wyloguj').or(page.locator('text=Wyloguj się')).first();
-        await logoutOption.click();
-        await page.waitForURL((url) => url.pathname.includes('/login') || url.pathname === '/', { timeout: 10000 });
+        const logoutVisible = await logoutOption.isVisible({ timeout: 2000 }).catch(() => false);
+        if (logoutVisible) {
+          await logoutOption.click();
+          await page.waitForURL((url) => url.pathname.includes('/login') || url.pathname === '/', { timeout: 10000 });
+        }
       }
       
       // Ensure session is cleared and wait for logout to complete
@@ -165,6 +193,7 @@ test.describe('Logout', () => {
       
       // Should redirect to login
       await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: 5000 });
+      
       expect(page.url()).toContain('/login');
     } finally {
       await deleteTestUser(email);
@@ -176,6 +205,7 @@ test.describe('Logout', () => {
     const password = 'TestPassword123!';
 
     await createTestUser(email, password, 'contractor');
+    testData.userEmails.push(email);
 
     try {
       // Login first

@@ -214,7 +214,7 @@ export const JobApplicationForm: React.FC<JobApplicationFormProps> = ({
       onSubmit(application);
       toast.success('Aplikacja została wysłana pomyślnie!');
       onClose();
-    } catch (_error) {
+    } catch {
       toast.error('Wystąpił błąd podczas wysyłania aplikacji');
     } finally {
       setIsSubmitting(false);

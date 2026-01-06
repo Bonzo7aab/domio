@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/types/database';
 import { TEST_USER_PREFIX } from '../config/constants';
@@ -140,12 +140,39 @@ export async function cleanupTestUsers() {
  * Logs in a user via the UI
  */
 export async function loginViaUI(page: Page, email: string, password: string) {
-  await page.goto('/login');
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', password);
+  // Detect browser for browser-specific timeouts
+  const browserName = page.context().browser()?.browserType().name() || 'chromium';
+  const isWebKit = browserName === 'webkit';
+  
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  
+  // Wait for auth initialization (critical for WebKit)
+  await waitForAuthInitialized(page);
+  
+  // Wait for login page to finish loading - use multiple wait strategies
+  // Try data-testid first (more reliable), then fallback to heading text
+  const timeout = isWebKit ? 30000 : 20000;
+  await Promise.race([
+    expect(page.locator('[data-testid="login-page"]')).toBeVisible({ timeout }),
+    expect(page.locator('[data-testid="login-heading"]')).toBeVisible({ timeout }),
+    expect(page.locator('h1').filter({ hasText: 'Zaloguj się' })).toBeVisible({ timeout }),
+    expect(page.locator('input[name="email"]')).toBeVisible({ timeout }),
+  ]);
+  
+  // Wait for form fields to be visible and actionable
+  const emailInput = page.locator('input[name="email"]');
+  await expect(emailInput).toBeVisible({ timeout });
+  await expect(emailInput).toBeEnabled({ timeout });
+  
+  await emailInput.fill(email);
+  const passwordInput = page.locator('input[name="password"]');
+  await expect(passwordInput).toBeVisible({ timeout });
+  await expect(passwordInput).toBeEnabled({ timeout });
+  await passwordInput.fill(password);
   await page.click('button[type="submit"]');
-  // Wait for navigation after login
-  await page.waitForURL((url) => url.pathname !== '/login', { timeout: 10000 });
+  
+  // Wait for navigation after login with longer timeout for WebKit
+  await page.waitForURL((url) => url.pathname !== '/login', { timeout: isWebKit ? 20000 : 10000 });
 }
 
 /**
@@ -215,14 +242,14 @@ export async function clearAuthState(page: Page) {
         if (typeof localStorage !== 'undefined') {
           localStorage.clear();
         }
-      } catch (e) {
+      } catch {
         // Ignore - localStorage not accessible
       }
       try {
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.clear();
         }
-      } catch (e) {
+      } catch {
         // Ignore - sessionStorage not accessible
       }
     });
@@ -235,6 +262,25 @@ export async function clearAuthState(page: Page) {
       // Re-throw unexpected errors
       throw e;
     }
+  }
+}
+
+/**
+ * Waits for auth context to finish initializing
+ * Useful for WebKit which may have delays
+ */
+export async function waitForAuthInitialized(page: Page) {
+  // Wait for loading state to disappear or network to be idle
+  await page.waitForLoadState('networkidle');
+  
+  // Wait for auth loading indicator to be gone (if it exists)
+  try {
+    await page.waitForSelector('[data-testid="auth-loading"]', { 
+      state: 'hidden', 
+      timeout: 5000 
+    });
+  } catch {
+    // If loading indicator doesn't exist, that's fine - auth may already be initialized
   }
 }
 

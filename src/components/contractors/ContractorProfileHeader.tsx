@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { useUserProfile } from '../../contexts/AuthContext';
 import type { ContractorProfile } from '../../types/contractor';
@@ -18,9 +17,11 @@ interface ContractorProfileHeaderProps {
 export function ContractorProfileHeader({ profile }: ContractorProfileHeaderProps) {
   const router = useRouter();
   const { user } = useUserProfile();
-  const [showPhoneNumber, setShowPhoneNumber] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showPhoneNumber, setShowPhoneNumber] = useState(false);
 
-  const handleRequestQuote = () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleRequestQuote = () => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby wysłać zapytanie o wycenę');
       router.push(`/login?redirectTo=${encodeURIComponent(window.location.pathname)}`);

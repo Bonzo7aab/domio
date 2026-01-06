@@ -121,21 +121,6 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   const [bids, setBids] = useState<ContractorBid[]>([]);
   const [stats, setStats] = useState<ContractorStats | null>(null);
   const [certificates] = useState<Certificate[]>([]);
-  const [_completedProjects] = useState<Array<{
-    id: string;
-    title: string;
-    description: string;
-    images: string[];
-    budget: string;
-    duration: string;
-    year: number;
-    category: string;
-    location: string;
-    projectType: string;
-    clientName: string;
-    clientFeedback: string;
-    isFeatured: boolean;
-  }>>([]);
   const [ratingSummary, setRatingSummary] = useState<{
     averageRating: number;
     totalReviews: number;
@@ -813,7 +798,6 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   const handlePortfolioSuccess = async () => {
     if (!companyId) return;
     
-    const _supabase = createClient();
     try {
       const portfolio = await fetchContractorPortfolio(companyId);
       setPortfolioProjects(portfolio || []);

@@ -341,7 +341,7 @@ function SmartDockItem({
 }) {
   const ref = React.useRef<HTMLButtonElement>(null);
   const distance = useMotionValue(0);
-  const scale = useMotionValue(1);
+  useMotionValue(1); // scale - kept for potential future use
  
   React.useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {

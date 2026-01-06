@@ -73,6 +73,7 @@ export async function createTestCompany(
 
 /**
  * Gets a pool manager user (reuses existing pool user)
+ * @deprecated Use createUniqueTestUsers() instead for better test isolation. Pool users can cause race conditions in parallel tests.
  */
 export async function getPoolManagerUser(index?: number): Promise<{ user: { id: string }; company: { id: string }; email: string; password: string }> {
   const poolUser = await getPoolManager(index);
@@ -91,6 +92,7 @@ export async function getPoolManagerUser(index?: number): Promise<{ user: { id: 
 
 /**
  * Gets a pool contractor user (reuses existing pool user)
+ * @deprecated Use createUniqueTestUsers() instead for better test isolation. Pool users can cause race conditions in parallel tests.
  */
 export async function getPoolContractorUser(index?: number): Promise<{ user: { id: string }; company: { id: string }; email: string; password: string }> {
   const poolUser = await getPoolContractor(index);
@@ -109,7 +111,7 @@ export async function getPoolContractorUser(index?: number): Promise<{ user: { i
 
 /**
  * Creates a test manager user with company
- * Note: For tests that don't specifically test user creation, use getPoolManagerUser() instead
+ * Note: For tests that don't specifically test user creation, use createUniqueTestUsers() instead
  */
 export async function createTestManager() {
   const email = `${TEST_USER_PREFIX}manager-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
@@ -142,6 +144,79 @@ export async function createTestManager() {
     company,
     email,
     password,
+  };
+}
+
+/**
+ * Creates unique test users (contractor and manager) with companies for test isolation.
+ * This is the recommended approach for tests to avoid race conditions and shared state issues.
+ * 
+ * @returns Object containing contractor and manager users with their companies
+ * @example
+ * ```typescript
+ * const { contractor, manager } = await createUniqueTestUsers();
+ * // Use contractor.email, contractor.password, contractor.user.id, contractor.company.id
+ * // Use manager.email, manager.password, manager.user.id, manager.company.id
+ * ```
+ */
+export async function createUniqueTestUsers(): Promise<{
+  contractor: { user: { id: string }; company: { id: string }; email: string; password: string };
+  manager: { user: { id: string }; company: { id: string }; email: string; password: string };
+}> {
+  const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  
+  // Create contractor
+  const contractorEmail = `${TEST_USER_PREFIX}contractor-${uniqueId}@example.com`;
+  const contractorPassword = 'TestPassword123!';
+  
+  const contractorUser = await createTestUser(contractorEmail, contractorPassword, 'contractor', {
+    firstName: 'Test',
+    lastName: 'Contractor',
+  });
+  
+  const contractorCompany = await createTestCompany(contractorUser.id, {
+    name: `Test Contractor Company ${uniqueId}`,
+  });
+  
+  // Create manager
+  const managerEmail = `${TEST_USER_PREFIX}manager-${uniqueId}@example.com`;
+  const managerPassword = 'TestPassword123!';
+  
+  const managerUser = await createTestUser(managerEmail, managerPassword, 'manager', {
+    firstName: 'Test',
+    lastName: 'Manager',
+  });
+  
+  const adminClient = createAdminClient();
+  const { data: managerCompany, error: companyError } = await upsertUserCompany(adminClient, managerUser.id, {
+    name: `Test Manager Company ${uniqueId}`,
+    type: 'spółdzielnia',
+    city: 'Warszawa',
+    address: 'ul. Managerowa 456',
+    phone: '+48987654321',
+    email: `manager-company-${uniqueId}@example.com`,
+  });
+  
+  if (companyError || !managerCompany) {
+    // Cleanup contractor if manager company creation fails
+    await deleteTestUser(contractorEmail);
+    await deleteTestUser(managerEmail);
+    throw new Error(`Failed to create manager company: ${companyError?.message || 'Unknown error'}`);
+  }
+  
+  return {
+    contractor: {
+      user: { id: contractorUser.id },
+      company: { id: contractorCompany.id },
+      email: contractorEmail,
+      password: contractorPassword,
+    },
+    manager: {
+      user: { id: managerUser.id },
+      company: { id: managerCompany.id },
+      email: managerEmail,
+      password: managerPassword,
+    },
   };
 }
 
