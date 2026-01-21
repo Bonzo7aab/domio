@@ -621,10 +621,13 @@ export default function JobList({
         </Badge>
       </div>
 
-      {/* Loading State */}
+      {/* Loading State - Show when loading and no jobs */}
       {isLoadingJobs && activeJobs.length === 0 && expiredJobs.length === 0 && (
         <div className="text-center py-8">
-          <div className="text-muted-foreground mb-2">Ładowanie ogłoszeń...</div>
+          <div className="flex flex-col items-center space-y-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="text-muted-foreground mb-2">Ładowanie ogłoszeń...</div>
+          </div>
         </div>
       )}
 
@@ -647,9 +650,17 @@ export default function JobList({
         </div>
       )}
 
-      {/* Active Job Cards */}
-      {!isLoadingJobs && activeJobs.length > 0 && (
-        <div className="space-y-2 max-w-full overflow-x-hidden">
+      {/* Active Job Cards - Show even when loading to allow overlay */}
+      {activeJobs.length > 0 && (
+        <div className="space-y-2 max-w-full overflow-x-hidden relative">
+          {isLoadingJobs && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+              <div className="flex flex-col items-center space-y-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="text-sm text-muted-foreground">Filtrowanie ogłoszeń...</div>
+              </div>
+            </div>
+          )}
           {activeJobs.map(job => (
             <JobCard 
               key={job.id} 

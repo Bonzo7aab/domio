@@ -79,7 +79,6 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
     propertyTypes: []
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_isLoadingCompany, setIsLoadingCompany] = useState(true);
 
   // Fetch and pre-fill company data

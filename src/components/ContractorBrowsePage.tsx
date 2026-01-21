@@ -44,10 +44,8 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [_expandedContractor] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_contractorReviews, _setContractorReviews] = useState<{[key: string]: Array<Record<string, unknown>>}>({});
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_contractorRatings, _setContractorRatings] = useState<{[key: string]: Record<string, unknown>}>({});
+  const [contractorReviews] = useState<{[key: string]: Array<Record<string, unknown>>}>({});
+  const [contractorRatings] = useState<{[key: string]: Record<string, unknown>}>({});
   const [currentLimit, setCurrentLimit] = useState(6);
   const [hasMoreContractors, setHasMoreContractors] = useState(false);
 

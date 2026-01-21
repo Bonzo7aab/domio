@@ -20,7 +20,6 @@ export function ContractorProfileHeader({ profile }: ContractorProfileHeaderProp
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_showPhoneNumber, setShowPhoneNumber] = useState(false);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleRequestQuote = () => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby wysłać zapytanie o wycenę');

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useNavigationWithLoading } from '../hooks/useNavigationWithLoading';
 import { 
   Home, 
   Search, 
@@ -30,7 +31,7 @@ import { useJobsContext } from '../contexts/JobsContext';
 import JobFilters from './JobFilters';
 
 export function MobileMenuDock() {
-  const router = useRouter();
+  const router = useNavigationWithLoading();
   const pathname = usePathname();
   const { isAuthenticated } = useUserProfile();
   const { isMapExpanded, setIsMapExpanded } = useLayoutContext();

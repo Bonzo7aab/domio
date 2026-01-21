@@ -344,7 +344,6 @@ export default function ServicePricingManager({ companyId, services: initialServ
         }
         
         // Save pricing
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { serviceName: _serviceName, ...pricingData } = formData;
         const updatedPricing = {
           ...servicePricing,

@@ -63,16 +63,14 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanyData | null>(null);
+  const [_isLoadingCompany, setIsLoadingCompany] = useState(false);
   // Priority 3: Prevent concurrent fetches
   const isFetchingRef = React.useRef(false);
   // Track client-side mount to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
   // Applications state
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_applications, setApplications] = useState<Array<{ id: string; contractor_id: string; job_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_isLoadingApplications, setIsLoadingApplications] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_selectedJobData, setSelectedJobData] = useState<{ title: string; budget: string } | null>(null);
   // Tender bids state
   const [tenderBids, setTenderBids] = useState<Array<{ id: string; contractor_id: string; tender_id: string; proposed_price: number; proposed_timeline: string; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);

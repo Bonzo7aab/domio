@@ -22,14 +22,14 @@ import {
 } from './ui/drawer';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import type { AuthUser } from '../types/auth';
-import { useRouter } from 'next/navigation';
+import { useNavigationWithLoading } from '../hooks/useNavigationWithLoading';
 
 interface HeaderProps {
   initialUser?: AuthUser | null;
 }
 
 export function Header({ initialUser }: HeaderProps) {
-  const router = useRouter()
+  const router = useNavigationWithLoading()
   const { user: contextUser, session, isAuthenticated: contextIsAuthenticated, logout, isLoading } = useUserProfile();
   const [isMounted, setIsMounted] = useState(false);
 

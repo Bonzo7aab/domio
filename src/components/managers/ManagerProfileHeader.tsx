@@ -22,12 +22,10 @@ export function ManagerProfileHeader({ profile }: ManagerProfileHeaderProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_showPhoneNumber, setShowPhoneNumber] = useState(false);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleBack = () => {
     router.push('/managers');
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleStartConversation = async () => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby rozpocząć konwersację');
@@ -150,7 +148,6 @@ export function ManagerProfileHeader({ profile }: ManagerProfileHeaderProps) {
     specialties: profile.services?.primaryNeeds?.slice(0, 5) || [],
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _getOrganizationTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       'wspólnota': 'Wspólnota mieszkaniowa',

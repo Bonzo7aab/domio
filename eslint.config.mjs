@@ -43,7 +43,7 @@ export default tseslint.config(
       '@typescript-eslint/triple-slash-reference': 'off',
       '@typescript-eslint/no-require-imports': 'off',
       'no-undef': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {
@@ -68,6 +68,8 @@ export default tseslint.config(
       '*.config.js',
       '*.config.ts',
       'next-env.d.ts',
+      'playwright-report/**',
+      'test-results/**',
     ],
   }
 );

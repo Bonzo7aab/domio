@@ -55,7 +55,8 @@ export async function withTransaction<T>(
     //   -- Transaction is started automatically by PostgreSQL
     // END;
     // $$ LANGUAGE plpgsql;
-    const { error: beginError } = await adminClient.rpc('begin_test_transaction');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: beginError } = await (adminClient.rpc as any)('begin_test_transaction');
     
     if (beginError) {
       console.warn('Transaction begin function not available. Running test without transaction isolation.');
@@ -68,7 +69,8 @@ export async function withTransaction<T>(
       const result = await testFn(adminClient);
       
       // Rollback transaction
-      const { error: rollbackError } = await adminClient.rpc('rollback_test_transaction');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: rollbackError } = await (adminClient.rpc as any)('rollback_test_transaction');
       if (rollbackError) {
         console.error('Error rolling back transaction:', rollbackError);
       }
@@ -76,12 +78,13 @@ export async function withTransaction<T>(
       return result;
     } catch (error) {
       // Rollback on error
-      await adminClient.rpc('rollback_test_transaction').catch(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (adminClient.rpc as any)('rollback_test_transaction').catch(() => {
         // Ignore rollback errors if transaction wasn't started
       });
       throw error;
     }
-  } catch (error) {
+  } catch {
     // If transaction functions don't exist, fallback to running without transaction
     console.warn('Transaction support not available. Running test without transaction isolation.');
     return await testFn(adminClient);

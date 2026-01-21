@@ -80,7 +80,6 @@ const categories = [
 ];
 
 // Available certificates (removed unused constant - kept for potential future use)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _availableCertificates = [
   'ISO 9001 - System zarządzania jakością',
   'ISO 14001 - System zarządzania środowiskowego',
