@@ -276,7 +276,7 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
                           {job.managementContact && (
                             <div className="flex items-center space-x-2">
                               <Users className="w-4 h-4 text-gray-400" />
-                              <span>Zarządca: {job.managementContact}</span>
+                              <span>Ogłoszeniodawca: {job.managementContact}</span>
                             </div>
                           )}
                           {job.managementPhone && (

@@ -39,11 +39,11 @@ test.describe('Registration Page', () => {
       expect(page.locator('[data-testid="register-page"]')).toBeVisible({ timeout }),
       expect(page.locator('[data-testid="register-heading"]')).toBeVisible({ timeout }),
       expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout }),
-      expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout }),
+      expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout }),
     ]);
     
     // Wait for the heading to appear (use data-testid for reliability)
-    await expect(page.locator('[data-testid="register-heading"]').or(page.locator('h1').filter({ hasText: 'Utwórz konto' }))).toBeVisible({ timeout });
+    await expect(page.locator('[data-testid="register-heading"]').or(page.locator('h1').filter({ hasText: 'Zarejestruj się' }))).toBeVisible({ timeout });
 
     // Now check for form fields
     const firstNameInput = page.locator('input[name="firstName"]');
@@ -58,7 +58,7 @@ test.describe('Registration Page', () => {
     await expect(page.locator('button[type="submit"]')).toBeVisible({ timeout });
 
     // Check user type selection (radio buttons are sr-only, so check by role)
-    await expect(page.getByRole('radio', { name: 'Zarządca' })).toBeAttached();
+    await expect(page.getByRole('radio', { name: 'Ogłoszeniodawca' })).toBeAttached();
     await expect(page.getByRole('radio', { name: 'Wykonawca' })).toBeAttached();
 
     // Check links
@@ -72,23 +72,21 @@ test.describe('Registration Page', () => {
 
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
-    // Then wait for form fields to be visible
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
-    // Fill registration form
+    await page.locator('form').getByText('Wykonawca').click();
     await page.fill('input[name="firstName"]', 'Test');
     await page.fill('input[name="lastName"]', 'Contractor');
     await page.fill('input[name="email"]', email);
+    await page.fill('input[name="phone"]', '+48123456789');
+    await page.fill('input[name="nip"]', '1234567890');
+    await page.fill('input[name="companyName"]', 'Test Contractor Sp. z o.o.');
     await page.fill('input[name="password"]', password);
     await page.fill('input[name="confirmPassword"]', password);
-    
-    // Select contractor (click the label since radio button is sr-only)
-    // Contractor should be default, but ensure it's selected
-    await page.getByText('Wykonawca').click();
+    await page.locator('form').getByRole('checkbox', { name: /akceptuję regulamin/i }).check();
+    await page.locator('form').getByText('Roboty Budowlane i Remonty').click();
 
-    // Submit form
     await page.click('button[type="submit"]');
 
     // Wait for redirect (either to home or login with success message)
@@ -108,22 +106,23 @@ test.describe('Registration Page', () => {
 
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
-    // Then wait for form fields to be visible
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
-    // Fill registration form
+    await page.locator('form').getByText('Ogłoszeniodawca').click();
+    await page.locator('form').getByText('Wspólnota').click();
     await page.fill('input[name="firstName"]', 'Test');
     await page.fill('input[name="lastName"]', 'Manager');
     await page.fill('input[name="email"]', email);
+    await page.fill('input[name="phone"]', '+48123456789');
+    await page.fill('input[name="nip"]', '1234567890');
+    await page.fill('input[name="companyName"]', 'Wspólnota Mieszkaniowa Test');
+    await page.fill('input[name="street"]', 'ul. Testowa 1');
+    await page.selectOption('select[name="district"]', 'Mokotów');
     await page.fill('input[name="password"]', password);
     await page.fill('input[name="confirmPassword"]', password);
-    
-    // Select manager (click the label since radio button is sr-only)
-    await page.getByText('Zarządca').click();
+    await page.locator('form').getByRole('checkbox', { name: /akceptuję regulamin/i }).check();
 
-    // Submit form
     await page.click('button[type="submit"]');
 
     // Wait for redirect
@@ -139,8 +138,7 @@ test.describe('Registration Page', () => {
   test('should show error with missing required fields', async ({ page }) => {
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     // Then wait for form fields to be visible
     await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
@@ -160,20 +158,21 @@ test.describe('Registration Page', () => {
   test('should validate password length', async ({ page }) => {
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
-    // Then wait for form fields to be visible
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
+    await page.locator('form').getByText('Wykonawca').click();
     await page.fill('input[name="firstName"]', 'Test');
     await page.fill('input[name="lastName"]', 'User');
     await page.fill('input[name="email"]', 'test@example.com');
-    
-    // Fill with password less than 6 characters
+    await page.fill('input[name="phone"]', '+48123456789');
+    await page.fill('input[name="nip"]', '1234567890');
+    await page.fill('input[name="companyName"]', 'Test Co');
+    await page.locator('form').getByText('Roboty Budowlane i Remonty').click();
     await page.fill('input[name="password"]', '12345');
     await page.fill('input[name="confirmPassword"]', '12345');
+    await page.locator('form').getByRole('checkbox', { name: /akceptuję regulamin/i }).check();
 
-    // Submit form
     await page.click('button[type="submit"]');
 
     // Should show error about password length (either client-side or server-side)
@@ -193,20 +192,23 @@ test.describe('Registration Page', () => {
   test('should validate password mismatch', async ({ page }) => {
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
-    // Then wait for form fields to be visible and actionable
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     const firstNameInput = page.locator('input[name="firstName"]');
     await expect(firstNameInput).toBeVisible({ timeout: 10000 });
     await expect(firstNameInput).toBeEnabled({ timeout: 10000 });
 
+    await page.locator('form').getByText('Wykonawca').click();
     await firstNameInput.fill('Test');
     await page.fill('input[name="lastName"]', 'User');
     await page.fill('input[name="email"]', 'test@example.com');
+    await page.fill('input[name="phone"]', '+48123456789');
+    await page.fill('input[name="nip"]', '1234567890');
+    await page.fill('input[name="companyName"]', 'Test Co');
+    await page.locator('form').getByText('Roboty Budowlane i Remonty').click();
     await page.fill('input[name="password"]', 'Password123!');
     await page.fill('input[name="confirmPassword"]', 'DifferentPassword123!');
+    await page.locator('form').getByRole('checkbox', { name: /akceptuję regulamin/i }).check();
 
-    // Submit form
     await page.click('button[type="submit"]');
 
     // Should show error about password mismatch
@@ -225,8 +227,7 @@ test.describe('Registration Page', () => {
   test('should validate email format', async ({ page }) => {
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     // Then wait for form fields to be visible and actionable
     const firstNameInput = page.locator('input[name="firstName"]');
     await expect(firstNameInput).toBeVisible({ timeout: 10000 });
@@ -250,33 +251,24 @@ test.describe('Registration Page', () => {
   test('should allow user type selection', async ({ page }) => {
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
-    // Wait for user type selection to be visible
-    await expect(page.getByText('Zarządca')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
+    const form = page.locator('form');
+    await expect(form.getByText('Ogłoszeniodawca')).toBeVisible({ timeout: 10000 });
 
-    // Check default selection (should be contractor based on code)
     const contractorRadio = page.getByRole('radio', { name: 'Wykonawca' });
-    const managerRadio = page.getByRole('radio', { name: 'Zarządca' });
+    const managerRadio = page.getByRole('radio', { name: 'Ogłoszeniodawca' });
 
-    // Select manager (click label since radio is sr-only)
-    const managerLabel = page.getByText('Zarządca');
-    await expect(managerLabel).toBeVisible({ timeout: 10000 });
-    await managerLabel.click();
+    await form.getByText('Ogłoszeniodawca').click();
     await expect(managerRadio).toBeChecked();
 
-    // Select contractor (click label since radio is sr-only)
-    const contractorLabel = page.getByText('Wykonawca');
-    await expect(contractorLabel).toBeVisible({ timeout: 10000 });
-    await contractorLabel.click();
+    await form.getByText('Wykonawca').click();
     await expect(contractorRadio).toBeChecked();
   });
 
   test('should navigate to login page', async ({ page }) => {
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     
     // Wait for login link to be visible
     const loginLink = page.getByRole('link', { name: /zaloguj|login/i });
@@ -327,12 +319,11 @@ test.describe('Registration Page', () => {
   test('should show terms and privacy links', async ({ page }) => {
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
 
-    // Check for terms and privacy links (use getByRole to avoid multiple matches)
-    const termsLink = page.getByRole('link', { name: 'Warunki użytkowania' });
-    const privacyLink = page.getByRole('link', { name: 'Politykę prywatności' });
+    const registerPage = page.locator('[data-testid="register-page"]');
+    const termsLink = registerPage.getByRole('link', { name: 'regulamin' });
+    const privacyLink = registerPage.getByRole('link', { name: 'politykę prywatności' });
 
     await expect(termsLink).toBeVisible({ timeout: 10000 });
     await expect(privacyLink).toBeVisible({ timeout: 10000 });
@@ -341,8 +332,7 @@ test.describe('Registration Page', () => {
   test('should toggle password visibility', async ({ page }) => {
     await page.goto(ROUTES.register);
     
-    // Wait for page to finish loading - wait for the heading first (more reliable indicator)
-    await expect(page.locator('h1').filter({ hasText: 'Utwórz konto' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     
     const passwordInput = page.locator('input[name="password"]');
     // Wait for password input to be visible and actionable

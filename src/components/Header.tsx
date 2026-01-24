@@ -172,9 +172,9 @@ export function Header({ initialUser }: HeaderProps) {
             </div>
           </div>
 
-            {/* Add Job button - only visible on desktop for authenticated users (not contractors) */}
+            {/* Add Job button - visible for unauthenticated (redirects to login) and authenticated managers */}
             <div className="hidden md:block mr-4">
-              {userIsAuthenticated && currentUser?.userType !== 'contractor' && (
+              {(!userIsAuthenticated || currentUser?.userType !== 'contractor') && (
                 <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
                   Dodaj Ogłoszenie
                 </Button>
@@ -230,7 +230,7 @@ export function Header({ initialUser }: HeaderProps) {
                             {currentUser?.email}
                           </p>
                           <p className="text-xs leading-none text-muted-foreground">
-                            {currentUser?.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}
+                            {currentUser?.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}
                           </p>
                         </div>
                       </DrawerTitle>
@@ -254,7 +254,7 @@ export function Header({ initialUser }: HeaderProps) {
                             onClick={() => router.push('/manager-dashboard')}
                           >
                             <User className="mr-2 h-4 w-4" />
-                            <span>Panel Zarządcy</span>
+                            <span>Panel Ogłoszeniodawcy</span>
                           </Button>
                         )}
                         
@@ -360,7 +360,7 @@ export function Header({ initialUser }: HeaderProps) {
                           {currentUser?.email}
                         </p>
                         <p className="text-xs leading-none text-muted-foreground">
-                          {currentUser?.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}
+                          {currentUser?.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}
                         </p>
                       </div>
                     </DropdownMenuLabel>
@@ -374,7 +374,7 @@ export function Header({ initialUser }: HeaderProps) {
                     {currentUser?.userType === 'manager' && (
                       <DropdownMenuItem onClick={() => router.push('/manager-dashboard')}>
                         <User className="mr-2 h-4 w-4" />
-                        <span>Panel Zarządcy</span>
+                        <span>Panel Ogłoszeniodawcy</span>
                       </DropdownMenuItem>
                     )}
                     
@@ -425,67 +425,54 @@ export function Header({ initialUser }: HeaderProps) {
               </>
             ) : (
               <>
-                {/* Mobile: Drawer */}
-                <div className="md:hidden">
+                {/* Mobile: Drawer - Dodaj Ogłoszenie, Zaloguj się, Zarejestruj się */}
+                <div className="md:hidden flex items-center space-x-2">
+                  <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
+                    Dodaj Ogłoszenie
+                  </Button>
                   <Drawer>
                     <DrawerTrigger asChild>
-                    <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
-                      <User className="h-4 w-4 mr-2" />
-                      
-                    </Button>
-                  </DrawerTrigger>
-                  <DrawerContent>
-                    <DrawerHeader className="border-b">
-                      <DrawerTitle>Konto</DrawerTitle>
-                    </DrawerHeader>
-                    <div className="overflow-y-auto flex-1 p-4">
-                      <div className="space-y-1">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={handleLoginClick}
-                        >
-                          <User className="mr-2 h-4 w-4" />
-                          <span>Logowanie</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={handleRegisterClick}
-                        >
-                          <User className="mr-2 h-4 w-4" />
-                          <span>Zarejestruj się</span>
-                        </Button>
+                      <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
+                        <User className="h-4 w-4 mr-2" />
+                        Zaloguj się
+                      </Button>
+                    </DrawerTrigger>
+                    <DrawerContent>
+                      <DrawerHeader className="border-b">
+                        <DrawerTitle>Konto</DrawerTitle>
+                      </DrawerHeader>
+                      <div className="overflow-y-auto flex-1 p-4">
+                        <div className="space-y-1">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={handleLoginClick}
+                          >
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Zaloguj się</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={handleRegisterClick}
+                          >
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Zarejestruj się</span>
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </DrawerContent>
+                    </DrawerContent>
                   </Drawer>
                 </div>
 
-                {/* Desktop: DropdownMenu */}
-                <div className="hidden md:block">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
-                        <User className="h-4 w-4 mr-2" />
-                        Logowanie
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      className="w-48 border border-gray-200 shadow-lg" 
-                      align="end"
-                      style={{ backgroundColor: '#f8fafc' }}
-                    >
-                    <DropdownMenuItem onClick={handleLoginClick}>
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Logowanie</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleRegisterClick}>
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Zarejestruj się</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                  </DropdownMenu>
+                {/* Desktop: [Dodaj Ogłoszenie] [Zaloguj się] [Zarejestruj się] - Add Job is in separate div above */}
+                <div className="hidden md:flex items-center space-x-2">
+                  <Button variant="ghost" size="sm" onClick={handleLoginClick} className="text-sm hover:bg-gray-200">
+                    Zaloguj się
+                  </Button>
+                  <Button variant="default" size="sm" onClick={handleRegisterClick} className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
+                    Zarejestruj się
+                  </Button>
                 </div>
               </>
             )}

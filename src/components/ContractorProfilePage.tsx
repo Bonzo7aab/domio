@@ -639,7 +639,7 @@ export default function ContractorProfilePage({ contractorId, onBack }: Contract
                             <div>
                               <h4 className="font-medium">{(review as { reviewerName?: string; author?: string }).reviewerName || (review as { reviewerName?: string; author?: string }).author || ''}</h4>
                               <p className="text-sm text-gray-600">
-                                {((review as { reviewerType?: string; authorType?: string }).reviewerType || (review as { reviewerType?: string; authorType?: string }).authorType) === 'manager' ? 'Zarządca' : 'Klient prywatny'}
+                                {((review as { reviewerType?: string; authorType?: string }).reviewerType || (review as { reviewerType?: string; authorType?: string }).authorType) === 'manager' ? 'Ogłoszeniodawca' : 'Klient prywatny'}
                               </p>
                             </div>
                             <div className="flex items-center space-x-1">

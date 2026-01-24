@@ -356,7 +356,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         <Card>
           <CardContent className="pt-6 text-center">
-            <h2 className="text-2xl font-bold mb-4">{error || 'Zarządca nie znaleziony'}</h2>
+            <h2 className="text-2xl font-bold mb-4">{error || 'Ogłoszeniodawca nie znaleziony'}</h2>
             {onBack && <Button onClick={onBack}>Powrót do listy</Button>}
           </CardContent>
         </Card>

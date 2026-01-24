@@ -17,6 +17,13 @@ export interface SignUpData {
   userType: 'manager' | 'contractor'
   phone?: string
   company?: string
+  organizationType?: 'spółdzielnia' | 'wspólnota'
+  nip?: string
+  companyName?: string
+  street?: string
+  city?: string
+  district?: string
+  categories?: string[]
 }
 
 export interface UpdateUserData {
@@ -57,22 +64,51 @@ export async function loginAction(formData: FormData): Promise<{ success: true }
 
 /**
  * Server Action for user registration
+ * Creates auth user, user_profiles, companies, and user_companies.
  */
 export async function registerAction(formData: FormData) {
   const supabase = await createClient()
-  
-  const email = formData.get('email') as string
+
+  const email = (formData.get('email') as string)?.trim()
   const password = formData.get('password') as string
   const confirmPassword = formData.get('confirmPassword') as string
-  const firstName = formData.get('firstName') as string
-  const lastName = formData.get('lastName') as string
+  const firstName = (formData.get('firstName') as string)?.trim()
+  const lastName = (formData.get('lastName') as string)?.trim()
   const userType = formData.get('userType') as 'contractor' | 'manager'
-  const phone = formData.get('phone') as string
-  const company = formData.get('company') as string
+  const phone = (formData.get('phone') as string)?.trim()
+  const acceptTerms = formData.get('acceptTerms') as string
+  const nip = (formData.get('nip') as string)?.trim()
+  const companyName = (formData.get('companyName') as string)?.trim()
+  const organizationType = formData.get('organizationType') as 'spółdzielnia' | 'wspólnota' | null
+  const street = (formData.get('street') as string)?.trim()
+  const city = (formData.get('city') as string)?.trim() || undefined
+  const district = (formData.get('district') as string)?.trim() || undefined
+  const categories = formData.getAll('categories') as string[]
 
-  // Validation
+  if (!acceptTerms || acceptTerms === '0') {
+    redirect(`/register?error=${encodeURIComponent('Musisz zaakceptować regulamin i politykę prywatności')}`)
+  }
+
   if (!email || !password || !firstName || !lastName || !userType) {
     redirect(`/register?error=${encodeURIComponent('Proszę wypełnić wszystkie wymagane pola')}`)
+  }
+
+  if (!nip || !companyName) {
+    redirect(`/register?error=${encodeURIComponent('NIP i Nazwa są wymagane')}`)
+  }
+
+  if (!phone) {
+    redirect(`/register?error=${encodeURIComponent('Telefon jest wymagany')}`)
+  }
+
+  if (userType === 'manager') {
+    if (!organizationType || !street || !district) {
+      redirect(`/register?error=${encodeURIComponent('Uzupełnij typ organizacji, adres (ulica, dzielnica)')}`)
+    }
+  }
+
+  if (userType === 'contractor' && (!categories || categories.length === 0)) {
+    redirect(`/register?error=${encodeURIComponent('Wybierz co najmniej jedną kategorię')}`)
   }
 
   if (password.length < 6) {
@@ -83,7 +119,6 @@ export async function registerAction(formData: FormData) {
     redirect(`/register?error=${encodeURIComponent('Hasła nie są identyczne')}`)
   }
 
-  // Create auth user
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -93,50 +128,103 @@ export async function registerAction(formData: FormData) {
         last_name: lastName,
         user_type: userType,
         phone,
-        company
-      }
-    }
+      },
+    },
   })
 
   if (authError) {
     redirect(`/register?error=${encodeURIComponent(authError.message)}`)
   }
-  
+
   if (!authData.user) {
-    redirect(`/register?error=${encodeURIComponent('Failed to create user')}`)
+    redirect(`/register?error=${encodeURIComponent('Nie udało się utworzyć konta')}`)
   }
 
-  // Create user profile
-  const { error: profileError } = await supabase
+  const userId = authData.user.id
+
+  const { createAdminClient } = await import('../supabase/admin')
+  const admin = createAdminClient()
+
+  const { error: profileError } = await admin
     .from('user_profiles')
     .insert({
-      id: authData.user.id,
+      id: userId,
       user_type: userType,
       first_name: firstName,
       last_name: lastName,
       phone: phone || null,
       is_verified: false,
       profile_completed: false,
-      onboarding_completed: false
+      onboarding_completed: false,
     })
 
   if (profileError) {
     redirect(`/register?error=${encodeURIComponent(profileError.message)}`)
   }
-  
-  revalidatePath('/', 'layout')
-  
-  // Check if user was auto-confirmed (session exists) or needs email confirmation
-  // If session exists, user is already logged in - redirect to home
-  // Otherwise, redirect to login with message about email confirmation
-  if (authData.session) {
-    // User is auto-confirmed and logged in - redirect to home
-    // The auth context will sync the session on the next page load
-    redirect(`/?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Zostałeś automatycznie zalogowany.')}`)
-  } else {
-    // Email confirmation required - redirect to login
-    redirect(`/login?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')}`)
+
+  const companyType: 'spółdzielnia' | 'wspólnota' | 'contractor' =
+    userType === 'manager'
+      ? (organizationType as 'spółdzielnia' | 'wspólnota')
+      : 'contractor'
+
+  const address =
+    userType === 'manager' && street && city && district
+      ? `${street}, ${city}, ${district}`
+      : undefined
+
+  const companyPayload = {
+    name: companyName,
+    type: companyType,
+    nip: nip || null,
+    address: address ?? null,
+    city: userType === 'manager' ? (city || 'Warszawa') : null,
+    country: 'PL',
+    email: email,
+    phone: phone || null,
+    is_verified: false,
+    verification_level: 'none' as const,
+    ...(userType === 'contractor' && {
+      metadata: { primary_category_slugs: categories },
+    }),
   }
+
+  const { data: companyRow, error: companyError } = await admin
+    .from('companies')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- companyPayload includes metadata, type not in DB schema
+    .insert(companyPayload as any)
+    .select('id')
+    .single()
+
+  if (companyError) {
+    redirect(`/register?error=${encodeURIComponent(companyError.message)}`)
+  }
+
+  if (!companyRow?.id) {
+    redirect(`/register?error=${encodeURIComponent('Nie udało się utworzyć firmy')}`)
+  }
+
+  // user_companies not in Database type; use type assertion
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: ucError } = await (admin as any)
+    .from('user_companies')
+    .insert({
+      user_id: userId,
+      company_id: companyRow.id,
+      role: 'owner',
+      is_primary: true,
+      is_active: true,
+    })
+
+  if (ucError) {
+    redirect(`/register?error=${encodeURIComponent(ucError.message)}`)
+  }
+
+  revalidatePath('/', 'layout')
+
+  if (authData.session) {
+    redirect(`/?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Zostałeś automatycznie zalogowany.')}`)
+  }
+  redirect(`/login?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')}`)
 }
 
 /**

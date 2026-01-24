@@ -147,9 +147,9 @@ export const ApplicationStatusCard: React.FC<ApplicationStatusCardProps> = ({
       case 'submitted':
         return 'Twoja aplikacja została wysłana i oczekuje na rozpatrzenie przez zarządcę.';
       case 'under_review':
-        return 'Zarządca obecnie analizuje Twoją ofertę. Oczekuj odpowiedzi w ciągu 48 godzin.';
+        return 'Ogłoszeniodawca obecnie analizuje Twoją ofertę. Oczekuj odpowiedzi w ciągu 48 godzin.';
       case 'accepted':
-        return 'Gratulacje! Twoja aplikacja została zaakceptowana. Zarządca skontaktuje się z Tobą w sprawie dalszych kroków.';
+        return 'Gratulacje! Twoja aplikacja została zaakceptowana. Ogłoszeniodawca skontaktuje się z Tobą w sprawie dalszych kroków.';
       case 'rejected':
         return 'Niestety, Twoja aplikacja nie została zaakceptowana tym razem. Zachęcamy do aplikowania na inne zlecenia.';
       case 'cancelled':

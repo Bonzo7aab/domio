@@ -1448,7 +1448,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
                             <div>
                               <h4 className="font-medium">{review.reviewerName}</h4>
                               <p className="text-sm text-gray-600">
-                                {review.reviewerType === 'manager' ? 'Zarządca' : 'Klient prywatny'}
+                                {review.reviewerType === 'manager' ? 'Ogłoszeniodawca' : 'Klient prywatny'}
                               </p>
                             </div>
                             <div className="flex items-center space-x-1">

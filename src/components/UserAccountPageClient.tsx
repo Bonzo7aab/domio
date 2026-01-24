@@ -136,7 +136,7 @@ export function UserAccountPageClient({
                   <div className="flex items-center">
                     <User className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                     <span className="capitalize">
-                      {user.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}
+                      {user.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}
                     </span>
                   </div>
                   <div className="flex items-center">
