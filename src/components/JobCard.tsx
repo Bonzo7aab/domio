@@ -34,6 +34,11 @@ interface JobCardProps {
   isExpired?: boolean;
 }
 
+// Helper function to format numbers with spaces for thousands
+function formatNumberWithSpaces(num: number): string {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
 const JobCard = React.memo(function JobCard({ 
   job, 
   onClick, 
@@ -417,41 +422,70 @@ const JobCard = React.memo(function JobCard({
 
             <div className='flex flex-col md:flex-row md:justify-between gap-4 md:gap-6'>
               <div className="space-y-3 mt-0 md:mt-4 flex-1">
-                {/* Skills/Tags */}
-                {job.skills && job.skills.length > 0 && (
+                {/* Budget Display */}
+                {job.budget && (job.budget.min !== null || job.budget.max !== null) && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-600 font-semibold text-sm">Budżet:</span>
+                    <span className="text-green-700 font-medium text-sm">
+                      {job.budget.min !== null && job.budget.max !== null && job.budget.min !== job.budget.max
+                        ? `${formatNumberWithSpaces(job.budget.min)} – ${formatNumberWithSpaces(job.budget.max)} ${job.budget.currency || 'zł'}`
+                        : job.budget.min !== null
+                        ? `${formatNumberWithSpaces(job.budget.min)} ${job.budget.currency || 'zł'}`
+                        : job.budget.max !== null
+                        ? `${formatNumberWithSpaces(job.budget.max)} ${job.budget.currency || 'zł'}`
+                        : 'Do negocjacji'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Specialization Tags (Subcategory + Skills) */}
+                {(job.subcategory || (job.skills && job.skills.length > 0)) && (
                   <div className="flex flex-wrap gap-1">
-                    {job.skills.slice(0, 3).map((skill, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {skill}
+                    {/* Subcategory tag */}
+                    {job.subcategory && (
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                        {job.subcategory}
                       </Badge>
-                    ))}
-                    {job.skills.length > 3 && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Badge variant="outline" className="text-xs cursor-help">
-                            +{job.skills.length - 3} więcej
+                    )}
+                    {/* Skills tags */}
+                    {job.skills && job.skills.length > 0 && (
+                      <>
+                        {job.skills.slice(0, job.subcategory ? 2 : 3).map((skill, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {skill}
                           </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className='bg-white rounded-sm'>
-                            <div className="flex flex-wrap gap-1">
-                              {job.skills.slice(3).map((skill, index) => (
-                                <Badge key={index} variant="secondary" className="text-xs">
-                                  {skill}
-                                </Badge>
-                              ))}
-                            </div>
-                        </TooltipContent>
-                      </Tooltip>
+                        ))}
+                        {job.skills.length > (job.subcategory ? 2 : 3) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-xs cursor-help">
+                                +{job.skills.length - (job.subcategory ? 2 : 3)} więcej
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className='bg-white rounded-sm'>
+                                <div className="flex flex-wrap gap-1">
+                                  {job.skills.slice(job.subcategory ? 2 : 3).map((skill, index) => (
+                                    <Badge key={index} variant="secondary" className="text-xs">
+                                      {skill}
+                                    </Badge>
+                                  ))}
+                                </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
 
                 {/* Job details */}
                 <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-600 font-medium">💰</span>
-                    <span>Stawka: <span className="text-green-600">{job.salary}</span></span>
-                  </div>
+                  {job.salary && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600 font-medium">💰</span>
+                      <span>Stawka: <span className="text-green-600">{job.salary}</span></span>
+                    </div>
+                  )}
                   
                   <div className="flex items-center gap-4 text-gray-500">
                     <div className="flex items-center gap-1">

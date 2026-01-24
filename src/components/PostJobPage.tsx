@@ -15,6 +15,8 @@ import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
 import { createJob } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { fetchAllCategoriesWithSubcategories } from '../lib/database/categories';
+import type { CategoryWithSubcategories } from '../lib/database/categories';
 import Link from 'next/link';
 import LocationAutocomplete from './LocationAutocomplete';
 import type { BudgetInput } from '../types/budget';
@@ -54,61 +56,7 @@ interface JobFormData {
   additionalInfo: string;
 }
 
-const categories = {
-  'Utrzymanie Czystości i Zieleni': [
-    'Sprzątanie klatek schodowych',
-    'Sprzątanie części wspólnych',
-    'Utrzymanie terenów zielonych',
-    'Pielęgnacja terenów zielonych',
-    'Projektowanie i urządzanie terenów zielonych',
-    'Odśnieżanie i zimowe utrzymanie',
-    'Odśnieżanie i usuwanie lodu',
-    'Wywóz śmieci',
-    'Mycie okien',
-    'Czyszczenie elewacji'
-  ],
-  'Roboty Remontowo-Budowlane': [
-    'Malowanie i tynkowanie',
-    'Wymiana drzwi i okien',
-    'Remonty mieszkań',
-    'Termomodernizacja',
-    'Termomodernizacja budynków',
-    'Wymiana pokryć dachowych',
-    'Roboty murarskie',
-    'Remonty dachów i elewacji',
-    'Ogrodzenia i infrastruktura'
-  ],
-  'Instalacje i systemy': [
-    'Instalacje elektryczne',
-    'Instalacje wodno-kanalizacyjne',
-    'Instalacje gazowe',
-    'Systemy grzewcze',
-    'Klimatyzacja i wentylacja',
-    'Instalacje alarmowe',
-    'Przegląd wind',
-    'Modernizacja instalacji elektrycznych'
-  ],
-  'Utrzymanie techniczne i konserwacja': [
-    'Konserwacja wind',
-    'Serwis urządzeń grzewczych',
-    'Konserwacja instalacji',
-    'Przeglądy techniczne',
-    'Naprawy bieżące',
-    'Konserwacja terenów wspólnych'
-  ],
-  'Specjalistyczne usługi': [
-    'Dezynsekcja i deratyzacja',
-    'Usługi prawne',
-    'Zarządzanie nieruchomościami',
-    'Audyty energetyczne',
-    'Geodezja',
-    'Usługi księgowe',
-    'Doradztwo techniczne'
-  ],
-  'Inne': [
-    'Inne'
-  ]
-};
+// Categories will be loaded from database
 
 const urgencyLevels = [
   { value: 'low', label: 'Niski', color: 'bg-green-100 text-green-800' },
@@ -159,6 +107,19 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
     checkCompany();
   }, [user, supabase]);
 
+  // Load categories from database
+  useEffect(() => {
+    const loadCategories = async () => {
+      setIsLoadingCategories(true);
+      const { data } = await fetchAllCategoriesWithSubcategories(supabase);
+      if (data) {
+        setCategoriesFromDb(data);
+      }
+      setIsLoadingCategories(false);
+    };
+    loadCategories();
+  }, [supabase]);
+
   const [formData, setFormData] = useState<JobFormData>({
     title: '',
     category: '',
@@ -184,6 +145,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploadedFileUrls, setUploadedFileUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [categoriesFromDb, setCategoriesFromDb] = useState<CategoryWithSubcategories[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
   const handleInputChange = (field: keyof JobFormData, value: string | number | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -299,22 +262,10 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       return;
     }
     
-    // Validate subcategory - accept "-" when category is "Inne"
-    // Ensure subcategory is set correctly for "Inne" category
-    const currentSubcategory = formData.category === 'Inne' ? '-' : formData.subcategory;
-    
-    const isValidSubcategory = formData.category === 'Inne'
-      ? currentSubcategory === '-' // For "Inne", must be "-"
-      : currentSubcategory && currentSubcategory !== '' && currentSubcategory !== '-'; // For others, must be selected
-    
-    if (!isValidSubcategory) {
+    // Validate subcategory
+    if (!formData.subcategory || formData.subcategory === '') {
       toast.error('Proszę wybrać podkategorię');
       return;
-    }
-    
-    // Update formData with correct subcategory if needed
-    if (formData.category === 'Inne' && formData.subcategory !== '-') {
-      setFormData(prev => ({ ...prev, subcategory: '-' }));
     }
     
     if (!formData.title || !formData.description || !locationCity) {
@@ -666,35 +617,32 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="category">Kategoria *</Label>
-                  <Select value={formData.category} onValueChange={(value) => {
-                    handleInputChange('category', value);
-                    // Set subcategory to "-" if "Inne" is selected, otherwise reset
-                    handleInputChange('subcategory', value === 'Inne' ? '-' : '');
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Wybierz kategorię" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(categories).map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {isLoadingCategories ? (
+                    <div className="h-10 bg-gray-100 rounded-md animate-pulse" />
+                  ) : (
+                    <Select value={formData.category} onValueChange={(value) => {
+                      handleInputChange('category', value);
+                      // Reset subcategory when category changes
+                      handleInputChange('subcategory', '');
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Wybierz kategorię" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categoriesFromDb.map((category) => (
+                          <SelectItem key={category.id} value={category.name}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div>
                   <Label htmlFor="subcategory">Podkategoria *</Label>
-                  {formData.category === 'Inne' ? (
-                    <div>
-                      <Input
-                        value="-"
-                        disabled
-                        className="bg-gray-100"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">(automatycznie ustawione dla kategorii &quot;Inne&quot;)</p>
-                    </div>
+                  {isLoadingCategories ? (
+                    <div className="h-10 bg-gray-100 rounded-md animate-pulse" />
                   ) : (
                     <Select 
                       value={formData.subcategory} 
@@ -705,11 +653,14 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
                         <SelectValue placeholder="Wybierz podkategorię" />
                       </SelectTrigger>
                       <SelectContent>
-                        {formData.category && categories[formData.category as keyof typeof categories]?.map((subcategory) => (
-                          <SelectItem key={subcategory} value={subcategory}>
-                            {subcategory}
-                          </SelectItem>
-                        ))}
+                        {formData.category && (() => {
+                          const selectedCategory = categoriesFromDb.find(c => c.name === formData.category);
+                          return selectedCategory?.subcategories.map((subcategory) => (
+                            <SelectItem key={subcategory.id} value={subcategory.name}>
+                              {subcategory.name}
+                            </SelectItem>
+                          ));
+                        })()}
                       </SelectContent>
                     </Select>
                   )}

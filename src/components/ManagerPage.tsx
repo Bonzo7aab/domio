@@ -510,7 +510,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
           currency: string;
           deadline: string;
-          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed';
+          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed' | 'inactive';
           job_categories: { name: string } | null;
           location: string | { city?: string };
         }) => {
@@ -656,7 +656,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
           currency: string;
           deadline: string;
-          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed';
+          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed' | 'inactive';
           job_categories: { name: string } | null;
           location: string | { city?: string };
         }) => {

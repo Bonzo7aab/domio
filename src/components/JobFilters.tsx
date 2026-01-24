@@ -6,7 +6,10 @@ import { Label } from './ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { extractCity, extractSublocality, getProvinceForCity, getProvincesFromCities } from '../utils/locationMapping';
 import { isTenderEndingSoon } from '../utils/tenderHelpers';
+import { createClient } from '../lib/supabase/client';
+import { fetchAllCategoriesWithSubcategories } from '../lib/database/categories';
 import type { Job } from '../types/job';
+import type { CategoryWithSubcategories } from '../lib/database/categories';
 
 export interface FilterState {
   categories: string[];
@@ -90,6 +93,8 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
   const isUpdatingFromSelfRef = useRef(false);
   const previousFilterStateRef = useRef<FilterState | null>(null);
   const isInitialMountRef = useRef(true);
+  const [categoriesFromDb, setCategoriesFromDb] = useState<CategoryWithSubcategories[]>([]);
+  const supabase = createClient();
 
   // Sync local state with incoming filters (from quick filters or URL)
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -120,28 +125,46 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
   }, [initialFilters, isMapView]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Calculate categories dynamically from jobs (using category.name)
-  const categories = useMemo(() => {
-    if (!jobs || jobs.length === 0) {
-      return [];
-    }
+  // Fetch categories from database
+  useEffect(() => {
+    const loadCategories = async () => {
+      const { data } = await fetchAllCategoriesWithSubcategories(supabase);
+      if (data) {
+        setCategoriesFromDb(data);
+      }
+    };
+    loadCategories();
+  }, [supabase]);
 
-    // Group jobs by category name
-    const categoryMap = new Map<string, number>();
-
+  // Calculate category counts from jobs
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    
     jobs.forEach(job => {
-      // Handle category as either string or object with name property
       const categoryName = typeof job.category === 'string' 
         ? job.category 
-        : (job.category?.name || 'Inne');
-      const currentCount = categoryMap.get(categoryName) || 0;
-      categoryMap.set(categoryName, currentCount + 1);
+        : (job.category?.name || '');
+      
+      if (categoryName) {
+        counts[categoryName] = (counts[categoryName] || 0) + 1;
+      }
     });
 
-    // Convert to array format sorted by count
-    return Array.from(categoryMap.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count); // Sort by count descending
+    return counts;
+  }, [jobs]);
+
+  // Calculate subcategory counts from jobs
+  // Count all jobs by subcategory to show available counts in filters
+  const subcategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    
+    jobs.forEach(job => {
+      if (job.subcategory) {
+        counts[job.subcategory] = (counts[job.subcategory] || 0) + 1;
+      }
+    });
+
+    return counts;
   }, [jobs]);
 
   // Extract unique cities and their sublocalities from jobs
@@ -1001,26 +1024,66 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                 }
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-2">
-                {categories.length > 0 ? (
-                  categories.map(category => (
-                    <div key={category.name} className="flex items-center space-x-2">
-                      <CustomCheckbox 
-                        id={`category-${category.name}`}
-                        checked={selectedCategories.includes(category.name)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedCategories(prev => [...prev, category.name]);
-                          } else {
-                            setSelectedCategories(prev => prev.filter(c => c !== category.name));
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`category-${category.name}`} className="text-sm cursor-pointer text-gray-900 font-light">
-                        {category.name} ({category.count})
-                      </Label>
-                    </div>
-                  ))
+                <div className="space-y-3">
+                {categoriesFromDb.length > 0 ? (
+                  categoriesFromDb.map(category => {
+                    const isCategorySelected = selectedCategories.includes(category.name);
+                    const count = categoryCounts[category.name] || 0;
+                    
+                    return (
+                      <div key={category.id} className="space-y-1">
+                        {/* Main Category */}
+                        <div className="flex items-center space-x-2">
+                          <CustomCheckbox 
+                            id={`category-${category.id}`}
+                            checked={isCategorySelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedCategories(prev => [...prev, category.name]);
+                              } else {
+                                setSelectedCategories(prev => prev.filter(c => c !== category.name));
+                                // Clear subcategories when main category is deselected
+                                setSelectedSubcategories(prev => {
+                                  const subcategoryNames = category.subcategories.map(sub => sub.name);
+                                  return prev.filter(sub => !subcategoryNames.includes(sub));
+                                });
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`category-${category.id}`} className="text-sm cursor-pointer text-gray-900 font-light">
+                            {category.name} {count > 0 && `(${count})`}
+                          </Label>
+                        </div>
+                        
+                        {/* Subcategories - shown when main category is selected */}
+                        {isCategorySelected && category.subcategories.length > 0 && (
+                          <div className="ml-6 space-y-1 pl-1 border-l-2 border-gray-200">
+                            {category.subcategories.map(subcategory => {
+                              const subCount = subcategoryCounts[subcategory.name] || 0;
+                              return (
+                                <div key={subcategory.id} className="flex items-center space-x-2">
+                                  <CustomCheckbox 
+                                    id={`subcategory-${subcategory.id}`}
+                                    checked={selectedSubcategories.includes(subcategory.name)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedSubcategories(prev => [...prev, subcategory.name]);
+                                      } else {
+                                        setSelectedSubcategories(prev => prev.filter(s => s !== subcategory.name));
+                                      }
+                                    }}
+                                  />
+                                  <Label htmlFor={`subcategory-${subcategory.id}`} className="text-xs cursor-pointer text-gray-700 font-light">
+                                    {subcategory.name} <span className="text-gray-500">({subCount})</span>
+                                  </Label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="text-xs text-gray-400 pl-2">Brak kategorii</div>
                 )}

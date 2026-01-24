@@ -6,6 +6,7 @@ import JobFilters from '../components/JobFilters';
 import JobList from '../components/JobList';
 import { JobApplicationModal } from '../components/JobApplicationModal';
 import { MapPlaceholder } from '../components/MapPlaceholder';
+import CategoryIconBar from '../components/CategoryIconBar';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -587,8 +588,12 @@ function HomePageContent() {
       
       {/* Main Layout - Hidden when map is expanded, wrapped in max-w-7xl container */}
       {!isMapExpanded && (
-        <div className="max-w-7xl mx-auto sm:px-4 md:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row min-h-0 lg:min-h-[calc(100vh-12rem)]">
+        <div className="w-full">
+          {/* Category Icon Bar - Level 1 Navigation */}
+          <CategoryIconBar jobs={loadedJobs} />
+          
+          <div className="max-w-7xl mx-auto sm:px-4 md:px-6 lg:px-8">
+            <div className="flex flex-col lg:flex-row min-h-0 lg:min-h-[calc(100vh-12rem)]">
             {/* Filters Sidebar - Visible only on laptop and above */}
             <div className="hidden lg:flex flex-col lg:w-80 xl:w-96 flex-shrink-0">
               {/* Map Placeholder */}
@@ -620,6 +625,7 @@ function HomePageContent() {
                 onApplyClick={handleApplyClick}
               />
             </div>
+          </div>
           </div>
         </div>
       )}

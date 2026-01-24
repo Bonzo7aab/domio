@@ -1002,7 +1002,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       <span className="text-xs text-gray-400">({job.address})</span>
                     )}
                   </div>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center gap-2">
                     <div className="flex items-center gap-1">
                       <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                       <span>{job.postedTime}</span>

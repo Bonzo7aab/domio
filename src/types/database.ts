@@ -383,7 +383,7 @@ export interface Database {
           project_duration: string | null
           deadline: string | null
           urgency: 'low' | 'medium' | 'high'
-          status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled'
+          status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled' | 'inactive'
           type: 'regular' | 'urgent' | 'premium'
           is_public: boolean
           contact_person: string | null

@@ -2,6 +2,7 @@ import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import type { Budget, BudgetInput } from '../../types/budget';
 import { budgetFromDatabase, budgetToDatabase, formatBudget } from '../../types/budget';
+import { fetchAllCategoriesWithSubcategories } from './categories';
 
 export interface JobFilters {
   categories?: string[];
@@ -179,18 +180,52 @@ export async function fetchJobs(
         category:job_categories!jobs_category_id_fkey (
           name,
           slug
+        ),
+        subcategory:job_categories!jobs_subcategory_id_fkey (
+          name,
+          slug
         )
       `)
       .eq('status', (filters.status || 'active') as 'active' | 'paused' | 'cancelled' | 'draft' | 'completed')
       .eq('is_public', true);
 
-    // Apply filters
-    if (filters.categories && filters.categories.length > 0) {
-      query = query.in('category_id', filters.categories);
-    }
+    // Apply category and subcategory filters
+    // Jobs have category_id = main category, subcategory_id = subcategory (FK to job_categories)
+    if (filters.categories && filters.categories.length > 0 || filters.subcategories && filters.subcategories.length > 0) {
+      const { data: allCategories } = await fetchAllCategoriesWithSubcategories(supabase);
+      const mainCategoryIds: string[] = [];
+      const subcategoryIds: string[] = [];
 
-    if (filters.subcategories && filters.subcategories.length > 0) {
-      query = query.in('subcategory', filters.subcategories);
+      if (allCategories) {
+        if (filters.categories && filters.categories.length > 0) {
+          for (const categoryName of filters.categories) {
+            const category = allCategories.find(c => c.name === categoryName);
+            if (category) {
+              mainCategoryIds.push(category.id);
+            }
+          }
+        }
+
+        if (filters.subcategories && filters.subcategories.length > 0) {
+          for (const mainCategory of allCategories) {
+            for (const sub of mainCategory.subcategories) {
+              if (filters.subcategories.includes(sub.name)) {
+                subcategoryIds.push(sub.id);
+              }
+            }
+          }
+        }
+      }
+
+      // Filter by main category (category_id)
+      if (mainCategoryIds.length > 0) {
+        query = query.in('category_id', mainCategoryIds);
+      }
+      // Filter by subcategory (subcategory_id)
+      if (subcategoryIds.length > 0) {
+        // @ts-expect-error - Type instantiation is complex but valid at runtime
+        query = query.in('subcategory_id', subcategoryIds);
+      }
     }
 
     if (filters.locations && filters.locations.length > 0) {
@@ -598,7 +633,7 @@ export async function fetchJobsAndTenders(
     salary: formatBudget(budget), // Display string for salary
     budget, // Budget object with all fields (min, max, type, currency)
     category: job.category?.name || 'Inne',
-    subcategory: job.subcategory || undefined,
+    subcategory: (job.subcategory as unknown as { name: string } | null | undefined)?.name || undefined,
     deadline: job.deadline || undefined,
     urgency: normalizeUrgency(job.urgency),
     metrics: {
