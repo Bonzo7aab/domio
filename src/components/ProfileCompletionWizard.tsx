@@ -13,7 +13,8 @@ import { Checkbox } from './ui/checkbox';
 import { useUserProfile } from '../contexts/AuthContext';
 import { updateUserAction } from '../lib/auth/actions';
 import { createClient } from '../lib/supabase/client';
-import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { fetchUserPrimaryCompany, upsertUserCompany } from '../lib/database/companies';
+import { toast } from 'sonner';
 
 interface ProfileCompletionWizardProps {
   onComplete: () => void;
@@ -232,22 +233,71 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
   };
 
   const handleNext = () => {
-    if (validateStep(currentStep)) {
-      if (currentStep < totalSteps) {
-        setCurrentStep(currentStep + 1);
-      } else {
-        handleComplete();
-      }
+    if (!validateStep(currentStep)) {
+      return;
+    }
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      void handleComplete();
     }
   };
 
-  const handleComplete = () => {
-    // Update user profile
-    updateUserAction({
+  const handleComplete = async () => {
+    if (!user?.id) {
+      await updateUserAction({
+        phone: profileData.phone,
+        profile_completed: true
+      });
+      onComplete();
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { data: company, error: companyFetchError } = await fetchUserPrimaryCompany(supabase, user.id);
+
+      if (companyFetchError) {
+        console.error('Error loading company before profile save:', companyFetchError);
+      }
+
+      if (company) {
+        const companyRow = company as typeof company & { is_public?: boolean };
+        const { error: upsertError } = await upsertUserCompany(supabase, user.id, {
+          name: profileData.companyName.trim(),
+          type: company.type,
+          phone: profileData.phone.trim(),
+          email: (company.email?.trim() || user.email?.trim() || '').trim() || undefined,
+          address: profileData.street.trim(),
+          city: profileData.city.trim(),
+          postal_code: profileData.postalCode.trim(),
+          nip: (company.nip || '').trim() || undefined,
+          regon: company.regon || undefined,
+          krs: company.krs || undefined,
+          website: profileData.website.trim() || company.website || undefined,
+          founded_year: company.founded_year ?? undefined,
+          employee_count: company.employee_count || undefined,
+          description: profileData.description.trim(),
+          is_public: companyRow.is_public !== false,
+        });
+
+        if (upsertError) {
+          console.error('Failed to save company from profile wizard:', upsertError);
+          toast.error('Nie udało się zapisać danych adresowych firmy (w tym kodu pocztowego). Spróbuj ponownie lub uzupełnij dane w zakładce Firma w koncie.');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Error saving company from profile wizard:', err);
+      toast.error('Nie udało się zapisać danych firmy. Spróbuj ponownie.');
+      return;
+    }
+
+    await updateUserAction({
       phone: profileData.phone,
       profile_completed: true
     });
-    
+
     onComplete();
   };
 

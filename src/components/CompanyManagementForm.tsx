@@ -796,9 +796,12 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                           value={companyData.postal_code}
                           onChange={(e) => handleCompanyChange('postal_code', e.target.value)}
                           placeholder="00-999"
-                          type="number"
+                          type="text"
+                          inputMode="text"
+                          autoComplete="postal-code"
+                          maxLength={10}
                           required
-                          className={cn(fieldErrors.postal_code ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '', 'placeholder:text-muted-foreground/60 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none') }
+                          className={cn(fieldErrors.postal_code ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '', 'placeholder:text-muted-foreground/60')}
                         />
                       {fieldErrors.postal_code && (
                         <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
