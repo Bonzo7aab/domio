@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { User, Mail, Lock, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -143,12 +144,12 @@ export function LoginPage({ searchParams }: LoginPageProps) {
               </form>
 
               <div className="mt-6 text-center">
-                <a 
+                <Link 
                   href="/forgot-password" 
                   className="text-sm text-slate-500 hover:text-slate-700 hover:underline transition-colors"
                 >
                   Zapomniałeś hasła?
-                </a>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -156,12 +157,12 @@ export function LoginPage({ searchParams }: LoginPageProps) {
           {/* Register Link */}
           <div className="mt-6 text-center">
             <span className="text-slate-600">Nie masz konta? </span>
-            <a 
+            <Link 
               href="/register" 
               className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
             >
               Zarejestruj się
-            </a>
+            </Link>
           </div>
         </div>
       </div>

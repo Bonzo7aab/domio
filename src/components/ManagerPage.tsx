@@ -923,8 +923,8 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
       setEditingTenderData(null);
       setShowTenderCreation(false);
       
-      // Refresh the page to show the updated/new tender
-      window.location.reload();
+      // Refresh route data without forcing a hard browser reload.
+      router.refresh();
     } catch (error) {
       toast.error('Wystąpił błąd podczas zapisywania przetargu');
       console.error('Error in handleTenderSubmit:', error);

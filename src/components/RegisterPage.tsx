@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
 import { Building, User, Phone, Mail, Lock, Eye, EyeOff, MapPin } from 'lucide-react';
@@ -420,13 +421,13 @@ export function RegisterPage() {
                     className="text-sm text-slate-600 cursor-pointer leading-tight"
                   >
                     Akceptuję{' '}
-                    <a href="/terms" className="text-blue-600 hover:underline">
+                    <Link href="/terms" className="text-blue-600 hover:underline">
                       regulamin
-                    </a>{' '}
+                    </Link>{' '}
                     i{' '}
-                    <a href="/privacy" className="text-blue-600 hover:underline">
+                    <Link href="/privacy" className="text-blue-600 hover:underline">
                       politykę prywatności
-                    </a>
+                    </Link>
                     .
                   </label>
                 </div>
@@ -458,12 +459,12 @@ export function RegisterPage() {
 
           <div className="mt-6 text-center">
             <span className="text-slate-600">Masz już konto? </span>
-            <a
+            <Link
               href="/login"
               className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
             >
               Zaloguj się
-            </a>
+            </Link>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "./utils";
 import { LucideIcon } from "lucide-react";
@@ -75,6 +76,8 @@ const MenuDock = React.forwardRef<HTMLDivElement, MenuDockProps>(
     },
     ref
   ) => {
+    const router = useRouter();
+
     return (
       <div
         ref={ref}
@@ -133,7 +136,7 @@ const MenuDock = React.forwardRef<HTMLDivElement, MenuDockProps>(
                 onClick={(e) => {
                   e.preventDefault();
                   if (item.onClick) item.onClick();
-                  else if (item.href) window.location.href = item.href;
+                  else if (item.href) router.push(item.href);
                 }}
               >
                 {content}
