@@ -142,52 +142,32 @@ export default function TenderCreationPage({ onBack }: TenderCreationPageProps) 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with navigation */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon" onClick={onBack}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <nav className="flex space-x-2 text-sm text-gray-500">
-                <span>Panel Zarządcy</span>
-                <span>/</span>
-                <span className="text-gray-900 font-medium">Nowy Przetarg</span>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-600">
-                Zalogowany jako: <span className="font-medium">{user?.email}</span>
-              </div>
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-medium">
-                {user?.email?.charAt(0).toUpperCase()}
-              </div>
+      {/* Header */}
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              className="hidden md:flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Powrót do wyboru typu ogłoszenia
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Opublikuj nowy przetarg</h1>
+              <p className="text-gray-600">Znajdź najlepszych wykonawców dla większych realizacji</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm">
-          {/* Page Header */}
-          <div className="p-6 border-b border-gray-200">
-            <h1 className="text-3xl font-bold text-gray-900">Utwórz Nowy Przetarg</h1>
-            <p className="mt-2 text-gray-600">
-              Wypełnij formularz, aby opublikować przetarg na platformie Domio.
-              Wszystkie pola oznaczone gwiazdką (*) są wymagane.
-            </p>
-          </div>
-
-          {/* Tender Creation Form */}
-          <div className="p-6">
-            <TenderCreationFormInline
-              onClose={handleFormClose}
-              onSubmit={handleTenderSubmit}
-            />
-          </div>
-        </div>
+      {/* Form Content */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <TenderCreationFormInline
+          onClose={handleFormClose}
+          onSubmit={handleTenderSubmit}
+        />
       </div>
     </div>
   );

@@ -81,7 +81,7 @@ export default function JobApplicationsPage() {
           toast.error("Nie udało się załadować ofert");
           setApplications([]);
         } else {
-          setApplications((applicationsData || []) as Application[]);
+          setApplications(applicationsData || []);
         }
       } catch (error: unknown) {
         console.error("Error loading applications page data:", error);

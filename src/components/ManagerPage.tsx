@@ -22,6 +22,7 @@ import { createTender, updateTender, fetchTenderById, fetchJobApplicationsByJobI
 import { fetchUserPrimaryCompany, type CompanyData } from '../lib/database/companies';
 import { fetchCompanyBuildings } from '../lib/database/buildings';
 import { fetchContractorsByWorkHistory } from '../lib/database/contractors';
+import type { Application } from '../types/application';
 import type { Building } from '../types/building';
 import { BUILDING_TYPE_OPTIONS } from '../types/building';
 import { toast } from 'sonner';
@@ -69,7 +70,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
   // Track client-side mount to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
   // Applications state
-  const [_applications, setApplications] = useState<Array<{ id: string; contractor_id: string; job_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
+  const [_applications, setApplications] = useState<Application[]>([]);
   const [_isLoadingApplications, setIsLoadingApplications] = useState(false);
   const [_selectedJobData, setSelectedJobData] = useState<{ title: string; budget: string } | null>(null);
   // Tender bids state
@@ -356,7 +357,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           toast.error('Nie udało się załadować ofert');
           setApplications([]);
         } else {
-          setApplications((applicationsData || []) as Array<{ id: string; contractor_id: string; job_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>);
+          setApplications(applicationsData || []);
         }
       } catch (err) {
         console.error('Error loading applications:', err);

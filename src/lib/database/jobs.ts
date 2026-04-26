@@ -1,5 +1,6 @@
 import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
+import type { Application } from '../../types/application';
 import type { Budget, BudgetInput } from '../../types/budget';
 import { budgetFromDatabase, budgetToDatabase, formatBudget } from '../../types/budget';
 import { fetchAllCategoriesWithSubcategories } from './categories';
@@ -2098,7 +2099,7 @@ export async function createJobApplication(
 export async function fetchJobApplicationsByJobId(
   supabase: SupabaseClient<Database>,
   jobId: string
-): Promise<{ data: Record<string, unknown>[] | null; error: PostgrestError | null }> {
+): Promise<{ data: Application[] | null; error: PostgrestError | null }> {
   try {
     // Use type assertion since job_applications may not be in generated types
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2164,10 +2165,26 @@ export async function fetchJobApplicationsByJobId(
           }
         }
         
+        const formattedAttachments = Array.isArray(app.attachments)
+          ? (app.attachments as Array<Record<string, unknown>>).map((attachment, index) => ({
+              id: String(attachment.id ?? `attachment-${index}`),
+              name: String(attachment.name ?? 'Załącznik'),
+              type:
+                (attachment.type === 'portfolio' ||
+                  attachment.type === 'reference' ||
+                  attachment.type === 'certificate' ||
+                  attachment.type === 'other'
+                  ? attachment.type
+                  : 'other') as 'portfolio' | 'reference' | 'certificate' | 'other',
+              url: String(attachment.url ?? ''),
+              size: Number(attachment.size ?? 0),
+            }))
+          : [];
+
         return {
-          id: app.id,
-          jobId: app.job_id,
-          contractorId: app.contractor_id,
+          id: String(app.id),
+          jobId: String(app.job_id),
+          contractorId: String(app.contractor_id),
           contractorName: app.contractor 
             ? `${String((app.contractor as Record<string, unknown>).first_name ?? '')} ${String((app.contractor as Record<string, unknown>).last_name ?? '')}`.trim() 
             : 'Nieznany wykonawca',
@@ -2176,19 +2193,19 @@ export async function fetchJobApplicationsByJobId(
           contractorRating: contractorProfile?.rating?.overall || 0,
           contractorCompletedJobs: contractorProfile?.experience?.completedProjects || 0,
           contractorLocation: contractorProfile?.location?.city || 'Nieznana lokalizacja',
-          proposedPrice: app.proposed_price || 0,
+          proposedPrice: Number(app.proposed_price ?? 0),
           proposedTimeline: proposedTimeline,
-          coverLetter: app.cover_letter || '',
-          experience: app.experience || '',
-          teamSize: app.team_size || 1,
-          availableFrom: app.available_from || new Date().toISOString(),
-          guaranteePeriod: app.guarantee_period ? `${app.guarantee_period} miesięcy` : '12 miesięcy',
-          attachments: (app.attachments as Array<Record<string, unknown>>) || [],
-          certificates: (app.certificates as string[]) || [],
+          coverLetter: String(app.cover_letter ?? ''),
+          experience: String(app.experience ?? ''),
+          teamSize: Number(app.team_size ?? 1),
+          availableFrom: String(app.available_from ?? new Date().toISOString()),
+          guaranteePeriod: app.guarantee_period ? `${String(app.guarantee_period)} miesięcy` : '12 miesięcy',
+          attachments: formattedAttachments,
+          certificates: Array.isArray(app.certificates) ? app.certificates.map((certificate) => String(certificate)) : [],
           status: (app.status as 'submitted' | 'under_review' | 'accepted' | 'rejected') || 'submitted',
           submittedAt: new Date(String(app.submitted_at ?? '')),
           lastUpdated: app.reviewed_at ? new Date(String(app.reviewed_at)) : new Date(String(app.submitted_at ?? '')),
-          reviewNotes: app.notes || undefined,
+          reviewNotes: typeof app.notes === 'string' ? app.notes : undefined,
         };
       })
     );
