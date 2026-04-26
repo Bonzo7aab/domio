@@ -17,7 +17,7 @@ export default function PostJob() {
   }, [user, isLoading, router]);
 
   const handleBack = () => {
-    router.push('/');
+    router.push('/job-type-selection');
   };
 
   // Show nothing while checking auth or if not authenticated (will redirect)

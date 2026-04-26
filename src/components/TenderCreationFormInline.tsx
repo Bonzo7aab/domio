@@ -31,7 +31,7 @@ import LocationAutocomplete from './LocationAutocomplete';
 
 interface TenderCreationFormInlineProps {
   onClose: () => void;
-  onSubmit: (tender: NewTender, tenderId?: string) => void;
+  onSubmit: (tender: NewTender, tenderId?: string) => void | Promise<void>;
   tenderId?: string;
   initialData?: TenderWithCompany;
 }
@@ -135,7 +135,7 @@ const defaultCriteria: EvaluationCriterion[] = [
 ];
 
 export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> = ({
-  onClose,
+  onClose: _onClose,
   onSubmit,
   tenderId,
   initialData
@@ -305,7 +305,7 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
     }
   };
 
-  const handleSubmit = (asDraft: boolean = false) => {
+  const handleSubmit = async (asDraft: boolean = false) => {
     if (!asDraft && !validateStep(currentStep)) return;
 
     const finalCategory = formData.category === 'Inne' && customCategory.trim() 
@@ -319,13 +319,12 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
       status: asDraft ? 'draft' : 'active'
     };
 
-    onSubmit(tender, tenderId);
-    toast.success(
-      isEditMode 
-        ? (asDraft ? 'Przetarg zaktualizowany jako szkic' : 'Przetarg został zaktualizowany i opublikowany')
-        : (asDraft ? 'Przetarg zapisany jako szkic' : 'Przetarg został opublikowany')
-    );
-    onClose();
+    try {
+      await Promise.resolve(onSubmit(tender, tenderId));
+    } catch (error) {
+      console.error('Error submitting tender form:', error);
+      toast.error('Wystąpił błąd podczas zapisywania przetargu');
+    }
   };
 
   const addRequirement = () => {
@@ -1215,11 +1214,11 @@ export const TenderCreationFormInline: React.FC<TenderCreationFormInlineProps> =
             </Button>
           ) : (
             <>
-              <Button variant="outline" onClick={() => handleSubmit(true)}>
+              <Button variant="outline" onClick={() => void handleSubmit(true)}>
                 <Save className="h-4 w-4 mr-2" />
                 Zapisz jako szkic
               </Button>
-              <Button onClick={() => handleSubmit(false)}>
+              <Button onClick={() => void handleSubmit(false)}>
                 <Send className="h-4 w-4 mr-2" />
                 Opublikuj przetarg
               </Button>

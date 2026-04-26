@@ -763,9 +763,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
   }, [activeTab, loadedTabs, companyId]);
 
   const handleTenderCreate = () => {
-    setEditingTenderId(null);
-    setEditingTenderData(null);
-    setShowTenderCreation(true);
+    router.push('/post-tender');
   };
 
   const handleTenderEdit = async (tenderId: string) => {

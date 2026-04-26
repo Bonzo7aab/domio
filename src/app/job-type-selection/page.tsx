@@ -87,7 +87,7 @@ export default function JobTypeSelection() {
       return;
     }
 
-    router.push('/manager-dashboard/tenders?create=true');
+    router.push('/post-tender');
   };
 
   return (

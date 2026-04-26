@@ -36,7 +36,7 @@ export function ManagerDashboardHeader({ company, userEmail, userCompany }: Mana
       router.push('/account?tab=company');
       return;
     }
-    router.push('/manager-dashboard/tenders?create=true');
+    router.push('/post-tender');
   };
 
   return (

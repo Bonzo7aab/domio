@@ -1264,7 +1264,6 @@ export async function createTender(
     }
 
     const categoryId = categoryData.id;
-    
     // Note: For custom categories, if a category with the exact custom name exists in the database,
     // it will be used and the name is preserved. If it doesn't exist, we fall back to a mapped category.
     // The category name stored in the database will be what we found/used.
@@ -1672,6 +1671,47 @@ export async function createJob(
     }
 
     const categoryId = categoryData.id;
+    let subcategoryId: string | null = null;
+
+    if (jobData.subcategory && jobData.subcategory.trim()) {
+      const subcategoryName = jobData.subcategory.trim();
+
+      // First, try an exact (case-insensitive) match scoped to the selected main category.
+      let { data: subcategoryData, error: subcategoryError } = await supabase
+        .from('job_categories')
+        .select('id, name')
+        .eq('parent_id', categoryId)
+        .ilike('name', subcategoryName)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      // Fallback to partial match when there are spacing/diacritic variations.
+      if (subcategoryError || !subcategoryData) {
+        const { data: partialSubcategory, error: partialSubcategoryError } = await supabase
+          .from('job_categories')
+          .select('id, name')
+          .eq('parent_id', categoryId)
+          .ilike('name', `%${subcategoryName}%`)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (!partialSubcategoryError && partialSubcategory) {
+          subcategoryData = partialSubcategory;
+          subcategoryError = null;
+        }
+      }
+
+      if (subcategoryError || !subcategoryData) {
+        console.warn('Subcategory not found for selected category, saving without subcategory_id', {
+          subcategory: subcategoryName,
+          categoryId,
+          categoryName: categoryData.name,
+        });
+      } else {
+        subcategoryId = subcategoryData.id;
+      }
+    }
 
     // Parse deadline if provided
     let deadlineDate: string | null = null;
@@ -1715,7 +1755,7 @@ export async function createJob(
       title: jobData.title,
       description: jobData.description,
       category_id: categoryId,
-      subcategory: jobData.subcategory || null,
+      subcategory_id: subcategoryId,
       manager_id: jobData.managerId,
       company_id: jobData.companyId,
       location: locationJsonb,

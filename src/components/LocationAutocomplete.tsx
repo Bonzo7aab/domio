@@ -34,6 +34,40 @@ interface AutocompleteSuggestion {
   };
 }
 
+interface GeolocationErrorDetails {
+  code?: number;
+  message: string;
+}
+
+const getGeolocationErrorDetails = (error: unknown): GeolocationErrorDetails => {
+  const fallbackMessage = 'Wystąpił błąd podczas pobierania lokalizacji';
+
+  if (error instanceof Error) {
+    const errorWithCode = error as Error & { code?: number };
+    return {
+      code: typeof errorWithCode.code === 'number' ? errorWithCode.code : undefined,
+      message: error.message || fallbackMessage,
+    };
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const errorRecord = error as Record<string, unknown>;
+    const code = typeof errorRecord.code === 'number' ? errorRecord.code : undefined;
+    const message =
+      typeof errorRecord.message === 'string' && errorRecord.message.trim()
+        ? errorRecord.message
+        : fallbackMessage;
+
+    return { code, message };
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return { message: error };
+  }
+
+  return { message: fallbackMessage };
+};
+
 export default function LocationAutocomplete({
   value = '',
   onLocationSelect,
@@ -473,16 +507,21 @@ export default function LocationAutocomplete({
       
       toast.success('Użyto Twojej aktualnej lokalizacji');
     } catch (error: unknown) {
-      console.error('Geolocation error:', error);
-      
-      if ((error as { code?: number }).code === 1) {
+      const geolocationError = getGeolocationErrorDetails(error);
+      console.error('Geolocation error:', {
+        code: geolocationError.code,
+        message: geolocationError.message,
+        rawError: error,
+      });
+
+      if (geolocationError.code === 1) {
         toast.error('Dostęp do lokalizacji został odrzucony. Sprawdź ustawienia przeglądarki.');
-      } else if ((error as { code?: number }).code === 2) {
+      } else if (geolocationError.code === 2) {
         toast.error('Nie udało się określić lokalizacji. Sprawdź połączenie z internetem.');
-      } else if ((error as { code?: number }).code === 3) {
+      } else if (geolocationError.code === 3) {
         toast.error('Przekroczono limit czasu oczekiwania na lokalizację.');
       } else {
-        toast.error('Wystąpił błąd podczas pobierania lokalizacji');
+        toast.error(geolocationError.message);
       }
     } finally {
       setIsGeolocating(false);

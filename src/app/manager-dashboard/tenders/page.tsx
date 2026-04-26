@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { createTender, updateTender, fetchTenderById } from '../../../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
@@ -17,13 +17,11 @@ import type { TenderWithCompany } from '../../../lib/database/jobs';
 export default function TendersPage() {
   const { user } = useUserProfile();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [showTenderCreation, setShowTenderCreation] = useState(false);
   const [editingTenderId, setEditingTenderId] = useState<string | null>(null);
   const [editingTenderData, setEditingTenderData] = useState<TenderWithCompany | null>(null);
   const [hasCompany, setHasCompany] = useState<boolean | null>(null);
   const [isCheckingCompany, setIsCheckingCompany] = useState(true);
-  const pendingCreateRef = React.useRef(false);
 
   // Check if user has a company
   useEffect(() => {
@@ -48,33 +46,6 @@ export default function TendersPage() {
     checkCompany();
   }, [user]);
 
-  // Check if we should open tender form from URL
-  useEffect(() => {
-    const shouldCreate = searchParams.get('create') === 'true';
-    if (shouldCreate) {
-      pendingCreateRef.current = true;
-      // Remove query param from URL
-      router.replace('/manager-dashboard/tenders', { scroll: false });
-    }
-  }, [searchParams, router]);
-
-  // Handle pending create action after company check completes
-  useEffect(() => {
-    // Wait for company check to complete
-    if (isCheckingCompany || !pendingCreateRef.current) return;
-    
-    // Clear the pending flag
-    pendingCreateRef.current = false;
-    
-    // Handle the create action based on company status
-    if (hasCompany) {
-      setShowTenderCreation(true);
-    } else {
-      // Show error toast if trying to create without company
-      toast.error('Najpierw musisz dodać dane firmy w profilu');
-    }
-  }, [hasCompany, isCheckingCompany]);
-
   const handleTenderCreate = () => {
     // Check if company exists before allowing creation
     if (!hasCompany) {
@@ -82,9 +53,7 @@ export default function TendersPage() {
       router.push('/account?tab=company');
       return;
     }
-    setEditingTenderId(null);
-    setEditingTenderData(null);
-    setShowTenderCreation(true);
+    router.push('/post-tender');
   };
 
   const handleTenderEdit = async (tenderId: string) => {

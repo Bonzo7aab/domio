@@ -28,14 +28,20 @@ async function getJobsData(userId: string) {
       currency,
       deadline,
       status,
-      job_categories (name),
+      category:job_categories!jobs_category_id_fkey (name),
       location
     `)
     .eq('company_id', company.id)
     .order('created_at', { ascending: false });
 
   if (jobsError) {
-    console.error('Error fetching jobs:', jobsError);
+    console.error('Error fetching jobs:', {
+      message: jobsError.message,
+      code: jobsError.code,
+      details: jobsError.details,
+      hint: jobsError.hint,
+      rawError: jobsError,
+    });
     return { jobs: [], companyId: company.id };
   }
 
@@ -71,7 +77,7 @@ async function getJobsData(userId: string) {
     currency: string;
     deadline: string | null;
     status: string;
-    job_categories: { name: string } | null;
+    category: { name: string } | null;
     location: string | { city?: string } | null;
   }) => {
     const location = typeof job.location === 'string' 
@@ -89,7 +95,7 @@ async function getJobsData(userId: string) {
     return {
       id: job.id,
       title: job.title,
-      category: job.job_categories?.name || 'Inne',
+      category: job.category?.name || 'Inne',
       status: job.status || 'active',
       budget,
       applications: applicationCounts[job.id] || 0,
