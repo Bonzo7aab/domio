@@ -4,7 +4,6 @@ import { Award, Clock, MapPin, Shield, Star } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
 import { getContractorAddress } from './shared/utils';
 import type { ContractorProfile } from '../../lib/database/contractors';
 
@@ -19,10 +18,6 @@ interface ContractorDashboardHeaderProps {
 export function ContractorDashboardHeader({ profile, stats }: ContractorDashboardHeaderProps) {
   const router = useRouter();
 
-  const handleBrowseJobs = () => {
-    router.push('/');
-  };
-
   if (!profile) {
     return (
       <div className="bg-white border-b">
@@ -36,14 +31,6 @@ export function ContractorDashboardHeader({ profile, stats }: ContractorDashboar
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Nowa firma</h1>
                 <p className="text-gray-600 text-xs sm:text-sm md:text-base">Profil w trakcie uzupełniania</p>
               </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-              <Button variant="outline" onClick={() => router.push('/account')} className="w-full sm:w-auto">
-                Profil użytkownika
-              </Button>
-              <Button onClick={handleBrowseJobs} className="w-full sm:w-auto">
-                Przeglądaj zlecenia
-              </Button>
             </div>
           </div>
         </div>
@@ -129,14 +116,6 @@ export function ContractorDashboardHeader({ profile, stats }: ContractorDashboar
                 </div>
               </div>
             </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => router.push('/account')} className="w-full sm:w-auto">
-              Profil użytkownika
-            </Button>
-            <Button onClick={handleBrowseJobs} className="w-full sm:w-auto">
-              Przeglądaj zlecenia
-            </Button>
           </div>
         </div>
       </div>

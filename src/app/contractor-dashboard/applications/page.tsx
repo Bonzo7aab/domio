@@ -70,7 +70,7 @@ async function getApplicationsData(userId: string) {
       postedTime: app.postedTime || undefined,
       attachments: transformedAttachments,
       certificates: app.certificates || [],
-      reviewNotes: app.notes || undefined,
+      reviewNotes: app.managerFeedbackMessage || app.notes || undefined,
       postType: 'job' as const
     };
   });
@@ -112,7 +112,7 @@ async function getApplicationsData(userId: string) {
       postedTime: bid.postedTime || undefined,
       attachments: [],
       certificates: [],
-      reviewNotes: undefined,
+      reviewNotes: bid.managerFeedbackMessage || undefined,
       postType: 'tender' as const
     };
   });

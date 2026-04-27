@@ -92,6 +92,10 @@ export function Header({ initialUser }: HeaderProps) {
     router.push('/account')
   }
 
+  const handleOffersClick = () => {
+    router.push('/contractor-dashboard/applications')
+  }
+
   const handleJobSelect = (jobId: string) => {
     router.push(`/jobs/${jobId}`)
   }
@@ -237,17 +241,45 @@ export function Header({ initialUser }: HeaderProps) {
                     </DrawerHeader>
                     <div className="overflow-y-auto flex-1 p-4">
                       <div className="space-y-1">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={handleAccountClick}
-                        >
-                          <User className="mr-2 h-4 w-4" />
-                          <span>Profil</span>
-                        </Button>
-                        
-                        {/* Dashboard Options based on user type */}
-                        {currentUser?.userType === 'manager' && (
+                        {currentUser?.userType === 'contractor' ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleAccountClick}
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              <span>Konto</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleOffersClick}
+                            >
+                              <Bookmark className="mr-2 h-4 w-4" />
+                              <span>Oferty</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-destructive"
+                              onClick={handleLogout}
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              <span>Wyloguj się</span>
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleAccountClick}
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              <span>Profil</span>
+                            </Button>
+                            {/* Dashboard Options based on user type */}
+                            {currentUser?.userType === 'manager' && (
                           <Button
                             variant="ghost"
                             className="w-full justify-start"
@@ -256,77 +288,67 @@ export function Header({ initialUser }: HeaderProps) {
                             <User className="mr-2 h-4 w-4" />
                             <span>Panel Ogłoszeniodawcy</span>
                           </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleBookmarkedJobsClick}
+                            >
+                              <Bookmark className="mr-2 h-4 w-4" />
+                              <span>Zapisane ogłoszenia</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleMessagingClick}
+                            >
+                              <MessageCircle className="mr-2 h-4 w-4" />
+                              <span>Wiadomości</span>
+                            </Button>
+
+                            <div className="h-px bg-border my-2" />
+
+                            {/* Help and Learning Section */}
+                            <div className="px-2 py-1.5">
+                              <p className="text-xs text-muted-foreground font-medium">POMOC I NAUKA</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleWelcomeClick}
+                            >
+                              <Play className="mr-2 h-4 w-4" />
+                              <span>Strona powitalna</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleTutorialClick}
+                            >
+                              <GraduationCap className="mr-2 h-4 w-4" />
+                              <span>Tutorial</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleProfileCompletionClick}
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              <span>Uzupełnij profil</span>
+                            </Button>
+
+                            <div className="h-px bg-border my-2" />
+
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-destructive"
+                              onClick={handleLogout}
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              <span>Wyloguj się</span>
+                            </Button>
+                          </>
                         )}
-                        
-                        {currentUser?.userType === 'contractor' && (
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => router.push('/contractor-dashboard')}
-                          >
-                            <User className="mr-2 h-4 w-4" />
-                            <span>Panel Wykonawcy</span>
-                          </Button>
-                        )}
-                        
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={handleBookmarkedJobsClick}
-                        >
-                          <Bookmark className="mr-2 h-4 w-4" />
-                          <span>Zapisane ogłoszenia</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={handleMessagingClick}
-                        >
-                          <MessageCircle className="mr-2 h-4 w-4" />
-                          <span>Wiadomości</span>
-                        </Button>
-                        
-                        <div className="h-px bg-border my-2" />
-                        
-                        {/* Help and Learning Section */}
-                        <div className="px-2 py-1.5">
-                          <p className="text-xs text-muted-foreground font-medium">POMOC I NAUKA</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={handleWelcomeClick}
-                        >
-                          <Play className="mr-2 h-4 w-4" />
-                          <span>Strona powitalna</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={handleTutorialClick}
-                        >
-                          <GraduationCap className="mr-2 h-4 w-4" />
-                          <span>Tutorial</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={handleProfileCompletionClick}
-                        >
-                          <User className="mr-2 h-4 w-4" />
-                          <span>Uzupełnij profil</span>
-                        </Button>
-                        
-                        <div className="h-px bg-border my-2" />
-                        
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-destructive"
-                          onClick={handleLogout}
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          <span>Wyloguj się</span>
-                        </Button>
                       </div>
                     </div>
                   </DrawerContent>
@@ -365,60 +387,73 @@ export function Header({ initialUser }: HeaderProps) {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleAccountClick}>
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Profil</span>
-                    </DropdownMenuItem>
-                    
-                    {/* Dashboard Options based on user type */}
-                    {currentUser?.userType === 'manager' && (
-                      <DropdownMenuItem onClick={() => router.push('/manager-dashboard')}>
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Panel Ogłoszeniodawcy</span>
-                      </DropdownMenuItem>
+                    {currentUser?.userType === 'contractor' ? (
+                      <>
+                        <DropdownMenuItem onClick={handleAccountClick}>
+                          <User className="mr-2 h-4 w-4" />
+                          <span>Konto</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleOffersClick}>
+                          <Bookmark className="mr-2 h-4 w-4" />
+                          <span>Oferty</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Wyloguj się</span>
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuItem onClick={handleAccountClick}>
+                          <User className="mr-2 h-4 w-4" />
+                          <span>Profil</span>
+                        </DropdownMenuItem>
+                        
+                        {/* Dashboard Options based on user type */}
+                        {currentUser?.userType === 'manager' && (
+                          <DropdownMenuItem onClick={() => router.push('/manager-dashboard')}>
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Panel Ogłoszeniodawcy</span>
+                          </DropdownMenuItem>
+                        )}
+                        
+                        <DropdownMenuItem onClick={handleBookmarkedJobsClick}>
+                          <Bookmark className="mr-2 h-4 w-4" />
+                          <span>Zapisane ogłoszenia</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleMessagingClick}>
+                          <MessageCircle className="mr-2 h-4 w-4" />
+                          <span>Wiadomości</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        
+                        {/* Help and Learning Section */}
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">
+                          POMOC I NAUKA
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem onClick={handleWelcomeClick}>
+                          <Play className="mr-2 h-4 w-4" />
+                          <span>Strona powitalna</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleTutorialClick}>
+                          <GraduationCap className="mr-2 h-4 w-4" />
+                          <span>Tutorial</span>
+                        </DropdownMenuItem>
+                        {!currentUser?.profileCompleted && (
+                          <DropdownMenuItem onClick={handleProfileCompletionClick}>
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Uzupełnij profil</span>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        
+                        <DropdownMenuItem onClick={handleLogout}>
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Wyloguj się</span>
+                        </DropdownMenuItem>
+                      </>
                     )}
-                    
-                    {currentUser?.userType === 'contractor' && (
-                      <DropdownMenuItem onClick={() => router.push('/contractor-dashboard')}>
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Panel Wykonawcy</span>
-                      </DropdownMenuItem>
-                    )}
-                    
-                    <DropdownMenuItem onClick={handleBookmarkedJobsClick}>
-                      <Bookmark className="mr-2 h-4 w-4" />
-                      <span>Zapisane ogłoszenia</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleMessagingClick}>
-                      <MessageCircle className="mr-2 h-4 w-4" />
-                      <span>Wiadomości</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    
-                    {/* Help and Learning Section */}
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">
-                      POMOC I NAUKA
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem onClick={handleWelcomeClick}>
-                      <Play className="mr-2 h-4 w-4" />
-                      <span>Strona powitalna</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleTutorialClick}>
-                      <GraduationCap className="mr-2 h-4 w-4" />
-                      <span>Tutorial</span>
-                    </DropdownMenuItem>
-                    {!currentUser?.profileCompleted && (
-                      <DropdownMenuItem onClick={handleProfileCompletionClick}>
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Uzupełnij profil</span>
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    
-                    <DropdownMenuItem onClick={handleLogout}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Wyloguj się</span>
-                    </DropdownMenuItem>
                   </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

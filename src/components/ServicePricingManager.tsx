@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { ServicePricing } from '../types/contractor';
 import { 
   fetchContractorServicePricing, 
@@ -28,6 +29,17 @@ interface ServicePricingManagerProps {
   onServicesUpdate?: () => void; // Callback to refresh parent
 }
 
+const UNIT_OPTIONS: Array<'m2' | 'szt.' | 'mb' | 'kg' | '1 godzina' | 'miesiąc'> = [
+  'm2',
+  'szt.',
+  'mb',
+  'kg',
+  '1 godzina',
+  'miesiąc',
+];
+
+const VAT_OPTIONS = [0, 5, 8, 23];
+
 export default function ServicePricingManager({ companyId, services: initialServices, onServicesUpdate }: ServicePricingManagerProps) {
   const [servicePricing, setServicePricing] = useState<Record<string, ServicePricing>>({});
   const [services, setServices] = useState(initialServices);
@@ -42,7 +54,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
     min: undefined,
     max: undefined,
     currency: 'PLN',
-    unit: '',
+    unit: undefined,
     serviceName: undefined
   });
   const [serviceFormData, setServiceFormData] = useState<{
@@ -70,28 +82,6 @@ export default function ServicePricingManager({ companyId, services: initialServ
     return null;
   };
 
-  // Helper function to format pricing
-  const formatPrice = (pricing: ServicePricing): string => {
-    if (!pricing) return 'Brak ceny';
-
-    const currency = pricing.currency || 'PLN';
-    const unit = pricing.unit ? ` ${pricing.unit}` : '';
-
-    switch (pricing.type) {
-      case 'hourly':
-        if (pricing.min && pricing.max && pricing.min !== pricing.max) {
-          return `${pricing.min} - ${pricing.max} ${currency}/h${unit}`;
-        }
-        return `${pricing.min || 0} ${currency}/h${unit}`;
-      case 'fixed':
-        return `${pricing.min || 0} ${currency}${unit}`;
-      case 'range':
-        return `${pricing.min || 0} - ${pricing.max || 0} ${currency}${unit}`;
-      default:
-        return 'Brak ceny';
-    }
-  };
-  
   // Update services when props change
   useEffect(() => {
     setServices(initialServices);
@@ -148,7 +138,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
       min: undefined,
       max: undefined,
       currency: 'PLN',
-      unit: '',
+      unit: undefined,
       serviceName: undefined
     });
     setShowDialog(true);
@@ -185,7 +175,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
         min: undefined,
         max: undefined,
         currency: 'PLN',
-        unit: '',
+        unit: undefined,
         serviceName: serviceName
       });
     }
@@ -344,10 +334,20 @@ export default function ServicePricingManager({ companyId, services: initialServ
         }
         
         // Save pricing
+        const netPrice = formData.netPrice ?? formData.min ?? 0;
+        const vatRate = formData.vatRate ?? 23;
+        const grossPrice = Number((netPrice * (1 + vatRate / 100)).toFixed(2));
         const { serviceName: _serviceName, ...pricingData } = formData;
         const updatedPricing = {
           ...servicePricing,
-          [finalServiceName]: pricingData as ServicePricing
+          [finalServiceName]: {
+            ...(pricingData as ServicePricing),
+            category: serviceFormData.category,
+            workDescription: finalServiceName,
+            netPrice,
+            vatRate,
+            grossPrice,
+          }
         };
         
         const { error: pricingError } = await updateContractorServicePricing(companyId, updatedPricing);
@@ -416,7 +416,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
         </div>
       </div>
 
-      {/* Services as Cards */}
+      {/* Services table */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-semibold">Twoje usługi</h3>
         <Button 
@@ -437,101 +437,58 @@ export default function ServicePricingManager({ companyId, services: initialServ
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {allServices.map((service) => {
-            const category = getServiceCategory(service);
-            const pricing = servicePricing[service];
-            
-            return (
-              <Card key={service} className="flex flex-col h-full">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-2">{service}</CardTitle>
-                      {category && (
-                        <Badge 
-                          variant={
-                            category === 'primary' ? 'default' : 
-                            category === 'secondary' ? 'outline' : 
-                            'secondary'
-                          }
-                          className="text-xs"
-                        >
-                          {category === 'primary' ? 'Usługa podstawowa' : 
-                           category === 'secondary' ? 'Usługa dodatkowa' : 
-                           'Specjalizacja'}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex flex-col flex-1 space-y-4">
-                  <div className="space-y-3 flex-1">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-gray-700">Cena:</span>
-                        <span className={pricing ? 'text-gray-900 font-semibold' : 'text-gray-500'}>
-                          {pricing ? formatPrice(pricing) : 'Brak ceny'}
-                        </span>
-                      </div>
-                      {pricing && (
-                        <div className="text-xs text-gray-600 space-y-1.5 border-t pt-2">
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">Typ ceny:</span>
-                            <span className="font-medium">
-                              {pricing.type === 'hourly' ? 'Stawka godzinowa' :
-                               pricing.type === 'fixed' ? 'Cena stała' :
-                               'Zakres cen'}
-                            </span>
-                          </div>
-                          {pricing.min !== undefined && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Cena min:</span>
-                              <span className="font-medium">{pricing.min} {pricing.currency || 'PLN'}</span>
-                            </div>
-                          )}
-                          {pricing.max !== undefined && pricing.max !== pricing.min && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Cena max:</span>
-                              <span className="font-medium">{pricing.max} {pricing.currency || 'PLN'}</span>
-                            </div>
-                          )}
-                          {pricing.unit && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Jednostka:</span>
-                              <span className="font-medium">{pricing.unit}</span>
-                            </div>
-                          )}
+        <Card>
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Kategoria usługi</TableHead>
+                  <TableHead>Podkategoria</TableHead>
+                  <TableHead>Wykonywane prace</TableHead>
+                  <TableHead>Jednostka</TableHead>
+                  <TableHead>Cena Netto</TableHead>
+                  <TableHead>Stawka VAT</TableHead>
+                  <TableHead>Cena Brutto</TableHead>
+                  <TableHead className="text-right">Akcje</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allServices.map((service) => {
+                  const category = getServiceCategory(service);
+                  const pricing = servicePricing[service];
+                  return (
+                    <TableRow key={service}>
+                      <TableCell>
+                        {category && (
+                          <Badge variant={category === 'primary' ? 'default' : category === 'secondary' ? 'outline' : 'secondary'}>
+                            {category === 'primary' ? 'Usługa podstawowa' : category === 'secondary' ? 'Usługa dodatkowa' : 'Specjalizacja'}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{pricing?.subcategory || '-'}</TableCell>
+                      <TableCell>{pricing?.workDescription || service}</TableCell>
+                      <TableCell>{pricing?.unit || '-'}</TableCell>
+                      <TableCell>{pricing?.netPrice !== undefined ? `${pricing.netPrice} PLN` : '-'}</TableCell>
+                      <TableCell>{pricing?.vatRate !== undefined ? `${pricing.vatRate}%` : '-'}</TableCell>
+                      <TableCell>{pricing?.grossPrice !== undefined ? `${pricing.grossPrice.toFixed(2)} PLN` : '-'}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEditService(service)} disabled={saving}>
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edytuj
+                          </Button>
+                          <Button variant="outline" size="sm" className="text-red-600" onClick={() => handleDeleteService(service)} disabled={saving}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 pt-4 mt-auto border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleEditService(service)}
-                      disabled={saving}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edytuj
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600"
-                      onClick={() => handleDeleteService(service)}
-                      disabled={saving}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       {/* Unified Add/Edit Dialog */}
@@ -547,7 +504,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
             min: undefined,
             max: undefined,
             currency: 'PLN',
-            unit: '',
+            unit: undefined,
             serviceName: undefined
           });
           setServiceFormData({
@@ -723,14 +680,66 @@ export default function ServicePricingManager({ companyId, services: initialServ
 
                 <div className="space-y-2">
                   <Label>Jednostka (opcjonalnie)</Label>
-                  <Input
-                    type="text"
+                  <Select
                     value={formData.unit || ''}
-                    onChange={(e) => {
-                      setFormData({ ...formData, unit: e.target.value });
-                    }}
-                    placeholder="np. per m², per projekt"
-                  />
+                    onValueChange={(value) => setFormData({ ...formData, unit: value as ServicePricing['unit'] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Wybierz jednostkę" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UNIT_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Cena netto</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.netPrice ?? formData.min ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                        setFormData({ ...formData, netPrice: value, min: value });
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Stawka VAT</Label>
+                    <Select
+                      value={String(formData.vatRate ?? 23)}
+                      onValueChange={(value) => setFormData({ ...formData, vatRate: Number(value) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="VAT" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VAT_OPTIONS.map((rate) => (
+                          <SelectItem key={rate} value={String(rate)}>
+                            {rate}%
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cena brutto</Label>
+                    <Input
+                      disabled
+                      value={
+                        formData.netPrice !== undefined
+                          ? `${(formData.netPrice * (1 + (formData.vatRate ?? 23) / 100)).toFixed(2)} PLN`
+                          : '-'
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             )}

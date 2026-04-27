@@ -21,6 +21,7 @@ export interface ContractorApplication {
   attachments?: Array<Record<string, unknown>>;
   certificates?: string[];
   notes?: string;
+  managerFeedbackMessage?: string;
   reviewedAt?: string;
   jobLocation?: string;
   jobCategory?: string;
@@ -41,6 +42,7 @@ export interface ContractorBid {
   category?: string;
   proposedTimeline?: number; // in days
   technicalProposal?: string;
+  managerFeedbackMessage?: string;
   reviewedAt?: string;
   postedTime?: string; // When the tender was posted (calculated from published_at or created_at)
 }
@@ -1103,6 +1105,7 @@ export async function fetchContractorApplications(
         attachments,
         certificates,
         notes,
+        manager_feedback_message,
         reviewed_at,
         status,
         submitted_at,
@@ -1136,6 +1139,7 @@ export async function fetchContractorApplications(
       attachments: app.attachments || [],
       certificates: app.certificates || [],
       notes: app.notes || undefined,
+      managerFeedbackMessage: app.manager_feedback_message || undefined,
       reviewedAt: app.reviewed_at || undefined,
       jobLocation: typeof app.jobs?.location === 'string' 
         ? app.jobs.location 
@@ -1154,6 +1158,7 @@ export async function fetchContractorApplications(
         bid_amount,
         proposed_timeline,
         technical_proposal,
+        manager_feedback_message,
         status,
         submitted_at,
         evaluated_at,
@@ -1183,6 +1188,7 @@ export async function fetchContractorApplications(
       valid_until?: string;
       proposed_timeline?: number;
       technical_proposal?: string;
+      manager_feedback_message?: string;
       evaluated_at?: string;
       tenders?: {
         title?: string;
@@ -1208,6 +1214,7 @@ export async function fetchContractorApplications(
       category: bid.tenders?.job_categories?.name || 'Przetarg',
       proposedTimeline: bid.proposed_timeline || undefined,
       technicalProposal: bid.technical_proposal || undefined,
+      managerFeedbackMessage: bid.manager_feedback_message || undefined,
       reviewedAt: bid.evaluated_at || undefined,
       postedTime: getTimeAgo(bid.tenders?.published_at || bid.tenders?.created_at)
     }));
