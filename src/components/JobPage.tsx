@@ -25,6 +25,7 @@ import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { findConversationByJob } from '../lib/database/messaging';
 import { formatBudget, budgetFromDatabase, type Budget } from '../types/budget';
 import { type Job, type TenderInfo } from '../types/job';
+import { getJobStatusLabel, isCompletedWorkflowStatus, type JobWorkflowStatus } from '../types/jobWorkflow';
 
 interface JobPageProps {
   jobId: string;
@@ -35,7 +36,7 @@ interface JobPageProps {
 // Extended Job type for component display with additional fields
 interface JobDisplayData extends Job {
   address?: string;
-  status?: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
+  status?: JobWorkflowStatus | 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
   published_at?: string | null;
   expires_at?: string | null;
 }
@@ -75,6 +76,11 @@ function formatLocation(location: string | { city: string; sublocality_level_1?:
 // Get status badge variant
 function getStatusBadgeVariant(status?: string) {
   switch (status) {
+    case 'collecting_offers':
+    case 'choosing_offer':
+    case 'in_progress':
+    case 'ready_for_acceptance':
+      return 'secondary';
     case 'active':
       return 'default';
     case 'draft':
@@ -93,6 +99,11 @@ function getStatusBadgeVariant(status?: string) {
 // Get status label in Polish
 function getStatusLabel(status?: string): string {
   switch (status) {
+    case 'collecting_offers':
+    case 'choosing_offer':
+    case 'in_progress':
+    case 'ready_for_acceptance':
+      return getJobStatusLabel(status);
     case 'active':
       return 'Aktywne';
     case 'draft':
@@ -947,6 +958,72 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     onJobSelect?.(selectedJobId);
   };
 
+  const handleDownloadCompletionReport = () => {
+    if (!job) return;
+
+    const generatedAt = new Date();
+    const financialSummary = job.salary || 'Kwota netto/brutto zgodna z wybraną ofertą';
+    const reportHtml = `<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <title>Protokół techniczny zakończenia prac</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #111827; line-height: 1.5; padding: 32px; }
+      .logo { font-weight: 700; font-size: 24px; color: #1d4ed8; margin-bottom: 16px; }
+      h1 { font-size: 24px; margin: 0 0 8px; }
+      h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d1d5db; padding-bottom: 6px; }
+      .meta, .footer { color: #4b5563; font-size: 13px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .box { border: 1px solid #d1d5db; border-radius: 8px; padding: 14px; }
+      .photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .photo { border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; font-size: 12px; overflow-wrap: anywhere; }
+      @media print { body { padding: 0; } button { display: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="logo">DOMIO</div>
+    <h1>Protokół techniczny zakończenia prac</h1>
+    <p class="meta">ID zgłoszenia: ${job.id}<br />Data wygenerowania: ${generatedAt.toLocaleString('pl-PL')}</p>
+
+    <h2>Dane Stron</h2>
+    <div class="grid">
+      <div class="box"><strong>Zleceniodawca:</strong><br />${job.company} dla ${job.address || formatLocation(job.location)}</div>
+      <div class="box"><strong>Wykonawca:</strong><br />Nazwa firmy wykonawcy + NIP</div>
+    </div>
+
+    <h2>Zakres prac</h2>
+    <p><strong>Tytuł:</strong> ${job.title}</p>
+    <p><strong>Opis:</strong><br />${job.description}</p>
+
+    <h2>Dokumentacja</h2>
+    <h3>Zdjęcia przed naprawą</h3>
+    <div class="photos">
+      ${(job.images || []).map((image) => `<div class="photo">${image}</div>`).join('') || '<div class="photo">Brak załączonych zdjęć</div>'}
+    </div>
+    <h3>Zdjęcia po naprawie</h3>
+    <div class="photos"><div class="photo">Zdjęcia wykonawcy dodane przy odbiorze prac</div></div>
+
+    <h2>Podsumowanie finansowe</h2>
+    <p>${financialSummary}</p>
+
+    <h2>Akceptacja cyfrowa</h2>
+    <p class="footer">Zaakceptowano cyfrowo przez ${user ? `${user.firstName} ${user.lastName}` : '[Imię Zarządcy]'} w systemie DOMIO.</p>
+  </body>
+</html>`;
+
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) {
+      toast.error('Nie udało się otworzyć raportu. Sprawdź blokowanie wyskakujących okien.');
+      return;
+    }
+
+    reportWindow.document.write(reportHtml);
+    reportWindow.document.close();
+    reportWindow.focus();
+    reportWindow.print();
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -1436,6 +1513,31 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
               currentJobType={job.postType}
               onJobSelect={handleJobSelect}
             />
+
+            {isCompletedWorkflowStatus(job.status) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Raport końcowy</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-lg border bg-white p-4 text-sm text-gray-700">
+                    <h3 className="font-semibold text-gray-900 mb-2">Protokół techniczny zakończenia prac</h3>
+                    <p>ID zgłoszenia: {job.id}</p>
+                    <p>Data wygenerowania: {new Date().toLocaleDateString('pl-PL')}</p>
+                    <p className="mt-3">Zleceniodawca: {job.company}</p>
+                    <p>Wykonawca: dane z wybranej oferty</p>
+                    <p className="mt-3">Zakres prac: {job.title}</p>
+                    <p>Kwota netto/brutto: zgodna z wybraną ofertą</p>
+                    <p className="mt-3">
+                      Zaakceptowano cyfrowo przez zarządcę w systemie Domio.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" onClick={handleDownloadCompletionReport}>
+                    Pobierz raport PDF
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}

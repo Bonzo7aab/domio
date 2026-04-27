@@ -4,6 +4,7 @@ import type { Application } from '../../types/application';
 import type { Budget, BudgetInput } from '../../types/budget';
 import { budgetFromDatabase, budgetToDatabase, formatBudget } from '../../types/budget';
 import { fetchAllCategoriesWithSubcategories } from './categories';
+import type { JobWorkflowStatus } from '../../types/jobWorkflow';
 
 export interface JobFilters {
   categories?: string[];
@@ -187,8 +188,13 @@ export async function fetchJobs(
           slug
         )
       `)
-      .eq('status', (filters.status || 'active') as 'active' | 'paused' | 'cancelled' | 'draft' | 'completed')
       .eq('is_public', true);
+
+    if (filters.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status as Database['public']['Tables']['jobs']['Row']['status']);
+    } else {
+      query = query.in('status', ['collecting_offers', 'active']);
+    }
 
     // Apply category and subcategory filters
     // Jobs have category_id = main category, subcategory_id = subcategory (FK to job_categories)
@@ -1142,7 +1148,7 @@ export async function createTender(
     insuranceRequired: string;
     advancePayment: boolean;
     performanceBond: boolean;
-    status?: 'draft' | 'active';
+    status?: 'draft' | 'active' | JobWorkflowStatus;
     managerId: string; // User profile ID
     companyId: string; // Company ID
     address?: string;
@@ -1387,7 +1393,7 @@ export async function updateTender(
     insuranceRequired: string;
     advancePayment: boolean;
     performanceBond: boolean;
-    status?: 'draft' | 'active';
+    status?: 'draft' | 'active' | 'collecting_offers' | 'choosing_offer' | 'in_progress' | 'ready_for_acceptance' | 'completed';
     address?: string;
     latitude?: number;
     longitude?: number;
@@ -1577,7 +1583,7 @@ export async function createJob(
     projectDuration?: string;
     deadline?: Date | string;
     urgency?: 'low' | 'medium' | 'high';
-    status?: 'draft' | 'active';
+    status?: 'draft' | 'active' | 'collecting_offers' | 'choosing_offer' | 'in_progress' | 'ready_for_acceptance' | 'completed';
     type?: 'regular' | 'urgent' | 'premium';
     isPublic?: boolean;
     contactPerson?: string;

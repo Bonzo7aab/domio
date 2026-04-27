@@ -1,5 +1,6 @@
 import { createClient } from '../../../lib/supabase/client';
 import type { CompanyData } from '../../../lib/database/companies';
+import { getJobStatusConfig } from '../../../types/jobWorkflow';
 
 /**
  * Map company type to Polish display name
@@ -53,12 +54,5 @@ export function getBuildingImageUrl(imagePath: string | null | undefined): strin
  * Get status badge configuration
  */
 export function getStatusBadgeConfig(status: string) {
-  const statusConfig = {
-    active: { label: 'Aktywne', variant: 'default' as const, color: 'bg-blue-100 text-blue-800' },
-    completed: { label: 'Zakończone', variant: 'secondary' as const, color: 'bg-green-100 text-green-800' },
-    pending: { label: 'Oczekujące', variant: 'outline' as const, color: 'bg-yellow-100 text-yellow-800' },
-    cancelled: { label: 'Anulowane', variant: 'outline' as const, color: 'bg-gray-100 text-gray-800' }
-  };
-  
-  return statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+  return getJobStatusConfig(status);
 }

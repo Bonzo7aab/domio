@@ -6,19 +6,20 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Separator } from './ui/separator';
-import { ArrowLeft, Upload, MapPin, FileText, Phone, Mail, Building, X, File, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Phone, Building2, X, File, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
 import { createJob } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { fetchCompanyBuildings } from '../lib/database/buildings';
 import { fetchAllCategoriesWithSubcategories } from '../lib/database/categories';
 import type { CategoryWithSubcategories } from '../lib/database/categories';
+import type { Building } from '../types/building';
 import Link from 'next/link';
-import LocationAutocomplete from './LocationAutocomplete';
 import type { BudgetInput } from '../types/budget';
 import { uploadJobAttachments, deleteJobAttachments } from '../lib/storage/job-attachments';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from './ui/dropzone';
@@ -38,39 +39,45 @@ interface JobFormData {
   category: string;
   subcategory: string;
   description: string;
+  propertyId: string;
   location: JobLocation | string; // Support both formats during transition
   address: string;
   latitude?: number;
   longitude?: number;
   sublocalityLevel1?: string;
   budget: string;
-  budgetType: 'fixed' | 'hourly' | 'negotiable';
-  deadline: string;
+  budgetType: 'fixed' | 'negotiable';
+  deadlineOption: 'emergency' | 'urgent_week' | 'to_agree';
   urgency: 'low' | 'medium' | 'high';
   contactName: string;
   contactPhone: string;
   contactEmail: string;
-  organizationType: string;
-  organizationName: string;
-  requirements: string;
   additionalInfo: string;
 }
 
 // Categories will be loaded from database
 
-const urgencyLevels = [
-  { value: 'low', label: 'Niski', color: 'bg-green-100 text-green-800' },
-  { value: 'medium', label: 'Średni', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'high', label: 'Pilny', color: 'bg-red-100 text-red-800' }
-];
+const deadlineOptions = [
+  { value: 'emergency', label: 'Awaria', description: 'Realizacja natychmiast', urgency: 'high' },
+  { value: 'urgent_week', label: 'Pilne', description: 'Realizacja w ciągu tygodnia', urgency: 'medium' },
+  { value: 'to_agree', label: 'Do ustalenia', description: 'Termin do uzgodnienia z wykonawcą', urgency: 'low' },
+] as const;
 
-const organizationTypes = [
-  'Spółdzielnia Mieszkaniowa',
-  'Wspólnota Mieszkaniowa', 
-  'Zarządca Nieruchomości',
-  'Deweloper',
-  'Inne'
-];
+const getDeadlineDate = (deadlineOption: JobFormData['deadlineOption']): string | undefined => {
+  if (deadlineOption === 'to_agree') return undefined;
+
+  const deadline = new Date();
+  if (deadlineOption === 'urgent_week') {
+    deadline.setDate(deadline.getDate() + 7);
+  }
+
+  return deadline.toISOString().split('T')[0];
+};
+
+const getDeadlineLabel = (deadlineOption: JobFormData['deadlineOption']): string => {
+  const option = deadlineOptions.find((item) => item.value === deadlineOption);
+  return option ? `${option.label} - ${option.description}` : 'Do ustalenia';
+};
 
 export default function PostJobPage({ onBack }: PostJobPageProps) {
   const { user, isAuthenticated } = useUserProfile();
@@ -125,20 +132,18 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
     category: '',
     subcategory: '',
     description: '',
+    propertyId: '',
     location: { city: '' },
     address: '',
     latitude: undefined,
     longitude: undefined,
     budget: '',
     budgetType: 'fixed',
-    deadline: '',
+    deadlineOption: 'to_agree',
     urgency: 'medium',
-    contactName: '',
-    contactPhone: '',
-    contactEmail: '',
-    organizationType: '',
-    organizationName: '',
-    requirements: '',
+    contactName: [user?.firstName, user?.lastName].filter(Boolean).join(' '),
+    contactPhone: user?.phone || '',
+    contactEmail: user?.email || '',
     additionalInfo: ''
   });
 
@@ -147,22 +152,65 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [categoriesFromDb, setCategoriesFromDb] = useState<CategoryWithSubcategories[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
+
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      contactName: prev.contactName || [user?.firstName, user?.lastName].filter(Boolean).join(' '),
+      contactPhone: prev.contactPhone || user?.phone || '',
+      contactEmail: prev.contactEmail || user?.email || '',
+    }));
+  }, [user]);
+
+  useEffect(() => {
+    const loadBuildings = async () => {
+      if (!user?.id) return;
+
+      setIsLoadingBuildings(true);
+      try {
+        const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);
+        if (!company) {
+          setBuildings([]);
+          return;
+        }
+
+        const { data, error } = await fetchCompanyBuildings(supabase, company.id);
+        if (error) {
+          console.error('Error loading buildings:', error);
+          toast.error('Nie udało się załadować nieruchomości z profilu');
+          setBuildings([]);
+          return;
+        }
+
+        setBuildings(data || []);
+      } finally {
+        setIsLoadingBuildings(false);
+      }
+    };
+
+    loadBuildings();
+  }, [user, supabase]);
 
   const handleInputChange = (field: keyof JobFormData, value: string | number | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleLocationSelect = (location: string, address: string, lat: number, lng: number, sublocalityLevel1?: string) => {
+  const handlePropertyChange = (buildingId: string) => {
+    const building = buildings.find((item) => item.id === buildingId);
+    if (!building) return;
+
     setFormData(prev => ({
       ...prev,
+      propertyId: buildingId,
       location: {
-        city: location,
-        ...(sublocalityLevel1 ? { sublocality_level_1: sublocalityLevel1 } : {})
+        city: building.city,
       },
-      address,
-      latitude: lat,
-      longitude: lng,
-      sublocalityLevel1: sublocalityLevel1
+      address: [building.street_address, building.postal_code, building.city].filter(Boolean).join(', '),
+      latitude: building.latitude ?? undefined,
+      longitude: building.longitude ?? undefined,
+      sublocalityLevel1: undefined
     }));
   };
 
@@ -247,15 +295,10 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
     
     // Check authentication
     if (!isAuthenticated || !user) {
-      toast.error('Musisz być zalogowany, aby opublikować zlecenie');
+      toast.error('Musisz być zalogowany, aby opublikować zgłoszenie');
       return;
     }
 
-    // Walidacja podstawowa
-    const locationCity = typeof formData.location === 'string' 
-      ? formData.location 
-      : formData.location?.city;
-    
     // Validate category
     if (!formData.category) {
       toast.error('Proszę wybrać kategorię');
@@ -268,21 +311,20 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       return;
     }
     
-    if (!formData.title || !formData.description || !locationCity) {
+    if (!formData.title || !formData.description) {
       toast.error('Proszę wypełnić wszystkie wymagane pola');
       return;
     }
 
-    // Walidacja lokalizacji i współrzędnych
-    if (!formData.latitude || !formData.longitude) {
-      toast.error('Proszę wybrać lokalizację z listy lub użyć przycisku geolokalizacji');
+    if (!formData.propertyId) {
+      toast.error('Proszę wybrać nieruchomość');
       return;
     }
 
-    // Walidacja budżetu - wymagany dla fixed i hourly, opcjonalny dla negotiable
+    // Walidacja budżetu - wymagany tylko przy opcji wpisania kwoty.
     if (formData.budgetType !== 'negotiable') {
       if (!formData.budget || formData.budget.trim() === '') {
-        toast.error(`Proszę podać ${formData.budgetType === 'hourly' ? 'stawkę godzinową' : 'budżet'}`);
+        toast.error('Proszę podać budżet netto');
         return;
       }
       
@@ -294,8 +336,10 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
       }
     }
 
-    // Walidacja pól kontaktowych (opcjonalne, używane jako kontakt do zlecenia, nie do tworzenia firmy)
-    // Company is required and checked earlier
+    if (!formData.contactName || !formData.contactPhone) {
+      toast.error('Proszę podać osobę kontaktową i telefon');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -327,9 +371,14 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         return;
       }
 
-      // Use stored coordinates (already geocoded when location was selected)
-      const latitude = formData.latitude;
-      const longitude = formData.longitude;
+      const selectedBuilding = buildings.find((building) => building.id === formData.propertyId);
+      if (!selectedBuilding) {
+        throw new Error('Wybrana nieruchomość nie jest już dostępna. Odśwież stronę i spróbuj ponownie.');
+      }
+
+      const deadlineOption = deadlineOptions.find((option) => option.value === formData.deadlineOption);
+      const deadlineLabel = getDeadlineLabel(formData.deadlineOption);
+      const derivedUrgency = deadlineOption?.urgency || 'low';
 
       // Parse budget using Budget type
       let budgetMin: number | undefined;
@@ -341,9 +390,6 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         
         if (!isNaN(budgetValue) && budgetValue > 0) {
           budgetMin = budgetValue;
-          // For fixed type, min and max are the same
-          // For hourly, only min is set
-          // For negotiable, both can be undefined
           budgetMax = formData.budgetType === 'fixed' ? budgetValue : undefined;
         } else {
           console.warn('Invalid budget value:', formData.budget);
@@ -363,11 +409,6 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         budgetType: formData.budgetType,
         parsed: budgetInput
       });
-
-      // Parse requirements string to array
-      const requirementsArray = formData.requirements
-        ? formData.requirements.split('\n').filter(r => r.trim().length > 0)
-        : [];
 
       // Upload attachments if any
       let uploadedUrls: string[] = [];
@@ -411,6 +452,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         category: formData.category,
         subcategory: formData.subcategory,
         budget: budgetInput,
+        deadline: deadlineLabel,
+        propertyId: formData.propertyId,
         managerId: managerId,
         companyId: company.data!.id,
         attachmentsCount: uploadedUrls.length,
@@ -423,23 +466,30 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         subcategory: formData.subcategory,
         location: formData.location,
         address: formData.address || undefined,
-        latitude,
-        longitude,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         sublocalityLevel1: formData.sublocalityLevel1 || undefined,
         budgetMin: budgetInput.min,
         budgetMax: budgetInput.max,
         budgetType: budgetInput.type || 'fixed',
         currency: budgetInput.currency || 'PLN',
-        deadline: formData.deadline || undefined,
-        urgency: formData.urgency,
-        status: 'active',
-        type: formData.urgency === 'high' ? 'urgent' : 'regular',
+        deadline: getDeadlineDate(formData.deadlineOption),
+        projectDuration: deadlineLabel,
+        urgency: derivedUrgency,
+        status: 'collecting_offers',
+        type: derivedUrgency === 'high' ? 'urgent' : 'regular',
         isPublic: true,
         contactPerson: formData.contactName,
         contactPhone: formData.contactPhone || undefined,
         contactEmail: formData.contactEmail,
-        additionalInfo: formData.additionalInfo || undefined,
-        requirements: requirementsArray.length > 0 ? requirementsArray : undefined,
+        buildingType: selectedBuilding.building_type || undefined,
+        buildingYear: selectedBuilding.year_built || undefined,
+        additionalInfo: [
+          `Nieruchomość: ${selectedBuilding.name}`,
+          `Adres nieruchomości: ${formData.address}`,
+          `Termin: ${deadlineLabel}`,
+          formData.additionalInfo ? `Dodatkowe informacje: ${formData.additionalInfo}` : null,
+        ].filter(Boolean).join('\n'),
         images: uploadedUrls.length > 0 ? uploadedUrls : undefined,
         managerId: managerId,
         companyId: company.data!.id,
@@ -476,7 +526,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         throw new Error('Nie udało się utworzyć zlecenia - brak danych zwrotnych');
       }
 
-      toast.success(`✅ Zlecenie "${formData.title}" zostało opublikowane pomyślnie!`);
+      toast.success(`✅ Zgłoszenie "${formData.title}" zostało opublikowane pomyślnie!`);
       
       // Reset form
       setFormData({
@@ -484,20 +534,18 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
         category: '',
         subcategory: '',
         description: '',
-        location: '',
+        propertyId: '',
+        location: { city: '' },
         address: '',
         latitude: undefined,
         longitude: undefined,
         budget: '',
         budgetType: 'fixed',
-        deadline: '',
+        deadlineOption: 'to_agree',
         urgency: 'medium',
-        contactName: '',
-        contactPhone: '',
-        contactEmail: '',
-        organizationType: '',
-        organizationName: '',
-        requirements: '',
+        contactName: [user?.firstName, user?.lastName].filter(Boolean).join(' '),
+        contactPhone: user?.phone || '',
+        contactEmail: user?.email || '',
         additionalInfo: ''
       });
       setAttachments([]);
@@ -580,11 +628,11 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
               className="hidden md:flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Powrót do listy zleceń
+              Powrót
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">Opublikuj nowe zlecenie</h1>
-              <p className="text-gray-600">Znajdź najlepszych wykonawców dla Twojego projektu</p>
+              <h1 className="text-2xl font-bold">Dodaj nowe zgłoszenie</h1>
+              <p className="text-gray-600">Opisz potrzebę i zbierz oferty od wykonawców</p>
             </div>
           </div>
         </div>
@@ -604,7 +652,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <Label htmlFor="title">Tytuł zlecenia *</Label>
+                <Label htmlFor="title">Tytuł *</Label>
                 <Input
                   id="title"
                   value={formData.title}
@@ -668,227 +716,54 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
               </div>
 
               <div>
-                <Label htmlFor="description">Opis zlecenia *</Label>
+                <Label htmlFor="propertyId">Nieruchomość *</Label>
+                {isLoadingBuildings ? (
+                  <div className="h-10 bg-gray-100 rounded-md animate-pulse" />
+                ) : buildings.length > 0 ? (
+                  <Select value={formData.propertyId} onValueChange={handlePropertyChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Wybierz nieruchomość z profilu" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {buildings.map((building) => (
+                        <SelectItem key={building.id} value={building.id}>
+                          {building.name} - {building.street_address}, {building.city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    Nie masz jeszcze dodanych nieruchomości. Dodaj je w profilu, aby móc utworzyć zgłoszenie.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Szczegóły techniczne */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Szczegóły techniczne
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label htmlFor="description">Opis *</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder="Szczegółowy opis prac do wykonania, wymagań technicznych, materiałów..."
+                  placeholder="Opisz usterkę, podaj piętro, czy potrzebny jest specjalistyczny sprzęt?"
                   rows={6}
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="requirements">Wymagania i kwalifikacje</Label>
-                <Textarea
-                  id="requirements"
-                  value={formData.requirements}
-                  onChange={(e) => handleInputChange('requirements', e.target.value)}
-                  placeholder="Wymagane uprawnienia, certyfikaty, doświadczenie..."
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Lokalizacja */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Lokalizacja
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <LocationAutocomplete
-                value={formData.address || (typeof formData.location === 'string' ? formData.location : formData.location?.city || '')}
-                onLocationSelect={handleLocationSelect}
-                required
-                placeholder="Wpisz adres lub wybierz z listy"
-                label="Lokalizacja *"
-              />
-            </CardContent>
-          </Card>
-
-          {/* Budżet i terminy */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="text-green-600 font-medium">💰</span>
-                Budżet i terminy
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="budget">
-                    {formData.budgetType === 'hourly' ? 'Stawka godzinowa' : 
-                     formData.budgetType === 'negotiable' ? 'Budżet (opcjonalnie)' : 
-                     'Budżet'}
-                  </Label>
-                  <Input
-                    id="budget"
-                    value={formData.budget}
-                    onChange={(e) => handleInputChange('budget', e.target.value)}
-                    placeholder={
-                      formData.budgetType === 'hourly' ? 'np. 50 PLN/h' :
-                      formData.budgetType === 'negotiable' ? 'np. 5000-10000 PLN (opcjonalnie)' :
-                      'np. 5000 PLN'
-                    }
-                  />
-                  {formData.budgetType === 'negotiable' && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Możesz podać orientacyjny zakres budżetu lub pozostawić puste - budżet będzie przedmiotem negocjacji
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="budgetType">Typ budżetu</Label>
-                  <Select value={formData.budgetType} onValueChange={(value: 'fixed' | 'hourly' | 'negotiable') => {
-                    handleInputChange('budgetType', value);
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fixed">Kwota stała</SelectItem>
-                      <SelectItem value="hourly">Za godzinę</SelectItem>
-                      <SelectItem value="negotiable">Do negocjacji</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="deadline">Termin wykonania</Label>
-                  <Input
-                    id="deadline"
-                    type="date"
-                    value={formData.deadline}
-                    onChange={(e) => handleInputChange('deadline', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="urgency">Priorytet</Label>
-                  <Select value={formData.urgency} onValueChange={(value: 'low' | 'medium' | 'high') => handleInputChange('urgency', value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {urgencyLevels.map((level) => (
-                        <SelectItem key={level.value} value={level.value}>
-                          <div className="flex items-center gap-2">
-                            <Badge className={level.color}>{level.label}</Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Informacje o organizacji */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5" />
-                Informacje o zleceniodawcy
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="organizationType">Typ organizacji *</Label>
-                  <Select value={formData.organizationType} onValueChange={(value) => handleInputChange('organizationType', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Wybierz typ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {organizationTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="organizationName">Nazwa organizacji *</Label>
-                  <Input
-                    id="organizationName"
-                    value={formData.organizationName}
-                    onChange={(e) => handleInputChange('organizationName', e.target.value)}
-                    placeholder="np. SM Przyjaźń"
-                    required
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="contactName">Osoba kontaktowa *</Label>
-                  <Input
-                    id="contactName"
-                    value={formData.contactName}
-                    onChange={(e) => handleInputChange('contactName', e.target.value)}
-                    placeholder="Jan Kowalski"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="contactPhone">Telefon</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="contactPhone"
-                      value={formData.contactPhone}
-                      onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                      placeholder="+48 123 456 789"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="contactEmail">Email *</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="contactEmail"
-                      type="email"
-                      value={formData.contactEmail}
-                      onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                      placeholder="kontakt@example.com"
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Załączniki */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Załączniki i dokumenty
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <Label>Dodaj pliki (zdjęcia, dokumenty, specyfikacje)</Label>
+                <Label>Załączniki</Label>
                 <Dropzone
                   accept={{
                     'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
@@ -897,8 +772,8 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
                   }}
                   maxFiles={10}
-                  maxSize={10 * 1024 * 1024} // 10MB
-                  minSize={1024} // 1KB
+                  maxSize={10 * 1024 * 1024}
+                  minSize={1024}
                   onDrop={handleFileUpload}
                   disabled={attachments.length >= 10 || isSubmitting || isUploading}
                   src={attachments}
@@ -906,36 +781,31 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
                 >
                   <DropzoneEmptyState>
                     <div className="flex flex-col items-center justify-center">
-                      <div className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                        <Upload className="h-4 w-4" />
+                      <div className="flex size-10 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        <Upload className="h-5 w-5" />
                       </div>
                       <p className="my-2 w-full truncate text-wrap font-medium text-sm">
-                        Przeciągnij pliki tutaj lub kliknij, aby wybrać
+                        Dodaj
                       </p>
                       <p className="w-full truncate text-wrap text-muted-foreground text-xs">
-                        Obsługiwane formaty: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX. Maksymalnie 10 plików, 10MB każdy.
+                        JPG, PNG, WEBP, GIF, PDF, DOC, DOCX. Maksymalnie 10 plików, 10MB każdy.
                       </p>
                     </div>
                   </DropzoneEmptyState>
                   <DropzoneContent>
                     <div className="flex flex-col items-center justify-center">
-                      <div className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                        <Upload className="h-4 w-4" />
+                      <div className="flex size-10 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        <Upload className="h-5 w-5" />
                       </div>
                       <p className="my-2 w-full truncate text-wrap font-medium text-sm">
-                        {attachments.length} plik{attachments.length > 1 ? 'ów' : ''} wybran{attachments.length > 1 ? 'ych' : 'y'}
+                        Dodaj
                       </p>
                       <p className="w-full truncate text-wrap text-muted-foreground text-xs">
-                        Kliknij, aby dodać więcej plików
+                        Wybrano {attachments.length} plik{attachments.length > 1 ? 'ów' : ''}
                       </p>
                     </div>
                   </DropzoneContent>
                 </Dropzone>
-                {attachments.length >= 10 && (
-                  <p className="text-sm text-amber-600 mt-1">
-                    Osiągnięto limit 10 plików. Usuń plik, aby dodać nowy.
-                  </p>
-                )}
               </div>
 
               {attachments.length > 0 && (
@@ -972,19 +842,14 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
                                 <p className="text-xs text-gray-500 mt-1">
                                   {formatFileSize(file.size)}
                                 </p>
-                                <div className="flex items-center gap-1 mt-1">
+                                <Badge variant={isImageFile(file) ? 'secondary' : 'outline'} className="text-xs mt-1">
                                   {isImageFile(file) ? (
-                                    <Badge variant="secondary" className="text-xs">
-                                      <ImageIcon className="h-3 w-3 mr-1" />
-                                      Obraz
-                                    </Badge>
+                                    <ImageIcon className="h-3 w-3 mr-1" />
                                   ) : (
-                                    <Badge variant="outline" className="text-xs">
-                                      <File className="h-3 w-3 mr-1" />
-                                      Dokument
-                                    </Badge>
+                                    <File className="h-3 w-3 mr-1" />
                                   )}
-                                </div>
+                                  {isImageFile(file) ? 'Obraz' : 'Dokument'}
+                                </Badge>
                               </div>
                               <Button
                                 type="button"
@@ -1004,16 +869,116 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
 
+          {/* Czas i budżet */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-green-600 font-medium">PLN</span>
+                Czas i budżet
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
               <div>
-                <Label htmlFor="additionalInfo">Dodatkowe informacje</Label>
-                <Textarea
-                  id="additionalInfo"
-                  value={formData.additionalInfo}
-                  onChange={(e) => handleInputChange('additionalInfo', e.target.value)}
-                  placeholder="Inne ważne informacje, uwagi, preferencje czasowe..."
-                  rows={3}
-                />
+                <Label>Termin *</Label>
+                <RadioGroup
+                  value={formData.deadlineOption}
+                  onValueChange={(value: JobFormData['deadlineOption']) => handleInputChange('deadlineOption', value)}
+                  className="mt-3 grid gap-3"
+                >
+                  {deadlineOptions.map((option) => (
+                    <Label
+                      key={option.value}
+                      htmlFor={`deadline-${option.value}`}
+                      className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 hover:bg-gray-50"
+                    >
+                      <RadioGroupItem id={`deadline-${option.value}`} value={option.value} className="mt-1" />
+                      <span>
+                        <span className="block font-medium">{option.label}</span>
+                        <span className="block text-sm text-gray-600">{option.description}</span>
+                      </span>
+                    </Label>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-4">
+                <Label>Budżet netto *</Label>
+                <RadioGroup
+                  value={formData.budgetType}
+                  onValueChange={(value: JobFormData['budgetType']) => {
+                    handleInputChange('budgetType', value);
+                    if (value === 'negotiable') {
+                      handleInputChange('budget', '');
+                    }
+                  }}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                >
+                  <Label htmlFor="budget-fixed" className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 hover:bg-gray-50">
+                    <RadioGroupItem id="budget-fixed" value="fixed" />
+                    <span className="font-medium">Wpisz kwotę</span>
+                  </Label>
+                  <Label htmlFor="budget-negotiable" className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 hover:bg-gray-50">
+                    <RadioGroupItem id="budget-negotiable" value="negotiable" />
+                    <span className="font-medium">Potrzebna wycena</span>
+                  </Label>
+                </RadioGroup>
+
+                {formData.budgetType === 'fixed' && (
+                <div>
+                  <Label htmlFor="budget">Kwota netto</Label>
+                  <Input
+                    id="budget"
+                    value={formData.budget}
+                    onChange={(e) => handleInputChange('budget', e.target.value)}
+                    placeholder="np. 5000 PLN"
+                  />
+                </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Osoba kontaktowa */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                Osoba kontaktowa
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <p className="text-sm text-gray-600">
+                Domyślnie wpisany jest zarządca dodający zgłoszenie. Możesz zmienić dane, jeśli na miejscu kontaktową osobą będzie ktoś inny.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="contactName">Imię i nazwisko *</Label>
+                  <Input
+                    id="contactName"
+                    value={formData.contactName}
+                    onChange={(e) => handleInputChange('contactName', e.target.value)}
+                    placeholder="Jan Kowalski"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="contactPhone">Telefon *</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="contactPhone"
+                      value={formData.contactPhone}
+                      onChange={(e) => handleInputChange('contactPhone', e.target.value)}
+                      placeholder="+48 123 456 789"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1028,7 +993,7 @@ export default function PostJobPage({ onBack }: PostJobPageProps) {
               className="bg-blue-600 hover:bg-blue-700"
               disabled={isMounted ? (isSubmitting || isUploading || !isAuthenticated) : false}
             >
-              {isUploading ? 'Przesyłanie plików...' : isSubmitting ? 'Publikowanie...' : 'Opublikuj zlecenie'}
+              {isUploading ? 'Przesyłanie plików...' : isSubmitting ? 'Publikowanie...' : 'Opublikuj zgłoszenie'}
             </Button>
           </div>
         </form>

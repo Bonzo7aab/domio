@@ -25,6 +25,7 @@ import { fetchContractorsByWorkHistory } from '../lib/database/contractors';
 import type { Application } from '../types/application';
 import type { Building } from '../types/building';
 import { BUILDING_TYPE_OPTIONS } from '../types/building';
+import type { JobWorkflowStatus } from '../types/jobWorkflow';
 import { toast } from 'sonner';
 import { formatBudget, budgetFromDatabase } from '../types/budget';
 import BidEvaluationPanel from './BidEvaluationPanel';
@@ -511,7 +512,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
           currency: string;
           deadline: string;
-          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed' | 'inactive';
+          status: JobWorkflowStatus | 'active' | 'paused' | 'cancelled' | 'draft' | 'completed' | 'inactive';
           job_categories: { name: string } | null;
           location: string | { city?: string };
         }) => {
@@ -657,7 +658,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
           currency: string;
           deadline: string;
-          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed' | 'inactive';
+          status: JobWorkflowStatus | 'active' | 'paused' | 'cancelled' | 'draft' | 'completed' | 'inactive';
           job_categories: { name: string } | null;
           location: string | { city?: string };
         }) => {

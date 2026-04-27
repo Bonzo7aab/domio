@@ -1,20 +1,19 @@
 import React from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ArrowLeft, FileText, Gavel, Clock, Users, Star, Shield, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Clock, Users, Shield, CheckCircle, AlertCircle, Star } from 'lucide-react';
 import Link from 'next/link';
 
 interface JobTypeSelectionPageProps {
   onBack: () => void;
   onSelectJob: () => void;
-  onSelectTender: () => void;
   isAuthenticated?: boolean;
   userType?: 'contractor' | 'manager';
   hasCompany?: boolean | null;
   isCheckingCompany?: boolean;
 }
 
-export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTender, isAuthenticated, userType, hasCompany, isCheckingCompany }: JobTypeSelectionPageProps) {
+export default function JobTypeSelectionPage({ onBack, onSelectJob, userType, hasCompany, isCheckingCompany }: JobTypeSelectionPageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -26,8 +25,8 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               Powrót
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Dodaj ogłoszenie</h1>
-              <p className="text-gray-600 mt-1">Wybierz odpowiedni typ ogłoszenia dla Twojego projektu</p>
+              <h1 className="text-3xl font-bold text-gray-900">Dodaj zgłoszenie</h1>
+              <p className="text-gray-600 mt-1">Utwórz jedno zgłoszenie i zbierz oferty od wykonawców</p>
             </div>
           </div>
         </div>
@@ -42,23 +41,23 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               <AlertCircle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-amber-700">
-                  Najpierw musisz <Link href="/account?tab=company" className="text-blue-700 underline">dodać dane firmy w profilu</Link>, aby móc tworzyć zlecenia i przetargi.
+                  Najpierw musisz <Link href="/account?tab=company" className="text-blue-700 underline">dodać dane firmy w profilu</Link>, aby móc tworzyć zgłoszenia.
                 </p>
               </div>
             </div>
           </div>
         )}
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8">
           
-          {/* Zlecenie Card */}
+          {/* Zgłoszenie Card */}
           <Card className="relative transition-all hover:shadow-lg border-2 hover:border-primary">
             <CardHeader className="text-center pb-4">
               <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                 <FileText className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl">Zlecenie</CardTitle>
-              <p className="text-gray-600">Szybkie i bezpośrednie zlecenia dla rutynowych prac</p>
+              <CardTitle className="text-2xl">Zgłoszenie</CardTitle>
+              <p className="text-gray-600">Jedna ścieżka dla awarii, pilnych prac i tematów do wyceny</p>
             </CardHeader>
             <CardContent className="space-y-6">
               
@@ -66,14 +65,13 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               <div>
                 <h3 className="font-semibold text-green-700 mb-3 flex items-center">
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Idealne dla:
+                  Obejmuje:
                 </h3>
                 <ul className="space-y-2 text-sm text-gray-600">
-                  <li>• Prace konserwacyjne i utrzymaniowe</li>
-                  <li>• Sprzątanie i utrzymanie czystości</li>
-                  <li>• Małe naprawy i remonty (do 10,000&nbsp;zł)</li>
-                  <li>• Pilne interwencje (awarie, usterki)</li>
-                  <li>• Sezonowe prace (odśnieżanie, koszenie)</li>
+                  <li>• Awarie wymagające natychmiastowej reakcji</li>
+                  <li>• Pilne prace do realizacji w ciągu tygodnia</li>
+                  <li>• Tematy, dla których potrzebna jest wycena</li>
+                  <li>• Prace na nieruchomościach dodanych w profilu zarządcy</li>
                 </ul>
               </div>
 
@@ -81,32 +79,33 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               <div>
                 <h3 className="font-semibold text-primary mb-3 flex items-center">
                   <Star className="w-4 h-4 mr-2" />
-                  Charakterystyka:
+                  Workflow:
                 </h3>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-center">
                     <Clock className="w-3 h-3 mr-2 text-green-600" />
-                    Szybka publikacja (1 formularz)
+                    Zbieranie ofert i wybór wykonawcy
                   </li>
                   <li className="flex items-center">
                     <Users className="w-3 h-3 mr-2 text-green-600" />
-                    Bezpośrednie aplikacje wykonawców
+                    Realizacja, odbiór i zakończenie prac
                   </li>
                   <li className="flex items-center">
                     <Shield className="w-3 h-3 mr-2 text-green-600" />
-                    Elastyczny wybór wykonawcy
+                    Raport techniczny do faktury po zakończeniu
                   </li>
                 </ul>
               </div>
 
               {/* Process */}
               <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium text-primary mb-2">Proces:</h4>
+                <h4 className="font-medium text-primary mb-2">Statusy:</h4>
                 <div className="text-sm text-gray-700 space-y-1">
-                  <div>1. Publikujesz zlecenie</div>
-                  <div>2. Wykonawcy składają oferty</div>
-                  <div>3. Wybierasz najlepszą ofertę</div>
-                  <div>4. Rozpoczynasz współpracę</div>
+                  <div>1. Zbieranie ofert</div>
+                  <div>2. Wybór ofert</div>
+                  <div>3. W realizacji</div>
+                  <div>4. Do odbioru</div>
+                  <div>5. Zakończone</div>
                 </div>
               </div>
 
@@ -116,118 +115,11 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                 </Button>
               ) : userType === 'manager' && hasCompany === false ? (
                 <Button disabled className="w-full" size="lg">
-                  Stwórz zlecenie
+                  Stwórz zgłoszenie
                 </Button>
               ) : (
                 <Button onClick={onSelectJob} className="w-full" size="lg">
-                  Stwórz zlecenie
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Przetarg Card */}
-          <Card className="relative transition-all hover:shadow-lg border-2 hover:border-primary">
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-                <Gavel className="w-8 h-8 text-purple-600" />
-              </div>
-              <CardTitle className="text-2xl">Przetarg</CardTitle>
-              <p className="text-gray-600">Formalny proces konkurencji dla dużych projektów</p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              
-              {/* Ideal for */}
-              <div>
-                <h3 className="font-semibold text-green-700 mb-3 flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Idealne dla:
-                </h3>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li>• Duże remonty i modernizacje (powyżej 10,000&nbsp;zł)</li>
-                  <li>• Wymiana wind, instalacji</li>
-                  <li>• Termomodernizacje budynków</li>
-                  <li>• Prace wymagające specjalistów</li>
-                  <li>• Długoterminowe kontrakty serwisowe</li>
-                </ul>
-              </div>
-
-              {/* Features */}
-              <div>
-                <h3 className="font-semibold text-purple-600 mb-3 flex items-center">
-                  <Star className="w-4 h-4 mr-2" />
-                  Charakterystyka:
-                </h3>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center">
-                    <Shield className="w-3 h-3 mr-2 text-purple-600" />
-                    Przejrzyste kryteria oceny
-                  </li>
-                  <li className="flex items-center">
-                    <Users className="w-3 h-3 mr-2 text-purple-600" />
-                    Formalna konkurencja ofert
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="w-3 h-3 mr-2 text-purple-600" />
-                    Obiektywny system punktowy
-                  </li>
-                </ul>
-              </div>
-
-              {/* Process */}
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <h4 className="font-medium text-purple-600 mb-2">Proces:</h4>
-                <div className="text-sm text-gray-700 space-y-1">
-                  <div>1. Tworzysz przetarg z kryteriami</div>
-                  <div>2. Wykonawcy składają oferty</div>
-                  <div>3. System ocenia według punktów</div>
-                  <div>4. Wybierasz zwycięzcę transparentnie</div>
-                </div>
-              </div>
-
-              {!isAuthenticated ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-700">
-                      <Shield className="w-4 h-4 inline mr-1" />
-                      Wymagane zalogowanie jako zarządca
-                    </p>
-                  </div>
-                  <Button onClick={onSelectTender} className="w-full" size="lg" variant="outline">
-                    Zaloguj się i utwórz przetarg
-                  </Button>
-                </div>
-              ) : userType !== 'manager' ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-sm text-amber-700">
-                      <AlertCircle className="w-4 h-4 inline mr-1" />
-                      Przetargi mogą tworzyć tylko zarządcy
-                    </p>
-                  </div>
-                  <Button disabled className="w-full" size="lg" variant="outline">
-                    Dostępne dla zarządców
-                  </Button>
-                </div>
-              ) : isCheckingCompany ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <p className="text-sm text-gray-700">
-                      <AlertCircle className="w-4 h-4 inline mr-1" />
-                      Sprawdzanie danych firmy...
-                    </p>
-                  </div>
-                  <Button disabled className="w-full" size="lg" variant="outline">
-                    Ładowanie...
-                  </Button>
-                </div>
-              ) : hasCompany === false ? (
-                <Button disabled className="w-full" size="lg" variant="outline">
-                  Utwórz przetarg
-                </Button>
-              ) : (
-                <Button onClick={onSelectTender} className="w-full" size="lg" variant="outline">
-                  Utwórz przetarg
+                  Stwórz zgłoszenie
                 </Button>
               )}
             </CardContent>

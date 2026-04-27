@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { budgetFromDatabase } from '../../../types/budget';
 import { Phone, Mail } from 'lucide-react';
 import type { JobWithCompany } from '../../../lib/database/jobs';
+import { getJobStatusMeta } from '../../../types/jobWorkflow';
 
 interface Job {
   id: string;
@@ -38,6 +39,99 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
   const [jobDetailsData, setJobDetailsData] = useState<JobWithCompany | null>(null);
   const [isLoadingJobDetails, setIsLoadingJobDetails] = useState(false);
   const [showJobDetailsDialog, setShowJobDetailsDialog] = useState(false);
+
+  const escapeHtml = (value: string | null | undefined) =>
+    String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+  const handleDownloadTechnicalReport = (job: JobWithCompany) => {
+    if (job.status !== 'completed') {
+      toast.info('Raport PDF jest dostępny po zakończeniu zgłoszenia.');
+      return;
+    }
+
+    const generatedAt = new Date().toLocaleDateString('pl-PL');
+    const acceptedAt = new Date().toLocaleString('pl-PL');
+    const budget = job.budget
+      ? formatBudget(job.budget)
+      : formatBudget(budgetFromDatabase({
+          budget_min: job.budget_min ?? null,
+          budget_max: job.budget_max ?? null,
+          budget_type: (job.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
+          currency: job.currency || 'PLN',
+        }));
+    const propertyLine = job.additional_info
+      ?.split('\n')
+      .find((line) => line.toLowerCase().startsWith('nieruchomość:'))
+      ?.replace('Nieruchomość:', '')
+      .trim() || 'Nieruchomość z profilu zarządcy';
+    const beforePhotos = job.images?.length
+      ? job.images.map((image, index) => `<div class="photo">Zdjęcie ${index + 1}: ${escapeHtml(image)}</div>`).join('')
+      : '<div class="photo">Brak załączonych zdjęć</div>';
+
+    const html = `
+      <!doctype html>
+      <html lang="pl">
+        <head>
+          <meta charset="utf-8" />
+          <title>Protokół techniczny zakończenia prac</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111827; padding: 32px; line-height: 1.5; }
+            header { border-bottom: 2px solid #1d4ed8; margin-bottom: 24px; padding-bottom: 16px; }
+            .logo { font-weight: 800; color: #1d4ed8; font-size: 24px; }
+            h1 { font-size: 24px; margin: 12px 0 4px; }
+            h2 { font-size: 16px; margin-top: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+            .box { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+            .photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+            .photo { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; overflow-wrap: anywhere; font-size: 12px; }
+            footer { margin-top: 32px; font-size: 13px; color: #4b5563; border-top: 1px solid #e5e7eb; padding-top: 16px; }
+          </style>
+        </head>
+        <body>
+          <header>
+            <div class="logo">DOMIO</div>
+            <h1>Protokół techniczny zakończenia prac</h1>
+            <div>ID zgłoszenia: ${escapeHtml(job.id)}</div>
+            <div>Data wygenerowania: ${generatedAt}</div>
+          </header>
+          <section class="grid">
+            <div class="box"><strong>Zleceniodawca:</strong><br />${escapeHtml(job.company?.name || 'Nazwa Firmy Zarządcy')} dla ${escapeHtml(propertyLine)}</div>
+            <div class="box"><strong>Wykonawca:</strong><br />Nazwa Firmy Wykonawcy + NIP</div>
+          </section>
+          <h2>Zakres prac</h2>
+          <p><strong>Tytuł:</strong> ${escapeHtml(job.title)}</p>
+          <p><strong>Opis:</strong><br />${escapeHtml(job.description)}</p>
+          <h2>Dokumentacja</h2>
+          <h3>Zdjęcia przed naprawą</h3>
+          <div class="photos">${beforePhotos}</div>
+          <h3>Zdjęcia po naprawie</h3>
+          <div class="photos"><div class="photo">Zdjęcia wykonawcy dodane przy odbiorze prac</div></div>
+          <h2>Podsumowanie finansowe</h2>
+          <p>Kwota netto/brutto zgodna z wybraną ofertą: ${escapeHtml(budget)}</p>
+          <footer>
+            Zaakceptowano cyfrowo przez ${escapeHtml(job.contact_person || 'Imię Zarządcy')} w systemie DOMIO.
+            Data akceptacji cyfrowej: ${acceptedAt}.
+          </footer>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Nie udało się otworzyć raportu. Sprawdź blokadę wyskakujących okien.');
+      return;
+    }
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
 
   const handleViewJobDetails = async (jobId: string) => {
     setShowJobDetailsDialog(true);
@@ -73,6 +167,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
         <div className="grid gap-4">
           {jobs.length > 0 ? jobs.map((job) => {
             const statusConfig = getStatusBadgeConfig(job.status);
+            const statusMeta = getJobStatusMeta(job.status);
             return (
               <Card key={job.id}>
                 <CardContent className="p-6">
@@ -82,6 +177,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
                         <h3 className="font-semibold text-lg">{job.title}</h3>
                         <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
                       </div>
+                      <p className="text-sm text-gray-500 mb-2">{statusMeta.description}</p>
                       <p className="text-gray-600 mb-2">{job.category}</p>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <div className="flex items-center gap-1">
@@ -116,6 +212,15 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
                         >
                           Zobacz oferty
                         </Button>
+                        {job.status === 'completed' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewJobDetails(job.id)}
+                          >
+                            Raport PDF
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -168,6 +273,12 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
                   </div>
                 </div>
               </div>
+
+              {jobDetailsData.status === 'completed' && (
+                <Button onClick={() => handleDownloadTechnicalReport(jobDetailsData)}>
+                  Pobierz raport PDF
+                </Button>
+              )}
 
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-lg">

@@ -69,32 +69,10 @@ export default function JobTypeSelection() {
     router.push('/post-job');
   };
 
-  const handleSelectTender = () => {
-    if (user?.userType !== 'manager') {
-      router.push('/login');
-      return;
-    }
-
-    // Check if company exists before navigating
-    if (hasCompany === false) {
-      toast.error('Najpierw musisz dodać dane firmy w profilu');
-      router.push('/account?tab=company');
-      return;
-    }
-
-    // If still checking, wait
-    if (isCheckingCompany || hasCompany === null) {
-      return;
-    }
-
-    router.push('/post-tender');
-  };
-
   return (
     <JobTypeSelectionPage 
       onBack={() => router.push('/')}
       onSelectJob={handleSelectJob}
-      onSelectTender={handleSelectTender}
       isAuthenticated={user?.userType === 'manager'}
       userType={user?.userType}
       hasCompany={hasCompany}
