@@ -10,6 +10,8 @@ import { PasswordForm } from './PasswordForm';
 import { ProfileForm } from './ProfileForm';
 import { CompanyManagementForm } from './CompanyManagementForm';
 import { DeleteAccountSection } from './DeleteAccountSection';
+import { ContractorInsuranceSettings } from './ContractorInsuranceSettings';
+import { ContractorNotificationsPanel } from './ContractorNotificationsPanel';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Button } from './ui/button';
 import { Tabs, TabsContent } from './ui/tabs';
@@ -39,7 +41,12 @@ export function UserAccountPageClient({
     // Priority 5: Initialize tab from URL on mount (only once)
     if (!hasInitializedTabFromUrl.current) {
       const tabFromUrl = searchParams.get('tab');
-      if (tabFromUrl && ['profile', 'company', 'security', 'notifications'].includes(tabFromUrl)) {
+      if (
+        tabFromUrl &&
+        ['profile', 'company', 'security', 'notifications', 'contractor-data', 'contractor-notifications'].includes(
+          tabFromUrl
+        )
+      ) {
         setActiveTab(tabFromUrl);
       }
       hasInitializedTabFromUrl.current = true;
@@ -71,6 +78,15 @@ export function UserAccountPageClient({
       hasCheckedAuth.current = true;
     }
   }, [isLoading]);
+
+  React.useEffect(() => {
+    if (!user) {
+      return;
+    }
+    if (user.userType === 'contractor' && activeTab === 'profile') {
+      setActiveTab('contractor-data');
+    }
+  }, [user, activeTab]);
 
   // Redirect to login only after we've confirmed no user and no session
   // This is a fallback in case middleware doesn't catch it (e.g., in test environment)
@@ -193,28 +209,44 @@ export function UserAccountPageClient({
       <nav className="border-b bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-1 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={cn(
-                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                activeTab === 'profile'
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              )}
-            >
-              Profil
-            </button>
-            <button
-              onClick={() => setActiveTab('company')}
-              className={cn(
-                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                activeTab === 'company'
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              )}
-            >
-              Firma
-            </button>
+            {user.userType === 'contractor' ? (
+              <button
+                onClick={() => setActiveTab('contractor-data')}
+                className={cn(
+                  "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                  activeTab === 'contractor-data'
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                )}
+              >
+                Twoje Dane
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className={cn(
+                    "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                    activeTab === 'profile'
+                      ? "border-primary text-primary"
+                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                  )}
+                >
+                  Profil
+                </button>
+                <button
+                  onClick={() => setActiveTab('company')}
+                  className={cn(
+                    "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                    activeTab === 'company'
+                      ? "border-primary text-primary"
+                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                  )}
+                >
+                  Firma
+                </button>
+              </>
+            )}
             <button
               onClick={() => setActiveTab('security')}
               className={cn(
@@ -227,15 +259,17 @@ export function UserAccountPageClient({
               Bezpieczeństwo
             </button>
             <button
-              onClick={() => setActiveTab('notifications')}
+              onClick={() => setActiveTab(user.userType === 'contractor' ? 'contractor-notifications' : 'notifications')}
               className={cn(
                 "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                activeTab === 'notifications'
+                (user.userType === 'contractor'
+                  ? activeTab === 'contractor-notifications'
+                  : activeTab === 'notifications')
                   ? "border-primary text-primary"
                   : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
               )}
             >
-              Powiadomienia
+              Zgody na Powiadomienia
             </button>
           </div>
         </div>
@@ -246,6 +280,11 @@ export function UserAccountPageClient({
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsContent value="profile" className="space-y-6">
             <ProfileForm user={user} />
+          </TabsContent>
+
+          <TabsContent value="contractor-data" className="space-y-6">
+            <ProfileForm user={user} />
+            <ContractorInsuranceSettings userId={user.id} />
           </TabsContent>
 
           <TabsContent value="company" className="space-y-6">
@@ -259,6 +298,10 @@ export function UserAccountPageClient({
 
           <TabsContent value="notifications" className="space-y-6">
             <NotificationSettings />
+          </TabsContent>
+
+          <TabsContent value="contractor-notifications" className="space-y-6">
+            <ContractorNotificationsPanel userId={user.id} />
           </TabsContent>
         </Tabs>
       </div>

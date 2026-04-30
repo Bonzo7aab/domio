@@ -5,11 +5,9 @@ import { usePathname } from 'next/navigation';
 import { cn } from '../ui/utils';
 
 const tabs = [
-  { id: 'dashboard', label: 'Dashboard', href: '/contractor-dashboard/dashboard' },
-  { id: 'applications', label: 'Moje aplikacje', href: '/contractor-dashboard/applications' },
-  { id: 'projects', label: 'Projekty', href: '/contractor-dashboard/projects' },
-  { id: 'ratings', label: 'Oceny', href: '/contractor-dashboard/ratings' },
-  { id: 'pricing', label: 'Cennik', href: '/contractor-dashboard/pricing' },
+  { id: 'offers', label: 'Moje Oferty', href: '/contractor-dashboard/applications' },
+  { id: 'ratings', label: 'Ocena Zgłoszeń', href: '/contractor-dashboard/ratings' },
+  { id: 'services', label: 'Usługi', href: '/contractor-dashboard/pricing' },
 ];
 
 export function ContractorDashboardNav() {
@@ -20,7 +18,12 @@ export function ContractorDashboardNav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex space-x-1 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {tabs.map((tab) => {
-            const isActive = pathname === tab.href || (tab.id === 'dashboard' && (pathname === '/contractor-dashboard' || pathname === '/contractor-dashboard/'));
+            const isActive =
+              pathname === tab.href ||
+              (tab.id === 'offers' &&
+                (pathname === '/contractor-dashboard' ||
+                  pathname === '/contractor-dashboard/' ||
+                  pathname === '/contractor-dashboard/dashboard'));
             return (
               <Link
                 key={tab.id}

@@ -3,7 +3,13 @@ export interface ServicePricing {
   min?: number;
   max?: number;
   currency: string;
-  unit?: string; // e.g., "per m²", "per project"
+  unit?: 'm2' | 'szt.' | 'mb' | 'kg' | '1 godzina' | 'miesiąc';
+  category?: string;
+  subcategory?: string;
+  workDescription?: string;
+  netPrice?: number;
+  vatRate?: number;
+  grossPrice?: number;
 }
 
 export interface ContractorProfile {

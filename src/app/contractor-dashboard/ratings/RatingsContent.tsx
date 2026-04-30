@@ -3,6 +3,7 @@
 import { Star } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Progress } from '../../../components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { getCategoryLabel } from '../../../components/contractor-dashboard/shared/utils';
 
 interface RatingSummary {
@@ -111,10 +112,25 @@ export function RatingsContent({ ratingSummary, reviews }: RatingsContentProps) 
         </Card>
       )}
 
-      {/* Reviews List */}
-      <div className="space-y-4">
-        {reviews.length > 0 ? (
-          reviews.map((review) => (
+      <Tabs defaultValue="received" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="issued">Wystawione</TabsTrigger>
+          <TabsTrigger value="received">Otrzymane</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="issued">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">
+                W tej sekcji pojawią się oceny wystawione przez Ciebie po zakończonych realizacjach.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="received" className="space-y-4">
+          {reviews.length > 0 ? (
+            reviews.map((review) => (
             <Card key={review.id}>
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-4">
@@ -167,19 +183,20 @@ export function RatingsContent({ ratingSummary, reviews }: RatingsContentProps) 
                 </div>
               </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="text-gray-500 mb-4">
-                <Star className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                <h3 className="text-lg font-medium mb-2">Brak opinii</h3>
-                <p>Twoja firma nie ma jeszcze żadnych opinii od klientów.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <div className="text-gray-500 mb-4">
+                  <Star className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <h3 className="text-lg font-medium mb-2">Brak opinii</h3>
+                  <p>Twoja firma nie ma jeszcze żadnych opinii od klientów.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
