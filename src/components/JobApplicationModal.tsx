@@ -12,6 +12,7 @@ import {
   MapPin,
   Clock,
   Users,
+  Eye,
   Building2,
   Briefcase,
   DollarSign
@@ -65,6 +66,22 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
   const { user } = useUserProfile();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const formatApplicationsCount = (count: number): string => {
+    if (count === 0) return 'Brak ofert';
+    if (count === 1) return '1 oferta';
+
+    const lastTwoDigits = count % 100;
+    const lastDigit = count % 10;
+    const useFewForm = lastDigit >= 2 && lastDigit <= 4 && !(lastTwoDigits >= 12 && lastTwoDigits <= 14);
+
+    return `${count} ${useFewForm ? 'oferty' : 'ofert'}`;
+  };
+
+  const applicationsRaw = (jobData as { applications?: number | string } | undefined)?.applications;
+  const applicationsCount =
+    typeof applicationsRaw === 'string' ? Number.parseInt(applicationsRaw, 10) : applicationsRaw;
+  const hasApplicationsCount = Number.isFinite(applicationsCount) && (applicationsCount ?? -1) >= 0;
 
   // Helper function to format location (string or object)
   const formatLocation = (location: string | { city: string; sublocality_level_1?: string } | undefined): string => {
@@ -197,7 +214,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
         <div className="bg-white border-b">
           <div className="px-6 py-4">
             {/* Icon and Title Row */}
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-start gap-3 mb-3">
               {/* Job Icon */}
               <div className="flex-shrink-0">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -210,9 +227,27 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
               </div>
               
               {/* Job Title */}
-              <h3 className="text-lg font-bold text-gray-900 line-clamp-2 flex-1">
-                {jobTitle}
-              </h3>
+              <div className="flex-1 min-w-0 flex items-start justify-between gap-3">
+                <h3 className="text-lg font-bold text-gray-900 line-clamp-2">
+                  {jobTitle}
+                </h3>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasApplicationsCount && (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
+                      <Users className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                      <span className="text-xs sm:text-sm text-gray-700 font-medium">
+                        {formatApplicationsCount(applicationsCount ?? 0)}
+                      </span>
+                    </div>
+                  )}
+                  {jobData && (jobData as { visits_count?: number }).visits_count !== undefined && ((jobData as { visits_count?: number }).visits_count || 0) > 0 && (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
+                      <Eye className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                      <span className="text-xs sm:text-sm text-gray-700 font-medium">{(jobData as { visits_count?: number }).visits_count || 0} wyświetleń</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             
             {/* Info Cards Row - left aligned */}
@@ -247,20 +282,6 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                 </div>
               )}
               
-              {/* Applications Count */}
-              {jobData?.applications && (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
-                  <Users className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{(jobData as { applications?: number }).applications || 0} {((jobData as { applications?: number }).applications || 0) === 1 ? 'oferta' : 'oferty'}</span>
-                </div>
-              )}
-              
-              {/* Visits */}
-              {jobData && (jobData as { visits_count?: number }).visits_count !== undefined && ((jobData as { visits_count?: number }).visits_count || 0) > 0 && (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-100">
-                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{(jobData as { visits_count?: number }).visits_count || 0} wyświetleń</span>
-                </div>
-              )}
             </div>
             
             {/* Category & Type Badges - left aligned */}
