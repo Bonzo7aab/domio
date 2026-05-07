@@ -2,6 +2,24 @@ import { createClient } from '../supabase/client';
 
 const CONTRACTOR_POLICY_BUCKET = 'verification-documents';
 
+/** Rozszerzenia i MIME dla skanu polisy OC (spójne z UI i walidacją uploadu). */
+export const OC_POLICY_ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'] as const;
+
+const OC_POLICY_ALLOWED_MIME = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+]);
+
+const OC_POLICY_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+const OC_POLICY_SIGNED_URL_TTL_SEC = 3600;
+
+export function getOcPolicyAllowedFormatsLabel(): string {
+  return 'PDF, JPG, JPEG, PNG, WEBP';
+}
+
 export interface ContractorNotificationChannels {
   email: boolean;
   app: boolean;
@@ -145,34 +163,84 @@ export async function upsertContractorAccountSettings(
   payload: Partial<ContractorAccountSettings>
 ): Promise<ContractorAccountSettings> {
   const supabase = createClient();
-  const dataToSave: Record<string, unknown> = {
-    user_id: userId,
-    updated_at: new Date().toISOString(),
-  };
+  const updatedAt = new Date().toISOString();
+
+  const patch: Record<string, unknown> = { updated_at: updatedAt };
 
   if (payload.ocValidUntil !== undefined) {
-    dataToSave.oc_valid_until = payload.ocValidUntil;
+    patch.oc_valid_until = payload.ocValidUntil;
   }
   if (payload.ocPolicyScanPath !== undefined) {
-    dataToSave.oc_policy_scan_path = payload.ocPolicyScanPath;
+    patch.oc_policy_scan_path = payload.ocPolicyScanPath;
   }
   if (payload.notificationChannels !== undefined) {
-    dataToSave.notification_channels = payload.notificationChannels;
+    patch.notification_channels = payload.notificationChannels;
   }
   if (payload.radar !== undefined) {
-    dataToSave.radar_settings = payload.radar;
+    patch.radar_settings = payload.radar;
   }
 
+  // Explicit UPDATE / INSERT — partial `.upsert()` can omit columns or behave unexpectedly with RLS + defaults.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const client = supabase as any;
+
+  const { data: existingRow, error: selectError } = await client
     .from('contractor_account_settings')
-    .upsert(dataToSave, { onConflict: 'user_id' })
-    .select('*')
-    .single();
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (selectError) {
+    if (isMissingContractorSettingsTableError(selectError)) {
+      return normalizeSettings(null);
+    }
+    throw selectError;
+  }
+
+  if (existingRow) {
+    const { data, error } = await client
+      .from('contractor_account_settings')
+      .update(patch)
+      .eq('user_id', userId)
+      .select('*')
+      .single();
+
+    if (error) {
+      if (isMissingContractorSettingsTableError(error)) {
+        return normalizeSettings(null);
+      }
+      throw error;
+    }
+
+    return normalizeSettings((data as Record<string, unknown>) || null);
+  }
+
+  const insertRow: Record<string, unknown> = {
+    user_id: userId,
+    notification_channels: DEFAULT_CHANNELS,
+    radar_settings: DEFAULT_RADAR,
+    ...patch,
+  };
+
+  const { data, error } = await client.from('contractor_account_settings').insert(insertRow).select('*').single();
 
   if (error) {
     if (isMissingContractorSettingsTableError(error)) {
       return normalizeSettings(null);
+    }
+    // Race: another request inserted the row between select and insert
+    const maybeUnique = (error as { code?: string }).code === '23505';
+    if (maybeUnique) {
+      const { data: afterRace, error: retryError } = await client
+        .from('contractor_account_settings')
+        .update(patch)
+        .eq('user_id', userId)
+        .select('*')
+        .single();
+      if (retryError) {
+        throw retryError;
+      }
+      return normalizeSettings((afterRace as Record<string, unknown>) || null);
     }
     throw error;
   }
@@ -180,12 +248,45 @@ export async function upsertContractorAccountSettings(
   return normalizeSettings((data as Record<string, unknown>) || null);
 }
 
-export async function uploadOcPolicyScan(userId: string, file: File): Promise<{ path: string; publicUrl: string }> {
+function validateOcPolicyFile(file: File): void {
+  if (file.size > OC_POLICY_MAX_BYTES) {
+    throw new Error(`Plik jest zbyt duży. Maksymalny rozmiar: ${OC_POLICY_MAX_BYTES / (1024 * 1024)} MB`);
+  }
+
+  const rawExt = file.name.includes('.') ? file.name.split('.').pop() : '';
+  const extension = rawExt ? rawExt.toLowerCase() : '';
+  const mime = file.type?.toLowerCase() ?? '';
+
+  const extOk = OC_POLICY_ALLOWED_EXTENSIONS.includes(
+    extension as (typeof OC_POLICY_ALLOWED_EXTENSIONS)[number]
+  );
+  const mimeOk =
+    mime === '' ||
+    OC_POLICY_ALLOWED_MIME.has(mime) ||
+    mime === 'image/pjpeg';
+
+  if (!extOk && !mimeOk) {
+    throw new Error(
+      `Nieobsługiwany format pliku. Dozwolone: ${getOcPolicyAllowedFormatsLabel()} (max ${OC_POLICY_MAX_BYTES / (1024 * 1024)} MB)`
+    );
+  }
+}
+
+export async function uploadOcPolicyScan(userId: string, file: File): Promise<{ path: string }> {
+  validateOcPolicyFile(file);
+
   const supabase = createClient();
-  const extension = file.name.includes('.') ? file.name.split('.').pop() : 'pdf';
+  const rawExt = file.name.includes('.') ? file.name.split('.').pop() : 'pdf';
+  const extension = rawExt ? rawExt.toLowerCase() : 'pdf';
+  const safeExt = OC_POLICY_ALLOWED_EXTENSIONS.includes(
+    extension as (typeof OC_POLICY_ALLOWED_EXTENSIONS)[number]
+  )
+    ? extension
+    : 'pdf';
+
   const filePath = `${userId}/verification/oc-policy/${Date.now()}-${Math.random()
     .toString(36)
-    .slice(2)}.${extension}`;
+    .slice(2)}.${safeExt}`;
 
   const { error: uploadError } = await supabase.storage
     .from(CONTRACTOR_POLICY_BUCKET)
@@ -195,13 +296,23 @@ export async function uploadOcPolicyScan(userId: string, file: File): Promise<{ 
     throw uploadError;
   }
 
-  const { data } = supabase.storage.from(CONTRACTOR_POLICY_BUCKET).getPublicUrl(filePath);
-  return { path: filePath, publicUrl: data.publicUrl };
+  return { path: filePath };
 }
 
-export function getOcPolicyScanPublicUrl(path: string): string {
+/**
+ * Podpisany URL — bucket jest zwykle prywatny; `getPublicUrl` nie działa w przeglądarce bez polityki public read.
+ */
+export async function getOcPolicyScanSignedUrl(path: string): Promise<string | null> {
   const supabase = createClient();
-  const { data } = supabase.storage.from(CONTRACTOR_POLICY_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  const { data, error } = await supabase.storage
+    .from(CONTRACTOR_POLICY_BUCKET)
+    .createSignedUrl(path, OC_POLICY_SIGNED_URL_TTL_SEC);
+
+  if (error || !data?.signedUrl) {
+    console.error('getOcPolicyScanSignedUrl:', error);
+    return null;
+  }
+
+  return data.signedUrl;
 }
 
