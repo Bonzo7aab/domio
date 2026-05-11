@@ -2136,6 +2136,7 @@ export async function fetchJobApplicationsByJobId(
         )
       `)
       .eq('job_id', jobId)
+      .neq('admin_moderation_status', 'suspended')
       .order('submitted_at', { ascending: false });
     
     if (error) {
@@ -2384,6 +2385,7 @@ export async function fetchTenderBidsByTenderId(
         )
       `)
       .eq('tender_id', tenderId)
+      .neq('admin_moderation_status', 'suspended')
       .order('submitted_at', { ascending: false });
     
     if (error) {

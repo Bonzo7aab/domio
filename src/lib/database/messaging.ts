@@ -193,7 +193,7 @@ export async function sendQuoteRequestMessage(
 export async function createNotification(
   supabase: SupabaseClient<Database>,
   userId: string,
-  type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder',
+  type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused',
   title: string,
   message: string,
   data?: Record<string, unknown>,

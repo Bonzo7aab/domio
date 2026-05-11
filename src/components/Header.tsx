@@ -66,9 +66,21 @@ export function Header({ initialUser }: HeaderProps) {
     router.push('/login')
   }
 
+  const isAdmin = currentUser?.platformRole === 'platform_admin'
+
+  const userRoleLabel = isAdmin
+    ? 'ADMIN'
+    : currentUser?.userType === 'manager'
+      ? 'Ogłoszeniodawca'
+      : 'Wykonawca'
+
   // Navigation handlers
   const handleAddJobClick = () => {
     router.push('/job-type-selection')
+  }
+
+  const handleAdminPanelClick = () => {
+    router.push('/admin')
   }
 
   const handleManagerPageClick = () => {
@@ -176,12 +188,29 @@ export function Header({ initialUser }: HeaderProps) {
             </div>
           </div>
 
-            {/* Add Job button - visible for unauthenticated (redirects to login) and authenticated managers */}
+            {/* Add Job button - visible for unauthenticated (redirects to login) and authenticated managers.
+                Admin gets a single ADMIN button instead. */}
             <div className="hidden md:block mr-4">
-              {(!userIsAuthenticated || currentUser?.userType !== 'contractor') && (
-                <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
-                  Dodaj Ogłoszenie
+              {userIsAuthenticated && isAdmin ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleAdminPanelClick}
+                  className="shrink-0 bg-blue-800 hover:bg-blue-900"
+                >
+                  ADMIN
                 </Button>
+              ) : (
+                (!userIsAuthenticated || currentUser?.userType !== 'contractor') && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleAddJobClick}
+                    className="shrink-0 bg-blue-800 hover:bg-blue-900"
+                  >
+                    Dodaj Ogłoszenie
+                  </Button>
+                )
               )}
             </div>
 
@@ -234,14 +263,33 @@ export function Header({ initialUser }: HeaderProps) {
                             {currentUser?.email}
                           </p>
                           <p className="text-xs leading-none text-muted-foreground">
-                            {currentUser?.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}
+                            {userRoleLabel}
                           </p>
                         </div>
                       </DrawerTitle>
                     </DrawerHeader>
                     <div className="overflow-y-auto flex-1 p-4">
                       <div className="space-y-1">
-                        {currentUser?.userType === 'contractor' ? (
+                        {isAdmin ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleAdminPanelClick}
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              <span>Panel administracyjny</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-destructive"
+                              onClick={handleLogout}
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              <span>Wyloguj się</span>
+                            </Button>
+                          </>
+                        ) : currentUser?.userType === 'contractor' ? (
                           <>
                             <Button
                               variant="ghost"
@@ -382,12 +430,24 @@ export function Header({ initialUser }: HeaderProps) {
                           {currentUser?.email}
                         </p>
                         <p className="text-xs leading-none text-muted-foreground">
-                          {currentUser?.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}
+                          {userRoleLabel}
                         </p>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {currentUser?.userType === 'contractor' ? (
+                    {isAdmin ? (
+                      <>
+                        <DropdownMenuItem onClick={handleAdminPanelClick}>
+                          <User className="mr-2 h-4 w-4" />
+                          <span>Panel administracyjny</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Wyloguj się</span>
+                        </DropdownMenuItem>
+                      </>
+                    ) : currentUser?.userType === 'contractor' ? (
                       <>
                         <DropdownMenuItem onClick={handleAccountClick}>
                           <User className="mr-2 h-4 w-4" />

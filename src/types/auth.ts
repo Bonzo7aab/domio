@@ -7,6 +7,8 @@ export type UserType = 'manager' | 'contractor'
 // Database types
 export type UserProfile = Database['public']['Tables']['user_profiles']['Row']
 
+export type PlatformRole = 'user' | 'platform_admin'
+
 // Authentication user interface (used by useAuth hook)
 export interface AuthUser {
   id: string
@@ -17,9 +19,16 @@ export interface AuthUser {
   phone?: string
   company?: string
   isVerified: boolean
+  /**
+   * ISO timestamp of when the user submitted documents for verification.
+   * `null` once the admin issues a decision (approved or rejected) — used
+   * together with `isVerified` to derive a tri-state on the client.
+   */
+  verificationSubmittedAt?: string | null
   profileCompleted: boolean
   onboardingCompleted: boolean
   avatar?: string
+  platformRole?: PlatformRole
 }
 
 // User with profile interface (used by useUser hook)

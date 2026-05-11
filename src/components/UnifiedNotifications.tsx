@@ -1,10 +1,11 @@
-import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, Search, Star, Trophy, UserCheck, X } from 'lucide-react';
+import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, Search, ShieldCheck, ShieldX, Star, Trophy, UserCheck, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
 import { deleteNotification, getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '../lib/database/notifications';
 import { createClient } from '../lib/supabase/client';
 import type { Database } from '../types/database';
-import type { ApplicationNotification, JobNotification, TenderNotification, UnifiedNotification, UnifiedNotificationsProps } from '../types/notification';
+import type { ApplicationNotification, JobNotification, SystemNotification, TenderNotification, UnifiedNotification, UnifiedNotificationsProps } from '../types/notification';
 import { Alert, AlertDescription } from './ui/alert';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
@@ -20,7 +21,7 @@ type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 function getNotificationCategoryAndType(
   dbType: NotificationRow['type'],
   data: Record<string, unknown> | null
-): { category: 'job' | 'application' | 'tender'; type: string } | null {
+): { category: 'job' | 'application' | 'tender' | 'system'; type: string } | null {
   switch (dbType) {
     // Job notifications
     case 'new_job':
@@ -33,7 +34,7 @@ function getNotificationCategoryAndType(
         return { category: 'tender', type: 'deadline_reminder' };
       }
       return { category: 'job', type: 'deadline_reminder' }; // Default to job
-    
+
     // Application notifications (for managers)
     case 'application_received':
       return { category: 'application', type: 'new_application' };
@@ -41,7 +42,7 @@ function getNotificationCategoryAndType(
       return { category: 'application', type: 'application_update' };
     case 'job_assigned':
       return { category: 'application', type: 'contract_signed' };
-    
+
     // Tender notifications (for contractors)
     case 'new_tender':
       return { category: 'tender', type: 'new_tender' };
@@ -49,7 +50,13 @@ function getNotificationCategoryAndType(
       return { category: 'tender', type: 'evaluation_started' };
     case 'tender_awarded':
       return { category: 'tender', type: 'tender_awarded' };
-    
+
+    // System (admin) notifications surfaced to the user
+    case 'verification_approved':
+      return { category: 'system', type: 'verification_approved' };
+    case 'verification_rejected':
+      return { category: 'system', type: 'verification_rejected' };
+
     default:
       // For other types, try to infer from data
       if (data?.jobId && !data?.tenderId) {
@@ -127,7 +134,19 @@ function transformNotification(dbNotification: NotificationRow): UnifiedNotifica
       };
       return tenderNotif;
     }
-    
+
+    case 'system': {
+      const systemNotif: SystemNotification = {
+        ...baseNotification,
+        category: 'system',
+        type: categoryAndType.type as SystemNotification['type'],
+        title: dbNotification.title,
+        message: dbNotification.message,
+        actionUrl: dbNotification.action_url ?? undefined,
+      };
+      return systemNotif;
+    }
+
     default:
       return null;
   }
@@ -140,6 +159,7 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
   onTenderSelect
 }) => {
   const { user } = useUserProfile();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [isMounted, setIsMounted] = useState(false);
@@ -312,8 +332,16 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         }
         break;
       }
+      case 'system': {
+        const systemNotif = notification as SystemNotification;
+        const target =
+          systemNotif.actionUrl ||
+          (systemNotif.type === 'verification_rejected' ? '/verification' : '/account');
+        router.push(target);
+        break;
+      }
     }
-    
+
     setIsOpen(false);
   };
 
@@ -366,8 +394,18 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         }
         break;
       }
+      case 'system': {
+        const systemNotif = notification as SystemNotification;
+        switch (systemNotif.type) {
+          case 'verification_approved':
+            return <ShieldCheck className="h-4 w-4 text-green-600" />;
+          case 'verification_rejected':
+            return <ShieldX className="h-4 w-4 text-red-600" />;
+        }
+        break;
+      }
     }
-    
+
     return <Bell className={`h-4 w-4 ${iconClass}`} />;
   };
 

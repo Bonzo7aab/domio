@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Calendar, ExternalLink, FileUp, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -10,6 +11,7 @@ import {
   upsertContractorAccountSettings,
   uploadOcPolicyScan,
 } from '../lib/database/contractor-account';
+import { createClient } from '../lib/supabase/client';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -19,19 +21,13 @@ interface ContractorInsuranceSettingsProps {
   userId: string;
 }
 
-function inferOcScanPreviewKind(path: string): 'pdf' | 'image' | 'unknown' {
-  const ext = path.split('.').pop()?.toLowerCase() ?? '';
-  if (ext === 'pdf') return 'pdf';
-  if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'image';
-  return 'unknown';
-}
-
 const OC_POLICY_ACCEPT =
   '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp';
 
 const OC_SETTINGS_SAVED_TOAST = 'Dane ubezpieczenia OC zostały zmienione';
 
 export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSettingsProps) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [ocValidUntil, setOcValidUntil] = React.useState('');
@@ -43,7 +39,36 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
       try {
         const settings = await getContractorAccountSettings(userId);
         setOcValidUntil(settings.ocValidUntil ?? '');
-        setPolicyPath(settings.ocPolicyScanPath);
+
+        // Fall back to the verification `insurance` document so the card
+        // reflects OC uploaded via /verification too. If we resolve a path
+        // via the fallback we proactively persist it to
+        // `contractor_account_settings` so subsequent reads (and the OC
+        // notice on /account) stay consistent without another fallback.
+        if (settings.ocPolicyScanPath) {
+          setPolicyPath(settings.ocPolicyScanPath);
+        } else {
+          const supabase = createClient();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: profile } = await (supabase as any)
+            .from('user_profiles')
+            .select('verification_document_paths')
+            .eq('id', userId)
+            .maybeSingle();
+          const verificationPaths =
+            (profile?.verification_document_paths as Record<string, string> | null | undefined) ?? {};
+          const insurancePath = verificationPaths.insurance ?? null;
+          if (insurancePath) {
+            setPolicyPath(insurancePath);
+            try {
+              await upsertContractorAccountSettings(userId, { ocPolicyScanPath: insurancePath });
+            } catch (syncError) {
+              console.error('Error backfilling OC scan path from verification docs:', syncError);
+            }
+          } else {
+            setPolicyPath(null);
+          }
+        }
       } catch (error) {
         console.error('Error loading OC settings:', error);
         toast.error('Nie udało się załadować ustawień OC');
@@ -89,6 +114,9 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
       }
       setPolicyPath(saved.ocPolicyScanPath);
       toast.success(OC_SETTINGS_SAVED_TOAST);
+      // Refresh server state so the OC notice in the page header and the
+      // /verification page reflect the newly synced scan immediately.
+      router.refresh();
     } catch (error) {
       console.error('Error uploading OC policy:', error);
       const message =
@@ -107,6 +135,7 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
         ocValidUntil: ocValidUntil || null,
       });
       toast.success(OC_SETTINGS_SAVED_TOAST);
+      router.refresh();
     } catch (error) {
       console.error('Error saving OC date:', error);
       toast.error('Nie udało się zapisać daty ważności OC');
@@ -114,8 +143,6 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
       setIsSaving(false);
     }
   };
-
-  const previewKind = policyPath ? inferOcScanPreviewKind(policyPath) : 'unknown';
 
   if (isLoading) {
     return (
@@ -126,7 +153,7 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
   }
 
   return (
-    <Card>
+    <Card id="oc-policy" className="scroll-mt-24">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <ShieldCheck className="h-4 w-4" />
@@ -181,51 +208,19 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
 
           {policyPath && !previewSignedUrl ? (
             <p className="text-xs text-destructive">
-              Nie udało się przygotować podglądu. Sprawdź uprawnienia do magazynu plików lub otwórz plik ponownie po
-              zapisaniu.
+              Nie udało się przygotować linku do pliku. Sprawdź uprawnienia do magazynu plików lub
+              zapisz plik ponownie.
             </p>
           ) : null}
 
           {previewSignedUrl ? (
-            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-foreground">Podgląd</span>
-                <Button variant="outline" size="sm" className="h-8" asChild>
-                  <a href={previewSignedUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                    Otwórz w nowej karcie
-                  </a>
-                </Button>
-              </div>
-
-              {previewKind === 'image' ? (
-                // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL, dynamic user upload
-                <img
-                  src={previewSignedUrl}
-                  alt="Skan polisy OC"
-                  className="mx-auto max-h-[min(420px,55vh)] w-auto max-w-full rounded border bg-background object-contain"
-                />
-              ) : null}
-
-              {previewKind === 'pdf' ? (
-                <div className="space-y-2">
-                  <iframe
-                    title="Podgląd PDF polisy OC"
-                    src={previewSignedUrl}
-                    className="h-[min(480px,60vh)] w-full rounded border bg-background"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Jeśli podgląd PDF się nie wczytuje, użyj „Otwórz w nowej karcie” — niektóre przeglądarki blokują
-                    iframe dla dokumentów.
-                  </p>
-                </div>
-              ) : null}
-
-              {previewKind === 'unknown' ? (
-                <p className="text-xs text-muted-foreground">
-                  Podgląd inline nie jest dostępny dla tego typu pliku. Użyj przycisku „Otwórz w nowej karcie”.
-                </p>
-              ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" className="h-8" asChild>
+                <a href={previewSignedUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  Otwórz w nowej karcie
+                </a>
+              </Button>
             </div>
           ) : null}
         </div>
