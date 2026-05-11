@@ -367,7 +367,10 @@ export async function deleteAccountAction() {
       }
       
       if (deleteError.message?.includes('permission') || deleteError.message?.includes('unauthorized')) {
-        return { error: 'Brak uprawnień do usunięcia konta. Sprawdź konfigurację SUPABASE_SERVICE_ROLE_KEY.' }
+        return {
+          error:
+            'Brak uprawnień do usunięcia konta. Sprawdź konfigurację SUPABASE_SECRET_KEY lub SUPABASE_SERVICE_ROLE_KEY.',
+        }
       }
       
       return { error: `Błąd bazy danych podczas usuwania użytkownika: ${deleteError.message || 'Nieznany błąd'}` }
@@ -385,9 +388,15 @@ export async function deleteAccountAction() {
     console.error('Error in deleteAccountAction:', error)
     
     // Handle missing service role key gracefully
-    if (error instanceof Error && error.message?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
-      return { 
-        error: 'Usuwanie konta nie jest skonfigurowane. Dodaj zmienną środowiskową SUPABASE_SERVICE_ROLE_KEY do pliku .env.local. Klucz można znaleźć w ustawieniach projektu Supabase w sekcji API → service_role (secret) key.' 
+    if (
+      error instanceof Error &&
+      (error.message?.includes('SUPABASE_SECRET_KEY') ||
+        error.message?.includes('SUPABASE_SERVICE_ROLE_KEY') ||
+        error.message?.includes('elevated API key'))
+    ) {
+      return {
+        error:
+          'Usuwanie konta nie jest skonfigurowane. Dodaj do pliku .env.local zmienną SUPABASE_SECRET_KEY (klucz tajny sb_secret_...) albo SUPABASE_SERVICE_ROLE_KEY (legacy JWT). Supabase → Settings → API Keys.',
       }
     }
     

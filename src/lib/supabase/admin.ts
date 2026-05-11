@@ -2,31 +2,37 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../../types/database'
 
 /**
- * Creates a Supabase admin client with service role key.
- * This client bypasses Row Level Security and must only be used server-side.
+ * Creates a Supabase admin client with an elevated API key (bypasses RLS).
+ * Use only on the server — never in the browser or under `NEXT_PUBLIC_*`.
  *
- * Set `SUPABASE_SERVICE_ROLE_KEY` in server env (e.g. `.env.local`).
- * Do not use `NEXT_PUBLIC_*` for the service role — it must never ship to the browser.
- *
- * Legacy: `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` is still read if set (not recommended).
+ * Resolution order (see Supabase → Settings → API Keys):
+ * 1. `SUPABASE_SECRET_KEY` — new secret key (`sb_secret_...`, recommended)
+ * 2. `SUPABASE_SERVICE_ROLE_KEY` — legacy JWT `service_role` key (still supported)
+ * 3. `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` — deprecated fallback only
  */
-export function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey =
+function resolveElevatedSupabaseKey(): string | undefined {
+  return (
+    process.env.SUPABASE_SECRET_KEY ??
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  )
+}
+
+export function createAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const elevatedKey = resolveElevatedSupabaseKey()
 
   if (!supabaseUrl) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
   }
 
-  if (!serviceRoleKey) {
+  if (!elevatedKey) {
     throw new Error(
-      'Missing SUPABASE_SERVICE_ROLE_KEY environment variable (service role secret from Supabase → Settings → API)'
+      'Missing Supabase elevated API key: set SUPABASE_SECRET_KEY (secret key, sb_secret_...) or SUPABASE_SERVICE_ROLE_KEY (legacy JWT) in server env — Supabase Dashboard → Settings → API Keys'
     )
   }
 
-  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+  return createClient<Database>(supabaseUrl, elevatedKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
