@@ -126,7 +126,7 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
   }
 
   return (
-    <Card>
+    <Card id="oc-policy" className="scroll-mt-24">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <ShieldCheck className="h-4 w-4" />

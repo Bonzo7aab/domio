@@ -44,10 +44,11 @@ export async function updateSession(request: NextRequest) {
     '/account',
     '/post-job',
     '/post-tender',
-    '/tender-creation'
+    '/tender-creation',
+    '/admin',
   ]
 
-  const isProtectedPath = protectedPaths.some(path => 
+  const isProtectedPath = protectedPaths.some(path =>
     request.nextUrl.pathname.startsWith(path)
   )
 
@@ -59,22 +60,76 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect to appropriate dashboard if accessing login/register while authenticated
-  if ((request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register') && user) {
-    // Get user profile to determine user type
+  const pathname = request.nextUrl.pathname
+  const isManagerOnlyPath =
+    pathname === '/account' ||
+    pathname.startsWith('/account/') ||
+    pathname === '/manager-dashboard' ||
+    pathname.startsWith('/manager-dashboard/')
+  const isContractorOnlyPath =
+    pathname === '/contractor-dashboard' || pathname.startsWith('/contractor-dashboard/')
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
+  const isAuthEntryPath = pathname === '/login' || pathname === '/register'
+
+  // Fetch role only when we may need to act on it
+  if (
+    user &&
+    (isAuthEntryPath || isManagerOnlyPath || isContractorOnlyPath || isAdminPath)
+  ) {
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('user_type')
+      .select('user_type, platform_role')
       .eq('id', user.id)
       .single()
 
-    const redirectPath = profile?.user_type === 'contractor' 
-      ? '/contractor-dashboard' 
-      : '/manager-dashboard'
-    
-    const url = request.nextUrl.clone()
-    url.pathname = redirectPath
-    return NextResponse.redirect(url)
+    const isAdmin = profile?.platform_role === 'platform_admin'
+    const isContractor = profile?.user_type === 'contractor'
+    const isManager = profile?.user_type === 'manager'
+
+    const homePathFor = (() => {
+      if (isAdmin) return '/admin'
+      if (isContractor) return '/contractor-dashboard'
+      return '/manager-dashboard'
+    })()
+
+    // Already authenticated → bounce away from /login & /register to role-correct landing
+    if (isAuthEntryPath) {
+      const url = request.nextUrl.clone()
+      url.pathname = homePathFor
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
+
+    // /account & /manager-dashboard are manager-only
+    if (isManagerOnlyPath && !isAdmin && !isManager) {
+      const url = request.nextUrl.clone()
+      url.pathname = homePathFor
+      return NextResponse.redirect(url)
+    }
+    if (isManagerOnlyPath && isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin'
+      return NextResponse.redirect(url)
+    }
+
+    // /contractor-dashboard is contractor-only (admin lands on /admin instead)
+    if (isContractorOnlyPath && !isContractor && !isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = homePathFor
+      return NextResponse.redirect(url)
+    }
+    if (isContractorOnlyPath && isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin'
+      return NextResponse.redirect(url)
+    }
+
+    // /admin is admin-only
+    if (isAdminPath && !isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = homePathFor
+      return NextResponse.redirect(url)
+    }
   }
 
   // Redirect to onboarding if profile is not completed (only for protected paths)

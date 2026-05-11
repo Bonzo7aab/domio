@@ -1,10 +1,20 @@
 'use client'
 
-import { Shield, User } from 'lucide-react';
+import {
+  CalendarClock,
+  ChevronRight,
+  Clock,
+  FileWarning,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+  Upload,
+  User,
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
-import type { UserAccountPageProps } from '../types/auth';
+import type { VerificationStatus } from '../lib/database/verification';
 import { NotificationSettings } from './NotificationSettings';
 import { PasswordForm } from './PasswordForm';
 import { ProfileForm } from './ProfileForm';
@@ -17,12 +27,261 @@ import { Button } from './ui/button';
 import { Tabs, TabsContent } from './ui/tabs';
 import { cn } from './ui/utils';
 
-export function UserAccountPageClient({ 
-  onBack: _onBack, 
-  onVerificationClick, 
-  onManagerDashboardClick, 
-  onContractorDashboardClick 
-}: UserAccountPageProps) {
+type OcState = 'missing' | 'expired' | 'expiring' | 'valid';
+
+interface OcSnapshot {
+  state: OcState;
+  validUntilLabel: string | null;
+  daysLeft: number | null;
+}
+
+const OC_EXPIRING_THRESHOLD_DAYS = 30;
+
+/**
+ * User-facing classification of the contractor's OC policy. We collapse the
+ * admin's `unknown` (scan present, no date) into `missing` because — from the
+ * user's perspective — both states require them to finish the same form.
+ */
+function classifyOcForUser(ocValidUntil: string | null, hasOcScan: boolean): OcSnapshot {
+  if (!hasOcScan || !ocValidUntil) {
+    return { state: 'missing', validUntilLabel: null, daysLeft: null };
+  }
+  const validUntilMs = Date.parse(ocValidUntil);
+  if (!Number.isFinite(validUntilMs)) {
+    return { state: 'missing', validUntilLabel: ocValidUntil, daysLeft: null };
+  }
+  const validUntilLabel = new Date(validUntilMs).toLocaleDateString('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const daysLeft = Math.ceil((validUntilMs - Date.now()) / (24 * 60 * 60 * 1000));
+  if (daysLeft < 0) return { state: 'expired', validUntilLabel, daysLeft };
+  if (daysLeft <= OC_EXPIRING_THRESHOLD_DAYS)
+    return { state: 'expiring', validUntilLabel, daysLeft };
+  return { state: 'valid', validUntilLabel, daysLeft };
+}
+
+interface OcPolicyNoticeProps {
+  ocOnboarding: OcOnboarding;
+  onAction: () => void;
+}
+
+/**
+ * Mirrors `VerificationNotice` styling so the two onboarding tasks read as a
+ * cohesive set. Hidden entirely when OC is in good shape so we don't clutter
+ * the header with a "you're fine" message that wastes space; we leave a tiny
+ * confirmation strip instead.
+ */
+function OcPolicyNotice({ ocOnboarding, onAction }: OcPolicyNoticeProps) {
+  const oc = classifyOcForUser(ocOnboarding.ocValidUntil, ocOnboarding.hasOcScan);
+
+  if (oc.state === 'valid') {
+    return (
+      <div className="mt-3 flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+          <ShieldCheck className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-emerald-700">Polisa OC dołączona</div>
+          <p className="text-xs text-muted-foreground">
+            Polisa ważna do {oc.validUntilLabel} · pozostało {oc.daysLeft} dni.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (oc.state === 'expiring') {
+    return (
+      <div className="mt-3 flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 sm:flex-row sm:items-center">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+          <Clock className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-amber-800">Polisa OC wkrótce wygasa</div>
+          <p className="text-xs text-muted-foreground">
+            Wygasa {oc.validUntilLabel} ({oc.daysLeft} dni). Zaktualizuj dane, aby Twoje oferty
+            pozostały widoczne.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onAction}
+          className="border-amber-500/40 text-amber-800 hover:bg-amber-500/10"
+        >
+          <CalendarClock className="mr-1 h-3.5 w-3.5" /> Zaktualizuj OC
+          <ChevronRight className="ml-1 h-3.5 w-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
+  if (oc.state === 'expired') {
+    return (
+      <div className="mt-3 flex flex-col gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/5 px-4 py-3 sm:flex-row sm:items-center">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
+          <ShieldX className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-destructive">Polisa OC wygasła</div>
+          <p className="text-xs text-muted-foreground">
+            Wygasła {oc.validUntilLabel}. Twoje oferty mogą zostać zawieszone — wgraj aktualną
+            polisę i ustaw nową datę ważności.
+          </p>
+        </div>
+        <Button variant="destructive" size="sm" onClick={onAction}>
+          <Upload className="mr-1 h-3.5 w-3.5" /> Zaktualizuj OC
+          <ChevronRight className="ml-1 h-3.5 w-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
+  // missing (no scan or no valid date)
+  return (
+    <div className="mt-3 flex flex-col gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/5 px-4 py-3 sm:flex-row sm:items-center">
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
+        <FileWarning className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-destructive">Brak polisy OC</div>
+        <p className="text-xs text-muted-foreground">
+          Dodaj skan polisy OC oraz datę ważności w ustawieniach konta wykonawcy. Bez polisy nie
+          możemy przeprowadzić weryfikacji ani opublikować Twoich ofert.
+        </p>
+      </div>
+      <Button size="sm" onClick={onAction}>
+        <Upload className="mr-1 h-3.5 w-3.5" /> Dodaj polisę OC
+        <ChevronRight className="ml-1 h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+interface VerificationNoticeProps {
+  status: VerificationStatus;
+  onAction: () => void;
+}
+
+/**
+ * Unified verification status notice rendered above the account tabs. Each
+ * state has a distinct color/icon palette plus an inline CTA so the user
+ * always sees one cohesive box rather than a mix of inline badges, separate
+ * buttons, and an alert.
+ */
+function VerificationNotice({ status, onAction }: VerificationNoticeProps) {
+  if (status.state === 'approved') {
+    return (
+      <div className="mt-4 flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+          <ShieldCheck className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-emerald-700">Konto zweryfikowane</div>
+          <p className="text-xs text-muted-foreground">
+            Twoja firma posiada oznaczenie „Zweryfikowany”.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status.state === 'pending') {
+    return (
+      <div className="mt-4 flex flex-col gap-3 rounded-lg border border-blue-500/30 bg-blue-500/5 px-4 py-3 sm:flex-row sm:items-center">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
+          <Clock className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-blue-700">Weryfikacja w toku</div>
+          <p className="text-xs text-muted-foreground">
+            Sprawdzimy Twoje dokumenty w 1–3 dni robocze. Powiadomimy Cię o wyniku.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onAction}
+          className="border-blue-500/40 text-blue-700 hover:bg-blue-500/10"
+        >
+          Sprawdź status
+          <ChevronRight className="ml-1 h-3.5 w-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
+  if (status.state === 'rejected') {
+    return (
+      <div className="mt-4 space-y-3 rounded-lg border-2 border-destructive/40 bg-destructive/5 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
+            <ShieldX className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="font-semibold text-destructive">Weryfikacja odrzucona</div>
+            <p className="text-xs text-muted-foreground">
+              Popraw wskazane elementy i prześlij dokumenty ponownie.
+            </p>
+          </div>
+          <Button variant="destructive" size="sm" onClick={onAction}>
+            Prześlij ponownie
+            <ChevronRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        </div>
+        {status.reason && (
+          <div className="rounded-md border border-destructive/30 bg-background p-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-destructive">
+              Powód odrzucenia
+            </div>
+            <p className="mt-1 whitespace-pre-line text-sm text-foreground">{status.reason}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // unsubmitted
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 sm:flex-row sm:items-center">
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+        <Shield className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-amber-800">Konto wymaga weryfikacji</div>
+        <p className="text-xs text-muted-foreground">
+          Zweryfikowane konto otrzymuje więcej zleceń i wyższą pozycję w wynikach wyszukiwania.
+          Proces jest bezpłatny i zajmuje 1–3 dni robocze.
+        </p>
+      </div>
+      <Button size="sm" onClick={onAction}>
+        Zweryfikuj konto
+        <ChevronRight className="ml-1 h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+interface OcOnboarding {
+  ocValidUntil: string | null;
+  hasOcScan: boolean;
+}
+
+interface UserAccountPageClientProps {
+  verificationStatus: VerificationStatus;
+  /**
+   * Contractor-only OC policy snapshot. `null` for managers (who do not have
+   * an OC requirement) so the notice block is skipped entirely.
+   */
+  ocOnboarding: OcOnboarding | null;
+}
+
+export function UserAccountPageClient({
+  verificationStatus,
+  ocOnboarding,
+}: UserAccountPageClientProps) {
   const { user, isLoading, session } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -66,10 +325,34 @@ export function UserAccountPageClient({
     } else {
       params.delete('tab');
     }
-    
-    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+
+    // Preserve any hash anchor (e.g. #oc-policy) so deep links from the
+    // verification / OC notice still scroll to the relevant card after the
+    // forced tab switch for contractors.
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    const newUrl = params.toString()
+      ? `?${params.toString()}${hash}`
+      : `${window.location.pathname}${hash}`;
     router.replace(newUrl, { scroll: false });
   }, [activeTab, isMounted, router, searchParams]);
+
+  // Scroll to the target anchor (e.g. `#oc-policy`) once the active tab's
+  // content has had a chance to render. Runs whenever the active tab changes
+  // so re-clicking the OC notice on the same page keeps working.
+  React.useEffect(() => {
+    if (!isMounted) return;
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (!hash || hash.length < 2) return;
+    const id = hash.slice(1);
+    const handle = window.requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [activeTab, isMounted]);
 
   // Wait for auth check to complete before redirecting
   React.useEffect(() => {
@@ -155,46 +438,53 @@ export function UserAccountPageClient({
                       {user.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}
                     </span>
                   </div>
-                  <div className="flex items-center">
-                    <Shield className={cn(
-                      "h-3 w-3 md:h-4 md:w-4 flex-shrink-0",
-                      !user.isVerified && "text-destructive"
-                    )} />
-                    <span className={cn(
-                      !user.isVerified && "text-destructive font-medium"
-                    )}>
-                      {user.isVerified ? 'Zweryfikowany' : 'Niezweryfikowany'}
+                  <div className="flex items-center gap-1">
+                    {verificationStatus.state === 'approved' && (
+                      <ShieldCheck className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-success" />
+                    )}
+                    {verificationStatus.state === 'pending' && (
+                      <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-blue-600" />
+                    )}
+                    {verificationStatus.state === 'rejected' && (
+                      <ShieldX className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
+                    )}
+                    {verificationStatus.state === 'unsubmitted' && (
+                      <Shield className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
+                    )}
+                    <span
+                      className={cn(
+                        'font-medium',
+                        verificationStatus.state === 'approved' && 'text-success',
+                        verificationStatus.state === 'pending' && 'text-blue-600',
+                        verificationStatus.state === 'rejected' && 'text-destructive',
+                        verificationStatus.state === 'unsubmitted' && 'text-destructive',
+                      )}
+                    >
+                      {verificationStatus.state === 'approved' && 'Zweryfikowany'}
+                      {verificationStatus.state === 'pending' && 'Oczekuje na weryfikację'}
+                      {verificationStatus.state === 'rejected' && 'Weryfikacja odrzucona'}
+                      {verificationStatus.state === 'unsubmitted' && 'Niezweryfikowany'}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-              {!user.isVerified && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={onVerificationClick}
-                  className="w-full sm:w-auto"
-                >
-                  Zweryfikuj konto
-                </Button>
-              )}
               {user.userType === 'manager' && (
-                <Button 
-                  variant="default" 
+                <Button
+                  variant="default"
                   size="sm"
-                  onClick={onManagerDashboardClick}
+                  onClick={() => router.push('/manager-dashboard')}
                   className="w-full sm:w-auto"
                 >
                   Panel Zarządcy
                 </Button>
               )}
               {user.userType === 'contractor' && (
-                <Button 
-                  variant="default" 
+                <Button
+                  variant="default"
                   size="sm"
-                  onClick={onContractorDashboardClick}
+                  onClick={() => router.push('/contractor-dashboard')}
                   className="w-full sm:w-auto"
                 >
                   Panel Wykonawcy
@@ -202,6 +492,17 @@ export function UserAccountPageClient({
               )}
             </div>
           </div>
+
+          <VerificationNotice
+            status={verificationStatus}
+            onAction={() => router.push('/verification')}
+          />
+          {ocOnboarding && (
+            <OcPolicyNotice
+              ocOnboarding={ocOnboarding}
+              onAction={() => router.push('/account?tab=contractor-data#oc-policy')}
+            />
+          )}
         </div>
       </div>
 

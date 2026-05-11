@@ -158,6 +158,53 @@ export async function getContractorAccountSettings(userId: string): Promise<Cont
   return normalizeSettings((data as Record<string, unknown> | null) || null);
 }
 
+/**
+ * Mirror the OC scan path into the user's verification document set so the
+ * `/verification` page (and admin review) sees the same file as the OC card.
+ * Best-effort: any failure is logged but does not roll back the main upsert.
+ */
+async function syncOcScanToVerificationDocs(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any,
+  userId: string,
+  ocPath: string | null
+): Promise<void> {
+  try {
+    const { data: profile, error: readError } = await client
+      .from('user_profiles')
+      .select('verification_document_paths')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (readError) {
+      console.error('syncOcScanToVerificationDocs: read failed', readError);
+      return;
+    }
+
+    const paths =
+      (profile?.verification_document_paths as Record<string, string> | null | undefined) ?? {};
+    const next: Record<string, string> = { ...paths };
+    if (ocPath) {
+      if (next.insurance === ocPath) return; // no-op
+      next.insurance = ocPath;
+    } else {
+      if (!('insurance' in next)) return; // no-op
+      delete next.insurance;
+    }
+
+    const { error: writeError } = await client
+      .from('user_profiles')
+      .update({ verification_document_paths: next })
+      .eq('id', userId);
+
+    if (writeError) {
+      console.error('syncOcScanToVerificationDocs: write failed', writeError);
+    }
+  } catch (err) {
+    console.error('syncOcScanToVerificationDocs: unexpected error', err);
+  }
+}
+
 export async function upsertContractorAccountSettings(
   userId: string,
   payload: Partial<ContractorAccountSettings>
@@ -210,6 +257,10 @@ export async function upsertContractorAccountSettings(
         return normalizeSettings(null);
       }
       throw error;
+    }
+
+    if (payload.ocPolicyScanPath !== undefined) {
+      await syncOcScanToVerificationDocs(client, userId, payload.ocPolicyScanPath);
     }
 
     return normalizeSettings((data as Record<string, unknown>) || null);

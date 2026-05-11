@@ -20,6 +20,9 @@ export interface Database {
           is_verified: boolean
           profile_completed: boolean
           onboarding_completed: boolean
+          platform_role: 'user' | 'platform_admin'
+          verification_submitted_at: string | null
+          verification_document_paths: Json
           created_at: string
           updated_at: string
         }
@@ -33,6 +36,9 @@ export interface Database {
           is_verified?: boolean
           profile_completed?: boolean
           onboarding_completed?: boolean
+          platform_role?: 'user' | 'platform_admin'
+          verification_submitted_at?: string | null
+          verification_document_paths?: Json
           created_at?: string
           updated_at?: string
         }
@@ -46,6 +52,9 @@ export interface Database {
           is_verified?: boolean
           profile_completed?: boolean
           onboarding_completed?: boolean
+          platform_role?: 'user' | 'platform_admin'
+          verification_submitted_at?: string | null
+          verification_document_paths?: Json
           created_at?: string
           updated_at?: string
         }
@@ -915,7 +924,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder'
+          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused'
           title: string
           message: string
           data: Json | null
@@ -929,7 +938,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder'
+          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused'
           title: string
           message: string
           data?: Json | null

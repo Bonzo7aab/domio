@@ -39,7 +39,7 @@ export function LoginPage({ searchParams }: LoginPageProps) {
     
     startTransition(async () => {
       const result = await loginAction(formData);
-      
+
       if ('error' in result) {
         setError(result.error);
       } else {
@@ -47,9 +47,11 @@ export function LoginPage({ searchParams }: LoginPageProps) {
         await refreshSession();
         // Refresh router to update server state
         router.refresh();
+        // Use server-determined redirect target (role-aware); fall back to client value.
+        const target = result.redirectTo || redirectTo;
         // Small delay to ensure context updates, then navigate
         setTimeout(() => {
-          router.push(redirectTo);
+          router.push(target);
         }, 100);
       }
     });

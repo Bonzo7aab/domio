@@ -36,30 +36,76 @@ export interface UpdateUserData {
 
 /**
  * Server Action for user login
- * Returns success/error instead of redirecting to allow client-side handling
+ * Returns success/error and a role-correct redirect target so the client can navigate.
  */
-export async function loginAction(formData: FormData): Promise<{ success: true } | { error: string }> {
+export async function loginAction(
+  formData: FormData
+): Promise<{ success: true; redirectTo: string } | { error: string }> {
   const supabase = await createClient()
-  
+
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  
+  const requestedRedirect = (formData.get('redirectTo') as string | null)?.trim() || ''
+
   if (!email || !password) {
     return { error: 'Email i hasło są wymagane' }
   }
-  
-  const { error } = await supabase.auth.signInWithPassword({
+
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({
     email,
-    password
+    password,
   })
-  
+
   if (error) {
     return { error: error.message }
   }
-  
-  console.log('Login successful')
+
+  const userId = signInData.user?.id
+  let redirectTo = '/'
+
+  if (userId) {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('user_type, platform_role')
+      .eq('id', userId)
+      .single()
+
+    const isAdmin = profile?.platform_role === 'platform_admin'
+    const isContractor = profile?.user_type === 'contractor'
+
+    const roleHome = isAdmin
+      ? '/admin'
+      : isContractor
+        ? '/contractor-dashboard'
+        : '/manager-dashboard'
+
+    if (isAdmin) {
+      // Admins always land on /admin regardless of `redirectTo`.
+      redirectTo = '/admin'
+    } else if (
+      requestedRedirect &&
+      requestedRedirect.startsWith('/') &&
+      !requestedRedirect.startsWith('//')
+    ) {
+      const forbiddenForContractor =
+        isContractor &&
+        (requestedRedirect.startsWith('/account') ||
+          requestedRedirect.startsWith('/manager-dashboard') ||
+          requestedRedirect.startsWith('/admin'))
+      const forbiddenForManager =
+        !isContractor &&
+        (requestedRedirect.startsWith('/admin') ||
+          requestedRedirect.startsWith('/contractor-dashboard'))
+
+      redirectTo =
+        forbiddenForContractor || forbiddenForManager ? roleHome : requestedRedirect
+    } else {
+      redirectTo = roleHome
+    }
+  }
+
   revalidatePath('/', 'layout')
-  return { success: true }
+  return { success: true, redirectTo }
 }
 
 /**

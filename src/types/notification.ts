@@ -67,7 +67,27 @@ export interface TenderNotification {
   tenderId: string;
 }
 
-export type UnifiedNotification = JobNotification | ApplicationNotification | TenderNotification;
+export interface SystemNotification {
+  id: string;
+  category: 'system';
+  /**
+   * Subset of the system events the bell currently surfaces. Extend as more
+   * platform-level notifications are wired in.
+   */
+  type: 'verification_approved' | 'verification_rejected';
+  title: string;
+  message: string;
+  actionUrl?: string;
+  timestamp: Date;
+  read: boolean;
+  urgent: boolean;
+}
+
+export type UnifiedNotification =
+  | JobNotification
+  | ApplicationNotification
+  | TenderNotification
+  | SystemNotification;
 
 export interface UnifiedNotificationsProps {
   onJobSelect?: (jobId: string) => void;

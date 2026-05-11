@@ -53,9 +53,11 @@ export default function AuthProvider({
         phone: profile.phone || undefined,
         company: undefined, // Company field not available in user_profiles table
         isVerified: profile.is_verified,
+        verificationSubmittedAt: profile.verification_submitted_at ?? null,
         profileCompleted: profile.profile_completed,
         onboardingCompleted: profile.onboarding_completed,
         avatar: profile.avatar_url || undefined,
+        platformRole: profile.platform_role ?? 'user',
       }
     } catch (err) {
       console.error('Error fetching profile:', err)

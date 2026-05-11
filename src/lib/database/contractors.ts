@@ -1123,6 +1123,7 @@ export async function fetchContractorApplications(
         )
       `)
       .eq('company_id', contractorId)
+      .neq('admin_moderation_status', 'suspended')
       .order('submitted_at', { ascending: false });
 
     const formattedApplications: ContractorApplication[] = applications?.map(app => ({
@@ -1177,6 +1178,7 @@ export async function fetchContractorApplications(
         )
       `)
       .eq('company_id', contractorId)
+      .neq('admin_moderation_status', 'suspended')
       .order('submitted_at', { ascending: false });
 
     type BidWithTenderDetails = {
