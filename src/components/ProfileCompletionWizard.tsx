@@ -122,7 +122,7 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
   }, [user?.id, user?.phone]);
 
   const isContractor = user?.userType === 'contractor';
-  const totalSteps = isContractor ? 5 : 4;
+  const totalSteps = isContractor ? 5 : 3;
 
   const serviceCategories = [
     'Utrzymanie Czystości i Zieleni',
@@ -234,6 +234,10 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
 
   const handleNext = () => {
     if (!validateStep(currentStep)) {
+      return;
+    }
+    if (!isContractor && currentStep === 3) {
+      void handleComplete();
       return;
     }
     if (currentStep < totalSteps) {

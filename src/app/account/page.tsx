@@ -13,10 +13,6 @@ export default async function Account() {
     redirect('/login?redirectTo=/account');
   }
 
-  const verificationStatus = await getUserVerificationStatus(user.id, supabase);
-
-  // Pull contractor OC settings server-side so the onboarding notice doesn't
-  // need a follow-up client fetch. Managers don't have OC, so we skip the read.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
   const { data: profileRow } = await sb
@@ -26,6 +22,17 @@ export default async function Account() {
     .maybeSingle();
 
   const isContractor = profileRow?.user_type === 'contractor';
+  const isManager = profileRow?.user_type === 'manager';
+
+  const verificationStatus = isManager
+    ? {
+        state: 'approved' as const,
+        submittedAt: null,
+        decidedAt: null,
+        reason: null,
+      }
+    : await getUserVerificationStatus(user.id, supabase);
+
   let ocValidUntil: string | null = null;
   let hasOcScan = false;
   if (isContractor) {
@@ -42,9 +49,6 @@ export default async function Account() {
         .maybeSingle(),
     ]);
     ocValidUntil = (casResult.data?.oc_valid_until as string | null) ?? null;
-    // OC scan can live either in contractor_account_settings or, equivalently,
-    // as the `insurance` doc in the verification document set. Treat both
-    // sources as a valid OC scan for the onboarding notice.
     const accountOcPath = (casResult.data?.oc_policy_scan_path as string | null) ?? null;
     const verificationPaths =
       (profileDocsResult.data?.verification_document_paths as Record<string, string> | null | undefined) ?? {};

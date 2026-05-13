@@ -1,11 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Bell, Radar } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type ContractorNotificationChannels,
-  type ContractorRadarSettings,
   getContractorAccountSettings,
   upsertContractorAccountSettings,
 } from '../lib/database/contractor-account';
@@ -13,19 +12,11 @@ import { getNotifications } from '../lib/database/notifications';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Checkbox } from './ui/checkbox';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 
 interface ContractorNotificationsPanelProps {
   userId: string;
 }
-
-/** Radar UI is disabled until the feature ships; preferences still persist server-side when re-enabled. */
-const RADAR_COMING_SOON = true;
-
-const AVAILABLE_AREAS = ['Warszawa', 'Wilanów', 'Mokotów'] as const;
 
 interface NotificationListItem {
   id: string;
@@ -73,11 +64,6 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
     phoneCall: false,
     sms: false,
   });
-  const [radar, setRadar] = React.useState<ContractorRadarSettings>({
-    enabled: true,
-    minAmountNet: 1000,
-    areas: ['Warszawa'],
-  });
   const [notifications, setNotifications] = React.useState<NotificationListItem[]>([]);
 
   React.useEffect(() => {
@@ -93,7 +79,6 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
           phoneCall: false,
           sms: false,
         });
-        setRadar(settings.radar);
         setNotifications(
           notificationRows.slice(0, 6).map((item) => ({
             id: item.id,
@@ -123,7 +108,6 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
           phoneCall: false,
           sms: false,
         },
-        ...(RADAR_COMING_SOON ? {} : { radar }),
       });
       toast.success('Ustawienia powiadomień zostały zapisane');
     } catch (error) {
@@ -172,42 +156,6 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
           <Button onClick={handleSave} disabled={isSaving}>
             Zapisz ustawienia
           </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="relative overflow-hidden">
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Radar className="h-4 w-4" />
-            Radar nowych zgłoszeń
-          </CardTitle>
-          <SoonBadge />
-        </CardHeader>
-        <CardContent className="pointer-events-none select-none space-y-4 opacity-55" aria-hidden>
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <div>
-              <p className="text-sm font-medium">Włącz radar</p>
-              <p className="text-xs text-muted-foreground">Monitoruje nowe zgłoszenia według Twoich filtrów</p>
-            </div>
-            <Switch checked={radar.enabled} disabled />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="min-net-amount">Powiadaj o zgłoszeniach powyżej kwoty netto (PLN)</Label>
-            <Input id="min-net-amount" type="number" min={0} value={radar.minAmountNet} disabled />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Obszar powiadomień</Label>
-            <div className="space-y-2 rounded-md border p-3">
-              {AVAILABLE_AREAS.map((area) => (
-                <label key={area} className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={radar.areas.includes(area)} disabled />
-                  {area}
-                </label>
-              ))}
-            </div>
-          </div>
         </CardContent>
       </Card>
 

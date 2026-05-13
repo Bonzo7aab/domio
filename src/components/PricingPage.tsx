@@ -134,7 +134,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onContractorRegister,
     {
       id: 'free',
       question: 'Czy korzystanie z Domio jest płatne?',
-      answer: 'Nie. Podstawowy dostęp do portalu, w tym dodawanie zleceń i przeglądanie ofert wykonawców, jest całkowicie bezpłatny. Zależy nam na tym, aby każdy Ogłoszeniodawca mógł łatwo i bezpiecznie znaleźć odpowiednią firmę do realizacji prac.'
+      answer: 'Nie. Podstawowy dostęp do portalu, w tym dodawanie zleceń i przeglądanie ofert wykonawców, jest całkowicie bezpłatny. Zależy nam na tym, aby każdy Zarządca mógł łatwo i bezpiecznie znaleźć odpowiednią firmę do realizacji prac.'
     },
     {
       id: 'benefits',

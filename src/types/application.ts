@@ -2,6 +2,8 @@ export interface Application {
   id: string;
   jobId: string;
   contractorId: string;
+  /** Contractor company id (for loading profile / OC in manager tools). */
+  contractorCompanyId?: string;
   contractorName: string;
   contractorCompany: string;
   contractorAvatar: string;

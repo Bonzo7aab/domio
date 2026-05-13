@@ -6,9 +6,8 @@ import { cn } from '../ui/utils';
 
 const tabs = [
   { id: 'overview', label: 'Przegląd', href: '/manager-dashboard/overview' },
-  { id: 'jobs', label: 'Zlecenia', href: '/manager-dashboard/jobs' },
-  { id: 'tenders', label: 'Przetargi', href: '/manager-dashboard/tenders' },
-  { id: 'properties', label: 'Nieruchomości', href: '/manager-dashboard/properties' },
+  { id: 'zgloszenia', label: 'Zgłoszenia', href: '/manager-dashboard/zgloszenia' },
+  { id: 'ocena', label: 'Ocena zgłoszeń', href: '/manager-dashboard/ocena-zgloszen' },
   { id: 'contractors', label: 'Wykonawcy', href: '/manager-dashboard/contractors' },
 ];
 
@@ -20,7 +19,12 @@ export function ManagerDashboardNav() {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex space-x-1">
           {tabs.map((tab) => {
-            const isActive = pathname === tab.href || (tab.id === 'overview' && (pathname === '/manager-dashboard' || pathname === '/manager-dashboard/'));
+            const isActive =
+              pathname === tab.href ||
+              (tab.id === 'overview' &&
+                (pathname === '/manager-dashboard' || pathname === '/manager-dashboard/')) ||
+              (tab.id === 'zgloszenia' && pathname.startsWith('/manager-dashboard/zgloszenia')) ||
+              (tab.id === 'ocena' && pathname.startsWith('/manager-dashboard/ocena-zgloszen'));
             return (
               <Link
                 key={tab.id}

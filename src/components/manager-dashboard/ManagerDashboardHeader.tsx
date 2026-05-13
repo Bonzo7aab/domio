@@ -1,10 +1,7 @@
 "use client";
 
 import { Mail, MapPin, Phone } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { Button } from '../ui/button';
 import { getCompanyTypeDisplayName, getCompanyAddress } from './shared/utils';
 import type { CompanyData } from '../../lib/database/companies';
 
@@ -15,35 +12,10 @@ interface ManagerDashboardHeaderProps {
 }
 
 export function ManagerDashboardHeader({ company, userEmail, userCompany }: ManagerDashboardHeaderProps) {
-  const router = useRouter();
-
-  const _handleBack = () => {
-    router.push('/');
-  };
-
-  const handlePostJob = () => {
-    if (!company) {
-      toast.error('Najpierw musisz dodać dane firmy w profilu');
-      router.push('/account?tab=company');
-      return;
-    }
-    router.push('/post-job');
-  };
-
-  const handleTenderCreate = () => {
-    if (!company) {
-      toast.error('Najpierw musisz dodać dane firmy w profilu');
-      router.push('/account?tab=company');
-      return;
-    }
-    router.push('/post-tender');
-  };
-
   return (
     <div className="bg-white border-b">
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 flex-1 min-w-0">
             <Avatar className="w-16 h-16">
               <AvatarImage src={company?.logo_url || ''} />
               <AvatarFallback className="bg-primary text-white">
@@ -75,16 +47,7 @@ export function ManagerDashboardHeader({ company, userEmail, userCompany }: Mana
               </div>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={handleTenderCreate}>
-              Utwórz przetarg
-            </Button>
-            <Button onClick={handlePostJob}>
-              Opublikuj zlecenie
-            </Button>
-          </div>
         </div>
       </div>
-    </div>
   );
 }

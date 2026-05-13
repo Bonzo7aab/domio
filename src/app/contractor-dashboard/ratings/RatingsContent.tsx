@@ -137,7 +137,7 @@ export function RatingsContent({ ratingSummary, reviews }: RatingsContentProps) 
                   <div>
                     <h4 className="font-medium">{review.reviewerName}</h4>
                     <p className="text-sm text-gray-600">
-                      {review.reviewerType === 'manager' ? 'Ogłoszeniodawca' : 'Klient prywatny'}
+                      {review.reviewerType === 'manager' ? 'Zarządca' : 'Klient prywatny'}
                     </p>
                   </div>
                   <div className="flex items-center space-x-1">

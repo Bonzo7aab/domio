@@ -30,7 +30,7 @@ export default function TermsPage() {
               <ul className="list-disc pl-6 space-y-2 text-slate-700">
                 <li><strong>Platforma:</strong> Serwis internetowy Domio dostępny pod adresem [wstawić URL]</li>
                 <li><strong>Użytkownik:</strong> Osoba fizyczna, prawna lub jednostka organizacyjna korzystająca z Platformy</li>
-                <li><strong>Ogłoszeniodawca:</strong> Użytkownik zamieszczający ogłoszenia (m.in. zarząd nieruchomości, wspólnota, spółdzielnia)</li>
+                <li><strong>Zarządca:</strong> Użytkownik zamieszczający ogłoszenia (m.in. zarząd nieruchomości, wspólnota, spółdzielnia)</li>
                 <li><strong>Wykonawca:</strong> Użytkownik świadczący usługi budowlane lub remontowe</li>
                 <li><strong>Zlecenie:</strong> Ogłoszenie o potrzebie wykonania usługi zamieszczone przez Ogłoszeniodawcę</li>
                 <li><strong>Oferta:</strong> Propozycja wykonania zlecenia złożona przez Wykonawcę</li>
@@ -71,7 +71,7 @@ export default function TermsPage() {
               <ul className="list-disc pl-6 space-y-2 text-slate-700 mb-4">
                 <li>Ogłoszeniodawcy mogą publikować zlecenia dotyczące usług budowlanych i remontowych</li>
                 <li>Zlecenie powinno zawierać dokładny opis prac, lokalizację, budżet i termin</li>
-                <li>Ogłoszeniodawca odpowiada za prawdziwość informacji zawartych w zleceniu</li>
+                <li>Zarządca odpowiada za prawdziwość informacji zawartych w zleceniu</li>
                 <li>Platforma nie gwarantuje znalezienia wykonawcy dla każdego zlecenia</li>
               </ul>
 

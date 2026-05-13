@@ -579,7 +579,7 @@ export async function pauseJobListingAction(jobId: string, feedback: string): Pr
     type: 'listing_admin_paused',
     title: 'Zlecenie zawieszone przez administratora',
     message: `${job.title}: ${msg}`,
-    actionUrl: `/manager-dashboard/jobs`,
+    actionUrl: `/manager-dashboard/zgloszenia`,
     sendPush: true,
   });
 

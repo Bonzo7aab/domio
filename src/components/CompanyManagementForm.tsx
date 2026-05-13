@@ -1,16 +1,14 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Building, Edit2, X, Check, Plus, MapPin, Mail, Phone, Globe, FileText, Loader2, AlertCircle, Eye } from 'lucide-react';
+import { Building, Edit2, X, Check, Plus, MapPin, Mail, Phone, Globe, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
-import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { Switch } from './ui/switch';
 import type { AuthUser } from '../types/auth';
 import { createClient } from '../lib/supabase/client';
 import { fetchUserPrimaryCompany, upsertUserCompany } from '../lib/database/companies';
@@ -837,50 +835,6 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                   )}
               </div>
 
-              {/* Profile Settings */}
-              {isEditing && (
-                <div className="border rounded-lg p-4 bg-muted/30">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <Label htmlFor="isPublic" className="font-medium cursor-pointer">
-                          Profil publiczny
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Twój profil będzie widoczny dla wszystkich użytkowników i będzie wyświetlany na stronie /contractors
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      id="isPublic"
-                      checked={companyData.is_public}
-                      onCheckedChange={(checked) => handleCompanyChange('is_public', checked)}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {!isEditing && (
-                <div className="border rounded-lg p-4 bg-muted/30">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Profil publiczny</p>
-                        <p className="text-xs text-muted-foreground">
-                          {companyData.is_public 
-                            ? 'Twój profil jest widoczny dla wszystkich użytkowników i będzie wyświetlany na stronie /contractors' 
-                            : 'Twój profil jest prywatny i nie będzie widoczny dla innych użytkowników'}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={companyData.is_public ? 'default' : 'secondary'}>
-                      {companyData.is_public ? 'Publiczny' : 'Prywatny'}
-                    </Badge>
-                  </div>
-                </div>
-              )}
             </div>
 
             {(hasCompany || isEditing) && (() => {
@@ -895,8 +849,9 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                   <p className="text-xs text-muted-foreground mb-2">
                     💡 <strong>Wskazówka:</strong> Kompletny profil firmy zwiększa zaufanie i pomaga w zdobywaniu zleceń.
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    <strong>Brakujące pola:</strong> {missingFields.join(', ')}
+                  <p className="text-xs">
+                    <strong className="text-amber-700 dark:text-amber-500">Brakujące pola:</strong>{' '}
+                    <span className="text-amber-800/95 dark:text-amber-400/95">{missingFields.join(', ')}</span>
                   </p>
                 </div>
               );

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Search, User, MessageCircle, GraduationCap, Play, Bookmark, LogOut } from 'lucide-react';
+import { Search, User, MessageCircle, GraduationCap, Play, Bookmark, LogOut, ClipboardList } from 'lucide-react';
 import { Button } from './ui/button';
 import { UnifiedNotifications } from './UnifiedNotifications';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -71,8 +71,12 @@ export function Header({ initialUser }: HeaderProps) {
   const userRoleLabel = isAdmin
     ? 'ADMIN'
     : currentUser?.userType === 'manager'
-      ? 'Ogłoszeniodawca'
+      ? 'Zarządca'
       : 'Wykonawca'
+
+  const handleZgloszeniaClick = () => {
+    router.push('/manager-dashboard/zgloszenia')
+  }
 
   // Navigation handlers
   const handleAddJobClick = () => {
@@ -259,9 +263,11 @@ export function Header({ initialUser }: HeaderProps) {
                           <p className="text-sm font-medium leading-none">
                             {currentUser?.firstName} {currentUser?.lastName}
                           </p>
-                          <p className="text-xs leading-none text-muted-foreground">
-                            {currentUser?.email}
-                          </p>
+                          {currentUser?.userType !== 'manager' && (
+                            <p className="text-xs leading-none text-muted-foreground">
+                              {currentUser?.email}
+                            </p>
+                          )}
                           <p className="text-xs leading-none text-muted-foreground">
                             {userRoleLabel}
                           </p>
@@ -316,7 +322,7 @@ export function Header({ initialUser }: HeaderProps) {
                               <span>Wyloguj się</span>
                             </Button>
                           </>
-                        ) : (
+                        ) : currentUser?.userType === 'manager' ? (
                           <>
                             <Button
                               variant="ghost"
@@ -324,19 +330,27 @@ export function Header({ initialUser }: HeaderProps) {
                               onClick={handleAccountClick}
                             >
                               <User className="mr-2 h-4 w-4" />
-                              <span>Profil</span>
+                              <span>Konto</span>
                             </Button>
-                            {/* Dashboard Options based on user type */}
-                            {currentUser?.userType === 'manager' && (
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => router.push('/manager-dashboard')}
-                          >
-                            <User className="mr-2 h-4 w-4" />
-                            <span>Panel Ogłoszeniodawcy</span>
-                          </Button>
-                            )}
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleZgloszeniaClick}
+                            >
+                              <ClipboardList className="mr-2 h-4 w-4" />
+                              <span>Zgłoszenia</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-destructive"
+                              onClick={handleLogout}
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              <span>Wyloguj się</span>
+                            </Button>
+                          </>
+                        ) : (
+                          <>
                             <Button
                               variant="ghost"
                               className="w-full justify-start"
@@ -426,9 +440,11 @@ export function Header({ initialUser }: HeaderProps) {
                         <p className="text-sm font-medium leading-none">
                           {currentUser?.firstName} {currentUser?.lastName}
                         </p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {currentUser?.email}
-                        </p>
+                        {currentUser?.userType !== 'manager' && (
+                          <p className="text-xs leading-none text-muted-foreground">
+                            {currentUser?.email}
+                          </p>
+                        )}
                         <p className="text-xs leading-none text-muted-foreground">
                           {userRoleLabel}
                         </p>
@@ -463,21 +479,29 @@ export function Header({ initialUser }: HeaderProps) {
                           <span>Wyloguj się</span>
                         </DropdownMenuItem>
                       </>
+                    ) : currentUser?.userType === 'manager' ? (
+                      <>
+                        <DropdownMenuItem onClick={handleAccountClick}>
+                          <User className="mr-2 h-4 w-4" />
+                          <span>Konto</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleZgloszeniaClick}>
+                          <ClipboardList className="mr-2 h-4 w-4" />
+                          <span>Zgłoszenia</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Wyloguj się</span>
+                        </DropdownMenuItem>
+                      </>
                     ) : (
                       <>
                         <DropdownMenuItem onClick={handleAccountClick}>
                           <User className="mr-2 h-4 w-4" />
                           <span>Profil</span>
                         </DropdownMenuItem>
-                        
-                        {/* Dashboard Options based on user type */}
-                        {currentUser?.userType === 'manager' && (
-                          <DropdownMenuItem onClick={() => router.push('/manager-dashboard')}>
-                            <User className="mr-2 h-4 w-4" />
-                            <span>Panel Ogłoszeniodawcy</span>
-                          </DropdownMenuItem>
-                        )}
-                        
+
                         <DropdownMenuItem onClick={handleBookmarkedJobsClick}>
                           <Bookmark className="mr-2 h-4 w-4" />
                           <span>Zapisane ogłoszenia</span>
@@ -487,7 +511,7 @@ export function Header({ initialUser }: HeaderProps) {
                           <span>Wiadomości</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        
+
                         {/* Help and Learning Section */}
                         <DropdownMenuLabel className="text-xs text-muted-foreground">
                           POMOC I NAUKA
@@ -507,7 +531,7 @@ export function Header({ initialUser }: HeaderProps) {
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-                        
+
                         <DropdownMenuItem onClick={handleLogout}>
                           <LogOut className="mr-2 h-4 w-4" />
                           <span>Wyloguj się</span>

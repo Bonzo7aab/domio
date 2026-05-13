@@ -114,10 +114,10 @@ export default function JobApplicationsPage() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <Button
         variant="outline"
-        onClick={() => router.push("/manager-dashboard/jobs")}
+        onClick={() => router.push("/manager-dashboard/zgloszenia")}
         className="mb-4"
       >
-        ← Powrót do listy zleceń
+        ← Powrót do listy zgłoszeń
       </Button>
 
       {isLoading ? (

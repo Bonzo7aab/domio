@@ -58,7 +58,7 @@ test.describe('Registration Page', () => {
     await expect(page.locator('button[type="submit"]')).toBeVisible({ timeout });
 
     // Check user type selection (radio buttons are sr-only, so check by role)
-    await expect(page.getByRole('radio', { name: 'Ogłoszeniodawca' })).toBeAttached();
+    await expect(page.getByRole('radio', { name: 'Zarządca' })).toBeAttached();
     await expect(page.getByRole('radio', { name: 'Wykonawca' })).toBeAttached();
 
     // Check links
@@ -109,7 +109,7 @@ test.describe('Registration Page', () => {
     await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10000 });
 
-    await page.locator('form').getByText('Ogłoszeniodawca').click();
+    await page.locator('form').getByText('Zarządca').click();
     await page.locator('form').getByText('Wspólnota').click();
     await page.fill('input[name="firstName"]', 'Test');
     await page.fill('input[name="lastName"]', 'Manager');
@@ -253,12 +253,12 @@ test.describe('Registration Page', () => {
     
     await expect(page.locator('h1').filter({ hasText: 'Zarejestruj się' })).toBeVisible({ timeout: 10000 });
     const form = page.locator('form');
-    await expect(form.getByText('Ogłoszeniodawca')).toBeVisible({ timeout: 10000 });
+    await expect(form.getByText('Zarządca')).toBeVisible({ timeout: 10000 });
 
     const contractorRadio = page.getByRole('radio', { name: 'Wykonawca' });
-    const managerRadio = page.getByRole('radio', { name: 'Ogłoszeniodawca' });
+    const managerRadio = page.getByRole('radio', { name: 'Zarządca' });
 
-    await form.getByText('Ogłoszeniodawca').click();
+    await form.getByText('Zarządca').click();
     await expect(managerRadio).toBeChecked();
 
     await form.getByText('Wykonawca').click();

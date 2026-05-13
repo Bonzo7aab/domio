@@ -180,7 +180,7 @@ export function WelcomePage({ onBack, onGetStarted, onTutorial }: WelcomePagePro
             {isManager ? (
               <>
                 <Users className="h-5 w-5 mr-2" />
-                Ogłoszeniodawca
+                Zarządca
               </>
             ) : (
               <>

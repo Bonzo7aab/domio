@@ -18,11 +18,6 @@ export default async function Verification() {
     redirect('/login?redirectTo=/verification');
   }
 
-  const status = await getUserVerificationStatus(user.id, supabase);
-
-  // Pull this user's stored verification document paths (subject to RLS) and
-  // mint short-lived signed URLs for view + download. Helper lives under
-  // admin-verification but does not itself require admin auth.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
   const { data: profileRow } = await sb
@@ -32,12 +27,14 @@ export default async function Verification() {
     .maybeSingle();
 
   const userType = (profileRow?.user_type as string | null) ?? null;
+  if (userType === 'manager') {
+    redirect('/account');
+  }
+
+  const status = await getUserVerificationStatus(user.id, supabase);
+
   const docPaths = (profileRow?.verification_document_paths ?? {}) as Record<string, string>;
 
-  // Fallback: legacy contractors who uploaded OC only via /account?tab=contractor-data
-  // don't have `insurance` in verification_document_paths. Pull the OC scan
-  // path from contractor_account_settings so the verification page renders
-  // their OC just like a freshly uploaded insurance doc.
   if (userType === 'contractor' && !docPaths.insurance) {
     const { data: cas } = await sb
       .from('contractor_account_settings')

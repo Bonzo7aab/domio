@@ -46,11 +46,11 @@ export function SurveyPage({ onBack }: SurveyPageProps) {
   const handleSendEmail = () => {
     if (!surveyData) return;
     
-    const subject = `Ankieta Urbi.eu - ${surveyData.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}`;
+    const subject = `Ankieta Urbi.eu - ${surveyData.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}`;
     const body = `
 Dziękujemy za wypełnienie ankiety Urbi.eu!
 
-Typ użytkownika: ${surveyData.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}
+Typ użytkownika: ${surveyData.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}
 Data wypełnienia: ${new Date(surveyData.submittedAt as string | number | Date).toLocaleDateString('pl-PL')}
 
 Dane kontaktowe:

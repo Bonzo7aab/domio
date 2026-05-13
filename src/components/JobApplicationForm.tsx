@@ -486,7 +486,7 @@ export const JobApplicationForm: React.FC<JobApplicationFormProps> = ({
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Po wysłaniu aplikacji otrzymasz potwierdzenie na e-mail. Ogłoszeniodawca będzie mógł 
+                Po wysłaniu aplikacji otrzymasz potwierdzenie na e-mail. Zarządca będzie mógł 
                 skontaktować się z Tobą w ciągu 48 godzin. Możesz śledzić status swojej aplikacji 
                 w panelu wykonawcy.
               </AlertDescription>

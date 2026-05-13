@@ -2192,6 +2192,7 @@ export async function fetchJobApplicationsByJobId(
           id: String(app.id),
           jobId: String(app.job_id),
           contractorId: String(app.contractor_id),
+          contractorCompanyId: String((app.company as Record<string, unknown>)?.id ?? ''),
           contractorName: app.contractor 
             ? `${String((app.contractor as Record<string, unknown>).first_name ?? '')} ${String((app.contractor as Record<string, unknown>).last_name ?? '')}`.trim() 
             : 'Nieznany wykonawca',
@@ -2411,6 +2412,7 @@ export async function fetchTenderBidsByTenderId(
         
         return {
           id: bid.id,
+          contractorCompanyId: String((bid.company as Record<string, unknown>)?.id ?? ''),
           contractorId: bid.contractor_id,
           contractorName: bid.contractor 
             ? `${String((bid.contractor as Record<string, unknown>).first_name ?? '')} ${String((bid.contractor as Record<string, unknown>).last_name ?? '')}`.trim() 

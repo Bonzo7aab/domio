@@ -106,7 +106,7 @@ export function RegisterPage() {
                       >
                         <Building className="h-5 w-5 text-slate-600" />
                         <div>
-                          <h3 className="font-medium text-slate-900">Ogłoszeniodawca</h3>
+                          <h3 className="font-medium text-slate-900">Zarządca</h3>
                         </div>
                       </Label>
                     </div>
@@ -133,7 +133,7 @@ export function RegisterPage() {
                   </div>
                 </div>
 
-                {/* Ogłoszeniodawca: Typ organizacji */}
+                {/* Zarządca: Typ organizacji */}
                 {selectedUserType === 'manager' && (
                   <div className="space-y-3">
                     <Label className="text-sm font-medium text-slate-900">Typ organizacji</Label>
@@ -211,7 +211,7 @@ export function RegisterPage() {
                   </div>
                 </div>
 
-                {/* Adres – tylko Ogłoszeniodawca */}
+                {/* Adres – tylko Zarządca */}
                 {selectedUserType === 'manager' && (
                   <div className="space-y-4">
                     <Label className="text-sm font-medium text-slate-900">Adres *</Label>

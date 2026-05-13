@@ -15,7 +15,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
 import type { VerificationStatus } from '../lib/database/verification';
-import { NotificationSettings } from './NotificationSettings';
 import { PasswordForm } from './PasswordForm';
 import { ProfileForm } from './ProfileForm';
 import { CompanyManagementForm } from './CompanyManagementForm';
@@ -330,13 +329,15 @@ export function UserAccountPageClient({
     // Priority 5: Initialize tab from URL on mount (only once)
     if (!hasInitializedTabFromUrl.current) {
       const tabFromUrl = searchParams.get('tab');
+      const normalizedTab =
+        tabFromUrl === 'notifications' ? 'contractor-notifications' : tabFromUrl;
       if (
-        tabFromUrl &&
-        ['profile', 'company', 'security', 'notifications', 'contractor-data', 'contractor-notifications'].includes(
-          tabFromUrl
+        normalizedTab &&
+        ['profile', 'company', 'security', 'contractor-data', 'contractor-notifications'].includes(
+          normalizedTab,
         )
       ) {
-        setActiveTab(tabFromUrl);
+        setActiveTab(normalizedTab);
       }
       hasInitializedTabFromUrl.current = true;
     }
@@ -465,36 +466,40 @@ export function UserAccountPageClient({
                   <div className="flex items-center">
                     <User className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                     <span className="capitalize">
-                      {user.userType === 'manager' ? 'Ogłoszeniodawca' : 'Wykonawca'}
+                      {user.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    {verificationStatus.state === 'approved' && (
-                      <ShieldCheck className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-success" />
+                    {user.userType !== 'manager' && (
+                      <>
+                        {verificationStatus.state === 'approved' && (
+                          <ShieldCheck className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-success" />
+                        )}
+                        {verificationStatus.state === 'pending' && (
+                          <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-blue-600" />
+                        )}
+                        {verificationStatus.state === 'rejected' && (
+                          <ShieldX className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
+                        )}
+                        {verificationStatus.state === 'unsubmitted' && (
+                          <Shield className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
+                        )}
+                        <span
+                          className={cn(
+                            'font-medium',
+                            verificationStatus.state === 'approved' && 'text-success',
+                            verificationStatus.state === 'pending' && 'text-blue-600',
+                            verificationStatus.state === 'rejected' && 'text-destructive',
+                            verificationStatus.state === 'unsubmitted' && 'text-destructive',
+                          )}
+                        >
+                          {verificationStatus.state === 'approved' && 'Zweryfikowany'}
+                          {verificationStatus.state === 'pending' && 'Oczekuje na weryfikację'}
+                          {verificationStatus.state === 'rejected' && 'Weryfikacja odrzucona'}
+                          {verificationStatus.state === 'unsubmitted' && 'Niezweryfikowany'}
+                        </span>
+                      </>
                     )}
-                    {verificationStatus.state === 'pending' && (
-                      <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-blue-600" />
-                    )}
-                    {verificationStatus.state === 'rejected' && (
-                      <ShieldX className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
-                    )}
-                    {verificationStatus.state === 'unsubmitted' && (
-                      <Shield className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
-                    )}
-                    <span
-                      className={cn(
-                        'font-medium',
-                        verificationStatus.state === 'approved' && 'text-success',
-                        verificationStatus.state === 'pending' && 'text-blue-600',
-                        verificationStatus.state === 'rejected' && 'text-destructive',
-                        verificationStatus.state === 'unsubmitted' && 'text-destructive',
-                      )}
-                    >
-                      {verificationStatus.state === 'approved' && 'Zweryfikowany'}
-                      {verificationStatus.state === 'pending' && 'Oczekuje na weryfikację'}
-                      {verificationStatus.state === 'rejected' && 'Weryfikacja odrzucona'}
-                      {verificationStatus.state === 'unsubmitted' && 'Niezweryfikowany'}
-                    </span>
                   </div>
                 </div>
               </div>
@@ -523,10 +528,12 @@ export function UserAccountPageClient({
             </div>
           </div>
 
-          <VerificationNotice
-            status={verificationStatus}
-            onAction={() => router.push('/verification')}
-          />
+          {user.userType !== 'manager' && (
+            <VerificationNotice
+              status={verificationStatus}
+              onAction={() => router.push('/verification')}
+            />
+          )}
           {ocOnboarding && (
             <OcPolicyNotice
               ocOnboarding={ocOnboarding}
@@ -563,7 +570,7 @@ export function UserAccountPageClient({
                       : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
                   )}
                 >
-                  Profil
+                  Twoje dane
                 </button>
                 <button
                   onClick={() => setActiveTab('company')}
@@ -574,7 +581,7 @@ export function UserAccountPageClient({
                       : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
                   )}
                 >
-                  Firma
+                  Dane firmy
                 </button>
               </>
             )}
@@ -590,12 +597,10 @@ export function UserAccountPageClient({
               Bezpieczeństwo
             </button>
             <button
-              onClick={() => setActiveTab(user.userType === 'contractor' ? 'contractor-notifications' : 'notifications')}
+              onClick={() => setActiveTab('contractor-notifications')}
               className={cn(
                 "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                (user.userType === 'contractor'
-                  ? activeTab === 'contractor-notifications'
-                  : activeTab === 'notifications')
+                activeTab === 'contractor-notifications'
                   ? "border-primary text-primary"
                   : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
               )}
@@ -626,10 +631,6 @@ export function UserAccountPageClient({
           <TabsContent value="security" className="space-y-6">
             <PasswordForm accountEmail={user.email} />
             <DeleteAccountSection />
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-6">
-            <NotificationSettings />
           </TabsContent>
 
           <TabsContent value="contractor-notifications" className="space-y-6">
