@@ -11,6 +11,7 @@ import {
 } from '../lib/database/contractor-account';
 import { getNotifications } from '../lib/database/notifications';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
@@ -20,6 +21,9 @@ import { Switch } from './ui/switch';
 interface ContractorNotificationsPanelProps {
   userId: string;
 }
+
+/** Radar UI is disabled until the feature ships; preferences still persist server-side when re-enabled. */
+const RADAR_COMING_SOON = true;
 
 const AVAILABLE_AREAS = ['Warszawa', 'Wilanów', 'Mokotów'] as const;
 
@@ -34,15 +38,30 @@ const NotificationChannelField = ({
   label,
   checked,
   onChange,
+  disabled,
+  rightSlot,
 }: {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  rightSlot?: React.ReactNode;
 }) => (
-  <div className="flex items-center justify-between rounded-md border p-3">
-    <span className="text-sm">{label}</span>
-    <Switch checked={checked} onCheckedChange={onChange} />
+  <div
+    className={`flex items-center justify-between rounded-md border p-3 gap-3 ${disabled ? 'bg-muted/40' : ''}`}
+  >
+    <div className="flex items-center gap-2 flex-wrap min-w-0">
+      <span className="text-sm font-medium">{label}</span>
+      {rightSlot}
+    </div>
+    <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
   </div>
+);
+
+const SoonBadge = () => (
+  <Badge variant="secondary" className="text-[10px] font-semibold tracking-wide shrink-0">
+    SOON!
+  </Badge>
 );
 
 export function ContractorNotificationsPanel({ userId }: ContractorNotificationsPanelProps) {
@@ -68,7 +87,12 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
           getContractorAccountSettings(userId),
           getNotifications(userId),
         ]);
-        setChannels(settings.notificationChannels);
+        setChannels({
+          email: settings.notificationChannels.email,
+          app: settings.notificationChannels.app,
+          phoneCall: false,
+          sms: false,
+        });
         setRadar(settings.radar);
         setNotifications(
           notificationRows.slice(0, 6).map((item) => ({
@@ -89,22 +113,17 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
     void loadData();
   }, [userId]);
 
-  const toggleArea = (area: string, checked: boolean) => {
-    setRadar((prev) => {
-      const areas = checked ? [...prev.areas, area] : prev.areas.filter((item) => item !== area);
-      return {
-        ...prev,
-        areas: areas.length > 0 ? areas : ['Warszawa'],
-      };
-    });
-  };
-
   const handleSave = async () => {
     try {
       setIsSaving(true);
       await upsertContractorAccountSettings(userId, {
-        notificationChannels: channels,
-        radar,
+        notificationChannels: {
+          email: channels.email,
+          app: channels.app,
+          phoneCall: false,
+          sms: false,
+        },
+        ...(RADAR_COMING_SOON ? {} : { radar }),
       });
       toast.success('Ustawienia powiadomień zostały zapisane');
     } catch (error) {
@@ -144,51 +163,38 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
             onChange={(checked) => setChannels((prev) => ({ ...prev, app: checked }))}
           />
           <NotificationChannelField
-            label="Rozmowa telefoniczna"
-            checked={channels.phoneCall}
-            onChange={(checked) => setChannels((prev) => ({ ...prev, phoneCall: checked }))}
+            label="SMS"
+            checked={false}
+            onChange={() => {}}
+            disabled
+            rightSlot={<SoonBadge />}
           />
-          <NotificationChannelField
-            label="Wiadomości tel. (SMS)"
-            checked={channels.sms}
-            onChange={(checked) => setChannels((prev) => ({ ...prev, sms: checked }))}
-          />
+          <Button onClick={handleSave} disabled={isSaving}>
+            Zapisz ustawienia
+          </Button>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card className="relative overflow-hidden">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Radar className="h-4 w-4" />
             Radar nowych zgłoszeń
           </CardTitle>
+          <SoonBadge />
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="pointer-events-none select-none space-y-4 opacity-55" aria-hidden>
           <div className="flex items-center justify-between rounded-md border p-3">
             <div>
               <p className="text-sm font-medium">Włącz radar</p>
               <p className="text-xs text-muted-foreground">Monitoruje nowe zgłoszenia według Twoich filtrów</p>
             </div>
-            <Switch
-              checked={radar.enabled}
-              onCheckedChange={(checked) => setRadar((prev) => ({ ...prev, enabled: checked }))}
-            />
+            <Switch checked={radar.enabled} disabled />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="min-net-amount">Powiadamiaj o zgłoszeniach powyżej kwoty netto (PLN)</Label>
-            <Input
-              id="min-net-amount"
-              type="number"
-              min={0}
-              value={radar.minAmountNet}
-              onChange={(event) =>
-                setRadar((prev) => ({
-                  ...prev,
-                  minAmountNet: Math.max(0, Number(event.target.value || 0)),
-                }))
-              }
-            />
+            <Label htmlFor="min-net-amount">Powiadaj o zgłoszeniach powyżej kwoty netto (PLN)</Label>
+            <Input id="min-net-amount" type="number" min={0} value={radar.minAmountNet} disabled />
           </div>
 
           <div className="space-y-2">
@@ -196,19 +202,12 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
             <div className="space-y-2 rounded-md border p-3">
               {AVAILABLE_AREAS.map((area) => (
                 <label key={area} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={radar.areas.includes(area)}
-                    onCheckedChange={(checked) => toggleArea(area, Boolean(checked))}
-                  />
+                  <Checkbox checked={radar.areas.includes(area)} disabled />
                   {area}
                 </label>
               ))}
             </div>
           </div>
-
-          <Button onClick={handleSave} disabled={isSaving}>
-            Zapisz ustawienia
-          </Button>
         </CardContent>
       </Card>
 
@@ -223,7 +222,9 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
             notifications.map((notification) => (
               <div key={notification.id} className="rounded-md border p-3">
                 <p className="text-sm font-medium">{notification.title}</p>
-                {notification.message ? <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p> : null}
+                {notification.message ? (
+                  <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
+                ) : null}
                 <p className="mt-2 text-xs text-muted-foreground">
                   {new Date(notification.createdAt).toLocaleString('pl-PL')}
                 </p>
@@ -235,4 +236,3 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
     </div>
   );
 }
-

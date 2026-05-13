@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
+import { Plus, Edit, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Label } from './ui/label';
-import { Badge } from './ui/badge';
-import { Switch } from './ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { ServicePricing } from '../types/contractor';
 import { 
@@ -51,24 +49,14 @@ interface ServicePricingManagerProps {
   onServicesUpdate?: () => void; // Callback to refresh parent
 }
 
-const UNIT_OPTIONS: Array<'m2' | 'szt.' | 'mb' | 'kg' | '1 godzina' | 'miesiąc'> = [
+const UNIT_OPTIONS = [
   'm2',
   'szt.',
   'mb',
   'kg',
   '1 godzina',
   'miesiąc',
-];
-
-/** UI choice for main „Typ ceny” picker (distinct from DB row when fixed + brak jednostki vs Jednostka). */
-type PriceTypeChoice = 'hourly' | 'range' | 'fixed' | 'unit';
-
-function derivePriceTypeChoice(pricing: Pick<ServicePricing, 'type' | 'unit'>): PriceTypeChoice {
-  if (pricing.type === 'hourly') return 'hourly';
-  if (pricing.type === 'range') return 'range';
-  if (pricing.type === 'fixed' && pricing.unit) return 'unit';
-  return 'fixed';
-}
+] as const;
 
 const VAT_OPTIONS = [0, 5, 8, 23];
 
@@ -82,17 +70,15 @@ export default function ServicePricingManager({ companyId, services: initialServ
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
-  const [enablePricing, setEnablePricing] = useState(false);
-  const [editingService, setEditingService] = useState<string | null>(null);
   const [editingServiceName, setEditingServiceName] = useState<string | null>(null);
-  const [priceTypeChoice, setPriceTypeChoice] = useState<PriceTypeChoice>('hourly');
   const [formData, setFormData] = useState<ServicePricing & { serviceName?: string }>({
-    type: 'hourly',
+    type: 'fixed',
     min: undefined,
     max: undefined,
     currency: 'PLN',
     unit: undefined,
-    serviceName: undefined
+    vatRate: 23,
+    serviceName: undefined,
   });
   const [serviceFormData, setServiceFormData] = useState<{
     name: string;
@@ -111,13 +97,30 @@ export default function ServicePricingManager({ companyId, services: initialServ
     ])
   ].sort();
 
-  // Helper function to get service category
-  const getServiceCategory = (serviceName: string): 'primary' | 'secondary' | 'specializations' | null => {
-    if (services.primary.includes(serviceName)) return 'primary';
-    if (services.secondary.includes(serviceName)) return 'secondary';
-    if (services.specializations.includes(serviceName)) return 'specializations';
-    return null;
-  };
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [tableScrollable, setTableScrollable] = useState(false);
+
+  const updateTableScrollable = useCallback(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    setTableScrollable(el.scrollWidth > el.clientWidth + 2);
+  }, []);
+
+  useLayoutEffect(() => {
+    updateTableScrollable();
+  }, [services, servicePricing, loading, updateTableScrollable]);
+
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => updateTableScrollable());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [updateTableScrollable]);
+
+  const scrollTableBy = useCallback((delta: number) => {
+    tableScrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
+  }, []);
 
   // Update services when props change
   useEffect(() => {
@@ -128,6 +131,15 @@ export default function ServicePricingManager({ companyId, services: initialServ
     () => categoriesFromDb.find((c) => c.name === jobMarketCategoryName),
     [categoriesFromDb, jobMarketCategoryName]
   );
+
+  const unitSelectOptions = useMemo(() => {
+    const u = formData.unit?.trim();
+    const base = [...UNIT_OPTIONS] as string[];
+    if (u && !base.includes(u)) {
+      return [u, ...base];
+    }
+    return base;
+  }, [formData.unit]);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -161,31 +173,27 @@ export default function ServicePricingManager({ companyId, services: initialServ
   // Service management handlers
   const handleAddService = () => {
     setEditingServiceName(null);
-    setEditingService(null);
-    setEnablePricing(false);
     setJobMarketCategoryName('');
     setJobMarketSubcategoryName('');
     setServiceFormData({
       name: '',
-      category: 'primary'
+      category: 'primary',
     });
     setFormData({
-      type: 'hourly',
+      type: 'fixed',
       min: undefined,
       max: undefined,
       currency: 'PLN',
       unit: undefined,
       serviceName: undefined,
       netPrice: undefined,
-      vatRate: undefined,
+      vatRate: 23,
       grossPrice: undefined,
     });
-    setPriceTypeChoice('hourly');
     setShowDialog(true);
   };
 
   const handleEditService = (serviceName: string) => {
-    // Determine which category the service belongs to
     let category: 'primary' | 'secondary' | 'specializations' = 'primary';
     if (services.primary.includes(serviceName)) {
       category = 'primary';
@@ -194,16 +202,13 @@ export default function ServicePricingManager({ companyId, services: initialServ
     } else if (services.specializations.includes(serviceName)) {
       category = 'specializations';
     }
-    
+
     const pricingSnapshot = servicePricing[serviceName];
-    const hasPricing = hasMonetaryPricing(pricingSnapshot);
-    
+
     setEditingServiceName(serviceName);
-    setEditingService(null);
-    setEnablePricing(hasPricing);
     setServiceFormData({
       name: serviceName,
-      category
+      category,
     });
     const storedMarketCat = pricingSnapshot?.category;
     const storedMarketSub = pricingSnapshot?.subcategory;
@@ -214,36 +219,25 @@ export default function ServicePricingManager({ companyId, services: initialServ
       setJobMarketCategoryName('');
       setJobMarketSubcategoryName('');
     }
-    if (hasPricing) {
-      const p = servicePricing[serviceName];
-      const netBase = p.min ?? p.netPrice;
-      const vat = p.vatRate ?? 23;
-      const gross = p.grossPrice ?? computeGrossFromNet(netBase, vat);
-      const merged: ServicePricing & { serviceName?: string } = {
-        ...p,
-        serviceName: serviceName,
-        min: netBase,
-        grossPrice: gross,
-      };
-      if (merged.type === 'hourly' || merged.type === 'range') {
-        merged.unit = undefined;
-      }
-      setFormData(merged);
-      setPriceTypeChoice(derivePriceTypeChoice(merged));
-    } else {
-      setFormData({
-        type: 'hourly',
-        min: undefined,
-        max: undefined,
-        currency: 'PLN',
-        unit: undefined,
-        serviceName: serviceName,
-        netPrice: undefined,
-        vatRate: undefined,
-        grossPrice: undefined,
-      });
-      setPriceTypeChoice('hourly');
-    }
+
+    const p = pricingSnapshot;
+    const netBase = p?.netPrice ?? p?.min;
+    const vat = p?.vatRate ?? 23;
+    const gross = p?.grossPrice ?? computeGrossFromNet(netBase, vat);
+    setFormData({
+      type: 'fixed',
+      min: netBase,
+      max: undefined,
+      currency: p?.currency ?? 'PLN',
+      unit: p?.unit,
+      category: p?.category,
+      subcategory: p?.subcategory,
+      workDescription: p?.workDescription,
+      netPrice: p?.netPrice,
+      vatRate: vat,
+      grossPrice: gross,
+      serviceName: serviceName,
+    });
     setShowDialog(true);
   };
 
@@ -293,9 +287,9 @@ export default function ServicePricingManager({ companyId, services: initialServ
   };
 
   const handleSaveService = async () => {
-    const serviceName = editingService || serviceFormData.name || formData.serviceName;
-    if (!serviceName?.trim()) {
-      toast.error('Podaj nazwę usługi');
+    const nameTrim = (serviceFormData.name || formData.serviceName)?.trim();
+    if (!nameTrim) {
+      toast.error('Podaj nazwę wykonywanej usługi');
       return;
     }
 
@@ -305,7 +299,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
     }
 
     if (!jobMarketCategoryName.trim() || !jobMarketSubcategoryName.trim()) {
-      toast.error('Wybierz kategorię i podkategorię');
+      toast.error('Wybierz kategorię i podkategorię usługi');
       return;
     }
 
@@ -316,183 +310,101 @@ export default function ServicePricingManager({ companyId, services: initialServ
       return;
     }
 
+    if (!formData.unit?.trim()) {
+      toast.error('Wybierz jednostkę miary');
+      return;
+    }
+
+    const netInput = formData.min ?? formData.netPrice;
+    if (netInput === undefined || !Number.isFinite(netInput) || netInput <= 0) {
+      toast.error('Podaj prawidłową cenę netto');
+      return;
+    }
+
     try {
       setSaving(true);
-      
-      // If only editing pricing (editingService set), skip service updates
-      if (!editingService) {
-        const updatedServices = { ...services };
-      
+
+      const updatedServices = { ...services };
+
       if (editingServiceName) {
-        // Editing existing service - remove from all categories first
-        updatedServices.primary = updatedServices.primary.filter(s => s !== editingServiceName);
-        updatedServices.secondary = updatedServices.secondary.filter(s => s !== editingServiceName);
-        updatedServices.specializations = updatedServices.specializations.filter(s => s !== editingServiceName);
-        
-        // Check if new name already exists (excluding current service)
+        updatedServices.primary = updatedServices.primary.filter((s) => s !== editingServiceName);
+        updatedServices.secondary = updatedServices.secondary.filter((s) => s !== editingServiceName);
+        updatedServices.specializations = updatedServices.specializations.filter((s) => s !== editingServiceName);
+
         const allServicesList = [
           ...updatedServices.primary,
           ...updatedServices.secondary,
-          ...updatedServices.specializations
+          ...updatedServices.specializations,
         ];
         if (serviceFormData.name !== editingServiceName && allServicesList.includes(serviceFormData.name)) {
           toast.error('Usługa o tej nazwie już istnieje');
           return;
         }
-        
-        // If name changed, update pricing key
-        if (editingServiceName !== serviceFormData.name && servicePricing[editingServiceName]) {
-          const pricing = servicePricing[editingServiceName];
-          const updatedPricing = { ...servicePricing };
-          delete updatedPricing[editingServiceName];
-          updatedPricing[serviceFormData.name] = pricing;
-          setServicePricing(updatedPricing);
-          await updateContractorServicePricing(companyId, updatedPricing);
-        }
       } else {
-        // Adding new service - check for duplicates
         const allServicesList = [
           ...updatedServices.primary,
           ...updatedServices.secondary,
-          ...updatedServices.specializations
+          ...updatedServices.specializations,
         ];
         if (allServicesList.includes(serviceFormData.name)) {
           toast.error('Ta usługa już istnieje');
           return;
         }
       }
-      
-      // Add to selected category (only if not already there)
+
       if (!updatedServices[serviceFormData.category].includes(serviceFormData.name)) {
-        updatedServices[serviceFormData.category] = [
-          ...updatedServices[serviceFormData.category],
-          serviceFormData.name
-        ].sort(); // Keep services sorted
+        updatedServices[serviceFormData.category] = [...updatedServices[serviceFormData.category], serviceFormData.name].sort();
       }
-      
+
       const { error } = await updateContractorServices(companyId, updatedServices);
-      
       if (error) {
         throw error;
       }
+      setServices(updatedServices);
 
-        setServices(updatedServices);
+      const finalServiceName = serviceFormData.name.trim();
+      const nextPricing = { ...servicePricing };
+
+      if (editingServiceName && editingServiceName !== finalServiceName) {
+        delete nextPricing[editingServiceName];
       }
-      
-      // Handle pricing if enabled
-      let finalServiceName = editingService || serviceFormData.name || formData.serviceName;
-      if (!finalServiceName?.trim()) {
-        toast.error('Podaj nazwę usługi');
-        return;
+
+      const netPrice = Number(netInput);
+      const vatRate = formData.vatRate ?? 23;
+      const grossPrice =
+        formData.grossPrice ??
+        computeGrossFromNet(netPrice, vatRate) ??
+        Number((netPrice * (1 + vatRate / 100)).toFixed(2));
+
+      const { serviceName: _sn, category: _c, subcategory: _s, netPrice: _n, ...restForm } = formData;
+
+      const updatedPricing: Record<string, ServicePricing> = {
+        ...nextPricing,
+        [finalServiceName]: {
+          ...(restForm as ServicePricing),
+          type: 'fixed',
+          min: netPrice,
+          max: undefined,
+          currency: 'PLN',
+          unit: formData.unit,
+          category: jobMarketCategoryName,
+          subcategory: jobMarketSubcategoryName,
+          workDescription: finalServiceName,
+          netPrice,
+          vatRate,
+          grossPrice,
+        },
+      };
+
+      const { error: pricingError } = await updateContractorServicePricing(companyId, updatedPricing);
+      if (pricingError) {
+        throw pricingError;
       }
-      
-      if (enablePricing) {
-        // Validate pricing if enabled
-        if (priceTypeChoice === 'unit' && !formData.unit) {
-          toast.error('Wybierz jednostkę');
-          return;
-        }
-        if (formData.type === 'hourly' || formData.type === 'fixed') {
-          if (!formData.min || formData.min <= 0) {
-            toast.error('Podaj prawidłową cenę minimalną');
-            return;
-          }
-        }
-        if (formData.type === 'range') {
-          if (!formData.min || !formData.max || formData.min <= 0 || formData.max <= formData.min) {
-            toast.error('Podaj prawidłowy zakres cen (min < max)');
-            return;
-          }
-        }
-        
-        // Handle service name change for pricing (only if not just editing pricing)
-        if (!editingService && editingServiceName && editingServiceName !== serviceFormData.name) {
-          // Service name changed - update pricing key
-          if (servicePricing[editingServiceName]) {
-            const updatedPricing = { ...servicePricing };
-            const pricing = updatedPricing[editingServiceName];
-            delete updatedPricing[editingServiceName];
-            updatedPricing[serviceFormData.name] = pricing;
-            setServicePricing(updatedPricing);
-            await updateContractorServicePricing(companyId, updatedPricing);
-            finalServiceName = serviceFormData.name;
-          }
-        }
-        
-        // Save pricing (single net amount from min)
-        const netPrice = formData.min ?? 0;
-        const vatRate = formData.vatRate ?? 23;
-        const grossPrice =
-          formData.grossPrice ??
-          computeGrossFromNet(netPrice > 0 ? netPrice : undefined, vatRate) ??
-          Number((netPrice * (1 + vatRate / 100)).toFixed(2));
-        const {
-          serviceName: _serviceName,
-          category: _discardCat,
-          subcategory: _discardSub,
-          netPrice: _discardNet,
-          ...pricingData
-        } = formData;
-        const updatedPricing = {
-          ...servicePricing,
-          [finalServiceName]: {
-            ...(pricingData as ServicePricing),
-            category: jobMarketCategoryName,
-            subcategory: jobMarketSubcategoryName,
-            workDescription: finalServiceName,
-            netPrice,
-            vatRate,
-            grossPrice,
-          }
-        };
-        
-        const { error: pricingError } = await updateContractorServicePricing(companyId, updatedPricing);
-        if (pricingError) {
-          throw pricingError;
-        }
-        
-        setServicePricing(updatedPricing);
-      } else {
-        let updatedPricing = { ...servicePricing };
 
-        if (
-          !editingService &&
-          editingServiceName &&
-          editingServiceName !== serviceFormData.name &&
-          updatedPricing[editingServiceName]
-        ) {
-          const pricing = updatedPricing[editingServiceName];
-          delete updatedPricing[editingServiceName];
-          updatedPricing[serviceFormData.name] = pricing;
-          finalServiceName = serviceFormData.name;
-        }
-
-        updatedPricing = {
-          ...updatedPricing,
-          [finalServiceName]: {
-            type: 'hourly',
-            currency: 'PLN',
-            category: jobMarketCategoryName,
-            subcategory: jobMarketSubcategoryName,
-            workDescription: finalServiceName.trim(),
-          },
-        };
-
-        const { error: pricingErrorMinimal } = await updateContractorServicePricing(
-          companyId,
-          updatedPricing
-        );
-        if (pricingErrorMinimal) {
-          throw pricingErrorMinimal;
-        }
-
-        setServicePricing(updatedPricing);
-      }
-      
-      toast.success(editingService ? 'Cena została zaktualizowana' : (editingServiceName ? 'Usługa została zaktualizowana' : 'Usługa została dodana'));
+      setServicePricing(updatedPricing);
+      toast.success(editingServiceName ? 'Usługa została zaktualizowana' : 'Usługa została dodana');
       setShowDialog(false);
-      
-      // Refresh parent component
+
       if (onServicesUpdate) {
         onServicesUpdate();
       }
@@ -559,48 +471,72 @@ export default function ServicePricingManager({ companyId, services: initialServ
       ) : (
         <Card>
           <CardContent className="pt-6">
-            <Table>
+            <div className="relative">
+              {tableScrollable ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="absolute left-1 top-1/2 z-10 h-9 w-9 -translate-y-1/2 shadow-md"
+                    aria-label="Przewiń tabelę w lewo"
+                    onClick={() => scrollTableBy(-240)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="absolute right-1 top-1/2 z-10 h-9 w-9 -translate-y-1/2 shadow-md"
+                    aria-label="Przewiń tabelę w prawo"
+                    onClick={() => scrollTableBy(240)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : null}
+              <div ref={tableScrollRef} className="overflow-x-auto rounded-md border">
+            <Table className="min-w-[720px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Typ w profilu</TableHead>
-                  <TableHead>Kategoria</TableHead>
-                  <TableHead>Podkategoria</TableHead>
-                  <TableHead>Wykonywane prace</TableHead>
-                  <TableHead>Jednostka</TableHead>
-                  <TableHead>Cena Netto</TableHead>
+                  <TableHead>Kategoria usługi</TableHead>
+                  <TableHead>Podkategoria usługi</TableHead>
+                  <TableHead>Wykonywana usługa</TableHead>
+                  <TableHead>Jednostka miary</TableHead>
+                  <TableHead>Cena netto</TableHead>
                   <TableHead>Stawka VAT</TableHead>
-                  <TableHead>Cena Brutto</TableHead>
+                  <TableHead>Cena brutto</TableHead>
                   <TableHead className="text-right">Akcje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {allServices.map((service) => {
-                  const category = getServiceCategory(service);
                   const pricing = servicePricing[service];
                   const marketCategory =
                     pricing?.category && !isLegacyPricingCategory(pricing.category)
                       ? pricing.category
                       : null;
+                  const netDisplay = pricing?.netPrice ?? pricing?.min;
                   return (
                     <TableRow key={service}>
-                      <TableCell>
-                        {category && (
-                          <Badge variant={category === 'primary' ? 'default' : category === 'secondary' ? 'outline' : 'secondary'}>
-                            {category === 'primary' ? 'Usługa podstawowa' : category === 'secondary' ? 'Usługa dodatkowa' : 'Specjalizacja'}
-                          </Badge>
-                        )}
-                      </TableCell>
                       <TableCell>{marketCategory || '—'}</TableCell>
                       <TableCell>{pricing?.subcategory || '—'}</TableCell>
-                      <TableCell>{pricing?.workDescription || service}</TableCell>
-                      <TableCell>{pricing?.unit || '-'}</TableCell>
+                      <TableCell className="max-w-[220px] truncate" title={pricing?.workDescription || service}>
+                        {pricing?.workDescription || service}
+                      </TableCell>
+                      <TableCell>{pricing?.unit || '—'}</TableCell>
                       <TableCell>
-                        {pricing?.min !== undefined || pricing?.netPrice !== undefined
-                          ? `${pricing?.min ?? pricing?.netPrice} PLN`
+                        {netDisplay !== undefined && Number(netDisplay) > 0
+                          ? `${Number(netDisplay).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} PLN`
                           : '—'}
                       </TableCell>
-                      <TableCell>{pricing?.vatRate !== undefined ? `${pricing.vatRate}%` : '-'}</TableCell>
-                      <TableCell>{pricing?.grossPrice !== undefined ? `${pricing.grossPrice.toFixed(2)} PLN` : '-'}</TableCell>
+                      <TableCell>{pricing?.vatRate !== undefined ? `${pricing.vatRate}%` : '—'}</TableCell>
+                      <TableCell>
+                        {pricing?.grossPrice !== undefined
+                          ? `${pricing.grossPrice.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN`
+                          : '—'}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" size="sm" onClick={() => handleEditService(service)} disabled={saving}>
@@ -617,6 +553,8 @@ export default function ServicePricingManager({ companyId, services: initialServ
                 })}
               </TableBody>
             </Table>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -625,131 +563,39 @@ export default function ServicePricingManager({ companyId, services: initialServ
       <Dialog open={showDialog} onOpenChange={(open) => {
         setShowDialog(open);
         if (!open) {
-          // Reset all state when dialog closes
-          setEditingService(null);
           setEditingServiceName(null);
-          setEnablePricing(false);
           setJobMarketCategoryName('');
           setJobMarketSubcategoryName('');
           setFormData({
-            type: 'hourly',
+            type: 'fixed',
             min: undefined,
             max: undefined,
             currency: 'PLN',
             unit: undefined,
             serviceName: undefined,
             netPrice: undefined,
-            vatRate: undefined,
+            vatRate: 23,
             grossPrice: undefined,
           });
           setServiceFormData({
             name: '',
-            category: 'primary'
+            category: 'primary',
           });
-          setPriceTypeChoice('hourly');
         }
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingServiceName || editingService
-                ? (editingService ? 'Edytuj cenę usługi' : 'Edytuj usługę')
-                : (serviceFormData.name || formData.serviceName
-                    ? 'Dodaj usługę i cenę'
-                    : 'Dodaj nową usługę')}
-            </DialogTitle>
+            <DialogTitle>{editingServiceName ? 'Edytuj pozycję cennika' : 'Dodaj pozycję cennika'}</DialogTitle>
             <DialogDescription>
-              {editingServiceName || editingService
-                ? (editingService 
-                    ? `Edytuj cenę dla usługi: ${editingService}`
-                    : 'Zmień nazwę, kategorię lub cenę usługi.')
-                : 'Dodaj nową usługę do swojego profilu. Opcjonalnie możesz ustawić cenę.'}
+              {editingServiceName
+                ? 'Zaktualizuj kategorię rynkową, opis wykonywanej usługi oraz ceny.'
+                : 'Uzupełnij pola i zapisz — pozycja trafi do Twojego cennika i profilu usług (lista podstawowa).'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Service Selection/Name */}
-            {!editingService && !editingServiceName && !serviceFormData.name && !formData.serviceName && (
-              <div className="space-y-2">
-                <Label>Usługa</Label>
-                {allServices.filter((s) => !hasMonetaryPricing(servicePricing[s])).length > 0 ? (
-                  <Select
-                    value={formData.serviceName || serviceFormData.name || ''}
-                    onValueChange={(value) => {
-                      // Find which category this service belongs to
-                      let category: 'primary' | 'secondary' | 'specializations' = 'primary';
-                      if (services.primary.includes(value)) {
-                        category = 'primary';
-                      } else if (services.secondary.includes(value)) {
-                        category = 'secondary';
-                      } else if (services.specializations.includes(value)) {
-                        category = 'specializations';
-                      }
-                      setServiceFormData({ name: value, category });
-                      setFormData({ ...formData, serviceName: value });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Wybierz istniejącą usługę" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allServices
-                        .filter((s) => !hasMonetaryPricing(servicePricing[s]))
-                        .map((service) => (
-                          <SelectItem key={service} value={service}>
-                            {service}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                ) : null}
-                <div className="text-sm text-gray-500">
-                  lub wprowadź nazwę nowej usługi poniżej
-                </div>
-              </div>
-            )}
-
-            {/* Service Name */}
             <div className="space-y-2">
-              <Label>Nazwa usługi</Label>
-              <Input
-                type="text"
-                value={serviceFormData.name || formData.serviceName || editingService || ''}
-                onChange={(e) => {
-                  if (!editingService) {
-                    const newName = e.target.value;
-                    setServiceFormData({ ...serviceFormData, name: newName });
-                    setFormData({ ...formData, serviceName: newName });
-                  }
-                }}
-                disabled={!!editingService}
-                placeholder="np. Remonty mieszkań"
-              />
-            </div>
-
-            {/* Profile bucket (primary / secondary / specializations) */}
-            <div className="space-y-2">
-              <Label>Typ usługi w profilu</Label>
-              <Select
-                value={serviceFormData.category}
-                onValueChange={(value: 'primary' | 'secondary' | 'specializations') => {
-                  setServiceFormData({ ...serviceFormData, category: value });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="primary">Usługi podstawowe</SelectItem>
-                  <SelectItem value="secondary">Usługi dodatkowe</SelectItem>
-                  <SelectItem value="specializations">Specjalizacje</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Marketplace category + subcategory (same source as homepage filters) */}
-            <div className="space-y-2">
-              <Label>Kategoria</Label>
+              <Label>Kategoria usługi</Label>
               <Select
                 value={jobMarketCategoryName}
                 onValueChange={(name) => {
@@ -771,7 +617,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
             </div>
 
             <div className="space-y-2">
-              <Label>Podkategoria</Label>
+              <Label>Podkategoria usługi</Label>
               <Select
                 value={jobMarketSubcategoryName}
                 onValueChange={setJobMarketSubcategoryName}
@@ -794,173 +640,146 @@ export default function ServicePricingManager({ companyId, services: initialServ
               </Select>
             </div>
 
-            {/* Enable Pricing Switch */}
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="space-y-0.5">
-                <Label htmlFor="enable-pricing">Dodaj cenę</Label>
-                <p className="text-sm text-gray-500">Włącz, aby ustawić cenę dla tej usługi</p>
+            {!editingServiceName && !serviceFormData.name && !formData.serviceName ? (
+              <div className="space-y-2">
+                <Label>Usługa z profilu (bez cennika)</Label>
+                {allServices.filter((s) => !hasMonetaryPricing(servicePricing[s])).length > 0 ? (
+                  <Select
+                    value={formData.serviceName || serviceFormData.name || ''}
+                    onValueChange={(value) => {
+                      let category: 'primary' | 'secondary' | 'specializations' = 'primary';
+                      if (services.primary.includes(value)) {
+                        category = 'primary';
+                      } else if (services.secondary.includes(value)) {
+                        category = 'secondary';
+                      } else if (services.specializations.includes(value)) {
+                        category = 'specializations';
+                      }
+                      setServiceFormData({ name: value, category });
+                      setFormData({ ...formData, serviceName: value });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Opcjonalnie: wybierz istniejącą usługę" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allServices
+                        .filter((s) => !hasMonetaryPricing(servicePricing[s]))
+                        .map((service) => (
+                          <SelectItem key={service} value={service}>
+                            {service}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                ) : null}
+                <p className="text-sm text-muted-foreground">Albo wpisz nową wykonywaną usługę poniżej.</p>
               </div>
-              <Switch
-                id="enable-pricing"
-                checked={enablePricing}
-                onCheckedChange={setEnablePricing}
+            ) : null}
+
+            <div className="space-y-2">
+              <Label>Wykonywana usługa</Label>
+              <Input
+                type="text"
+                value={serviceFormData.name || formData.serviceName || ''}
+                onChange={(e) => {
+                  const newName = e.target.value;
+                  setServiceFormData({ ...serviceFormData, name: newName });
+                  setFormData({ ...formData, serviceName: newName });
+                }}
+                placeholder="np. Malowanie ścian w mieszkaniu"
               />
             </div>
 
-            {/* Pricing Fields - Conditionally Shown */}
-            {enablePricing && (
-              <div className="space-y-4 p-4 border rounded-lg">
+            <div className="space-y-2">
+              <Label>Jednostka miary</Label>
+              <Select
+                value={
+                  formData.unit && unitSelectOptions.includes(formData.unit)
+                    ? formData.unit
+                    : undefined
+                }
+                onValueChange={(u) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    type: 'fixed',
+                    unit: u,
+                  }))
+                }
+              >
+                <SelectTrigger aria-label="Jednostka miary">
+                  <SelectValue placeholder="Wybierz jednostkę" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unitSelectOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+              <div className="space-y-2">
+                <Label>Cena netto (PLN)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.min ?? ''}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      min: e.target.value ? parseFloat(e.target.value) : undefined,
+                    });
+                  }}
+                  onBlur={recalculateGrossFromForm}
+                  placeholder="0,00"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Typ ceny (netto)</Label>
+                  <Label>Stawka VAT</Label>
                   <Select
-                    value={priceTypeChoice}
-                    onValueChange={(value: PriceTypeChoice) => {
-                      setPriceTypeChoice(value);
+                    value={String(formData.vatRate ?? 23)}
+                    onValueChange={(value) => {
+                      const vatRate = Number(value);
                       setFormData((prev) => {
-                        if (value === 'hourly') {
-                          return { ...prev, type: 'hourly', unit: undefined };
-                        }
-                        if (value === 'range') {
-                          return { ...prev, type: 'range', unit: undefined };
-                        }
-                        if (value === 'fixed') {
-                          return { ...prev, type: 'fixed', unit: undefined };
-                        }
-                        return { ...prev, type: 'fixed', unit: undefined };
+                        const grossPrice = computeGrossFromNet(prev.min, vatRate);
+                        return { ...prev, vatRate, grossPrice };
                       });
                     }}
                   >
-                    <SelectTrigger aria-label="Typ ceny">
-                      <SelectValue placeholder="Wybierz typ ceny" />
+                    <SelectTrigger>
+                      <SelectValue placeholder="VAT" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="hourly">Stawka godzinowa</SelectItem>
-                      <SelectItem value="range">Zakres cen</SelectItem>
-                      <SelectItem value="fixed">Cena stała</SelectItem>
-                      <SelectItem value="unit">Jednostka</SelectItem>
+                      {VAT_OPTIONS.map((rate) => (
+                        <SelectItem key={rate} value={String(rate)}>
+                          {rate}%
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {priceTypeChoice === 'unit' && (
-                  <div className="space-y-2">
-                    <Label>Jednostka</Label>
-                    <Select
-                      value={formData.unit ?? ''}
-                      onValueChange={(u) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          type: 'fixed',
-                          unit: u as ServicePricing['unit'],
-                        }))
-                      }
-                    >
-                      <SelectTrigger aria-label="Jednostka ceny">
-                        <SelectValue placeholder="Wybierz jednostkę" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {UNIT_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>
-                      Cena min (netto)
-                      {formData.type === 'hourly'
-                        ? ' · zł/h'
-                        : priceTypeChoice === 'unit' && formData.unit
-                          ? ` · za ${formData.unit}`
-                          : ''}
-                    </Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.min || ''}
-                      onChange={(e) => {
-                        setFormData({
-                          ...formData,
-                          min: e.target.value ? parseFloat(e.target.value) : undefined,
-                        });
-                      }}
-                      onBlur={recalculateGrossFromForm}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  {(formData.type === 'range' || formData.type === 'hourly') && (
-                    <div className="space-y-2">
-                      <Label>
-                        Cena max (netto)
-                        {formData.type === 'hourly'
-                          ? ' · zł/h'
-                          : priceTypeChoice === 'unit' && formData.unit
-                            ? ` · za ${formData.unit}`
-                            : ''}
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.max || ''}
-                        onChange={(e) => {
-                          setFormData({ ...formData, max: e.target.value ? parseFloat(e.target.value) : undefined });
-                        }}
-                        placeholder="0"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Stawka VAT</Label>
-                    <Select
-                      value={String(formData.vatRate ?? 23)}
-                      onValueChange={(value) => {
-                        const vatRate = Number(value);
-                        setFormData((prev) => {
-                          const grossPrice = computeGrossFromNet(prev.min, vatRate);
-                          return { ...prev, vatRate, grossPrice };
-                        });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="VAT" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {VAT_OPTIONS.map((rate) => (
-                          <SelectItem key={rate} value={String(rate)}>
-                            {rate}%
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Cena brutto</Label>
-                    <Input
-                      readOnly
-                      disabled
-                      className="bg-muted"
-                      placeholder="Uzupełni się po podaniu netto"
-                      value={
-                        formData.grossPrice !== undefined
-                          ? `${formData.grossPrice.toFixed(2)} PLN`
-                          : ''
-                      }
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Cena brutto</Label>
+                  <Input
+                    readOnly
+                    disabled
+                    className="bg-muted"
+                    placeholder="Obliczana z netto i VAT"
+                    value={
+                      formData.grossPrice !== undefined
+                        ? `${formData.grossPrice.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN`
+                        : ''
+                    }
+                  />
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           <DialogFooter>
@@ -974,7 +793,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
                   Zapisywanie...
                 </>
               ) : (
-                editingServiceName || editingService ? 'Zapisz zmiany' : 'Zapisz'
+                editingServiceName ? 'Zapisz zmiany' : 'Zapisz'
               )}
             </Button>
           </DialogFooter>

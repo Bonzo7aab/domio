@@ -250,7 +250,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   // Fetch dashboard tab data when tab is opened
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (activeTab !== 'dashboard' || !companyId || loadedTabs.has('dashboard')) {
+      if (activeTab !== 'dashboard' || !companyId || !user?.id || loadedTabs.has('dashboard')) {
         return;
       }
 
@@ -258,7 +258,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
       
       try {
         setLoadingDashboard(true);
-        const dashboardData = await fetchContractorDashboardStats(supabase, companyId);
+        const dashboardData = await fetchContractorDashboardStats(supabase, companyId, user.id);
         
         setProfile(dashboardData.profile);
         setStats(dashboardData.stats);
@@ -287,7 +287,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   // Fetch applications tab data when tab is opened
   useEffect(() => {
     const fetchApplicationsData = async () => {
-      if (activeTab !== 'applications' || !companyId || loadedTabs.has('applications')) {
+      if (activeTab !== 'applications' || !user?.id || loadedTabs.has('applications')) {
         return;
       }
 
@@ -295,8 +295,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
       
       try {
         setLoadingApplications(true);
-        const applicationsData = await fetchContractorApplications(supabase, companyId);
-        
+        const applicationsData = await fetchContractorApplications(supabase, user.id);
         setApplications(applicationsData.applications);
         setBids(applicationsData.bids);
         
@@ -309,7 +308,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
     };
 
     fetchApplicationsData();
-  }, [activeTab, companyId, loadedTabs]);
+  }, [activeTab, user?.id, loadedTabs]);
 
   // Fetch projects tab data when tab is opened
   useEffect(() => {

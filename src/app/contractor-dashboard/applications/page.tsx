@@ -15,7 +15,7 @@ async function getApplicationsData(userId: string) {
   }
 
   // Fetch applications data
-  const applicationsData = await fetchContractorApplications(supabase, company.id);
+  const applicationsData = await fetchContractorApplications(supabase, userId);
 
   // Map status from database format to component format
   const statusMap: Record<string, 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'cancelled'> = {

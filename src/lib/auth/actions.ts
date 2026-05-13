@@ -314,21 +314,44 @@ export async function updateUserAction(userData: UpdateUserData) {
   return { success: true }
 }
 
+function getPublicAppOrigin(): string {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'http://localhost:3000'
+  return base.replace(/\/$/, '')
+}
+
 /**
- * Server Action for password reset
+ * Sends Supabase password recovery email (PKCE). Link lands on `/auth/callback` then `/auth/update-password`.
  */
-export async function resetPasswordAction(email: string) {
+export async function requestPasswordResetEmailAction(
+  email: string
+): Promise<{ success: true } | { error: string }> {
   const supabase = await createClient()
-  
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/reset-password`
+  const trimmed = email.trim().toLowerCase()
+  if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return { error: 'Podaj prawidłowy adres email' }
+  }
+
+  const origin = getPublicAppOrigin()
+  const next = encodeURIComponent('/auth/update-password')
+  const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+    redirectTo: `${origin}/auth/callback?next=${next}`,
   })
-  
+
   if (error) {
     return { error: error.message }
   }
-  
+
   return { success: true }
+}
+
+/**
+ * Server Action for password reset (legacy name; same as request flow used on forgot-password).
+ */
+export async function resetPasswordAction(email: string) {
+  return requestPasswordResetEmailAction(email)
 }
 
 /**

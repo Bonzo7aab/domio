@@ -36,7 +36,7 @@ export default async function ContractorDashboardLayout({
   // Fetch stats for header (rating, completed projects)
   let stats = null;
   try {
-    const dashboardData = await fetchContractorDashboardStats(supabase, company.id);
+    const dashboardData = await fetchContractorDashboardStats(supabase, company.id, user.id);
     stats = {
       averageRating: dashboardData.stats.averageRating,
       completedProjects: dashboardData.stats.completedProjects,

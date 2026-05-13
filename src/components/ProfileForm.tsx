@@ -1,19 +1,25 @@
 'use client'
 
-import React, { useState } from 'react';
-import { Mail, Phone, Edit2, X, Check } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Mail, Phone, Edit2, X, Check, Building2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
 import { updateUserAction } from '../lib/auth/actions';
+import { createClient } from '../lib/supabase/client';
+import { fetchUserPrimaryCompany, upsertUserCompany, type CompanyData } from '../lib/database/companies';
 import type { AuthUser } from '../types/auth';
 
 interface ProfileFormProps {
   user: AuthUser;
+  /** When true (e.g. contractor „Dane wykonawcy” tab), show editable company name and NIP under personal data. */
+  includeBusinessData?: boolean;
 }
 
-export function ProfileForm({ user }: ProfileFormProps) {
+export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
+  const router = useRouter();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -21,6 +27,13 @@ export function ProfileForm({ user }: ProfileFormProps) {
   // Separate editing states for each section
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
   const [isEditingContact, setIsEditingContact] = useState(false);
+  const [isEditingBusiness, setIsEditingBusiness] = useState(false);
+
+  const isContractorBusinessBlock = Boolean(includeBusinessData && user.userType === 'contractor');
+  const [isLoadingBusiness, setIsLoadingBusiness] = useState(false);
+  const [companySnapshot, setCompanySnapshot] = useState<CompanyData | null>(null);
+  const [businessCompanyName, setBusinessCompanyName] = useState('');
+  const [businessNip, setBusinessNip] = useState('');
 
   const [profileData, setProfileData] = useState({
     firstName: user.firstName || '',
@@ -35,6 +48,37 @@ export function ProfileForm({ user }: ProfileFormProps) {
       [e.target.name]: e.target.value
     }));
   };
+
+  const loadPrimaryCompany = useCallback(async () => {
+    if (!isContractorBusinessBlock) return;
+    setIsLoadingBusiness(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await fetchUserPrimaryCompany(supabase, user.id);
+      if (error || !data) {
+        setCompanySnapshot(null);
+        setBusinessCompanyName('');
+        setBusinessNip('');
+        return;
+      }
+      setCompanySnapshot(data);
+      setBusinessCompanyName(data.name || '');
+      setBusinessNip((data.nip || '').trim());
+    } finally {
+      setIsLoadingBusiness(false);
+    }
+  }, [isContractorBusinessBlock, user.id]);
+
+  useEffect(() => {
+    if (!isContractorBusinessBlock) {
+      setCompanySnapshot(null);
+      setBusinessCompanyName('');
+      setBusinessNip('');
+      setIsEditingBusiness(false);
+      return;
+    }
+    void loadPrimaryCompany();
+  }, [isContractorBusinessBlock, loadPrimaryCompany]);
 
   const handleSavePersonal = async () => {
     setError('');
@@ -94,6 +138,87 @@ export function ProfileForm({ user }: ProfileFormProps) {
     }
   };
 
+  const handleSaveBusiness = async () => {
+    if (!isContractorBusinessBlock) return;
+    setError('');
+    setSuccess('');
+    const trimmedName = businessCompanyName.trim();
+    const trimmedNip = businessNip.trim();
+    if (!trimmedName || !trimmedNip) {
+      setError('Nazwa firmy i NIP są wymagane');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const supabase = createClient();
+      const snap = companySnapshot;
+      const isPublic =
+        snap &&
+        'is_public' in snap &&
+        typeof (snap as { is_public?: unknown }).is_public === 'boolean'
+          ? (snap as { is_public: boolean }).is_public
+          : true;
+
+      const payload = snap
+        ? {
+            name: trimmedName,
+            type: snap.type,
+            nip: trimmedNip,
+            phone: snap.phone || user.phone || '',
+            email: snap.email || user.email || '',
+            address: snap.address || '',
+            city: snap.city || '',
+            postal_code: snap.postal_code || '',
+            regon: snap.regon || '',
+            krs: snap.krs || '',
+            website: snap.website || '',
+            founded_year: snap.founded_year ?? undefined,
+            employee_count: snap.employee_count || '',
+            description: snap.description || '',
+            is_public: isPublic,
+          }
+        : {
+            name: trimmedName,
+            type: 'contractor',
+            nip: trimmedNip,
+            phone: user.phone?.trim() || undefined,
+            email: user.email?.trim() || undefined,
+          };
+
+      const { data: saved, error: upError } = await upsertUserCompany(supabase, user.id, payload);
+      if (upError || !saved) {
+        const message =
+          typeof upError === 'object' && upError !== null && 'message' in upError
+            ? String((upError as { message?: string }).message)
+            : 'Nie udało się zapisać danych firmy';
+        setError(message);
+        return;
+      }
+      setCompanySnapshot(saved);
+      setBusinessCompanyName(saved.name || '');
+      setBusinessNip((saved.nip || '').trim());
+      setSuccess('Dane biznesowe zostały zaktualizowane');
+      setIsEditingBusiness(false);
+      setTimeout(() => setSuccess(''), 3000);
+      router.refresh();
+    } catch {
+      setError('Wystąpił błąd podczas aktualizacji danych firmy');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelBusiness = () => {
+    if (companySnapshot) {
+      setBusinessCompanyName(companySnapshot.name || '');
+      setBusinessNip((companySnapshot.nip || '').trim());
+    } else {
+      setBusinessCompanyName('');
+      setBusinessNip('');
+    }
+    setIsEditingBusiness(false);
+    setError('');
+  };
 
   const handleCancelPersonal = () => {
     setProfileData(prev => ({
@@ -192,6 +317,67 @@ export function ProfileForm({ user }: ProfileFormProps) {
           </div>
         </div>
       </div>
+
+      {isContractorBusinessBlock ? (
+        <div className="border rounded-lg p-4 bg-card">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-medium flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden />
+              Dane biznesowe
+            </h4>
+            {isLoadingBusiness ? (
+              <span className="text-xs text-muted-foreground">Ładowanie…</span>
+            ) : !isEditingBusiness ? (
+              <Button variant="outline" size="sm" onClick={() => setIsEditingBusiness(true)}>
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edytuj
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleCancelBusiness} disabled={isLoading}>
+                  <X className="h-4 w-4 mr-2" />
+                  Anuluj
+                </Button>
+                <Button variant="default" size="sm" onClick={handleSaveBusiness} disabled={isLoading}>
+                  <Check className="h-4 w-4 mr-2" />
+                  {isLoading ? 'Zapisywanie...' : 'Zapisz'}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="businessCompanyName">Nazwa firmy *</Label>
+              {isEditingBusiness ? (
+                <Input
+                  id="businessCompanyName"
+                  value={businessCompanyName}
+                  onChange={(e) => setBusinessCompanyName(e.target.value)}
+                  autoComplete="organization"
+                />
+              ) : (
+                <p className="text-sm py-2 px-3 bg-muted rounded-md">{businessCompanyName || '—'}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="businessNip">NIP *</Label>
+              {isEditingBusiness ? (
+                <Input
+                  id="businessNip"
+                  value={businessNip}
+                  onChange={(e) => setBusinessNip(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="np. 1234567890"
+                />
+              ) : (
+                <p className="text-sm py-2 px-3 bg-muted rounded-md">{businessNip || '—'}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Contact Information Section */}
       <div className="border rounded-lg p-4 bg-card">

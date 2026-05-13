@@ -2,77 +2,49 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, ExternalLink, FileUp, ShieldCheck, Trash2 } from 'lucide-react';
+import { Calendar, ExternalLink, FileUp, GraduationCap, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getContractorAccountSettings,
   getOcPolicyAllowedFormatsLabel,
-  getOcPolicyScanSignedUrl,
+  getVerificationDocumentSignedUrl,
   removeVerificationDocumentsFromBucket,
   upsertContractorAccountSettings,
-  uploadOcPolicyScan,
+  uploadProfessionalQualificationsScan,
 } from '../lib/database/contractor-account';
-import { createClient } from '../lib/supabase/client';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 
-interface ContractorInsuranceSettingsProps {
+interface ContractorProfessionalQualificationsSettingsProps {
   userId: string;
 }
 
-const OC_POLICY_ACCEPT =
+const SCAN_ACCEPT =
   '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp';
 
-const OC_SETTINGS_SAVED_TOAST = 'Dane ubezpieczenia OC zostały zmienione';
+const SAVED_TOAST = 'Dane uprawnień zawodowych zostały zapisane';
 
-export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSettingsProps) {
+export function ContractorProfessionalQualificationsSettings({
+  userId,
+}: ContractorProfessionalQualificationsSettingsProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [ocValidUntil, setOcValidUntil] = React.useState('');
-  const [policyPath, setPolicyPath] = React.useState<string | null>(null);
+  const [validUntil, setValidUntil] = React.useState('');
+  const [scanPath, setScanPath] = React.useState<string | null>(null);
   const [previewSignedUrl, setPreviewSignedUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const load = async () => {
       try {
         const settings = await getContractorAccountSettings(userId);
-        setOcValidUntil(settings.ocValidUntil ?? '');
-
-        // Fall back to the verification `insurance` document so the card
-        // reflects OC uploaded via /verification too. If we resolve a path
-        // via the fallback we proactively persist it to
-        // `contractor_account_settings` so subsequent reads (and the OC
-        // notice on /account) stay consistent without another fallback.
-        if (settings.ocPolicyScanPath) {
-          setPolicyPath(settings.ocPolicyScanPath);
-        } else {
-          const supabase = createClient();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: profile } = await (supabase as any)
-            .from('user_profiles')
-            .select('verification_document_paths')
-            .eq('id', userId)
-            .maybeSingle();
-          const verificationPaths =
-            (profile?.verification_document_paths as Record<string, string> | null | undefined) ?? {};
-          const insurancePath = verificationPaths.insurance ?? null;
-          if (insurancePath) {
-            setPolicyPath(insurancePath);
-            try {
-              await upsertContractorAccountSettings(userId, { ocPolicyScanPath: insurancePath });
-            } catch (syncError) {
-              console.error('Error backfilling OC scan path from verification docs:', syncError);
-            }
-          } else {
-            setPolicyPath(null);
-          }
-        }
+        setValidUntil(settings.professionalQualificationsValidUntil ?? '');
+        setScanPath(settings.professionalQualificationsScanPath ?? null);
       } catch (error) {
-        console.error('Error loading OC settings:', error);
-        toast.error('Nie udało się załadować ustawień OC');
+        console.error('Error loading professional qualifications settings:', error);
+        toast.error('Nie udało się załadować danych uprawnień zawodowych');
       } finally {
         setIsLoading(false);
       }
@@ -81,14 +53,14 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
   }, [userId]);
 
   React.useEffect(() => {
-    if (!policyPath) {
+    if (!scanPath) {
       setPreviewSignedUrl(null);
       return;
     }
 
     let cancelled = false;
     void (async () => {
-      const url = await getOcPolicyScanSignedUrl(policyPath);
+      const url = await getVerificationDocumentSignedUrl(scanPath);
       if (!cancelled) {
         setPreviewSignedUrl(url);
       }
@@ -97,7 +69,7 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
     return () => {
       cancelled = true;
     };
-  }, [policyPath]);
+  }, [scanPath]);
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -105,23 +77,26 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
 
     try {
       setIsSaving(true);
-      const uploadResult = await uploadOcPolicyScan(userId, file);
-      const saved = await upsertContractorAccountSettings(userId, { ocPolicyScanPath: uploadResult.path });
-      if (!saved.ocPolicyScanPath || saved.ocPolicyScanPath !== uploadResult.path) {
+      const uploadResult = await uploadProfessionalQualificationsScan(userId, file);
+      const saved = await upsertContractorAccountSettings(userId, {
+        professionalQualificationsScanPath: uploadResult.path,
+      });
+      if (
+        !saved.professionalQualificationsScanPath ||
+        saved.professionalQualificationsScanPath !== uploadResult.path
+      ) {
         toast.error(
-          'Plik został wgrany do magazynu, ale ścieżka nie została zapisana w bazie. Uruchom migrację contractor_account_settings lub sprawdź RLS.'
+          'Plik został wgrany do magazynu, ale ścieżka nie została zapisana w bazie. Uruchom migrację lub sprawdź RLS.'
         );
         return;
       }
-      setPolicyPath(saved.ocPolicyScanPath);
-      toast.success(OC_SETTINGS_SAVED_TOAST);
-      // Refresh server state so the OC notice in the page header and the
-      // /verification page reflect the newly synced scan immediately.
+      setScanPath(saved.professionalQualificationsScanPath);
+      toast.success(SAVED_TOAST);
       router.refresh();
     } catch (error) {
-      console.error('Error uploading OC policy:', error);
+      console.error('Error uploading qualification scan:', error);
       const message =
-        error instanceof Error ? error.message : 'Nie udało się zapisać skanu polisy';
+        error instanceof Error ? error.message : 'Nie udało się zapisać skanu uprawnień';
       toast.error(message);
     } finally {
       setIsSaving(false);
@@ -130,20 +105,20 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
   };
 
   const handleRemoveScan = async () => {
-    if (!policyPath) return;
-    if (!window.confirm('Czy na pewno chcesz usunąć skan polisy? Plik zostanie usunięty z magazynu.')) {
+    if (!scanPath) return;
+    if (!window.confirm('Czy na pewno chcesz usunąć skan uprawnień? Plik zostanie usunięty z magazynu.')) {
       return;
     }
     try {
       setIsSaving(true);
-      await removeVerificationDocumentsFromBucket([policyPath]);
-      await upsertContractorAccountSettings(userId, { ocPolicyScanPath: null });
-      setPolicyPath(null);
-      toast.success('Skan polisy został usunięty');
+      await removeVerificationDocumentsFromBucket([scanPath]);
+      await upsertContractorAccountSettings(userId, { professionalQualificationsScanPath: null });
+      setScanPath(null);
+      toast.success('Skan uprawnień został usunięty');
       router.refresh();
     } catch (error) {
-      console.error('Error removing OC policy scan:', error);
-      toast.error('Nie udało się usunąć skanu polisy');
+      console.error('Error removing qualification scan:', error);
+      toast.error('Nie udało się usunąć skanu uprawnień');
     } finally {
       setIsSaving(false);
     }
@@ -153,13 +128,13 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
     try {
       setIsSaving(true);
       await upsertContractorAccountSettings(userId, {
-        ocValidUntil: ocValidUntil || null,
+        professionalQualificationsValidUntil: validUntil || null,
       });
-      toast.success(OC_SETTINGS_SAVED_TOAST);
+      toast.success(SAVED_TOAST);
       router.refresh();
     } catch (error) {
-      console.error('Error saving OC date:', error);
-      toast.error('Nie udało się zapisać daty ważności OC');
+      console.error('Error saving qualification validity date:', error);
+      toast.error('Nie udało się zapisać daty ważności uprawnień');
     } finally {
       setIsSaving(false);
     }
@@ -168,31 +143,33 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="py-6 text-sm text-muted-foreground">Ładowanie danych OC...</CardContent>
+        <CardContent className="py-6 text-sm text-muted-foreground">
+          Ładowanie danych uprawnień zawodowych...
+        </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card id="oc-policy" className="scroll-mt-24">
+    <Card className="scroll-mt-24">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheck className="h-4 w-4" />
-          Ubezpieczenie OC
+          <GraduationCap className="h-4 w-4" />
+          Uprawnienia Zawodowe
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="oc-valid-until">Data ważności OC</Label>
+          <Label htmlFor="pq-valid-until">Data ważności dokumentu</Label>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Calendar className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                id="oc-valid-until"
+                id="pq-valid-until"
                 type="date"
                 className="pl-9"
-                value={ocValidUntil}
-                onChange={(event) => setOcValidUntil(event.target.value)}
+                value={validUntil}
+                onChange={(event) => setValidUntil(event.target.value)}
               />
             </div>
             <Button onClick={handleSaveDate} disabled={isSaving}>
@@ -202,23 +179,23 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
         </div>
 
         <div className="min-w-0 space-y-2">
-          <Label htmlFor="oc-policy-file">Skan polisy OC</Label>
+          <Label htmlFor="pq-scan-file">Skan uprawnień (certyfikat, licencja)</Label>
           <p className="text-xs text-muted-foreground">
             Dozwolone formaty: {getOcPolicyAllowedFormatsLabel()} · maks. 10 MB
           </p>
           <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 shadow-sm sm:flex-row sm:items-center sm:gap-0 sm:px-3 sm:py-2.5">
             <div className="min-w-0 flex-1 sm:border-r sm:border-border/70 sm:pr-4">
-              {policyPath ? (
-                <p className="truncate text-left text-sm leading-snug" title={policyPath}>
+              {scanPath ? (
+                <p className="truncate text-left text-sm leading-snug" title={scanPath}>
                   <span className="text-muted-foreground">Plik zapisany: </span>
-                  <span className="font-medium text-foreground">{policyPath.split('/').pop()}</span>
+                  <span className="font-medium text-foreground">{scanPath.split('/').pop()}</span>
                 </p>
               ) : (
                 <p className="text-left text-sm leading-snug text-muted-foreground">Brak dodanego skanu</p>
               )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pl-4">
-              {policyPath ? (
+              {scanPath ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -232,12 +209,12 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
                 </Button>
               ) : null}
               <Button variant="outline" size="sm" disabled={isSaving} className="h-9 shrink-0" asChild>
-                <label htmlFor="oc-policy-file" className="cursor-pointer">
+                <label htmlFor="pq-scan-file" className="cursor-pointer">
                   <FileUp className="mr-2 h-4 w-4" />
-                  {policyPath ? 'Zamień' : 'Dodaj skan polisy'}
+                  {scanPath ? 'Zamień' : 'Dodaj skan'}
                 </label>
               </Button>
-              {policyPath && previewSignedUrl ? (
+              {scanPath && previewSignedUrl ? (
                 <Button variant="outline" size="sm" className="h-9 shrink-0" asChild>
                   <a href={previewSignedUrl} target="_blank" rel="noreferrer">
                     <ExternalLink className="mr-2 h-4 w-4" />
@@ -246,19 +223,19 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
                 </Button>
               ) : null}
               <input
-                id="oc-policy-file"
+                id="pq-scan-file"
                 type="file"
                 className="hidden"
-                accept={OC_POLICY_ACCEPT}
+                accept={SCAN_ACCEPT}
                 onChange={handleUpload}
               />
             </div>
           </div>
 
-          {policyPath && !previewSignedUrl ? (
+          {scanPath && !previewSignedUrl ? (
             <p className="text-xs text-destructive">
-              Nie udało się przygotować linku do pliku. Sprawdź uprawnienia do magazynu plików lub
-              zapisz plik ponownie.
+              Nie udało się przygotować linku do pliku. Sprawdź uprawnienia do magazynu plików lub zapisz plik
+              ponownie.
             </p>
           ) : null}
         </div>

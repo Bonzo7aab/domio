@@ -25,6 +25,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Textarea } from './ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { getJobById, getTenderById } from '../lib/data';
+import { shouldUseMockData } from '../lib/config/data-source';
 import { useRouter } from 'next/navigation';
 import { useIsMobile } from './ui/use-mobile';
 
@@ -133,10 +134,19 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
         return;
       }
 
+      const jobId = currentConversation.jobId.trim();
+      if (
+        !shouldUseMockData() &&
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)
+      ) {
+        setJobData(null);
+        return;
+      }
+
       setIsLoadingJob(true);
       try {
         // Try to fetch as job first
-        const { data: job, error: jobError } = await getJobById(currentConversation.jobId);
+        const { data: job, error: jobError } = await getJobById(jobId);
         if (job && !jobError) {
           setJobData({ id: job.id, title: job.title || '', company: ((job as unknown) as { company?: string }).company || '' });
           setIsLoadingJob(false);
@@ -144,7 +154,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
         }
 
         // If not found as job, try as tender
-        const { data: tender, error: tenderError } = await getTenderById(currentConversation.jobId);
+        const { data: tender, error: tenderError } = await getTenderById(jobId);
         if (tender && !tenderError) {
           setJobData({ id: tender.id, title: tender.title || '', company: ((tender as unknown) as { company?: string }).company || '' });
           setIsLoadingJob(false);

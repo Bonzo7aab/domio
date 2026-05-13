@@ -991,41 +991,41 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
  */
 export async function fetchContractorDashboardStats(
   supabase: SupabaseClient<Database>,
-  contractorId: string
+  companyId: string,
+  contractorUserId: string
 ): Promise<{ profile: ContractorProfile; stats: ContractorStats }> {
   try {
-    // Fetch contractor profile
-    const profile = await fetchContractorById(contractorId);
+    // Fetch contractor profile (company-scoped public profile)
+    const profile = await fetchContractorById(companyId);
     if (!profile) {
       throw new Error('Contractor not found');
     }
 
-    // Fetch applications count for stats
+    // Count offers by auth user (contractor_id), not company_id, so stats match RLS and survive primary-company changes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: applicationsCount } = await (supabase as any)
       .from('job_applications')
       .select('*', { count: 'exact', head: true })
-      .eq('company_id', contractorId);
+      .eq('contractor_id', contractorUserId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: acceptedApplicationsCount } = await (supabase as any)
       .from('job_applications')
       .select('*', { count: 'exact', head: true })
-      .eq('company_id', contractorId)
+      .eq('contractor_id', contractorUserId)
       .eq('status', 'accepted');
 
-    // Fetch bids count for stats
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: bidsCount } = await (supabase as any)
       .from('tender_bids')
       .select('*', { count: 'exact', head: true })
-      .eq('company_id', contractorId);
+      .eq('contractor_id', contractorUserId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: acceptedBidsCount } = await (supabase as any)
       .from('tender_bids')
       .select('*', { count: 'exact', head: true })
-      .eq('company_id', contractorId)
+      .eq('contractor_id', contractorUserId)
       .eq('status', 'accepted');
 
     // Calculate stats
@@ -1049,11 +1049,12 @@ export async function fetchContractorDashboardStats(
 }
 
 /**
- * Fetch contractor applications and bids (for applications tab)
+ * Fetch contractor applications and bids (for applications tab).
+ * @param contractorUserId — `user_profiles.id` / `auth.users.id` (matches `job_applications.contractor_id` / RLS).
  */
 export async function fetchContractorApplications(
   supabase: SupabaseClient<Database>,
-  contractorId: string
+  contractorUserId: string
 ): Promise<{ applications: ContractorApplication[]; bids: ContractorBid[] }> {
   try {
     // Helper function to convert days to readable format
@@ -1117,12 +1118,12 @@ export async function fetchContractorApplications(
           companies (
             name
           ),
-          job_categories (
+          job_categories!jobs_category_id_fkey (
             name
           )
         )
       `)
-      .eq('company_id', contractorId)
+      .eq('contractor_id', contractorUserId)
       .neq('admin_moderation_status', 'suspended')
       .order('submitted_at', { ascending: false });
 
@@ -1169,7 +1170,7 @@ export async function fetchContractorApplications(
           location,
           published_at,
           created_at,
-          job_categories (
+          job_categories!tenders_category_id_fkey (
             name
           ),
           companies (
@@ -1177,7 +1178,7 @@ export async function fetchContractorApplications(
           )
         )
       `)
-      .eq('company_id', contractorId)
+      .eq('contractor_id', contractorUserId)
       .neq('admin_moderation_status', 'suspended')
       .order('submitted_at', { ascending: false });
 

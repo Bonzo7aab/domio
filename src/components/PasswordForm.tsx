@@ -1,128 +1,188 @@
 'use client'
 
-import React, { useState } from 'react';
-import { Eye, EyeOff, Edit2, X, Check, Lock } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Alert, AlertDescription } from './ui/alert';
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Eye, EyeOff, Edit2, X, Check, Lock, Mail } from 'lucide-react'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Alert, AlertDescription } from './ui/alert'
+import { createClient } from '../lib/supabase/client'
+import { requestPasswordResetEmailAction } from '../lib/auth/actions'
 
-export function PasswordForm() {
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isEditingPassword, setIsEditingPassword] = useState(false);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+interface PasswordFormProps {
+  /** Logged-in user email (e.g. from account page) — required for „Zmień hasło” and reset link. */
+  accountEmail?: string
+}
+
+export function PasswordForm({ accountEmail }: PasswordFormProps) {
+  const router = useRouter()
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [resetSending, setResetSending] = useState(false)
+  const [isEditingPassword, setIsEditingPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-  });
+  })
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPasswordData(prev => ({
+    setPasswordData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
+      [e.target.name]: e.target.value,
+    }))
+  }
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setIsLoading(true);
+  const handlePasswordSubmit = async () => {
+    setError('')
+    setSuccess('')
+    setIsLoading(true)
+
+    const email = accountEmail?.trim()
+    if (!email) {
+      setError('Brak adresu email konta. Odśwież stronę lub skontaktuj się z pomocą.')
+      setIsLoading(false)
+      return
+    }
 
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      setError('Wszystkie pola hasła są wymagane');
-      setIsLoading(false);
-      return;
+      setError('Wszystkie pola hasła są wymagane')
+      setIsLoading(false)
+      return
     }
 
     if (passwordData.newPassword.length < 6) {
-      setError('Nowe hasło musi mieć co najmniej 6 znaków');
-      setIsLoading(false);
-      return;
+      setError('Nowe hasło musi mieć co najmniej 6 znaków')
+      setIsLoading(false)
+      return
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setError('Nowe hasła nie są identyczne');
-      setIsLoading(false);
-      return;
+      setError('Nowe hasła nie są identyczne')
+      setIsLoading(false)
+      return
     }
 
     try {
-      // TODO: Implement password change with Supabase
-      // For now, just simulate success
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setSuccess('Hasło zostało zmienione pomyślnie');
+      const supabase = createClient()
+      const { error: signError } = await supabase.auth.signInWithPassword({
+        email,
+        password: passwordData.currentPassword,
+      })
+
+      if (signError) {
+        setError('Nieprawidłowe obecne hasło')
+        setIsLoading(false)
+        return
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      })
+
+      if (updateError) {
+        setError(updateError.message)
+        setIsLoading(false)
+        return
+      }
+
+      setSuccess('Hasło zostało zmienione pomyślnie')
       setPasswordData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
-      });
-      setIsEditingPassword(false);
-      setTimeout(() => setSuccess(''), 3000);
+      })
+      setIsEditingPassword(false)
+      setTimeout(() => setSuccess(''), 4000)
+      router.refresh()
     } catch {
-      setError('Wystąpił błąd podczas zmiany hasła');
+      setError('Wystąpił błąd podczas zmiany hasła')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
+
+  const handleSendResetEmail = async () => {
+    setError('')
+    setSuccess('')
+    const email = accountEmail?.trim()
+    if (!email) {
+      setError('Brak adresu email konta.')
+      return
+    }
+    setResetSending(true)
+    try {
+      const result = await requestPasswordResetEmailAction(email)
+      if ('error' in result) {
+        setError(result.error)
+        return
+      }
+      setSuccess('Wysłano link resetujący na Twój adres email. Sprawdź skrzynkę (również folder spam).')
+      setTimeout(() => setSuccess(''), 8000)
+    } catch {
+      setError('Nie udało się wysłać wiadomości resetującej')
+    } finally {
+      setResetSending(false)
+    }
+  }
 
   const handleCancelPassword = () => {
     setPasswordData({
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
-    });
-    setIsEditingPassword(false);
-    setError('');
-  };
+    })
+    setIsEditingPassword(false)
+    setError('')
+  }
 
   return (
     <div className="space-y-4">
       {(error || success) && (
-        <Alert variant={error ? "destructive" : "default"}>
+        <Alert variant={error ? 'destructive' : 'default'}>
           <AlertDescription>{error || success}</AlertDescription>
         </Alert>
       )}
 
-      {/* Password Change Section */}
+      <div className="border rounded-lg p-4 bg-card">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            <h4 className="font-medium">Reset hasła emailem</h4>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleSendResetEmail} disabled={resetSending || !accountEmail}>
+            {resetSending ? 'Wysyłanie…' : 'Wyślij link resetujący'}
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Otrzymasz wiadomość z linkiem. Po kliknięciu ustawisz nowe hasło na bezpiecznej stronie.
+        </p>
+      </div>
+
       <div className="border rounded-lg p-4 bg-card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Lock className="h-4 w-4 text-muted-foreground" />
-            <h4 className="font-medium">Hasło</h4>
+            <h4 className="font-medium">Zmiana hasła (zalogowany)</h4>
           </div>
           {!isEditingPassword ? (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setIsEditingPassword(true)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setIsEditingPassword(true)} disabled={!accountEmail}>
               <Edit2 className="h-4 w-4 mr-2" />
               Zmień hasło
             </Button>
           ) : (
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleCancelPassword}
-                disabled={isLoading}
-              >
+              <Button variant="outline" size="sm" onClick={handleCancelPassword} disabled={isLoading}>
                 <X className="h-4 w-4 mr-2" />
                 Anuluj
               </Button>
-              <Button 
-                variant="default" 
-                size="sm"
-                onClick={handlePasswordSubmit}
-                disabled={isLoading}
-              >
+              <Button variant="default" size="sm" onClick={handlePasswordSubmit} disabled={isLoading}>
                 <Check className="h-4 w-4 mr-2" />
                 {isLoading ? 'Zapisywanie...' : 'Zapisz'}
               </Button>
@@ -133,7 +193,7 @@ export function PasswordForm() {
         {!isEditingPassword ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Kliknij &quot;Zmień hasło&quot; aby zaktualizować swoje hasło.
+              Znasz obecne hasło? Użyj „Zmień hasło”. W przeciwnym razie wyślij link resetujący powyżej.
             </p>
             <div className="flex items-center py-2 px-3 bg-muted rounded-md">
               <Lock className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -232,6 +292,5 @@ export function PasswordForm() {
         )}
       </div>
     </div>
-  );
+  )
 }
-

@@ -21,6 +21,7 @@ import { ProfileForm } from './ProfileForm';
 import { CompanyManagementForm } from './CompanyManagementForm';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { ContractorInsuranceSettings } from './ContractorInsuranceSettings';
+import { ContractorProfessionalQualificationsSettings } from './ContractorProfessionalQualificationsSettings';
 import { ContractorNotificationsPanel } from './ContractorNotificationsPanel';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Button } from './ui/button';
@@ -613,8 +614,9 @@ export function UserAccountPageClient({
           </TabsContent>
 
           <TabsContent value="contractor-data" className="space-y-6">
-            <ProfileForm user={user} />
+            <ProfileForm user={user} includeBusinessData />
             <ContractorInsuranceSettings userId={user.id} />
+            <ContractorProfessionalQualificationsSettings userId={user.id} />
           </TabsContent>
 
           <TabsContent value="company" className="space-y-6">
@@ -622,7 +624,7 @@ export function UserAccountPageClient({
           </TabsContent>
 
           <TabsContent value="security" className="space-y-6">
-            <PasswordForm />
+            <PasswordForm accountEmail={user.email} />
             <DeleteAccountSection />
           </TabsContent>
 

@@ -134,21 +134,10 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:102',message:'handleSubmit entry',data:{formData:applicationForm,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
     if (!validateForm()) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:106',message:'validation failed',data:{errors},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       toast.error('Wypełnij wszystkie wymagane pola');
       return;
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:110',message:'validation passed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
 
     setIsSubmitting(true);
 
@@ -164,25 +153,13 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
         submittedAt: new Date(),
       };
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:125',message:'before simulated delay',data:{applicationData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
-
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:127',message:'calling onApplicationSubmit',data:{applicationData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       
       const result = onApplicationSubmit(applicationData);
       if (result instanceof Promise) {
         await result;
       }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:129',message:'after onApplicationSubmit call',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       
       // Wait a brief moment to ensure toast is displayed before closing modal
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -191,10 +168,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
       // The parent component (JobPage) will handle showing the success toast
       // We close the modal here to ensure it closes even if parent doesn't
       onClose();
-    } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JobApplicationModal.tsx:131',message:'error in handleSubmit',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
+    } catch {
       toast.error('Wystąpił błąd podczas wysyłania oferty');
     } finally {
       setIsSubmitting(false);

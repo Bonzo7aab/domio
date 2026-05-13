@@ -3,7 +3,8 @@ export interface ServicePricing {
   min?: number;
   max?: number;
   currency: string;
-  unit?: 'm2' | 'szt.' | 'mb' | 'kg' | '1 godzina' | 'miesiąc';
+  /** Jednostka miary (np. m², szt.) — string dla kompatybilności wstecznej */
+  unit?: string;
   category?: string;
   subcategory?: string;
   workDescription?: string;

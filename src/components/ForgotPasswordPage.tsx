@@ -7,6 +7,7 @@ import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { useUserProfile } from '../contexts/AuthContext';
+import { requestPasswordResetEmailAction } from '../lib/auth/actions';
 
 interface ForgotPasswordPageProps {
   onBack: () => void;
@@ -21,6 +22,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,11 +38,18 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      // TODO: Implement password reset functionality
+      const result = await requestPasswordResetEmailAction(email);
+      if ('error' in result) {
+        setError(result.error);
+        return;
+      }
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Wystąpił błąd podczas resetowania hasła');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -183,9 +192,9 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
               <Button 
                 type="submit" 
                 className="w-full bg-primary hover:bg-primary/90"
-                disabled={isLoading}
+                disabled={isLoading || isSubmitting}
               >
-                {isLoading ? (
+                {isLoading || isSubmitting ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Wysyłanie...</span>

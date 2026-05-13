@@ -760,6 +760,17 @@ export async function fetchJobsAndTenders(
   return { data: uniqueCombined, error: null };
 }
 
+/** Treat as “no row” / invalid id — do not log as application error */
+function isBenignJobOrTenderLookupError(error: PostgrestError | null | undefined): boolean {
+  if (!error) return false;
+  const code = String((error as PostgrestError).code ?? '');
+  const msg = String(error.message ?? '').toLowerCase();
+  if (code === 'PGRST116') return true;
+  if (msg.includes('0 rows') || msg.includes('single json object')) return true;
+  if (code === '22P02' || msg.includes('invalid input syntax for type uuid')) return true;
+  return false;
+}
+
 /**
  * Fetch a single job by ID
  */
@@ -767,6 +778,10 @@ export async function fetchJobById(
   supabase: SupabaseClient<Database>,
   jobId: string
 ): Promise<{ data: JobWithCompany | null; error: PostgrestError | null }> {
+  const id = jobId?.trim();
+  if (!id) {
+    return { data: null, error: null };
+  }
   try {
     const { data, error } = await supabase
       .from('jobs')
@@ -783,18 +798,24 @@ export async function fetchJobById(
           slug
         )
       `)
-      .eq('id', jobId)
+      .eq('id', id)
       .maybeSingle(); // Use maybeSingle() instead of single() to avoid throwing on 0 rows
 
     // Handle "not found" error (PGRST116) as a normal case, not an error
     if (error) {
       // Check for PGRST116 in multiple ways since error structure can vary
       const errorCode = (error as PostgrestError).code || error?.code;
-      if (errorCode === 'PGRST116' || error.message?.includes('0 rows') || error.message?.includes('single JSON object')) {
+      if (
+        errorCode === 'PGRST116' ||
+        error.message?.includes('0 rows') ||
+        error.message?.includes('single JSON object') ||
+        isBenignJobOrTenderLookupError(error as PostgrestError)
+      ) {
         // Job not found - this is expected, not an error
         return { data: null, error: null };
       }
-      console.error('Error fetching job:', error);
+      const e = error as PostgrestError;
+      console.error('Error fetching job:', { message: e.message, code: e.code, details: e.details, hint: e.hint });
       return { data: null, error };
     }
 
@@ -808,7 +829,7 @@ export async function fetchJobById(
     const { count, error: countsError } = await (supabase as any)
       .from('job_applications')
       .select('*', { count: 'exact', head: true })
-      .eq('job_id', jobId);
+      .eq('job_id', id);
 
     if (!countsError && count !== null) {
       data.applications_count = count;
@@ -819,10 +840,16 @@ export async function fetchJobById(
     const error = err as PostgrestError | Error;
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = (error as PostgrestError)?.code || ((error as unknown as { error?: { code?: string } })?.error?.code);
-    if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
+    if (
+      errorCode === 'PGRST116' ||
+      error?.message?.includes('0 rows') ||
+      error?.message?.includes('single JSON object') ||
+      isBenignJobOrTenderLookupError(error as PostgrestError)
+    ) {
       return { data: null, error: null };
     }
-    console.error('Error fetching job:', err);
+    const e = error as PostgrestError;
+    console.error('Error fetching job:', { message: e.message, code: e.code, details: e.details, hint: e.hint });
     return { data: null, error: err };
   }
 }
@@ -834,6 +861,10 @@ export async function fetchTenderById(
   supabase: SupabaseClient<Database>,
   tenderId: string
 ): Promise<{ data: TenderWithCompany | null; error: PostgrestError | null }> {
+  const id = tenderId?.trim();
+  if (!id) {
+    return { data: null, error: null };
+  }
   try {
     // Type assertion needed as tenders table may not be in generated types yet
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -852,18 +883,24 @@ export async function fetchTenderById(
           slug
         )
       `)
-      .eq('id', tenderId)
+      .eq('id', id)
       .maybeSingle(); // Use maybeSingle() instead of single() to avoid throwing on 0 rows
 
     // Handle "not found" error (PGRST116) as a normal case, not an error
     if (result.error) {
       // Check for PGRST116 in multiple ways since error structure can vary
       const errorCode = result.error.code || result.error?.code;
-      if (errorCode === 'PGRST116' || result.error.message?.includes('0 rows') || result.error.message?.includes('single JSON object')) {
+      if (
+        errorCode === 'PGRST116' ||
+        result.error.message?.includes('0 rows') ||
+        result.error.message?.includes('single JSON object') ||
+        isBenignJobOrTenderLookupError(result.error as PostgrestError)
+      ) {
         // Tender not found - this is expected, not an error
         return { data: null, error: null };
       }
-      console.error('Error fetching tender:', result.error);
+      const e = result.error as PostgrestError;
+      console.error('Error fetching tender:', { message: e.message, code: e.code, details: e.details, hint: e.hint });
       return { data: null, error: result.error };
     }
 
@@ -877,7 +914,7 @@ export async function fetchTenderById(
     const { count, error: countsError } = await (supabase as any)
       .from('tender_bids')
       .select('*', { count: 'exact', head: true })
-      .eq('tender_id', tenderId);
+      .eq('tender_id', id);
 
     if (!countsError && count !== null && result.data) {
       (result.data as unknown as { bids_count?: number }).bids_count = count;
@@ -888,10 +925,16 @@ export async function fetchTenderById(
     const error = err as PostgrestError | Error;
     // Handle "not found" error (PGRST116) as a normal case
     const errorCode = (error as PostgrestError)?.code || ((error as unknown as { error?: { code?: string } })?.error?.code);
-    if (errorCode === 'PGRST116' || error?.message?.includes('0 rows') || error?.message?.includes('single JSON object')) {
+    if (
+      errorCode === 'PGRST116' ||
+      error?.message?.includes('0 rows') ||
+      error?.message?.includes('single JSON object') ||
+      isBenignJobOrTenderLookupError(error as PostgrestError)
+    ) {
       return { data: null, error: null };
     }
-    console.error('Error fetching tender:', err);
+    const e = error as PostgrestError;
+    console.error('Error fetching tender:', { message: e.message, code: e.code, details: e.details, hint: e.hint });
     return { data: null, error: err };
   }
 }
@@ -1921,18 +1964,10 @@ export async function createJobApplication(
     additionalNotes?: string;
   }
 ): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1775',message:'createJobApplication entry',data:{jobId,contractorId,applicationData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
   try {
     // Fetch contractor's primary company
     const { fetchUserPrimaryCompany } = await import('./companies');
     const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, contractorId);
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1789',message:'after fetchUserPrimaryCompany',data:{hasCompany:!!company,hasError:!!companyError,errorMessage:companyError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     
     if (companyError) {
       console.error('Error fetching contractor company:', companyError);
@@ -1945,9 +1980,6 @@ export async function createJobApplication(
     }
     
     if (!company) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1801',message:'no company found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return { 
         data: null, 
         error: new Error('Contractor must have a company to submit applications') as PostgrestError
@@ -1962,14 +1994,7 @@ export async function createJobApplication(
       ? applicationData.proposedPrice 
       : parseFloat(String(applicationData.proposedPrice)) || 0;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1812',message:'price validation',data:{proposedPrice,originalPrice:applicationData.proposedPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
     if (proposedPrice <= 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1816',message:'invalid price',data:{proposedPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return {
         data: null,
         error: new Error('Proposed price must be greater than 0') as PostgrestError
@@ -1978,9 +2003,6 @@ export async function createJobApplication(
     
     // Validate required fields
     if (!applicationData.coverLetter || applicationData.coverLetter.trim().length === 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1824',message:'missing cover letter',data:{coverLetterLength:applicationData.coverLetter?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return {
         data: null,
         error: new Error('Cover letter is required') as PostgrestError
@@ -2016,19 +2038,12 @@ export async function createJobApplication(
     });
     
     // Insert application (using type assertion since job_applications may not be in generated types)
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1881',message:'before database insert',data:{insertData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: insertedApplication, error: insertError } = await (supabase as any)
       .from('job_applications')
       .insert(insertData)
       .select()
       .single();
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1886',message:'after database insert',data:{hasData:!!insertedApplication,hasError:!!insertError,errorMessage:insertError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     
     if (insertError) {
       const error = insertError as { message?: string; details?: string; hint?: string; code?: string };
@@ -2045,9 +2060,6 @@ export async function createJobApplication(
           companyId: company.id,
         }
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1887',message:'database insert error',data:{errorMessage:error?.message,errorCode:error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return { 
         data: null, 
         error: (insertError instanceof Error 
@@ -2075,15 +2087,9 @@ export async function createJobApplication(
       company_id: (insertedApplication as unknown as JobApplicationRow)?.company_id,
       status: (insertedApplication as unknown as JobApplicationRow)?.status
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1939',message:'createJobApplication success',data:{insertedApplicationId:(insertedApplication as unknown as { id?: string })?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return { data: insertedApplication as unknown as JobApplicationRow, error: null };
   } catch (err) {
     console.error('Error creating job application:', err);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/16ea34c2-05be-4b03-91cb-d11a1170616e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobs.ts:1940',message:'createJobApplication exception',data:{error:String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return { 
       data: null, 
       error: (err instanceof Error 

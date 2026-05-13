@@ -36,6 +36,8 @@ export interface ContractorRadarSettings {
 export interface ContractorAccountSettings {
   ocValidUntil: string | null;
   ocPolicyScanPath: string | null;
+  professionalQualificationsValidUntil: string | null;
+  professionalQualificationsScanPath: string | null;
   notificationChannels: ContractorNotificationChannels;
   radar: ContractorRadarSettings;
   updatedAt: string | null;
@@ -88,6 +90,8 @@ const normalizeSettings = (row: Record<string, unknown> | null): ContractorAccou
     return {
       ocValidUntil: null,
       ocPolicyScanPath: null,
+      professionalQualificationsValidUntil: null,
+      professionalQualificationsScanPath: null,
       notificationChannels: DEFAULT_CHANNELS,
       radar: DEFAULT_RADAR,
       updatedAt: null,
@@ -107,6 +111,14 @@ const normalizeSettings = (row: Record<string, unknown> | null): ContractorAccou
   return {
     ocValidUntil: typeof row.oc_valid_until === 'string' ? row.oc_valid_until : null,
     ocPolicyScanPath: typeof row.oc_policy_scan_path === 'string' ? row.oc_policy_scan_path : null,
+    professionalQualificationsValidUntil:
+      typeof row.professional_qualifications_valid_until === 'string'
+        ? row.professional_qualifications_valid_until
+        : null,
+    professionalQualificationsScanPath:
+      typeof row.professional_qualifications_scan_path === 'string'
+        ? row.professional_qualifications_scan_path
+        : null,
     notificationChannels: {
       email: normalizeBoolean(notificationChannelsRaw.email, DEFAULT_CHANNELS.email),
       app: normalizeBoolean(notificationChannelsRaw.app, DEFAULT_CHANNELS.app),
@@ -220,6 +232,12 @@ export async function upsertContractorAccountSettings(
   if (payload.ocPolicyScanPath !== undefined) {
     patch.oc_policy_scan_path = payload.ocPolicyScanPath;
   }
+  if (payload.professionalQualificationsValidUntil !== undefined) {
+    patch.professional_qualifications_valid_until = payload.professionalQualificationsValidUntil;
+  }
+  if (payload.professionalQualificationsScanPath !== undefined) {
+    patch.professional_qualifications_scan_path = payload.professionalQualificationsScanPath;
+  }
   if (payload.notificationChannels !== undefined) {
     patch.notification_channels = payload.notificationChannels;
   }
@@ -306,7 +324,7 @@ export async function upsertContractorAccountSettings(
   return normalizeSettings((data as Record<string, unknown>) || null);
 }
 
-function validateOcPolicyFile(file: File): void {
+function validateVerificationScanFile(file: File): void {
   if (file.size > OC_POLICY_MAX_BYTES) {
     throw new Error(`Plik jest zbyt duży. Maksymalny rozmiar: ${OC_POLICY_MAX_BYTES / (1024 * 1024)} MB`);
   }
@@ -331,7 +349,7 @@ function validateOcPolicyFile(file: File): void {
 }
 
 export async function uploadOcPolicyScan(userId: string, file: File): Promise<{ path: string }> {
-  validateOcPolicyFile(file);
+  validateVerificationScanFile(file);
 
   const supabase = createClient();
   const rawExt = file.name.includes('.') ? file.name.split('.').pop() : 'pdf';
@@ -357,20 +375,67 @@ export async function uploadOcPolicyScan(userId: string, file: File): Promise<{ 
   return { path: filePath };
 }
 
+export async function uploadProfessionalQualificationsScan(
+  userId: string,
+  file: File
+): Promise<{ path: string }> {
+  validateVerificationScanFile(file);
+
+  const supabase = createClient();
+  const rawExt = file.name.includes('.') ? file.name.split('.').pop() : 'pdf';
+  const extension = rawExt ? rawExt.toLowerCase() : 'pdf';
+  const safeExt = OC_POLICY_ALLOWED_EXTENSIONS.includes(
+    extension as (typeof OC_POLICY_ALLOWED_EXTENSIONS)[number]
+  )
+    ? extension
+    : 'pdf';
+
+  const filePath = `${userId}/verification/professional-qualifications/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}.${safeExt}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(CONTRACTOR_POLICY_BUCKET)
+    .upload(filePath, file, { upsert: false });
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  return { path: filePath };
+}
+
+/** Best-effort removal of objects from the verification-documents bucket (ignores missing files). */
+export async function removeVerificationDocumentsFromBucket(paths: string[]): Promise<void> {
+  const filtered = paths.map((p) => p.trim()).filter(Boolean);
+  if (filtered.length === 0) return;
+
+  const supabase = createClient();
+  const { error } = await supabase.storage.from(CONTRACTOR_POLICY_BUCKET).remove(filtered);
+  if (error) {
+    console.error('removeVerificationDocumentsFromBucket:', error);
+  }
+}
+
 /**
  * Podpisany URL — bucket jest zwykle prywatny; `getPublicUrl` nie działa w przeglądarce bez polityki public read.
  */
-export async function getOcPolicyScanSignedUrl(path: string): Promise<string | null> {
+export async function getVerificationDocumentSignedUrl(path: string): Promise<string | null> {
   const supabase = createClient();
   const { data, error } = await supabase.storage
     .from(CONTRACTOR_POLICY_BUCKET)
     .createSignedUrl(path, OC_POLICY_SIGNED_URL_TTL_SEC);
 
   if (error || !data?.signedUrl) {
-    console.error('getOcPolicyScanSignedUrl:', error);
+    console.error('getVerificationDocumentSignedUrl:', error);
     return null;
   }
 
   return data.signedUrl;
+}
+
+/** @deprecated Use getVerificationDocumentSignedUrl */
+export async function getOcPolicyScanSignedUrl(path: string): Promise<string | null> {
+  return getVerificationDocumentSignedUrl(path);
 }
 

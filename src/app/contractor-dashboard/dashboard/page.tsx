@@ -16,9 +16,9 @@ async function getDashboardData(userId: string) {
 
   // Fetch all data in parallel
   const [dashboardData, activitiesData, applicationsData] = await Promise.all([
-    fetchContractorDashboardStats(supabase, company.id),
+    fetchContractorDashboardStats(supabase, company.id, userId),
     fetchContractorRecentActivities(supabase, company.id, userId, 10),
-    fetchContractorApplications(supabase, company.id),
+    fetchContractorApplications(supabase, userId),
   ]);
 
   // Map status from database format to component format
