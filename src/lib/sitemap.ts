@@ -2,7 +2,6 @@ import {
   Home, 
   Users, 
   Building2, 
-  DollarSign, 
   User, 
   LogIn, 
   LogOut, 
@@ -57,15 +56,6 @@ export const sitemapEntries: SitemapEntry[] = [
     description: "Przeglądaj profile zarządców",
     keywords: ["zarządcy", "managers", "nieruchomości", "property"]
   },
-  {
-    category: "Główne",
-    label: "Cennik",
-    path: "/pricing",
-    icon: DollarSign,
-    description: "Sprawdź nasze ceny i plany",
-    keywords: ["cennik", "pricing", "ceny", "plany", "koszt"]
-  },
-
   // Dla Wykonawców
   {
     category: "Dla Wykonawców",

@@ -16,12 +16,6 @@ export function Footer() {
           {/* Links */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
             <Link 
-              href="/pricing" 
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Cennik
-            </Link>
-            <Link 
               href="/contractors" 
               className="text-muted-foreground hover:text-foreground transition-colors"
             >

@@ -11,7 +11,6 @@ import {
   User,
   Briefcase,
   Users,
-  DollarSign,
   Menu,
   SlidersHorizontal,
   Map
@@ -60,7 +59,6 @@ export function MobileMenuDock() {
       'Zapisane': '/bookmarked-jobs',
       'Wiadomości': '/messages',
       'Profil': '/account',
-      'Cennik': '/pricing',
     };
     return titleToPath[title] || '';
   };
@@ -139,15 +137,6 @@ export function MobileMenuDock() {
           } as FloatingDockItem,
         ]
       : [
-          {
-            title: 'Cennik',
-            icon: <DollarSign className="size-6" />,
-            href: '/pricing',
-            onClick: () => {
-              router.push('/pricing');
-              setMenuDrawerOpen(false);
-            },
-          } as FloatingDockItem,
           {
             title: 'Zaloguj',
             icon: <User className="size-6" />,

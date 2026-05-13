@@ -110,7 +110,7 @@ export default function TermsPage() {
               <ul className="list-disc pl-6 space-y-2 text-slate-700">
                 <li>Konta Ogłoszeniodawców są bezpłatne</li>
                 <li>Wykonawcy mogą korzystać z płatnych planów subskrypcyjnych</li>
-                <li>Szczegóły dotyczące opłat znajdują się w zakładce Cennik</li>
+                <li>Szczegóły dotyczące opłat subskrypcyjnych są przekazywane w aplikacji przed finalizacją zakupu</li>
                 <li>Platforma nie pobiera prowizji od transakcji między Użytkownikami</li>
                 <li>Platforma zastrzega sobie prawo do zmiany modelu biznesowego z odpowiednim wyprzedzeniem</li>
               </ul>

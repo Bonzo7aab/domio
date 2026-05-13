@@ -112,7 +112,7 @@ const ExpertConsultationPage: React.FC<ExpertConsultationPageProps> = ({ onBack 
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button variant="outline" onClick={onBack}>
-                  Wróć do cennika
+                  Wróć na stronę główną
                 </Button>
                 <Button onClick={onBack} className="bg-primary">
                   Przeglądaj zlecenia

@@ -1,8 +1,66 @@
 import { updateSession } from './src/lib/supabase/middleware'
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
+
+/**
+ * First path segment for routes defined under `src/app`.
+ * Anything else (e.g. /foo-bar) is redirected to `/` after session refresh.
+ * Invalid dynamic IDs (e.g. /jobs/…) are handled by `src/app/not-found.tsx`.
+ */
+const ALLOWED_FIRST_SEGMENTS = new Set<string>([
+  'account',
+  'admin',
+  'api',
+  'auth',
+  'bookmarked-jobs',
+  'contractor-dashboard',
+  'contractors',
+  'expert-consultation',
+  'forgot-password',
+  'job-type-selection',
+  'jobs',
+  'login',
+  'manager-dashboard',
+  'managers',
+  'messages',
+  'onboarding',
+  'post-job',
+  'post-tender',
+  'privacy',
+  'profile-completion',
+  'register',
+  'tender-creation',
+  'terms',
+  'tutorial',
+  'user-type-selection',
+  'verification',
+  'welcome',
+])
+
+function isKnownAppRoute(pathname: string): boolean {
+  if (pathname === '/') return true
+  const segment = pathname.split('/').filter(Boolean)[0]
+  if (!segment) return true
+  if (segment.startsWith('.')) return true
+  return ALLOWED_FIRST_SEGMENTS.has(segment)
+}
+
+function copyCookies(from: NextResponse, to: NextResponse): void {
+  from.cookies.getAll().forEach((cookie) => {
+    to.cookies.set(cookie.name, cookie.value)
+  })
+}
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  const sessionResponse = await updateSession(request)
+  if (sessionResponse.headers.has('location')) {
+    return sessionResponse
+  }
+  if (!isKnownAppRoute(request.nextUrl.pathname)) {
+    const redirectHome = NextResponse.redirect(new URL('/', request.url))
+    copyCookies(sessionResponse, redirectHome)
+    return redirectHome
+  }
+  return sessionResponse
 }
 
 export const config = {
