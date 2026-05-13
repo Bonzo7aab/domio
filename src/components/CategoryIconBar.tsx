@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Grid } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFilterContext } from '../contexts/FilterContext';
 import { createClient } from '../lib/supabase/client';
 import { fetchAllCategories } from '../lib/database/categories';
@@ -80,14 +80,13 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
       
       if (isSelected) {
         // Deselect category and clear subcategories
-        // If no categories remain, "Wszystkie" will be automatically selected
         return {
           ...prev,
           categories: currentCategories.filter(c => c !== categoryName),
           subcategories: prev.subcategories || [] // Keep subcategories for now, will be filtered by JobFilters
         };
       } else {
-        // Select category - this automatically unselects "Wszystkie" since categories array will not be empty
+        // Select category
         return {
           ...prev,
           categories: [...currentCategories, categoryName]
@@ -96,24 +95,9 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
     });
   };
 
-  // Handle "Wszystkie" (All) click
-  const handleAllClick = () => {
-    setFilters(prev => ({
-      ...prev,
-      categories: [],
-      subcategories: [] // Clear subcategories when selecting "All"
-    }));
-  };
-
   // Check if category is selected
   const isCategorySelected = (categoryName: string) => {
     return (filters.categories || []).includes(categoryName);
-  };
-
-  // Check if "Wszystkie" (All) is selected
-  // Selected by default when no categories are selected (empty array)
-  const isAllSelected = () => {
-    return !filters?.categories || filters.categories.length === 0;
   };
 
   // Check scroll position and update arrow visibility
@@ -201,68 +185,6 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
           className="flex gap-2 sm:gap-4 overflow-x-auto pb-2 pl-2 sm:pl-0 sm:justify-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           style={{ scrollPaddingLeft: '0.5rem', scrollPaddingRight: '0.5rem' }}
         >
-          {/* "Wszystkie" (All) tile */}
-          <button
-            onClick={handleAllClick}
-            className={cn(
-              "flex-shrink-0 flex flex-col items-center gap-2",
-              "w-36 sm:w-40 h-24 sm:h-28",
-              "rounded-xl border transition-all duration-200",
-              "pt-3 pb-2.5",
-              "hover:shadow-md",
-              "focus:outline-none",
-              isAllSelected()
-                ? "border-primary shadow-sm bg-primary/5 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/20"
-                : "border-border bg-card hover:bg-accent/50 hover:border-accent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/30"
-            )}
-            style={
-              isAllSelected()
-                ? {
-                    borderColor: '#3b82f6',
-                    backgroundColor: '#3b82f608',
-                    '--tw-ring-color': '#3b82f620',
-                    boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.1)',
-                  } as React.CSSProperties
-                : undefined
-            }
-            aria-label="Pokaż wszystkie kategorie"
-          >
-            <div className="relative flex items-center justify-center">
-              <div
-                className={cn(
-                  "flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-lg transition-colors",
-                  isAllSelected() ? "" : "bg-muted"
-                )}
-                style={
-                  isAllSelected()
-                    ? {
-                        backgroundColor: '#3b82f620',
-                      }
-                    : undefined
-                }
-              >
-                <Grid
-                  className={cn(
-                    "w-5 h-5 sm:w-6 sm:h-6 transition-colors",
-                    isAllSelected() ? "" : "text-muted-foreground"
-                  )}
-                  style={isAllSelected() ? { color: '#3b82f6' } : undefined}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-1 w-full px-2 flex-1 justify-start min-h-0">
-              <span
-                className={cn(
-                  "text-[10px] sm:text-[11px] font-medium text-center leading-tight line-clamp-3",
-                  isAllSelected() ? "text-foreground" : "text-muted-foreground"
-                )}
-                style={isAllSelected() ? { color: '#3b82f6' } : undefined}
-              >
-                Wszystkie
-              </span>
-            </div>
-          </button>
-
             {categories.map(category => {
               const config = getCategoryConfig(category.slug);
               if (!config) return null;
