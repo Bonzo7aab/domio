@@ -337,7 +337,8 @@ export function UserAccountPageClient({
           normalizedTab,
         )
       ) {
-        setActiveTab(normalizedTab);
+        // Managers no longer use a separate „Dane firmy” tab — deep links still work.
+        setActiveTab(normalizedTab === 'company' ? 'profile' : normalizedTab);
       }
       hasInitializedTabFromUrl.current = true;
     }
@@ -399,6 +400,9 @@ export function UserAccountPageClient({
     }
     if (user.userType === 'contractor' && activeTab === 'profile') {
       setActiveTab('contractor-data');
+    }
+    if (user.userType === 'manager' && activeTab === 'company') {
+      setActiveTab('profile');
     }
   }, [user, activeTab]);
 
@@ -505,16 +509,6 @@ export function UserAccountPageClient({
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-              {user.userType === 'manager' && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => router.push('/manager-dashboard')}
-                  className="w-full sm:w-auto"
-                >
-                  Panel Zarządcy
-                </Button>
-              )}
               {user.userType === 'contractor' && (
                 <Button
                   variant="default"
@@ -557,33 +551,20 @@ export function UserAccountPageClient({
                     : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
                 )}
               >
-                Twoje Dane
+                Twoje dane
               </button>
             ) : (
-              <>
-                <button
-                  onClick={() => setActiveTab('profile')}
-                  className={cn(
-                    "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                    activeTab === 'profile'
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-                  )}
-                >
-                  Twoje dane
-                </button>
-                <button
-                  onClick={() => setActiveTab('company')}
-                  className={cn(
-                    "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                    activeTab === 'company'
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-                  )}
-                >
-                  Dane firmy
-                </button>
-              </>
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={cn(
+                  "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
+                  activeTab === 'profile'
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                )}
+              >
+                Twoje dane
+              </button>
             )}
             <button
               onClick={() => setActiveTab('security')}
@@ -605,7 +586,7 @@ export function UserAccountPageClient({
                   : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
               )}
             >
-              Zgody na Powiadomienia
+              Zgody na powiadomienia
             </button>
           </div>
         </div>
@@ -616,16 +597,13 @@ export function UserAccountPageClient({
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsContent value="profile" className="space-y-6">
             <ProfileForm user={user} />
+            {user.userType === 'manager' && <CompanyManagementForm user={user} />}
           </TabsContent>
 
           <TabsContent value="contractor-data" className="space-y-6">
             <ProfileForm user={user} includeBusinessData />
             <ContractorInsuranceSettings userId={user.id} />
             <ContractorProfessionalQualificationsSettings userId={user.id} />
-          </TabsContent>
-
-          <TabsContent value="company" className="space-y-6">
-            <CompanyManagementForm user={user} />
           </TabsContent>
 
           <TabsContent value="security" className="space-y-6">

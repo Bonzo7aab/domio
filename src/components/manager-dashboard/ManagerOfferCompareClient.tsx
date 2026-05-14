@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Phone, Mail } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '../../lib/supabase/client';
 import {
@@ -63,6 +63,10 @@ interface TenderBidLike {
   attachments: Array<Record<string, unknown>>;
 }
 
+function netFromBid(bid: TenderBidLike): number {
+  return bid.totalPrice;
+}
+
 interface ManagerOfferCompareClientProps {
   submissionId: string;
   kind: CompareKind;
@@ -87,6 +91,55 @@ function formatDate(d: Date | string | undefined): string {
   });
 }
 
+type CompareSortKey =
+  | 'contractor'
+  | 'net'
+  | 'brutto'
+  | 'start'
+  | 'duration'
+  | 'guarantee'
+  | 'rating';
+
+interface CompareSortState {
+  key: CompareSortKey;
+  dir: 'asc' | 'desc';
+}
+
+function parseGuaranteeMonths(value: string | number): number {
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  const m = /^(\d+)/.exec(String(value).trim());
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+interface SortableThProps {
+  label: string;
+  sortKey: CompareSortKey;
+  sort: CompareSortState;
+  onSort: (key: CompareSortKey) => void;
+}
+
+function SortableTh({ label, sortKey, sort, onSort }: SortableThProps): React.ReactElement {
+  const active = sort.key === sortKey;
+  return (
+    <TableHead>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+        onClick={() => onSort(sortKey)}
+      >
+        {label}
+        {active ? (
+          sort.dir === 'asc' ? (
+            <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          ) : (
+            <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          )
+        ) : null}
+      </button>
+    </TableHead>
+  );
+}
+
 export function ManagerOfferCompareClient({
   submissionId,
   kind,
@@ -101,6 +154,94 @@ export function ManagerOfferCompareClient({
   const [detailBid, setDetailBid] = useState<TenderBidLike | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [contactProfile, setContactProfile] = useState<ContractorProfile | null>(null);
+
+  const [sort, setSort] = useState<CompareSortState>({ key: 'net', dir: 'asc' });
+
+  const toggleSort = (key: CompareSortKey): void => {
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+    );
+  };
+
+  const sortedJobApps = useMemo(() => {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    const rows = [...jobApps];
+    rows.sort((a, b) => {
+      let cmp = 0;
+      switch (sort.key) {
+        case 'contractor':
+          cmp = a.contractorCompany.localeCompare(b.contractorCompany, 'pl');
+          break;
+        case 'net':
+          cmp = a.proposedPrice - b.proposedPrice;
+          break;
+        case 'brutto':
+          cmp =
+            grossFromVat(a.proposedPrice, a.vatRate ?? 23) -
+            grossFromVat(b.proposedPrice, b.vatRate ?? 23);
+          break;
+        case 'start':
+          cmp = new Date(a.availableFrom).getTime() - new Date(b.availableFrom).getTime();
+          break;
+        case 'duration': {
+          const da = a.timelineDays ?? Number.MAX_SAFE_INTEGER;
+          const db = b.timelineDays ?? Number.MAX_SAFE_INTEGER;
+          cmp = da - db;
+          break;
+        }
+        case 'guarantee':
+          cmp = parseGuaranteeMonths(a.guaranteePeriod) - parseGuaranteeMonths(b.guaranteePeriod);
+          break;
+        case 'rating':
+          cmp = a.contractorRating - b.contractorRating;
+          break;
+        default:
+          cmp = 0;
+      }
+      if (cmp !== 0) return cmp * mul;
+      return a.contractorCompany.localeCompare(b.contractorCompany, 'pl');
+    });
+    return rows;
+  }, [jobApps, sort]);
+
+  const sortedTenderBids = useMemo(() => {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    const rows = [...tenderBids];
+    rows.sort((a, b) => {
+      let cmp = 0;
+      const netA = netFromBid(a);
+      const netB = netFromBid(b);
+      switch (sort.key) {
+        case 'contractor':
+          cmp = a.contractorCompany.localeCompare(b.contractorCompany, 'pl');
+          break;
+        case 'net':
+          cmp = netA - netB;
+          break;
+        case 'brutto':
+          cmp = grossFromVat(netA, DEFAULT_VAT) - grossFromVat(netB, DEFAULT_VAT);
+          break;
+        case 'start':
+          cmp =
+            new Date(a.proposedStartDate).getTime() - new Date(b.proposedStartDate).getTime();
+          break;
+        case 'duration':
+          cmp = a.proposedTimeline - b.proposedTimeline;
+          break;
+        case 'guarantee':
+          cmp = a.guaranteePeriod - b.guaranteePeriod;
+          break;
+        case 'rating':
+          cmp = a.contractorRating - b.contractorRating;
+          break;
+        default:
+          cmp = 0;
+      }
+      if (cmp !== 0) return cmp * mul;
+      return a.contractorCompany.localeCompare(b.contractorCompany, 'pl');
+    });
+    return rows;
+  }, [tenderBids, sort]);
 
   const loadProfiles = useCallback(async (companyIds: string[]): Promise<void> => {
     const unique = [...new Set(companyIds.filter(Boolean))];
@@ -205,16 +346,10 @@ export function ManagerOfferCompareClient({
   };
 
   const detailProfile = useMemo(() => {
-    if (detailApp) {
-      return profileForCompany(detailApp.contractorCompanyId);
-    }
-    if (detailBid) {
-      return profileForCompany(detailBid.contractorCompanyId);
-    }
-    return null;
+    const id = detailApp?.contractorCompanyId || detailBid?.contractorCompanyId;
+    if (!id) return null;
+    return profiles[id] ?? null;
   }, [detailApp, detailBid, profiles]);
-
-  const netFromBid = (bid: TenderBidLike): number => bid.totalPrice;
 
   if (loading) {
     return (
@@ -243,14 +378,14 @@ export function ManagerOfferCompareClient({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Wykonawca</TableHead>
-                  <TableHead>Cena netto</TableHead>
+                  <SortableTh label="Wykonawca" sortKey="contractor" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Cena netto" sortKey="net" sort={sort} onSort={toggleSort} />
                   <TableHead>VAT</TableHead>
-                  <TableHead>Cena brutto</TableHead>
-                  <TableHead>Termin rozpoczęcia</TableHead>
-                  <TableHead>Czas realizacji</TableHead>
-                  <TableHead>Okres gwarancji</TableHead>
-                  <TableHead>Profil</TableHead>
+                  <SortableTh label="Cena brutto" sortKey="brutto" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Termin rozpoczęcia" sortKey="start" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Czas realizacji" sortKey="duration" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Okres gwarancji" sortKey="guarantee" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Ocena wykonawcy" sortKey="rating" sort={sort} onSort={toggleSort} />
                   <TableHead className="text-right">Szczegóły</TableHead>
                 </TableRow>
               </TableHeader>
@@ -262,7 +397,7 @@ export function ManagerOfferCompareClient({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  jobApps.map((app) => {
+                  sortedJobApps.map((app) => {
                     const net = app.proposedPrice;
                     const vatRate = app.vatRate ?? 23;
                     const brutto = grossFromVat(net, vatRate);
@@ -300,14 +435,14 @@ export function ManagerOfferCompareClient({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Wykonawca</TableHead>
-                  <TableHead>Cena netto</TableHead>
+                  <SortableTh label="Wykonawca" sortKey="contractor" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Cena netto" sortKey="net" sort={sort} onSort={toggleSort} />
                   <TableHead>VAT</TableHead>
-                  <TableHead>Cena brutto</TableHead>
-                  <TableHead>Termin rozpoczęcia</TableHead>
-                  <TableHead>Czas realizacji</TableHead>
-                  <TableHead>Okres gwarancji</TableHead>
-                  <TableHead>Profil</TableHead>
+                  <SortableTh label="Cena brutto" sortKey="brutto" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Termin rozpoczęcia" sortKey="start" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Czas realizacji" sortKey="duration" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Okres gwarancji" sortKey="guarantee" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Ocena wykonawcy" sortKey="rating" sort={sort} onSort={toggleSort} />
                   <TableHead className="text-right">Szczegóły</TableHead>
                 </TableRow>
               </TableHeader>
@@ -319,7 +454,7 @@ export function ManagerOfferCompareClient({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  tenderBids.map((bid) => {
+                  sortedTenderBids.map((bid) => {
                     const net = netFromBid(bid);
                     const brutto = grossFromVat(net, DEFAULT_VAT);
                     const p = profileForCompany(bid.contractorCompanyId);

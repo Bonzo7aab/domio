@@ -50,7 +50,7 @@ export default function TendersPage() {
     // Check if company exists before allowing creation
     if (!hasCompany) {
       toast.error('Najpierw musisz dodać dane firmy w profilu');
-      router.push('/account?tab=company');
+      router.push('/account');
       return;
     }
     router.push('/post-tender');
@@ -60,7 +60,7 @@ export default function TendersPage() {
     // Check if company exists before allowing edit
     if (!hasCompany) {
       toast.error('Najpierw musisz dodać dane firmy w profilu');
-      router.push('/account?tab=company');
+      router.push('/account');
       return;
     }
 
@@ -122,7 +122,7 @@ export default function TendersPage() {
     // Ensure company exists before any tender operation
     if (!hasCompany) {
       toast.error('Najpierw musisz dodać dane firmy w profilu');
-      router.push('/account?tab=company');
+      router.push('/account');
       return;
     }
 
@@ -262,7 +262,7 @@ export default function TendersPage() {
         <Card>
           <CardContent className="pt-6 text-center space-y-4 gap-2 flex flex-col justify-center">
             <p className="text-muted-foreground">Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.</p>
-            <Link href="/account?tab=company">
+            <Link href="/account">
               <Button>Dodaj dane firmy w profilu</Button>
             </Link>
           </CardContent>

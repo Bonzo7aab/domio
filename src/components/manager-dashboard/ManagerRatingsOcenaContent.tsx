@@ -29,7 +29,7 @@ export function ManagerRatingsOcenaContent({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Ocena zgłoszeń</h2>
+        <h2 className="text-2xl font-bold">Ocena Zgłoszeń</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Opinie wystawione przez Ciebie oraz oceny Twojej organizacji.
         </p>

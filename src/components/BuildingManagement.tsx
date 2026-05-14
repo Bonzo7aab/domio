@@ -6,10 +6,11 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
+import { cn } from './ui/utils';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from './ui/dropzone';
 import type { FileRejection } from 'react-dropzone';
 import {
@@ -32,10 +33,8 @@ import {
 } from './ui/alert-dialog';
 import { createClient } from '../lib/supabase/client';
 import { fetchCompanyBuildings, createBuilding, updateBuilding, deleteBuilding } from '../lib/database/buildings';
-import { geocodeAddressWithFallback } from '../lib/database/geocoding-helper';
 import { uploadBuildingImages } from '../lib/storage/building-images';
 import type { Building, BuildingFormData } from '../types/building';
-import { BUILDING_TYPE_OPTIONS } from '../types/building';
 
 interface BuildingManagementProps {
   companyId: string;
@@ -51,7 +50,6 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
   const [deletingBuilding, setDeletingBuilding] = useState<Building | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGeocoding, setIsGeocoding] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -76,24 +74,29 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
-  const loadBuildings = async () => {
-    setIsLoading(true);
+  const loadBuildings = async (options?: { skipListLayoutLoading?: boolean }) => {
+    const skipListLayoutLoading = options?.skipListLayoutLoading === true;
+    if (!skipListLayoutLoading) {
+      setIsLoading(true);
+    }
     setError('');
     try {
       const supabase = createClient();
       const { data, error: fetchError } = await fetchCompanyBuildings(supabase, companyId);
-      
+
       if (fetchError) {
-        setError('Nie udało się załadować budynków');
+        setError('Nie udało się załadować nieruchomości');
         console.error('Error fetching buildings:', fetchError);
       } else {
         setBuildings(data || []);
       }
     } catch (err) {
-      setError('Wystąpił błąd podczas ładowania budynków');
+      setError('Wystąpił błąd podczas ładowania nieruchomości');
       console.error('Error loading buildings:', err);
     } finally {
-      setIsLoading(false);
+      if (!skipListLayoutLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -204,33 +207,32 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
     setError('');
     setSuccess('');
     setIsSubmitting(true);
-    setIsGeocoding(true);
 
     // Validate required fields
     if (!formData.name.trim() || !formData.street_address.trim() || !formData.city.trim()) {
-      setError('Nazwa, adres ulicy i miasto są wymagane');
+      setError('Nazwa nieruchomości, ulica i miasto są wymagane');
       setIsSubmitting(false);
-      setIsGeocoding(false);
       return;
     }
 
     try {
       const supabase = createClient();
-      
-      // Get user ID for image uploads
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
       if (!authUser) {
-        setError('Musisz być zalogowany, aby zapisać budynek');
+        setError('Musisz być zalogowany, aby zapisać nieruchomość');
         setIsSubmitting(false);
-        setIsGeocoding(false);
         return;
       }
 
-      // Geocode address
-      const fullAddress = `${formData.street_address}, ${formData.city}${formData.postal_code ? `, ${formData.postal_code}` : ''}, Polska`;
-      const geocodeResult = await geocodeAddressWithFallback(fullAddress);
-      
-      setIsGeocoding(false);
+      const latitude: number | null = editingBuilding
+        ? formData.latitude ?? editingBuilding.latitude ?? null
+        : null;
+      const longitude: number | null = editingBuilding
+        ? formData.longitude ?? editingBuilding.longitude ?? null
+        : null;
 
       if (editingBuilding) {
         // Update existing building
@@ -266,8 +268,9 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
 
         const buildingData: BuildingFormData = {
           ...formData,
-          latitude: geocodeResult.success ? geocodeResult.latitude : null,
-          longitude: geocodeResult.success ? geocodeResult.longitude : null,
+          building_type: '',
+          latitude,
+          longitude,
           images: imageUrls.length > 0 ? imageUrls : undefined,
         };
 
@@ -278,25 +281,27 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
         );
 
         if (updateError) {
-          setError(updateError.message || 'Nie udało się zaktualizować budynku');
+          setError(updateError.message || 'Nie udało się zaktualizować nieruchomości');
         } else {
           const imageCount = imageUrls.length;
-          setSuccess(`Budynek został zaktualizowany pomyślnie${imageCount > 0 ? ` z ${imageCount} ${imageCount === 1 ? 'obrazem' : 'obrazami'}` : ''}`);
-          await loadBuildings();
-          setTimeout(() => {
-            setIsDialogOpen(false);
-            setSuccess('');
-            setImageFiles([]);
-            setImagePreviews([]);
-            setExistingImages([]);
-          }, 2000);
+          setSuccess(
+            `Nieruchomość została zaktualizowana pomyślnie${imageCount > 0 ? ` z ${imageCount} ${imageCount === 1 ? 'obrazem' : 'obrazami'}` : ''}`,
+          );
+          await loadBuildings({ skipListLayoutLoading: true });
+          setIsDialogOpen(false);
+          setEditingBuilding(null);
+          setImageFiles([]);
+          setImagePreviews([]);
+          setExistingImages([]);
+          setTimeout(() => setSuccess(''), 4000);
         }
       } else {
         // Create new building first, then upload images with correct building ID
         const buildingData: BuildingFormData = {
           ...formData,
-          latitude: geocodeResult.success ? geocodeResult.latitude : null,
-          longitude: geocodeResult.success ? geocodeResult.longitude : null,
+          building_type: '',
+          latitude,
+          longitude,
           images: [], // Create without images first
         };
 
@@ -307,13 +312,13 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
         );
 
         if (createError) {
-          setError(createError.message || 'Nie udało się utworzyć budynku');
+          setError(createError.message || 'Nie udało się utworzyć nieruchomości');
           setIsSubmitting(false);
           return;
         }
 
         if (!newBuilding) {
-          setError('Nie udało się utworzyć budynku');
+          setError('Nie udało się utworzyć nieruchomości');
           setIsSubmitting(false);
           return;
         }
@@ -332,7 +337,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
             if (uploadErrors.length > 0) {
               console.error('Some images failed to upload:', uploadErrors);
               const errorMessages = uploadErrors.map(e => (e as { error?: { message?: string } }).error?.message || 'Nieznany błąd').join(', ');
-              setError(`Budynek został utworzony, ale ${uploadErrors.length} ${uploadErrors.length === 1 ? 'obraz nie został' : 'obrazów nie zostało'} przesłanych: ${errorMessages}`);
+              setError(`Nieruchomość została utworzona, ale ${uploadErrors.length} ${uploadErrors.length === 1 ? 'obraz nie został' : 'obrazów nie zostało'} przesłanych: ${errorMessages}`);
             }
 
             const finalImageUrls = uploadedImages.length > 0 
@@ -349,36 +354,34 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
 
               if (updateError) {
                 console.error('Error updating building with images:', updateError);
-                setError('Budynek został utworzony, ale nie udało się zapisać obrazów. Spróbuj edytować budynek i dodać obrazy ponownie.');
+                setError('Nieruchomość została utworzona, ale nie udało się zapisać obrazów. Spróbuj edytować wpis i dodać obrazy ponownie.');
               } else {
-                setSuccess(`Budynek został dodany pomyślnie${uploadedImages.length > 0 ? ` z ${uploadedImages.length} ${uploadedImages.length === 1 ? 'obrazem' : 'obrazami'}` : ''}`);
+                setSuccess(`Nieruchomość została dodana pomyślnie${uploadedImages.length > 0 ? ` z ${uploadedImages.length} ${uploadedImages.length === 1 ? 'obrazem' : 'obrazami'}` : ''}`);
               }
             } else {
-              setSuccess('Budynek został dodany pomyślnie');
+              setSuccess('Nieruchomość została dodana pomyślnie');
             }
           } catch (uploadErr) {
             console.error('Error during image upload:', uploadErr);
-            setError('Budynek został utworzony, ale wystąpił błąd podczas przesyłania obrazów. Spróbuj edytować budynek i dodać obrazy ponownie.');
+            setError('Nieruchomość została utworzona, ale wystąpił błąd podczas przesyłania obrazów. Spróbuj edytować wpis i dodać obrazy ponownie.');
           } finally {
             setIsUploadingImages(false);
           }
         } else {
-          setSuccess('Budynek został dodany pomyślnie');
+          setSuccess('Nieruchomość została dodana pomyślnie');
         }
 
-        await loadBuildings();
-        setTimeout(() => {
-          setIsDialogOpen(false);
-          setSuccess('');
-          setImageFiles([]);
-          setImagePreviews([]);
-          setExistingImages([]);
-        }, 1500);
+        await loadBuildings({ skipListLayoutLoading: true });
+        setIsDialogOpen(false);
+        setEditingBuilding(null);
+        setImageFiles([]);
+        setImagePreviews([]);
+        setExistingImages([]);
+        setTimeout(() => setSuccess(''), 4000);
       }
     } catch (err) {
-      setIsGeocoding(false);
       setIsUploadingImages(false);
-      setError('Wystąpił błąd podczas zapisywania budynku');
+      setError('Wystąpił błąd podczas zapisywania nieruchomości');
       console.error('Error saving building:', err);
     } finally {
       setIsSubmitting(false);
@@ -396,25 +399,20 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
       const { success, error: deleteError } = await deleteBuilding(supabase, deletingBuilding.id);
 
       if (deleteError || !success) {
-        setError(deleteError?.message || 'Nie udało się usunąć budynku');
+        setError(deleteError?.message || 'Nie udało się usunąć nieruchomości');
       } else {
-        setSuccess('Budynek został usunięty pomyślnie');
-        await loadBuildings();
+        setSuccess('Nieruchomość została usunięta pomyślnie');
+        await loadBuildings({ skipListLayoutLoading: true });
         setIsDeleteDialogOpen(false);
         setDeletingBuilding(null);
         setTimeout(() => setSuccess(''), 3000);
       }
     } catch (err) {
-      setError('Wystąpił błąd podczas usuwania budynku');
+      setError('Wystąpił błąd podczas usuwania nieruchomości');
       console.error('Error deleting building:', err);
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const getBuildingTypeLabel = (type: string | null) => {
-    if (!type) return 'Nie określono';
-    return BUILDING_TYPE_OPTIONS.find(opt => opt.value === type)?.label || type;
   };
 
   if (isLoading) {
@@ -422,7 +420,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
       <div className="border rounded-lg p-4 bg-card">
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          <p className="ml-2 text-sm text-muted-foreground">Ładowanie budynków...</p>
+          <p className="ml-2 text-sm text-muted-foreground">Ładowanie nieruchomości...</p>
         </div>
       </div>
     );
@@ -440,10 +438,10 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
-            <h4 className="font-medium">Zarządzanie budynkami</h4>
+            <h4 className="font-medium">Zarządzanie nieruchomościami</h4>
             {buildings.length > 0 && (
               <Badge variant="outline" className="text-xs">
-                {buildings.length} {buildings.length === 1 ? 'budynek' : 'budynków'}
+                {buildings.length} {buildings.length === 1 ? 'nieruchomość' : 'nieruchomości'}
               </Badge>
             )}
           </div>
@@ -453,7 +451,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
             onClick={handleOpenAddDialog}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Dodaj budynek
+            Dodaj
           </Button>
         </div>
 
@@ -461,59 +459,75 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
           <div className="text-center py-8">
             <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground mb-2">
-              Nie masz jeszcze dodanych budynków
+              Nie masz jeszcze dodanych nieruchomości
             </p>
             <p className="text-xs text-muted-foreground">
-              Kliknij &quot;Dodaj budynek&quot; aby dodać pierwszy budynek
+              Kliknij „Dodaj”, aby dodać pierwszą nieruchomość (np. wspólnotę lub budynek, którym zarządzasz).
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {buildings.map((building) => (
-              <Card key={building.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-base">{building.name}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground">
-                          {building.street_address}, {building.city}
-                        </p>
+              <Card
+                key={building.id}
+                className={cn(
+                  'group overflow-hidden border-border/80 bg-card shadow-sm transition-all duration-200',
+                  'hover:border-primary/25 hover:shadow-md',
+                )}
+              >
+                <CardHeader className="relative border-b bg-gradient-to-b from-muted/50 to-muted/20 px-4 pb-3 pt-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <CardTitle className="text-lg font-semibold leading-tight tracking-tight">
+                        {building.name}
+                      </CardTitle>
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" aria-hidden />
+                        <span className="leading-snug">
+                          {building.street_address}
+                          {building.postal_code ? `, ${building.postal_code}` : ''}
+                          <br />
+                          <span className="font-medium text-foreground/80">{building.city}</span>
+                        </span>
                       </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex shrink-0 gap-0.5 rounded-lg border bg-background/80 p-0.5 shadow-sm backdrop-blur-sm">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0"
+                        className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => handleOpenEditDialog(building)}
+                        aria-label="Edytuj nieruchomość"
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
+                      <Separator orientation="vertical" className="h-7 self-center" />
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive"
                         onClick={() => handleOpenDeleteDialog(building)}
+                        aria-label="Usuń nieruchomość"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  {/* Building Images */}
+                <CardContent className="space-y-4 p-4">
                   {building.images && building.images.length > 0 && (
-                    <div className="mb-3">
+                    <div>
                       <div className="grid grid-cols-3 gap-2">
                         {building.images.slice(0, 3).map((imageUrl, index) => (
-                          <div key={index} className="relative aspect-video rounded-md overflow-hidden border">
+                          <div
+                            key={index}
+                            className="relative aspect-[4/3] overflow-hidden rounded-lg border bg-muted/30 shadow-inner ring-1 ring-black/5"
+                          >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={imageUrl}
-                              alt={`${building.name} - zdjęcie ${index + 1}`}
-                              className="w-full h-full object-cover"
+                              alt={`${building.name} — zdjęcie ${index + 1}`}
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                               onError={(e) => {
                                 console.error('Error loading building image:', imageUrl);
                                 e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect width="100" height="100" fill="%23f3f4f6"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="12"%3EBłąd ładowania%3C/text%3E%3C/svg%3E';
@@ -523,42 +537,39 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                         ))}
                       </div>
                       {building.images.length > 3 && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          +{building.images.length - 3} więcej {building.images.length - 3 === 1 ? 'zdjęcia' : 'zdjęć'}
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          +{building.images.length - 3}{' '}
+                          {building.images.length - 3 === 1 ? 'zdjęcie' : 'zdjęć'}
                         </p>
                       )}
                     </div>
                   )}
-                  <div className="space-y-2 text-sm">
-                    {building.building_type && (
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {getBuildingTypeLabel(building.building_type)}
+
+                  {(building.year_built || building.units_count != null || building.floors_count != null) && (
+                    <div className="flex flex-wrap gap-2">
+                      {building.year_built ? (
+                        <Badge variant="secondary" className="font-normal">
+                          Rok budowy: {building.year_built}
                         </Badge>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                      {building.year_built && (
-                        <div>Rok budowy: {building.year_built}</div>
-                      )}
-                      {building.units_count && (
-                        <div>Jednostek: {building.units_count}</div>
-                      )}
-                      {building.floors_count && (
-                        <div>Pięter: {building.floors_count}</div>
-                      )}
-                      {(building.latitude && building.longitude) && (
-                        <div className="col-span-2">
-                          Współrzędne: {building.latitude.toFixed(6)}, {building.longitude.toFixed(6)}
-                        </div>
-                      )}
+                      ) : null}
+                      {building.units_count != null && building.units_count > 0 ? (
+                        <Badge variant="secondary" className="font-normal">
+                          Lokali: {building.units_count}
+                        </Badge>
+                      ) : null}
+                      {building.floors_count != null && building.floors_count > 0 ? (
+                        <Badge variant="secondary" className="font-normal">
+                          Pięter: {building.floors_count}
+                        </Badge>
+                      ) : null}
                     </div>
-                    {building.notes && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {building.notes}
-                      </p>
-                    )}
-                  </div>
+                  )}
+
+                  {building.notes ? (
+                    <p className="line-clamp-3 rounded-lg border border-dashed border-border/80 bg-muted/25 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                      {building.notes}
+                    </p>
+                  ) : null}
                 </CardContent>
               </Card>
             ))}
@@ -571,10 +582,12 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingBuilding ? 'Edytuj budynek' : 'Dodaj nowy budynek'}
+              {editingBuilding ? 'Edytuj nieruchomość' : 'Dodaj nową nieruchomość'}
             </DialogTitle>
             <DialogDescription>
-              Wypełnij formularz aby {editingBuilding ? 'zaktualizować' : 'dodać'} budynek. Adres zostanie automatycznie zgeokodowany.
+              {editingBuilding
+                ? 'Zaktualizuj dane nieruchomości i zapisz zmiany.'
+                : 'Uzupełnij dane nowej nieruchomości. Pola oznaczone gwiazdką są wymagane.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -587,18 +600,18 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
-                <Label htmlFor="buildingName">Nazwa budynku *</Label>
+                <Label htmlFor="buildingName">Nazwa nieruchomości *</Label>
                 <Input
                   id="buildingName"
                   value={formData.name}
                   onChange={(e) => handleFormChange('name', e.target.value)}
-                  placeholder="np. Budynek A, Osiedle XYZ"
+                  placeholder="np. Wspólnota Przykładowa 1"
                   required
                 />
               </div>
 
               <div className="col-span-2 space-y-2">
-                <Label htmlFor="streetAddress">Adres ulicy *</Label>
+                <Label htmlFor="streetAddress">Ulica *</Label>
                 <Input
                   id="streetAddress"
                   value={formData.street_address}
@@ -629,25 +642,6 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                 />
               </div>
 
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="buildingType">Typ budynku</Label>
-                <Select
-                  value={formData.building_type}
-                  onValueChange={(value) => handleFormChange('building_type', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Wybierz typ budynku" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BUILDING_TYPE_OPTIONS.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="col-span-2 md:col-span-1 space-y-2">
                 <Label htmlFor="yearBuilt">Rok budowy</Label>
                 <Input
@@ -662,7 +656,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
               </div>
 
               <div className="col-span-2 md:col-span-1 space-y-2">
-                <Label htmlFor="unitsCount">Liczba jednostek</Label>
+                <Label htmlFor="unitsCount">Liczba lokali</Label>
                 <Input
                   id="unitsCount"
                   type="number"
@@ -691,14 +685,14 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                   id="notes"
                   value={formData.notes}
                   onChange={(e) => handleFormChange('notes', e.target.value)}
-                  placeholder="Dodatkowe informacje o budynku..."
+                  placeholder="Dodatkowe informacje o nieruchomości…"
                   rows={3}
                 />
               </div>
 
               {/* Image Upload Section */}
               <div className="col-span-2 space-y-2">
-                <Label>Zdjęcia budynku</Label>
+                <Label>Zdjęcia nieruchomości</Label>
                 <Dropzone
                   accept={{ 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] }}
                   maxFiles={10}
@@ -746,7 +740,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={url}
-                            alt={`Budynek ${index + 1}`}
+                            alt={`Nieruchomość — zdjęcie ${index + 1}`}
                             className="w-full h-24 object-cover rounded-md border"
                           />
                           <Button
@@ -796,17 +790,6 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                   </div>
                 )}
               </div>
-
-              {isGeocoding && (
-                <div className="col-span-2">
-                  <Alert>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <AlertDescription>
-                      Geokodowanie adresu...
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )}
             </div>
           </div>
 
@@ -821,17 +804,17 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || isGeocoding || isUploadingImages}
+              disabled={isSubmitting || isUploadingImages}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {isGeocoding ? 'Geokodowanie...' : isUploadingImages ? 'Przesyłanie zdjęć...' : 'Zapisywanie...'}
+                  {isUploadingImages ? 'Przesyłanie zdjęć...' : 'Zapisywanie...'}
                 </>
               ) : (
                 <>
                   <Check className="h-4 w-4 mr-2" />
-                  {editingBuilding ? 'Zapisz zmiany' : 'Dodaj budynek'}
+                  {editingBuilding ? 'Zapisz zmiany' : 'Dodaj'}
                 </>
               )}
             </Button>
@@ -843,9 +826,9 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Usunąć budynek?</AlertDialogTitle>
+            <AlertDialogTitle>Usunąć nieruchomość?</AlertDialogTitle>
             <AlertDialogDescription>
-              Czy na pewno chcesz usunąć budynek &quot;{deletingBuilding?.name}&quot;? 
+              Czy na pewno chcesz usunąć nieruchomość &quot;{deletingBuilding?.name}&quot;? 
               Ta operacja jest nieodwracalna.
             </AlertDialogDescription>
           </AlertDialogHeader>

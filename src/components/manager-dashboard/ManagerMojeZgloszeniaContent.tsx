@@ -70,12 +70,6 @@ export function ManagerMojeZgloszeniaContent({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Moje zgłoszenia</h2>
-        </div>
-      </div>
-
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -149,22 +143,35 @@ export function ManagerMojeZgloszeniaContent({
                             year: 'numeric',
                           })}
                         </TableCell>
-                        <TableCell className="text-right space-x-2 whitespace-nowrap">
-                          <Button variant="outline" size="sm" onClick={() => setPodgladRow(row)}>
-                            Podgląd
-                          </Button>
-                          {row.kind === 'job' && row.canEdit && (
-                            <Button variant="secondary" size="sm" asChild>
-                              <Link href={`/manager-dashboard/zgloszenia/edytuj/${row.id}`}>Edytuj</Link>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setPodgladRow(row)}>
+                              Podgląd
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            disabled={row.offersCount === 0}
-                            onClick={() => router.push(compareHref(row))}
-                          >
-                            Porównaj oferty
-                          </Button>
+                            {row.kind === 'job' && row.canEdit && (
+                              <Button variant="secondary" size="sm" asChild>
+                                <Link href={`/manager-dashboard/zgloszenia/edytuj/${row.id}`}>Edytuj</Link>
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled
+                              title="Funkcja w przygotowaniu."
+                            >
+                              Odbiór
+                            </Button>
+                            <Button variant="outline" size="sm" disabled title="Funkcja w przygotowaniu.">
+                              Zakończ
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={row.offersCount === 0}
+                              onClick={() => router.push(compareHref(row))}
+                            >
+                              Porównaj oferty
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

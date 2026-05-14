@@ -35,6 +35,7 @@ const CONTRACTOR_COMPANY_TYPES = [
 ];
 
 export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
+  const isManager = user.userType === 'manager';
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -171,7 +172,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
       errors.name = false;
     }
     
-    if (!companyData.type) {
+    if (!isManager && !companyData.type) {
       errors.type = true;
       hasErrors = true;
     } else {
@@ -185,18 +186,29 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
       errors.nip = false;
     }
 
-    if (!companyData.phone.trim()) {
-      errors.phone = true;
-      hasErrors = true;
-    } else {
+    if (isManager) {
+      if (!(user.phone || '').trim()) {
+        setError('Uzupełnij telefon w sekcji „Dane kontaktowe” powyżej.');
+        setIsLoading(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       errors.phone = false;
-    }
-
-    if (!companyData.email.trim()) {
-      errors.email = true;
-      hasErrors = true;
-    } else {
       errors.email = false;
+    } else {
+      if (!companyData.phone.trim()) {
+        errors.phone = true;
+        hasErrors = true;
+      } else {
+        errors.phone = false;
+      }
+
+      if (!companyData.email.trim()) {
+        errors.email = true;
+        hasErrors = true;
+      } else {
+        errors.email = false;
+      }
     }
 
     if (!companyData.address.trim()) {
@@ -235,14 +247,22 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
 
     try {
       const supabase = createClient();
+      const resolvedType = isManager ? 'wspólnota' : companyData.type;
+      const resolvedPhone = isManager
+        ? (user.phone || '').trim()
+        : companyData.phone.trim();
+      const resolvedEmail = isManager
+        ? (user.email || '').trim()
+        : companyData.email.trim();
+
       const { error: saveError } = await upsertUserCompany(
         supabase,
         user.id,
         {
           name: companyData.name,
-          type: companyData.type,
-          phone: companyData.phone,
-          email: companyData.email,
+          type: resolvedType,
+          phone: resolvedPhone,
+          email: resolvedEmail,
           address: companyData.address,
           city: companyData.city,
           postal_code: companyData.postal_code,
@@ -318,10 +338,10 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
 
     // Check each required field - a field is missing if it's null, undefined, empty string "", or whitespace-only
     if (isEmpty(companyData.name)) missingFields.push(fieldLabels.name);
-    if (isEmpty(companyData.type)) missingFields.push(fieldLabels.type);
+    if (!isManager && isEmpty(companyData.type)) missingFields.push(fieldLabels.type);
     if (isEmpty(companyData.nip)) missingFields.push(fieldLabels.nip);
-    if (isEmpty(companyData.phone)) missingFields.push(fieldLabels.phone);
-    if (isEmpty(companyData.email)) missingFields.push(fieldLabels.email);
+    if (!isManager && isEmpty(companyData.phone)) missingFields.push(fieldLabels.phone);
+    if (!isManager && isEmpty(companyData.email)) missingFields.push(fieldLabels.email);
     if (isEmpty(companyData.address)) missingFields.push(fieldLabels.address);
     if (isEmpty(companyData.city)) missingFields.push(fieldLabels.city);
     if (isEmpty(companyData.postal_code)) missingFields.push(fieldLabels.postal_code);
@@ -447,7 +467,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-2">
                   <Label htmlFor="companyName" className={fieldErrors.name ? 'text-red-600 dark:text-red-400' : ''}>
-                    Nazwa firmy/organizacji *
+                    Nazwa firmy *
                   </Label>
                   {isEditing ? (
                     <Input
@@ -469,44 +489,62 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                       To pole jest wymagane
                     </p>
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="companyType" className={fieldErrors.type ? 'text-red-600 dark:text-red-400' : ''}>
-                    Typ organizacji *
-                  </Label>
-                  {isEditing ? (
-                    <>
-                      <Select 
-                        value={companyData.type} 
-                        onValueChange={(value) => handleCompanyChange('type', value)}
-                      >
-                        <SelectTrigger className={fieldErrors.type ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}>
-                          <SelectValue placeholder="Wybierz typ organizacji" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(user.userType === 'manager' ? MANAGER_COMPANY_TYPES : CONTRACTOR_COMPANY_TYPES).map(type => (
-                            <SelectItem key={type.value} value={type.value}>
-                              {type.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {fieldErrors.type && (
-                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          To pole jest wymagane
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className={`text-sm py-2 px-3 bg-muted rounded-md ${!companyData.type ? 'text-muted-foreground/60' : ''}`}>
-                      {[...MANAGER_COMPANY_TYPES, ...CONTRACTOR_COMPANY_TYPES].find(t => t.value === companyData.type)?.label || companyData.type || '—'}
+                  {isEditing && isManager && (
+                    <p className="text-xs text-muted-foreground">
+                      Nazwa zgodna z rejestracją — każdy zarządca musi mieć NIP i firmę wpisaną do rejestru.
                     </p>
                   )}
                 </div>
 
-                <div className="space-y-2">
+                {!isManager && (
+                  <div className="space-y-2">
+                    <Label htmlFor="companyType" className={fieldErrors.type ? 'text-red-600 dark:text-red-400' : ''}>
+                      Typ organizacji *
+                    </Label>
+                    {isEditing ? (
+                      <>
+                        <Select
+                          value={companyData.type}
+                          onValueChange={(value) => handleCompanyChange('type', value)}
+                        >
+                          <SelectTrigger
+                            className={
+                              fieldErrors.type ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }
+                          >
+                            <SelectValue placeholder="Wybierz typ organizacji" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(user.userType === 'manager' ? MANAGER_COMPANY_TYPES : CONTRACTOR_COMPANY_TYPES).map(
+                              (type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </SelectItem>
+                              ),
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {fieldErrors.type && (
+                          <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            To pole jest wymagane
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p
+                        className={`text-sm py-2 px-3 bg-muted rounded-md ${!companyData.type ? 'text-muted-foreground/60' : ''}`}
+                      >
+                        {[...MANAGER_COMPANY_TYPES, ...CONTRACTOR_COMPANY_TYPES].find((t) => t.value === companyData.type)
+                          ?.label ||
+                          companyData.type ||
+                          '—'}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className={cn('space-y-2', isManager && 'col-span-2')}>
                   <Label htmlFor="companyNip" className={fieldErrors.nip ? 'text-red-600 dark:text-red-400' : ''}>
                     NIP *
                   </Label>
@@ -630,7 +668,8 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                 </div>
               )}
 
-              {/* Contact Details */}
+              {/* Contact Details — dla zarządcy telefon i e-mail biorą się z zakładki „Dane kontaktowe” powyżej */}
+              {!isManager && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="companyPhone" className={fieldErrors.phone ? 'text-red-600 dark:text-red-400' : ''}>
@@ -697,7 +736,10 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
                       </div>
                     )}
                 </div>
+              </div>
+              )}
 
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="companyWebsite">Strona internetowa</Label>
                   {isEditing ? (
@@ -862,7 +904,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
 
       {/* Building Management Section - Only for managers */}
       {user.userType === 'manager' && (
-        <div className="mt-6">
+        <div className="mt-6" id="nieruchomosci">
           <Separator className="my-6" />
           {hasCompany && companyId ? (
             <BuildingManagement companyId={companyId} />
@@ -870,15 +912,15 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
             <div className="border rounded-lg p-4 bg-card">
               <div className="flex items-center gap-2 mb-2">
                 <Building className="h-4 w-4 text-muted-foreground" />
-                <h4 className="font-medium">Zarządzanie budynkami</h4>
+                <h4 className="font-medium">Zarządzanie nieruchomościami</h4>
               </div>
               <div className="text-center py-6">
                 <Building className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-sm text-muted-foreground mb-2">
-                  Aby zarządzać budynkami, najpierw dodaj firmę powyżej
+                  Aby dodać nieruchomości, najpierw uzupełnij dane firmy powyżej
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Po dodaniu firmy będziesz mógł dodawać i zarządzać budynkami
+                  Po zapisaniu firmy możesz dodawać i edytować nieruchomości, którymi zarządzasz
                 </p>
               </div>
             </div>

@@ -31,7 +31,7 @@ export default async function OcenaZgloszenPage(): Promise<ReactElement> {
           <CardContent className="pt-6 text-center space-y-4 flex flex-col items-center">
             <p className="text-muted-foreground">Najpierw uzupełnij dane firmy w profilu.</p>
             <Button asChild>
-              <Link href="/account?tab=company">Przejdź do konta</Link>
+              <Link href="/account">Przejdź do konta</Link>
             </Button>
           </CardContent>
         </Card>
