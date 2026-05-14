@@ -15,7 +15,15 @@ export interface ContractorApplication {
   status: 'submitted' | 'under_review' | 'shortlisted' | 'accepted' | 'rejected' | 'cancelled' | 'pending';
   appliedAt: string;
   proposedPrice?: string;
+  /** Raw `proposed_timeline` (days) from DB. */
+  proposedTimelineDays?: number | null;
   estimatedCompletion?: string;
+  /** VAT percent stored with the offer (8 or 23). */
+  vatRate?: 8 | 23;
+  proposedStartDate?: string | null;
+  availableFrom?: string | null;
+  guaranteePeriodMonths?: number | null;
+  teamSize?: number | null;
   coverLetter?: string;
   experience?: string;
   attachments?: Array<Record<string, unknown>>;
@@ -826,8 +834,20 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
         job_id,
         proposed_price,
         proposed_timeline,
+        vat_rate,
+        proposed_start_date,
+        available_from,
+        guarantee_period,
+        team_size,
         cover_letter,
+        experience,
+        attachments,
+        certificates,
+        notes,
+        manager_feedback_message,
+        reviewed_at,
         status,
+        submitted_at,
         created_at,
         job:jobs (
           id,
@@ -875,26 +895,44 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
       return `${months} ${months === 1 ? 'miesiąc' : 'miesiące'} ${remainingDays} ${remainingDays === 1 ? 'dzień' : 'dni'}`;
     };
 
-    const formattedApplications: ContractorApplication[] = ((applications as Array<Record<string, unknown>>) || []).map((app: Record<string, unknown>) => ({
-      id: String(app.id ?? ''),
-      jobId: String(app.job_id ?? ''),
-      jobTitle: String((app.job as Record<string, unknown>)?.title ?? ''),
-      companyName: String(((app.job as Record<string, unknown>)?.company as Record<string, unknown>)?.name ?? ''),
-      status: String(app.status ?? 'pending') as 'submitted' | 'under_review' | 'shortlisted' | 'accepted' | 'rejected' | 'cancelled' | 'pending',
-      appliedAt: String(app.submitted_at ?? ''),
-      proposedPrice: app.proposed_price != null ? String(app.proposed_price) : undefined,
-      estimatedCompletion: formatTimeline(app.proposed_timeline as number | null | undefined),
-      coverLetter: String(app.cover_letter ?? ''),
-      experience: String(app.experience ?? ''),
-      attachments: (app.attachments as Array<Record<string, unknown>>) || [],
-      certificates: (app.certificates as string[]) || [],
-      notes: app.notes as string | undefined,
-      reviewedAt: app.reviewed_at as string | undefined,
-      jobLocation: typeof (app.jobs as Record<string, unknown>)?.location === 'string' 
-        ? (app.jobs as Record<string, unknown>).location as string
-        : String(((app.jobs as Record<string, unknown>)?.location as Record<string, unknown>)?.city ?? 'Nieznana lokalizacja'),
-      jobCategory: String(((app.jobs as Record<string, unknown>)?.job_categories as Record<string, unknown>)?.name ?? 'Inne usługi')
-    })) || [];
+    const formattedApplications: ContractorApplication[] = ((applications as Array<Record<string, unknown>>) || []).map((app: Record<string, unknown>) => {
+      const job = app.job as Record<string, unknown> | undefined;
+      const loc = job?.location;
+      return {
+        id: String(app.id ?? ''),
+        jobId: String(app.job_id ?? ''),
+        jobTitle: String(job?.title ?? ''),
+        companyName: String((job?.company as Record<string, unknown>)?.name ?? ''),
+        status: String(app.status ?? 'pending') as 'submitted' | 'under_review' | 'shortlisted' | 'accepted' | 'rejected' | 'cancelled' | 'pending',
+        appliedAt: String(app.submitted_at ?? app.created_at ?? ''),
+        proposedPrice: app.proposed_price != null ? String(app.proposed_price) : undefined,
+        proposedTimelineDays:
+          app.proposed_timeline !== null && app.proposed_timeline !== undefined
+            ? Number(app.proposed_timeline)
+            : null,
+        estimatedCompletion: formatTimeline(app.proposed_timeline as number | null | undefined),
+        vatRate: app.vat_rate === 8 ? 8 : 23,
+        proposedStartDate: (app.proposed_start_date as string | null) ?? null,
+        availableFrom: (app.available_from as string | null) ?? null,
+        guaranteePeriodMonths:
+          app.guarantee_period !== null && app.guarantee_period !== undefined
+            ? Number(app.guarantee_period)
+            : null,
+        teamSize: app.team_size !== null && app.team_size !== undefined ? Number(app.team_size) : null,
+        coverLetter: String(app.cover_letter ?? ''),
+        experience: String(app.experience ?? ''),
+        attachments: (app.attachments as Array<Record<string, unknown>>) || [],
+        certificates: (app.certificates as string[]) || [],
+        notes: app.notes as string | undefined,
+        managerFeedbackMessage: app.manager_feedback_message as string | undefined,
+        reviewedAt: app.reviewed_at as string | undefined,
+        jobLocation:
+          typeof loc === 'string'
+            ? loc
+            : String((loc as Record<string, unknown> | undefined)?.city ?? 'Nieznana lokalizacja'),
+        jobCategory: String(((job?.category as Record<string, unknown>)?.name as string) ?? 'Inne usługi'),
+      };
+    }) || [];
 
     // Fetch bids with more details for applications view
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1101,6 +1139,11 @@ export async function fetchContractorApplications(
         job_id,
         proposed_price,
         proposed_timeline,
+        vat_rate,
+        proposed_start_date,
+        available_from,
+        guarantee_period,
+        team_size,
         cover_letter,
         experience,
         attachments,
@@ -1135,7 +1178,20 @@ export async function fetchContractorApplications(
       status: app.status || 'pending',
       appliedAt: app.submitted_at,
       proposedPrice: app.proposed_price,
+      proposedTimelineDays:
+        app.proposed_timeline !== null && app.proposed_timeline !== undefined
+          ? Number(app.proposed_timeline)
+          : null,
       estimatedCompletion: formatTimeline(app.proposed_timeline),
+      vatRate: app.vat_rate === 8 ? 8 : 23,
+      proposedStartDate: app.proposed_start_date ?? null,
+      availableFrom: app.available_from ?? null,
+      guaranteePeriodMonths:
+        app.guarantee_period !== null && app.guarantee_period !== undefined
+          ? Number(app.guarantee_period)
+          : null,
+      teamSize:
+        app.team_size !== null && app.team_size !== undefined ? Number(app.team_size) : null,
       coverLetter: app.cover_letter,
       experience: app.experience || '',
       attachments: app.attachments || [],

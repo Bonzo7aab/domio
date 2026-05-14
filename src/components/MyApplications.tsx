@@ -5,11 +5,40 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { 
+import {
   Eye,
+  ExternalLink,
   MessageSquare,
   X,
 } from 'lucide-react';
+import { ScrollArea } from './ui/scroll-area';
+
+function grossFromNet(net: number, vatPct: 8 | 23): number {
+  return Math.round(net * (1 + vatPct / 100) * 100) / 100;
+}
+
+function formatPlDateIso(iso: string): string {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso;
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return iso;
+  return new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium' }).format(dt);
+}
+
+function formatGuaranteeMonths(n: number): string {
+  if (n === 1) return '1 miesiąc';
+  if (n >= 2 && n <= 4) return `${n} miesiące`;
+  return `${n} miesięcy`;
+}
+
+function formatMoneyPl(price: number, fractionDigits: 0 | 2): string {
+  return new Intl.NumberFormat('pl-PL', {
+    style: 'currency',
+    currency: 'PLN',
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  }).format(price);
+}
 
 interface MyApplication {
   id: string;
@@ -20,13 +49,23 @@ interface MyApplication {
   jobCategory: string;
   proposedPrice: number;
   proposedTimeline: string;
+  /** Raw timeline in days (from DB), for „dni roboczych” label. */
+  proposedTimelineDays?: number | null;
+  /** VAT % on net price (job offers). */
+  vatRate?: 8 | 23;
+  proposedStartDate?: string;
+  availableFrom?: string;
+  guaranteePeriodMonths?: number;
+  teamSize?: number;
+  /** Przetarg: ważność oferty. */
+  tenderValidUntil?: string;
   status: 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'cancelled';
   submittedAt: Date;
   lastUpdated: Date;
   coverLetter: string;
   experience: string;
-  additionalNotes?: string; // Additional notes from the form
-  postedTime?: string; // When the job was posted
+  additionalNotes?: string;
+  postedTime?: string;
   attachments: Array<{
     id: string;
     name: string;
@@ -42,7 +81,7 @@ interface MyApplication {
     totalValue: number;
     paymentSchedule: string;
   };
-  postType?: 'job' | 'tender'; // Optional field to distinguish bids from applications
+  postType?: 'job' | 'tender';
 }
 
 interface MyApplicationsProps {
@@ -239,39 +278,180 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
       </Tabs>
 
       <Dialog open={Boolean(selectedOffer)} onOpenChange={(open) => !open && setSelectedOfferId(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Szczegóły mojej oferty</DialogTitle>
           </DialogHeader>
           {selectedOffer ? (
-            <div className="space-y-4 text-sm">
-              <div>
-                <p className="font-medium">{selectedOffer.jobTitle}</p>
-                <p className="text-muted-foreground">{selectedOffer.jobCompany}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4 rounded-md border p-3">
+            <ScrollArea className="max-h-[min(70vh,620px)] pr-4">
+              <div className="space-y-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">Kwota netto</p>
-                  <p className="font-medium">{formatPrice(selectedOffer.proposedPrice)}</p>
+                  <p className="text-base font-semibold">{selectedOffer.jobTitle}</p>
+                  <p className="text-muted-foreground">{selectedOffer.jobCompany}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {selectedOffer.jobLocation}
+                    {selectedOffer.jobCategory ? ` · ${selectedOffer.jobCategory}` : ''}
+                  </p>
+                  {selectedOffer.postType && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedOffer.postType === 'tender' ? 'Przetarg' : 'Zlecenie'}
+                    </p>
+                  )}
                 </div>
+
+                <div className="rounded-md border p-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <p className="text-muted-foreground">
+                        {selectedOffer.postType === 'tender' ? 'Kwota oferty' : 'Kwota netto'}
+                      </p>
+                      <p className="font-medium">{formatMoneyPl(selectedOffer.proposedPrice, 2)}</p>
+                    </div>
+                    {selectedOffer.postType !== 'tender' && (
+                      <>
+                        <div>
+                          <p className="text-muted-foreground">Stawka VAT</p>
+                          <p className="font-medium">{selectedOffer.vatRate ?? 23}%</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Kwota brutto (szac.)</p>
+                          <p className="font-medium">
+                            {formatMoneyPl(
+                              grossFromNet(selectedOffer.proposedPrice, selectedOffer.vatRate ?? 23),
+                              2,
+                            )}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="mt-3 border-t pt-3">
+                    <p className="text-muted-foreground">Termin realizacji</p>
+                    <p className="font-medium">{selectedOffer.proposedTimeline}</p>
+                    {selectedOffer.proposedTimelineDays != null &&
+                      selectedOffer.proposedTimelineDays > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          ({selectedOffer.proposedTimelineDays}{' '}
+                          {selectedOffer.proposedTimelineDays === 1
+                            ? 'dzień roboczy wg kalendarza'
+                            : 'dni roboczych wg kalendarza'}
+                          )
+                        </p>
+                      )}
+                  </div>
+                </div>
+
+                {(selectedOffer.proposedStartDate || selectedOffer.availableFrom) && (
+                  <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+                    {selectedOffer.proposedStartDate && (
+                      <div>
+                        <p className="text-muted-foreground">Proponowany start</p>
+                        <p className="font-medium">{formatPlDateIso(selectedOffer.proposedStartDate)}</p>
+                      </div>
+                    )}
+                    {selectedOffer.availableFrom &&
+                      selectedOffer.availableFrom !== selectedOffer.proposedStartDate && (
+                        <div>
+                          <p className="text-muted-foreground">Dostępność od</p>
+                          <p className="font-medium">{formatPlDateIso(selectedOffer.availableFrom)}</p>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+                {selectedOffer.guaranteePeriodMonths != null &&
+                  selectedOffer.guaranteePeriodMonths > 0 && (
+                    <div className="rounded-md border p-3">
+                      <p className="text-muted-foreground">Okres gwarancji</p>
+                      <p className="font-medium">{formatGuaranteeMonths(selectedOffer.guaranteePeriodMonths)}</p>
+                    </div>
+                  )}
+
+                {selectedOffer.teamSize != null && selectedOffer.teamSize > 0 && (
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground">Wielkość zespołu</p>
+                    <p className="font-medium">{selectedOffer.teamSize} os.</p>
+                  </div>
+                )}
+
+                {selectedOffer.tenderValidUntil && (
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground">Oferta ważna do</p>
+                    <p className="font-medium">{formatPlDateIso(selectedOffer.tenderValidUntil)}</p>
+                  </div>
+                )}
+
                 <div>
-                  <p className="text-muted-foreground">Termin realizacji</p>
-                  <p className="font-medium">{selectedOffer.proposedTimeline}</p>
+                  <p className="mb-1 font-medium">
+                    {selectedOffer.postType === 'tender' ? 'Propozycja techniczna' : 'Treść oferty'}
+                  </p>
+                  <div className="rounded-md border bg-muted/40 p-3 whitespace-pre-wrap">
+                    {selectedOffer.coverLetter?.trim() || '—'}
+                  </div>
+                </div>
+
+                {selectedOffer.experience?.trim() ? (
+                  <div>
+                    <p className="mb-1 font-medium">Doświadczenie</p>
+                    <div className="rounded-md border bg-muted/40 p-3 whitespace-pre-wrap">
+                      {selectedOffer.experience}
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedOffer.additionalNotes?.trim() ? (
+                  <div>
+                    <p className="mb-1 font-medium">Dodatkowe uwagi</p>
+                    <div className="rounded-md border bg-muted/40 p-3 whitespace-pre-wrap">
+                      {selectedOffer.additionalNotes}
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedOffer.attachments.length > 0 && (
+                  <div>
+                    <p className="mb-2 font-medium">Załączniki</p>
+                    <ul className="space-y-2">
+                      {selectedOffer.attachments.map((att) => (
+                        <li key={att.id}>
+                          {att.url ? (
+                            <a
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-primary underline-offset-4 hover:underline"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                              {att.name || 'Załącznik'}
+                            </a>
+                          ) : (
+                            <span>{att.name || 'Załącznik'}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedOffer.certificates.length > 0 && (
+                  <div>
+                    <p className="mb-2 font-medium">Certyfikaty</p>
+                    <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+                      {selectedOffer.certificates.map((c, i) => (
+                        <li key={`${c}-${i}`}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div>
+                  <p className="mb-1 font-medium">Wiadomość zwrotna od Zarządcy</p>
+                  <div className="rounded-md border bg-muted/40 p-3 whitespace-pre-wrap">
+                    {selectedOffer.reviewNotes?.trim() || 'Brak wiadomości zwrotnej.'}
+                  </div>
                 </div>
               </div>
-              <div>
-                <p className="mb-1 font-medium">Treść wysłanej oferty</p>
-                <div className="rounded-md border bg-muted/40 p-3 whitespace-pre-wrap">
-                  {selectedOffer.coverLetter || 'Brak treści oferty.'}
-                </div>
-              </div>
-              <div>
-                <p className="mb-1 font-medium">Wiadomość zwrotna od Zarządcy</p>
-                <div className="rounded-md border bg-muted/40 p-3 whitespace-pre-wrap">
-                  {selectedOffer.reviewNotes || 'Brak wiadomości zwrotnej.'}
-                </div>
-              </div>
-            </div>
+            </ScrollArea>
           ) : null}
         </DialogContent>
       </Dialog>

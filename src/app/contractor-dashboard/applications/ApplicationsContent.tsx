@@ -15,6 +15,13 @@ interface Application {
   jobCategory: string;
   proposedPrice: number;
   proposedTimeline: string;
+  proposedTimelineDays?: number | null;
+  vatRate?: 8 | 23;
+  proposedStartDate?: string;
+  availableFrom?: string;
+  guaranteePeriodMonths?: number;
+  teamSize?: number;
+  tenderValidUntil?: string;
   status: 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'cancelled';
   submittedAt: Date;
   lastUpdated: Date;

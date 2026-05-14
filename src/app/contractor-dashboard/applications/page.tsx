@@ -61,6 +61,12 @@ async function getApplicationsData(userId: string) {
       jobCategory: app.jobCategory || 'Inne usługi',
       proposedPrice: proposedPrice,
       proposedTimeline: app.estimatedCompletion || 'Nie określono',
+      proposedTimelineDays: app.proposedTimelineDays ?? null,
+      vatRate: app.vatRate,
+      proposedStartDate: app.proposedStartDate ?? undefined,
+      availableFrom: app.availableFrom ?? undefined,
+      guaranteePeriodMonths: app.guaranteePeriodMonths ?? undefined,
+      teamSize: app.teamSize ?? undefined,
       status: statusMap[app.status] || 'submitted',
       submittedAt: new Date(app.appliedAt),
       lastUpdated: app.reviewedAt ? new Date(app.reviewedAt) : new Date(app.appliedAt),
@@ -70,8 +76,8 @@ async function getApplicationsData(userId: string) {
       postedTime: app.postedTime || undefined,
       attachments: transformedAttachments,
       certificates: app.certificates || [],
-      reviewNotes: app.managerFeedbackMessage || app.notes || undefined,
-      postType: 'job' as const
+      reviewNotes: app.managerFeedbackMessage || undefined,
+      postType: 'job' as const,
     };
   });
 
@@ -104,6 +110,8 @@ async function getApplicationsData(userId: string) {
       jobCategory: bid.category || 'Przetarg',
       proposedPrice: proposedPrice,
       proposedTimeline: proposedTimeline,
+      proposedTimelineDays: bid.proposedTimeline ?? null,
+      tenderValidUntil: bid.validUntil || undefined,
       status: statusMap[bid.status] || 'submitted',
       submittedAt: new Date(bid.submittedAt),
       lastUpdated: bid.reviewedAt ? new Date(bid.reviewedAt) : new Date(bid.submittedAt),
@@ -113,7 +121,7 @@ async function getApplicationsData(userId: string) {
       attachments: [],
       certificates: [],
       reviewNotes: bid.managerFeedbackMessage || undefined,
-      postType: 'tender' as const
+      postType: 'tender' as const,
     };
   });
 

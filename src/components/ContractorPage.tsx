@@ -630,17 +630,23 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
       jobCategory: app.jobCategory || 'Inne usługi',
       proposedPrice: proposedPrice,
       proposedTimeline: app.estimatedCompletion || 'Nie określono',
+      proposedTimelineDays: app.proposedTimelineDays ?? null,
+      vatRate: app.vatRate,
+      proposedStartDate: app.proposedStartDate ?? undefined,
+      availableFrom: app.availableFrom ?? undefined,
+      guaranteePeriodMonths: app.guaranteePeriodMonths ?? undefined,
+      teamSize: app.teamSize ?? undefined,
       status: statusMap[app.status] || 'submitted',
       submittedAt: new Date(app.appliedAt),
       lastUpdated: app.reviewedAt ? new Date(app.reviewedAt) : new Date(app.appliedAt),
       coverLetter: app.coverLetter || '',
       experience: app.experience || '',
-      additionalNotes: app.notes || undefined, // Map notes to additionalNotes
-      postedTime: app.postedTime || undefined, // Job posted time
+      additionalNotes: app.notes || undefined,
+      postedTime: app.postedTime || undefined,
       attachments: transformedAttachments,
       certificates: app.certificates || [],
-      reviewNotes: app.notes || undefined,
-      postType: 'job' as const // Mark as job application
+      reviewNotes: app.managerFeedbackMessage || undefined,
+      postType: 'job' as const,
     };
   });
 
@@ -668,23 +674,25 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
 
     return {
       id: bid.id,
-      jobId: bid.tenderId, // Use tenderId as jobId for navigation
+      jobId: bid.tenderId,
       jobTitle: bid.tenderTitle || 'Bez tytułu',
       jobCompany: bid.companyName || 'Nieznana firma',
       jobLocation: bid.location || 'Nieznana lokalizacja',
       jobCategory: bid.category || 'Przetarg',
       proposedPrice: proposedPrice,
       proposedTimeline: proposedTimeline,
+      proposedTimelineDays: bid.proposedTimeline ?? null,
+      tenderValidUntil: bid.validUntil || undefined,
       status: statusMap[bid.status] || 'submitted',
       submittedAt: new Date(bid.submittedAt),
       lastUpdated: bid.reviewedAt ? new Date(bid.reviewedAt) : new Date(bid.submittedAt),
       coverLetter: bid.technicalProposal || '',
       experience: '',
-      postedTime: bid.postedTime || undefined, // Tender posted time
+      postedTime: bid.postedTime || undefined,
       attachments: [],
       certificates: [],
-      reviewNotes: undefined,
-      postType: 'tender' as const // Mark as tender bid
+      reviewNotes: bid.managerFeedbackMessage || undefined,
+      postType: 'tender' as const,
     };
   });
 
