@@ -13,6 +13,8 @@ export interface ManagerSubmission {
   /** ISO timestamp of the most recently submitted offer, or null if none. */
   lastOfferAt: string | null;
   createdAt: string;
+  /** Jobs only: editable when draft/active and no offers (see updateManagerJob). */
+  canEdit: boolean;
 }
 
 function jobStatusLabel(status: string): string {
@@ -132,6 +134,9 @@ export async function fetchManagerSubmissions(
     newOffersCount: jobOfferCounts[j.id]?.newCount ?? 0,
     lastOfferAt: jobLastOfferAt[j.id] ?? null,
     createdAt: j.created_at,
+    canEdit:
+      (j.status === 'draft' || j.status === 'active') &&
+      (jobOfferCounts[j.id]?.total ?? 0) === 0,
   }));
 
   const tenders: ManagerSubmission[] = tenderRows.map((t) => ({
@@ -143,6 +148,7 @@ export async function fetchManagerSubmissions(
     newOffersCount: tenderOfferCounts[t.id]?.newCount ?? 0,
     lastOfferAt: tenderLastOfferAt[t.id] ?? null,
     createdAt: t.created_at,
+    canEdit: false,
   }));
 
   return [...jobs, ...tenders].sort(

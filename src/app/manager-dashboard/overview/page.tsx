@@ -41,7 +41,7 @@ async function getOverviewData(userId: string) {
         currency,
         deadline,
         status,
-        job_categories (name),
+        job_categories!jobs_category_id_fkey (name),
         location
       `)
       .eq('company_id', company.id)

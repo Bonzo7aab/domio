@@ -288,7 +288,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
             currency,
             deadline,
             status,
-            job_categories (name),
+            job_categories!jobs_category_id_fkey (name),
             location
           `)
           .eq('company_id', managerId)

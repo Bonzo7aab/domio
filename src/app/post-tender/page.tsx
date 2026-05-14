@@ -19,5 +19,5 @@ export default function PostTenderPage() {
     return null;
   }
 
-  return <TenderCreationPage onBack={() => router.push('/job-type-selection')} />;
+  return <TenderCreationPage onBack={() => router.push('/manager-dashboard/tenders')} />;
 }

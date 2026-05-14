@@ -80,7 +80,7 @@ export function Header({ initialUser }: HeaderProps) {
 
   // Navigation handlers
   const handleAddJobClick = () => {
-    router.push('/job-type-selection')
+    router.push('/post-job')
   }
 
   const handleAdminPanelClick = () => {
@@ -212,7 +212,7 @@ export function Header({ initialUser }: HeaderProps) {
                     onClick={handleAddJobClick}
                     className="shrink-0 bg-blue-800 hover:bg-blue-900"
                   >
-                    Dodaj Ogłoszenie
+                    Dodaj Zgłoszenie
                   </Button>
                 )
               )}
@@ -544,10 +544,10 @@ export function Header({ initialUser }: HeaderProps) {
               </>
             ) : (
               <>
-                {/* Mobile: Drawer - Dodaj Ogłoszenie, Zaloguj się, Zarejestruj się */}
+                {/* Mobile: Drawer - Dodaj Zgłoszenie, Zaloguj się, Zarejestruj się */}
                 <div className="md:hidden flex items-center space-x-2">
                   <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
-                    Dodaj Ogłoszenie
+                    Dodaj Zgłoszenie
                   </Button>
                   <Drawer>
                     <DrawerTrigger asChild>
@@ -584,7 +584,7 @@ export function Header({ initialUser }: HeaderProps) {
                   </Drawer>
                 </div>
 
-                {/* Desktop: [Dodaj Ogłoszenie] [Zaloguj się] [Zarejestruj się] - Add Job is in separate div above */}
+                {/* Desktop: [Dodaj Zgłoszenie] [Zaloguj się] [Zarejestruj się] - Add Job is in separate div above */}
                 <div className="hidden md:flex items-center space-x-2">
                   <Button variant="ghost" size="sm" onClick={handleLoginClick} className="text-sm hover:bg-gray-200">
                     Zaloguj się

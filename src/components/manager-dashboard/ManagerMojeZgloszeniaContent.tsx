@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   type ManagerSubmission,
   getSubmissionStatusLabel,
@@ -152,6 +153,11 @@ export function ManagerMojeZgloszeniaContent({
                           <Button variant="outline" size="sm" onClick={() => setPodgladRow(row)}>
                             Podgląd
                           </Button>
+                          {row.kind === 'job' && row.canEdit && (
+                            <Button variant="secondary" size="sm" asChild>
+                              <Link href={`/manager-dashboard/zgloszenia/edytuj/${row.id}`}>Edytuj</Link>
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             disabled={row.offersCount === 0}

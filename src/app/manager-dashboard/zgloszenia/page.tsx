@@ -42,6 +42,12 @@ export default async function ZgloszeniaPage(): Promise<ReactElement> {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <h1 className="text-2xl font-bold">Zgłoszenia</h1>
+        <Button asChild>
+          <Link href="/post-job?from=zgloszenia">Dodaj zgłoszenie</Link>
+        </Button>
+      </div>
       <ManagerMojeZgloszeniaContent submissions={submissions} />
     </div>
   );

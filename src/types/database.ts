@@ -378,9 +378,11 @@ export interface Database {
           title: string
           description: string
           category_id: string
+          subcategory_id: string | null
           subcategory: string | null
           manager_id: string
           company_id: string
+          building_id: string | null
           location: string
           address: string | null
           latitude: number | null
@@ -419,9 +421,11 @@ export interface Database {
           title: string
           description: string
           category_id: string
+          subcategory_id?: string | null
           subcategory?: string | null
           manager_id: string
           company_id: string
+          building_id?: string | null
           location: string
           address?: string | null
           latitude?: number | null
@@ -460,9 +464,11 @@ export interface Database {
           title?: string
           description?: string
           category_id?: string
+          subcategory_id?: string | null
           subcategory?: string | null
           manager_id?: string
           company_id?: string
+          building_id?: string | null
           location?: string
           address?: string | null
           latitude?: number | null
@@ -505,6 +511,13 @@ export interface Database {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "jobs_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "job_categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "jobs_manager_id_fkey"
             columns: ["manager_id"]
             isOneToOne: false
@@ -516,6 +529,13 @@ export interface Database {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "buildings"
             referencedColumns: ["id"]
           }
         ]

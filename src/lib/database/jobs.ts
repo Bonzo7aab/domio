@@ -88,6 +88,332 @@ export interface JobWithCompany {
   } | null;
 }
 
+/**
+ * Resolve main category_id and optional subcategory_id from Polish form labels.
+ * Shared by createJob and updateManagerJob.
+ */
+export async function resolveJobFormCategoryIds(
+  supabase: SupabaseClient<Database>,
+  categoryName: string,
+  subcategoryName?: string | null,
+): Promise<
+  | { categoryId: string; subcategoryId: string | null; error: null }
+  | { categoryId: null; subcategoryId: null; error: PostgrestError }
+> {
+  const categoryMapping: Record<string, string> = {
+    'Utrzymanie Czystości i Zieleni': 'Usługi Sprzątające',
+    'Roboty Remontowo-Budowlane': 'Remonty i Budownictwo',
+    'Instalacje i systemy': 'Instalacje Techniczne',
+    'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
+    'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
+    'Inne': 'Zarządzanie Nieruchomościami',
+  };
+
+  const searchCategoryName = categoryMapping[categoryName] || categoryName;
+
+  let { data: categoryData, error: categoryError } = await supabase
+    .from('job_categories')
+    .select('id, name')
+    .ilike('name', searchCategoryName)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (categoryError || !categoryData) {
+    const { data: partialMatch, error: partialError } = await supabase
+      .from('job_categories')
+      .select('id, name')
+      .ilike('name', `%${searchCategoryName}%`)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!partialError && partialMatch) {
+      categoryData = partialMatch;
+      categoryError = null;
+    }
+  }
+
+  if (categoryError || !categoryData) {
+    const { data: originalMatch, error: originalError } = await supabase
+      .from('job_categories')
+      .select('id, name')
+      .ilike('name', `%${categoryName}%`)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!originalError && originalMatch) {
+      categoryData = originalMatch;
+      categoryError = null;
+    }
+  }
+
+  if (categoryError || !categoryData) {
+    const { data: allCategories } = await supabase
+      .from('job_categories')
+      .select('name, slug')
+      .eq('is_active', true)
+      .limit(20);
+
+    return {
+      categoryId: null,
+      subcategoryId: null,
+      error: new Error(
+        `Category "${categoryName}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`,
+      ) as PostgrestError,
+    };
+  }
+
+  const categoryId = categoryData.id;
+  let subcategoryId: string | null = null;
+
+  if (subcategoryName && subcategoryName.trim()) {
+    const subTrim = subcategoryName.trim();
+
+    let { data: subcategoryData, error: subcategoryError } = await supabase
+      .from('job_categories')
+      .select('id, name')
+      .eq('parent_id', categoryId)
+      .ilike('name', subTrim)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (subcategoryError || !subcategoryData) {
+      const { data: partialSubcategory, error: partialSubcategoryError } = await supabase
+        .from('job_categories')
+        .select('id, name')
+        .eq('parent_id', categoryId)
+        .ilike('name', `%${subTrim}%`)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!partialSubcategoryError && partialSubcategory) {
+        subcategoryData = partialSubcategory;
+        subcategoryError = null;
+      }
+    }
+
+    if (!subcategoryError && subcategoryData) {
+      subcategoryId = subcategoryData.id;
+    }
+  }
+
+  return { categoryId, subcategoryId, error: null };
+}
+
+/**
+ * Location for jobs table: prefer selected building (company-scoped), else company HQ city.
+ */
+export async function resolveJobLocationFromBuildingOrCompany(
+  supabase: SupabaseClient<Database>,
+  companyId: string,
+  buildingId: string | null | undefined,
+  companyCity: string | null | undefined,
+  companyAddress: string | null | undefined,
+): Promise<{ city: string; address: string | null; latitude: number | null; longitude: number | null }> {
+  if (buildingId) {
+    const { data: b, error } = await supabase
+      .from('buildings')
+      .select('city, street_address, latitude, longitude')
+      .eq('id', buildingId)
+      .eq('company_id', companyId)
+      .maybeSingle();
+
+    if (!error && b) {
+      return {
+        city: b.city || '—',
+        address: b.street_address || null,
+        latitude: b.latitude != null ? Number(b.latitude) : null,
+        longitude: b.longitude != null ? Number(b.longitude) : null,
+      };
+    }
+  }
+
+  const city = (companyCity && companyCity.trim()) || 'Warszawa';
+  return {
+    city,
+    address: companyAddress?.trim() || null,
+    latitude: null,
+    longitude: null,
+  };
+}
+
+/**
+ * Update an existing job owned by the manager. Allowed only for draft/active jobs with zero applications.
+ */
+export async function updateManagerJob(
+  supabase: SupabaseClient<Database>,
+  params: {
+    jobId: string;
+    managerId: string;
+    companyId: string;
+    title: string;
+    description: string;
+    category: string;
+    subcategory?: string;
+    buildingId?: string | null;
+    budgetMin?: number | null;
+    budgetMax?: number | null;
+    budgetType?: 'fixed' | 'hourly' | 'negotiable' | 'range';
+    currency?: string;
+    deadline?: Date | string | null;
+    urgency?: 'low' | 'medium' | 'high';
+    type?: 'regular' | 'urgent' | 'premium';
+    isPublic?: boolean;
+    requirements?: string[];
+    additionalInfo?: string | null;
+    images?: string[] | null;
+  },
+): Promise<{ data: JobWithCompany | null; error: PostgrestError | null }> {
+  try {
+    const jobId = params.jobId?.trim();
+    if (!jobId) {
+      return { data: null, error: new Error('Missing job id') as PostgrestError };
+    }
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from('jobs')
+      .select('id, manager_id, company_id, status, published_at')
+      .eq('id', jobId)
+      .maybeSingle();
+
+    if (fetchErr || !existing) {
+      return { data: null, error: fetchErr || (new Error('Job not found') as PostgrestError) };
+    }
+
+    if (existing.manager_id !== params.managerId) {
+      return { data: null, error: new Error('Brak uprawnień do edycji tego zgłoszenia') as PostgrestError };
+    }
+
+    if (existing.company_id !== params.companyId) {
+      return { data: null, error: new Error('Zgłoszenie nie należy do tej firmy') as PostgrestError };
+    }
+
+    const status = existing.status as string;
+    if (status !== 'draft' && status !== 'active') {
+      return {
+        data: null,
+        error: new Error('Edycja jest możliwa tylko dla zgłoszeń ze statusem szkic lub aktywne') as PostgrestError,
+      };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { count, error: countErr } = await (supabase as any)
+      .from('job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('job_id', jobId);
+
+    if (countErr) {
+      return { data: null, error: countErr as PostgrestError };
+    }
+
+    if (count !== null && count > 0) {
+      return {
+        data: null,
+        error: new Error('Nie można edytować zgłoszenia po otrzymaniu ofert') as PostgrestError,
+      };
+    }
+
+    const resolved = await resolveJobFormCategoryIds(supabase, params.category, params.subcategory);
+    if (resolved.error || !resolved.categoryId) {
+      return { data: null, error: resolved.error };
+    }
+
+    const { fetchUserPrimaryCompany } = await import('./companies');
+    const { data: companyRow } = await fetchUserPrimaryCompany(supabase, params.managerId);
+    const loc = await resolveJobLocationFromBuildingOrCompany(
+      supabase,
+      params.companyId,
+      params.buildingId ?? null,
+      companyRow?.city ?? null,
+      companyRow?.address ?? null,
+    );
+
+    let deadlineDate: string | null = null;
+    if (params.deadline) {
+      if (typeof params.deadline === 'string') {
+        deadlineDate = params.deadline;
+      } else {
+        deadlineDate = params.deadline.toISOString().split('T')[0];
+      }
+    }
+
+    const budgetInput: BudgetInput = {
+      min: params.budgetMin,
+      max: params.budgetMax,
+      type: params.budgetType || 'fixed',
+      currency: params.currency || 'PLN',
+    };
+    const budgetDb = budgetToDatabase(budgetInput);
+
+    const locationJsonb = {
+      city: loc.city,
+    };
+
+    const updatePayload: Record<string, unknown> = {
+      title: params.title,
+      description: params.description,
+      category_id: resolved.categoryId,
+      subcategory_id: resolved.subcategoryId,
+      building_id: params.buildingId ?? null,
+      location: locationJsonb,
+      address: loc.address,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      budget_min: budgetDb.budget_min,
+      budget_max: budgetDb.budget_max,
+      budget_type: budgetDb.budget_type,
+      currency: budgetDb.currency,
+      deadline: deadlineDate,
+      urgency: params.urgency ?? 'medium',
+      type: params.type ?? 'regular',
+      is_public: params.isPublic !== undefined ? params.isPublic : true,
+      requirements: params.requirements ?? null,
+      additional_info: params.additionalInfo ?? null,
+      images: params.images ?? null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: updatedJob, error: updateError } = await (supabase as any)
+      .from('jobs')
+      .update(updatePayload)
+      .eq('id', jobId)
+      .eq('manager_id', params.managerId)
+      .select(
+        `
+        *,
+        company:companies!jobs_company_id_fkey (
+          id,
+          name,
+          logo_url,
+          is_verified
+        ),
+        category:job_categories!jobs_category_id_fkey (
+          name,
+          slug
+        ),
+        subcategory:job_categories!jobs_subcategory_id_fkey (
+          name,
+          slug
+        )
+      `,
+      )
+      .single();
+
+    if (updateError) {
+      console.error('Error updating job:', updateError);
+      return { data: null, error: updateError };
+    }
+
+    return { data: updatedJob as JobWithCompany, error: null };
+  } catch (err) {
+    console.error('Error in updateManagerJob:', err);
+    return { data: null, error: err as PostgrestError };
+  }
+}
+
 // Helper types for tables not yet in Database type
 interface JobApplicationRow {
   id: string;
@@ -224,7 +550,6 @@ export async function fetchJobs(
       }
       // Filter by subcategory (subcategory_id)
       if (subcategoryIds.length > 0) {
-        // @ts-expect-error - Type instantiation is complex but valid at runtime
         query = query.in('subcategory_id', subcategoryIds);
       }
     }
@@ -794,6 +1119,10 @@ export async function fetchJobById(
           is_verified
         ),
         category:job_categories!jobs_category_id_fkey (
+          name,
+          slug
+        ),
+        subcategory:job_categories!jobs_subcategory_id_fkey (
           name,
           slug
         )
@@ -1608,7 +1937,7 @@ export async function createJob(
     description: string;
     category: string; // Category name, will be converted to category_id
     subcategory?: string;
-    location: JobLocation | string; // Can be object or string for backward compatibility
+    location?: JobLocation | string;
     address?: string;
     latitude?: number;
     longitude?: number;
@@ -1636,126 +1965,16 @@ export async function createJob(
     images?: string[];
     managerId: string; // User profile ID
     companyId: string; // Company ID
+    buildingId?: string | null;
   }
 ): Promise<{ data: JobWithCompany | null; error: PostgrestError | null }> {
   try {
-    // Map form category names to database category names
-    const categoryMapping: Record<string, string> = {
-      'Utrzymanie Czystości i Zieleni': 'Usługi Sprzątające',
-      'Roboty Remontowo-Budowlane': 'Remonty i Budownictwo',
-      'Instalacje i systemy': 'Instalacje Techniczne',
-      'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
-      'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
-      'Inne': 'Zarządzanie Nieruchomościami',
-    };
-
-    // Use mapped category name if available, otherwise use original
-    const searchCategoryName = categoryMapping[jobData.category] || jobData.category;
-
-    // First, try exact match (case-insensitive)
-    let { data: categoryData, error: categoryError } = await supabase
-      .from('job_categories')
-      .select('id, name')
-      .ilike('name', searchCategoryName)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    // If exact match fails, try partial match
-    if (categoryError || !categoryData) {
-      const { data: partialMatch, error: partialError } = await supabase
-        .from('job_categories')
-        .select('id, name')
-        .ilike('name', `%${searchCategoryName}%`)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-
-      if (!partialError && partialMatch) {
-        categoryData = partialMatch;
-        categoryError = null;
-      }
+    const resolved = await resolveJobFormCategoryIds(supabase, jobData.category, jobData.subcategory);
+    if (resolved.error || !resolved.categoryId) {
+      return { data: null, error: resolved.error };
     }
-
-    // If still no match, try searching with the original category name
-    if (categoryError || !categoryData) {
-      const { data: originalMatch, error: originalError } = await supabase
-        .from('job_categories')
-        .select('id, name')
-        .ilike('name', `%${jobData.category}%`)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-
-      if (!originalError && originalMatch) {
-        categoryData = originalMatch;
-        categoryError = null;
-      }
-    }
-
-    if (categoryError || !categoryData) {
-      console.error('Error finding category:', {
-        error: categoryError,
-        searchedCategory: jobData.category,
-        mappedCategory: searchCategoryName,
-      });
-      
-      // Try to get all available categories for debugging
-      const { data: allCategories } = await supabase
-        .from('job_categories')
-        .select('name, slug')
-        .eq('is_active', true)
-        .limit(20);
-      
-      console.error('Available categories:', allCategories);
-      
-      return { 
-        data: null, 
-        error: new Error(`Category "${jobData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) as PostgrestError 
-      };
-    }
-
-    const categoryId = categoryData.id;
-    let subcategoryId: string | null = null;
-
-    if (jobData.subcategory && jobData.subcategory.trim()) {
-      const subcategoryName = jobData.subcategory.trim();
-
-      // First, try an exact (case-insensitive) match scoped to the selected main category.
-      let { data: subcategoryData, error: subcategoryError } = await supabase
-        .from('job_categories')
-        .select('id, name')
-        .eq('parent_id', categoryId)
-        .ilike('name', subcategoryName)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      // Fallback to partial match when there are spacing/diacritic variations.
-      if (subcategoryError || !subcategoryData) {
-        const { data: partialSubcategory, error: partialSubcategoryError } = await supabase
-          .from('job_categories')
-          .select('id, name')
-          .eq('parent_id', categoryId)
-          .ilike('name', `%${subcategoryName}%`)
-          .eq('is_active', true)
-          .limit(1)
-          .maybeSingle();
-
-        if (!partialSubcategoryError && partialSubcategory) {
-          subcategoryData = partialSubcategory;
-          subcategoryError = null;
-        }
-      }
-
-      if (subcategoryError || !subcategoryData) {
-        console.warn('Subcategory not found for selected category, saving without subcategory_id', {
-          subcategory: subcategoryName,
-          categoryId,
-          categoryName: categoryData.name,
-        });
-      } else {
-        subcategoryId = subcategoryData.id;
-      }
-    }
+    const categoryId = resolved.categoryId;
+    const subcategoryId = resolved.subcategoryId;
 
     // Parse deadline if provided
     let deadlineDate: string | null = null;
@@ -1776,22 +1995,52 @@ export async function createJob(
     };
     const budgetDb = budgetToDatabase(budgetInput);
 
-    // Prepare location as JSONB object
-    let locationJsonb: { city: string; sublocality_level_1?: string } | null;
-    if (typeof jobData.location === 'string') {
-      // If location is a string, convert to object format
-      locationJsonb = {
-        city: jobData.location,
-        ...(jobData.sublocalityLevel1 ? { sublocality_level_1: jobData.sublocalityLevel1 } : {})
-      };
+    const { fetchUserPrimaryCompany } = await import('./companies');
+    const { data: companyRow } = await fetchUserPrimaryCompany(supabase, jobData.managerId);
+
+    let locationJsonb: { city: string; sublocality_level_1?: string };
+    let latitudeVal: number | null = jobData.latitude ?? null;
+    let longitudeVal: number | null = jobData.longitude ?? null;
+    let addressVal: string | null = jobData.address ?? null;
+
+    if (jobData.buildingId) {
+      const loc = await resolveJobLocationFromBuildingOrCompany(
+        supabase,
+        jobData.companyId,
+        jobData.buildingId,
+        companyRow?.city ?? null,
+        companyRow?.address ?? null,
+      );
+      locationJsonb = { city: loc.city };
+      latitudeVal = loc.latitude;
+      longitudeVal = loc.longitude;
+      addressVal = loc.address;
+    } else if (jobData.location !== undefined && jobData.location !== null && jobData.location !== '') {
+      if (typeof jobData.location === 'string') {
+        locationJsonb = {
+          city: jobData.location,
+          ...(jobData.sublocalityLevel1 ? { sublocality_level_1: jobData.sublocalityLevel1 } : {}),
+        };
+      } else {
+        locationJsonb = {
+          city: jobData.location.city,
+          ...(jobData.location.sublocality_level_1 || jobData.sublocalityLevel1
+            ? { sublocality_level_1: jobData.location.sublocality_level_1 || jobData.sublocalityLevel1 }
+            : {}),
+        };
+      }
     } else {
-      // If location is already an object, use it directly
-      locationJsonb = {
-        city: jobData.location.city,
-        ...(jobData.location.sublocality_level_1 || jobData.sublocalityLevel1 
-          ? { sublocality_level_1: jobData.location.sublocality_level_1 || jobData.sublocalityLevel1 } 
-          : {})
-      };
+      const loc = await resolveJobLocationFromBuildingOrCompany(
+        supabase,
+        jobData.companyId,
+        null,
+        companyRow?.city ?? null,
+        companyRow?.address ?? null,
+      );
+      locationJsonb = { city: loc.city };
+      latitudeVal = loc.latitude;
+      longitudeVal = loc.longitude;
+      addressVal = loc.address;
     }
 
     // Prepare insert data
@@ -1800,12 +2049,13 @@ export async function createJob(
       description: jobData.description,
       category_id: categoryId,
       subcategory_id: subcategoryId,
+      building_id: jobData.buildingId ?? null,
       manager_id: jobData.managerId,
       company_id: jobData.companyId,
       location: locationJsonb,
-      address: jobData.address || null,
-      latitude: jobData.latitude || null,
-      longitude: jobData.longitude || null,
+      address: addressVal,
+      latitude: latitudeVal,
+      longitude: longitudeVal,
       budget_min: budgetDb.budget_min,
       budget_max: budgetDb.budget_max,
       budget_type: budgetDb.budget_type,
@@ -2765,7 +3015,7 @@ export async function fetchJobsByWorkHistory(
         status,
         location,
         created_at,
-        job_categories (name)
+        job_categories!jobs_category_id_fkey (name)
       `)
       .in('id', jobIdsWithApplications)
       .order('created_at', { ascending: false });

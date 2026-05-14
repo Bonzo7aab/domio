@@ -21,6 +21,15 @@ export default function JobTypeSelection() {
     }
   }, [user, isLoading, router]);
 
+  // Managers: unified zgłoszenie flow (KAN-9) — skip tender vs job chooser
+  useEffect(() => {
+    if (isLoading || !user) return;
+    if (user.userType !== 'manager') return;
+    if (hasCompany === false) return;
+    if (isCheckingCompany || hasCompany === null) return;
+    router.replace('/post-job');
+  }, [user, isLoading, hasCompany, isCheckingCompany, router]);
+
   // Check if user has a company (only for managers)
   useEffect(() => {
     const checkCompany = async () => {

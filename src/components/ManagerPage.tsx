@@ -495,7 +495,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
             currency,
             deadline,
             status,
-            job_categories (name),
+            job_categories!jobs_category_id_fkey (name),
             location
           `)
           .eq('company_id', companyId)
@@ -611,7 +611,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
             currency,
             deadline,
             status,
-            job_categories (name),
+            job_categories!jobs_category_id_fkey (name),
             location
           `)
           .eq('company_id', companyId)

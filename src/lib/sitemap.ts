@@ -69,11 +69,11 @@ export const sitemapEntries: SitemapEntry[] = [
   },
   {
     category: "Dla Wykonawców",
-    label: "Dodaj Ogłoszenie",
+    label: "Dodaj Zgłoszenie",
     path: "/job-type-selection",
     icon: Plus,
-    description: "Utwórz nowe ogłoszenie o pracę",
-    keywords: ["dodaj", "ogłoszenie", "praca", "job", "post", "nowe"],
+    description: "Utwórz nowe zgłoszenie",
+    keywords: ["dodaj", "zgłoszenie", "praca", "job", "post", "nowe"],
     requiresAuth: true,
     userTypes: ['manager']
   },

@@ -26,7 +26,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               Powrót
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Dodaj ogłoszenie</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Dodaj zgłoszenie</h1>
               <p className="text-gray-600 mt-1">Wybierz odpowiedni typ ogłoszenia dla Twojego projektu</p>
             </div>
           </div>
