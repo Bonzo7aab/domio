@@ -12,7 +12,10 @@ import { Tabs, TabsContent } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { cn } from './ui/utils';
 
-import JobApplicationModal from './JobApplicationModal';
+import JobApplicationModal, {
+  type JobApplicationFormFields,
+  type JobApplicationSubmitPayload,
+} from './JobApplicationModal';
 import { AskQuestionModal } from './AskQuestionModal';
 import SimilarJobs from './SimilarJobs';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -447,11 +450,15 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [showCompanyRequiredDialog, setShowCompanyRequiredDialog] = useState(false);
-  const [applicationForm, setApplicationForm] = useState({
+  const [applicationForm, setApplicationForm] = useState<JobApplicationFormFields>({
     proposedPrice: '',
+    vatRate: '23',
+    workingDays: '',
+    startDate: '',
+    guaranteeMonths: '12',
     estimatedCompletion: '',
     coverLetter: '',
-    additionalNotes: ''
+    additionalNotes: '',
   });
 
   const [jobData, setJobData] = useState<JobDisplayData | null>(null);
@@ -762,16 +769,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     setShowApplicationForm(true);
   };
 
-  const handleApplicationFormSubmit = async (applicationData: {
-    id: string;
-    contractorId: string;
-    contractorName: string;
-    proposedPrice: number;
-    estimatedCompletion: string;
-    coverLetter: string;
-    additionalNotes?: string;
-    submittedAt: Date;
-  }) => {
+  const handleApplicationFormSubmit = async (applicationData: JobApplicationSubmitPayload) => {
     if (!user?.id || !supabase) {
       toast.error('Musisz być zalogowany aby złożyć ofertę');
       return;
@@ -830,9 +828,13 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           user.id,
           {
             proposedPrice: applicationData.proposedPrice,
-            estimatedCompletion: applicationData.estimatedCompletion,
             coverLetter: applicationData.coverLetter,
             additionalNotes: applicationData.additionalNotes,
+            vatRate: applicationData.vatRate,
+            workingDays: applicationData.workingDays,
+            startDate: applicationData.startDate,
+            guaranteeMonths: applicationData.guaranteeMonths,
+            attachments: applicationData.attachments,
           }
         );
 
@@ -863,7 +865,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         }
 
         console.log('Application submitted successfully:', data);
-        toast.success('Oferta została złożona pomyślnie!');
+        toast.success(
+          'Wiążąca oferta została złożona. Nie możesz jej już edytować — zamawiający wkrótce ją zobaczy.'
+        );
       }
 
       // Close modal and reset form after successful submission
@@ -872,9 +876,13 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       // Reset form
       setApplicationForm({
         proposedPrice: '',
+        vatRate: '23',
+        workingDays: '',
+        startDate: '',
+        guaranteeMonths: '12',
         estimatedCompletion: '',
         coverLetter: '',
-        additionalNotes: ''
+        additionalNotes: '',
       });
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -1541,9 +1549,10 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         onClose={() => setShowApplicationForm(false)}
         jobTitle={job.title}
         companyName={job.company}
+        jobId={job.id}
         onApplicationSubmit={handleApplicationFormSubmit}
         applicationForm={applicationForm}
-        setApplicationForm={(form) => setApplicationForm(prev => ({ ...prev, ...form, additionalNotes: form.additionalNotes ?? prev.additionalNotes }))}
+        setApplicationForm={(form) => setApplicationForm(form)}
         postType={job.postType}
       />
 

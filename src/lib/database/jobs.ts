@@ -2131,73 +2131,102 @@ export async function createJob(
  * Examples: "1 miesiąc" -> 30, "2 tygodnie" -> 14, "1-3 dni" -> 2, "2-4 tygodnie" -> 21
  */
 function convertEstimatedCompletionToDays(estimatedCompletion: string): number | null {
-  if (!estimatedCompletion) return null;
-  
-  const lower = estimatedCompletion.toLowerCase().trim();
-  
-  // Handle ranges with units (e.g., "2-4 tygodnie", "1-3 dni")
-  if (lower.includes('-')) {
-    // Detect unit first
-    let unitMultiplier = 1;
-    let unitKeyword = '';
-    
+  try {
+    if (!estimatedCompletion) return null;
+
+    const lower = estimatedCompletion.toLowerCase().trim();
+
+    // Ranges like "1-3 dni", "2-4 tygodnie" — parse leading "a-b" instead of stripping Polish words (avoids breaking "tygodnie")
+    if (lower.includes('-')) {
+      const hasDay = lower.includes('dzień') || lower.includes('dni');
+      const hasWeek = lower.includes('tydzień') || lower.includes('tygodnie') || lower.includes('tygodni');
+      const hasMonth = lower.includes('miesiąc') || lower.includes('miesięcy');
+
+      if (hasDay || hasWeek || hasMonth) {
+        const rangeMatch = lower.match(/^(\d+)\s*-\s*(\d+)/);
+        if (rangeMatch) {
+          const first = parseInt(rangeMatch[1], 10);
+          const second = parseInt(rangeMatch[2], 10);
+          if (!Number.isNaN(first) && !Number.isNaN(second)) {
+            const average = Math.round((first + second) / 2);
+            if (hasDay) return average;
+            if (hasWeek) return average * 7;
+            if (hasMonth) return average * 30;
+          }
+        }
+      } else {
+        const parts = lower.split('-').map((p) => p.trim());
+        if (parts.length === 2) {
+          const first = parseInt(parts[0], 10);
+          const second = parseInt(parts[1], 10);
+          if (!Number.isNaN(first) && !Number.isNaN(second)) {
+            return Math.round((first + second) / 2);
+          }
+        }
+      }
+    }
+
     if (lower.includes('dzień') || lower.includes('dni')) {
-      unitMultiplier = 1;
-      unitKeyword = lower.includes('dzień') ? 'dzień' : 'dni';
-    } else if (lower.includes('tydzień') || lower.includes('tygodni')) {
-      unitMultiplier = 7;
-      unitKeyword = lower.includes('tydzień') ? 'tydzień' : 'tygodni';
-    } else if (lower.includes('miesiąc') || lower.includes('miesięcy')) {
-      unitMultiplier = 30;
-      unitKeyword = lower.includes('miesiąc') ? 'miesiąc' : 'miesięcy';
+      const days = parseInt(lower, 10);
+      return Number.isNaN(days) ? null : days;
     }
-    
-    // If unit found, extract numbers from range
-    if (unitKeyword) {
-      // Remove unit keyword and extract numbers
-      const withoutUnit = lower.replace(new RegExp(unitKeyword, 'g'), '').trim();
-      const parts = withoutUnit.split('-').map(p => p.trim());
-      
-      if (parts.length === 2) {
-        const first = parseInt(parts[0]);
-        const second = parseInt(parts[1]);
-        if (!isNaN(first) && !isNaN(second)) {
-          const average = Math.round((first + second) / 2);
-          return average * unitMultiplier;
-        }
-      }
-    } else {
-      // Range without unit - try to parse as plain numbers
-      const parts = lower.split('-').map(p => p.trim());
-      if (parts.length === 2) {
-        const first = parseInt(parts[0]);
-        const second = parseInt(parts[1]);
-        if (!isNaN(first) && !isNaN(second)) {
-          return Math.round((first + second) / 2);
-        }
-      }
+
+    if (lower.includes('tydzień') || lower.includes('tygodnie') || lower.includes('tygodni')) {
+      const weeks = parseInt(lower, 10);
+      return Number.isNaN(weeks) ? null : weeks * 7;
     }
+
+    if (lower.includes('miesiąc') || lower.includes('miesięcy')) {
+      const months = parseInt(lower, 10);
+      return Number.isNaN(months) ? null : months * 30;
+    }
+
+    const number = parseInt(lower, 10);
+    return Number.isNaN(number) ? null : number;
+  } catch (e) {
+    console.warn('convertEstimatedCompletionToDays failed:', estimatedCompletion, e);
+    return null;
   }
-  
-  // Handle specific time periods (non-range)
-  if (lower.includes('dzień') || lower.includes('dni')) {
-    const days = parseInt(lower);
-    return isNaN(days) ? null : days;
+}
+
+function formatJobApplicationInsertError(insertError: unknown): string {
+  if (insertError instanceof Error) return insertError.message;
+  const o = insertError as Record<string, unknown>;
+  const msg = [o.message, o.details, o.hint, o.code].filter(Boolean).join(' — ');
+  if (msg) return String(msg);
+  try {
+    return JSON.stringify(insertError);
+  } catch {
+    return String(insertError);
   }
-  
-  if (lower.includes('tydzień') || lower.includes('tygodni')) {
-    const weeks = parseInt(lower);
-    return isNaN(weeks) ? null : weeks * 7;
-  }
-  
-  if (lower.includes('miesiąc') || lower.includes('miesięcy')) {
-    const months = parseInt(lower);
-    return isNaN(months) ? null : months * 30;
-  }
-  
-  // Try to extract number
-  const number = parseInt(lower);
-  return isNaN(number) ? null : number;
+}
+
+function isMissingVatRateColumnError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes('vat_rate') &&
+    (m.includes('does not exist') ||
+      m.includes('nie istnieje') ||
+      m.includes('column') ||
+      m.includes('schema cache'))
+  );
+}
+
+/** Payload for creating a job application (`proposed_price` stored as net PLN before VAT). */
+export interface CreateJobApplicationInput {
+  proposedPrice: number;
+  coverLetter: string;
+  additionalNotes?: string;
+  /** VAT percent: only 8 or 23; default 23 when omitted. */
+  vatRate?: 8 | 23;
+  /** Working days for job offers (KAN-17); takes precedence over `estimatedCompletion`. */
+  workingDays?: number;
+  /** ISO date `YYYY-MM-DD` — stored as `available_from` and `proposed_start_date`. */
+  startDate?: string;
+  guaranteeMonths?: number;
+  /** Legacy completion string (e.g. tender modal); used when `workingDays` is not set. */
+  estimatedCompletion?: string;
+  attachments?: Array<{ id: string; name: string; type: string; url: string; size: number }>;
 }
 
 /**
@@ -2207,12 +2236,7 @@ export async function createJobApplication(
   supabase: SupabaseClient<Database>,
   jobId: string,
   contractorId: string,
-  applicationData: {
-    proposedPrice: number;
-    estimatedCompletion: string;
-    coverLetter: string;
-    additionalNotes?: string;
-  }
+  applicationData: CreateJobApplicationInput
 ): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
   try {
     // Fetch contractor's primary company
@@ -2236,10 +2260,15 @@ export async function createJobApplication(
       };
     }
     
-    // Convert estimated completion to days
-    const proposedTimeline = convertEstimatedCompletionToDays(applicationData.estimatedCompletion);
+    let proposedTimeline: number | null = null;
+    const workingDaysNum = Number(applicationData.workingDays);
+    if (Number.isFinite(workingDaysNum) && workingDaysNum > 0) {
+      proposedTimeline = Math.floor(workingDaysNum);
+    } else if (applicationData.estimatedCompletion) {
+      proposedTimeline = convertEstimatedCompletionToDays(applicationData.estimatedCompletion);
+    }
     
-    // Ensure proposed_price is a valid number
+    // Ensure proposed_price is a valid number (net PLN)
     const proposedPrice = typeof applicationData.proposedPrice === 'number' 
       ? applicationData.proposedPrice 
       : parseFloat(String(applicationData.proposedPrice)) || 0;
@@ -2259,6 +2288,8 @@ export async function createJobApplication(
       };
     }
     
+    const vatRate: 8 | 23 = applicationData.vatRate === 8 ? 8 : 23;
+    
     // Prepare insert data
     const insertData: Record<string, unknown> = {
       job_id: jobId,
@@ -2266,14 +2297,29 @@ export async function createJobApplication(
       company_id: company.id,
       proposed_price: proposedPrice,
       currency: 'PLN',
+      vat_rate: vatRate,
       cover_letter: applicationData.coverLetter.trim(),
       notes: applicationData.additionalNotes?.trim() || null,
       status: 'submitted',
     };
     
-    // Only add proposed_timeline if we successfully converted it
     if (proposedTimeline !== null) {
       insertData.proposed_timeline = proposedTimeline;
+    }
+
+    const startRaw = applicationData.startDate?.trim();
+    if (startRaw && /^\d{4}-\d{2}-\d{2}$/.test(startRaw)) {
+      insertData.available_from = startRaw;
+      insertData.proposed_start_date = startRaw;
+    }
+
+    const guaranteeMonthsNum = Number(applicationData.guaranteeMonths);
+    if (Number.isFinite(guaranteeMonthsNum) && guaranteeMonthsNum > 0) {
+      insertData.guarantee_period = Math.floor(guaranteeMonthsNum);
+    }
+
+    if (Array.isArray(applicationData.attachments) && applicationData.attachments.length > 0) {
+      insertData.attachments = applicationData.attachments;
     }
     
     // Log the data being inserted for debugging
@@ -2282,6 +2328,7 @@ export async function createJobApplication(
       contractor_id: contractorId,
       company_id: company.id,
       proposed_price: applicationData.proposedPrice,
+      vat_rate: vatRate,
       proposed_timeline: proposedTimeline,
       cover_letter_length: applicationData.coverLetter?.length || 0,
       status: 'submitted'
@@ -2296,25 +2343,15 @@ export async function createJobApplication(
       .single();
     
     if (insertError) {
-      const error = insertError as { message?: string; details?: string; hint?: string; code?: string };
-      console.error('Error creating job application:', {
-        error: insertError,
-        errorMessage: error?.message,
-        errorDetails: error?.details,
-        errorHint: error?.hint,
-        errorCode: error?.code,
-        insertData: insertData,
-        applicationData: {
-          jobId,
-          contractorId,
-          companyId: company.id,
-        }
-      });
-      return { 
-        data: null, 
-        error: (insertError instanceof Error 
-          ? insertError 
-          : new Error(((insertError as unknown as { message?: string; details?: string; hint?: string })?.message || (insertError as unknown as { message?: string; details?: string; hint?: string })?.details || (insertError as unknown as { message?: string; details?: string; hint?: string })?.hint || 'Unknown database error') as string)) as PostgrestError
+      const msg = formatJobApplicationInsertError(insertError);
+      console.error('Error creating job application:', msg, insertError);
+      const friendly =
+        isMissingVatRateColumnError(msg)
+          ? 'Brak kolumny vat_rate w tabeli job_applications. Uruchom migrację (np. database/56_job_applications_vat_rate.sql lub odpowiedni plik w supabase/migrations).'
+          : msg;
+      return {
+        data: null,
+        error: new Error(friendly) as PostgrestError,
       };
     }
     
@@ -2339,12 +2376,20 @@ export async function createJobApplication(
     });
     return { data: insertedApplication as unknown as JobApplicationRow, error: null };
   } catch (err) {
-    console.error('Error creating job application:', err);
-    return { 
-      data: null, 
-      error: (err instanceof Error 
-        ? err 
-        : new Error(((err as unknown as { message?: string })?.message || String(err) || 'Unknown error occurred') as string)) as PostgrestError
+    const msg =
+      err instanceof Error
+        ? `${err.message}\n${err.stack ?? ''}`
+        : formatJobApplicationInsertError(err);
+    console.error('Error creating job application (exception):', msg, err);
+    return {
+      data: null,
+      error: (err instanceof Error
+        ? err
+        : new Error(
+            ((err as unknown as { message?: string })?.message ||
+              formatJobApplicationInsertError(err) ||
+              'Unknown error occurred') as string,
+          )) as PostgrestError,
     };
   }
 }
@@ -2367,6 +2412,8 @@ export async function fetchJobApplicationsByJobId(
         contractor_id,
         proposed_price,
         proposed_timeline,
+        proposed_start_date,
+        vat_rate,
         cover_letter,
         experience,
         team_size,
@@ -2407,10 +2454,15 @@ export async function fetchJobApplicationsByJobId(
         const { fetchContractorById } = await import('./contractors');
         const contractorProfile = await fetchContractorById(String((app.company as Record<string, unknown>)?.id ?? ''));
         
+        const timelineDays =
+          app.proposed_timeline !== null && app.proposed_timeline !== undefined && app.proposed_timeline !== ''
+            ? Number(app.proposed_timeline)
+            : null;
+
         // Convert proposed_timeline (days) back to readable string
         let proposedTimeline = 'Nie określono';
-        if (app.proposed_timeline) {
-          const days = Number(app.proposed_timeline);
+        if (timelineDays !== null && !Number.isNaN(timelineDays)) {
+          const days = timelineDays;
           if (days < 7) {
             proposedTimeline = `${days} ${days === 1 ? 'dzień' : 'dni'}`;
           } else if (days < 30) {
@@ -2421,6 +2473,11 @@ export async function fetchJobApplicationsByJobId(
             proposedTimeline = `${months} ${months === 1 ? 'miesiąc' : months < 5 ? 'miesiące' : 'miesięcy'}`;
           }
         }
+
+        const vatRaw = Number(app.vat_rate);
+        const vatRate: 8 | 23 = vatRaw === 8 ? 8 : 23;
+
+        const startRaw = app.available_from ?? app.proposed_start_date;
         
         const formattedAttachments = Array.isArray(app.attachments)
           ? (app.attachments as Array<Record<string, unknown>>).map((attachment, index) => ({
@@ -2453,10 +2510,14 @@ export async function fetchJobApplicationsByJobId(
           contractorLocation: contractorProfile?.location?.city || 'Nieznana lokalizacja',
           proposedPrice: Number(app.proposed_price ?? 0),
           proposedTimeline: proposedTimeline,
+          timelineDays: timelineDays !== null && !Number.isNaN(timelineDays) ? timelineDays : null,
+          vatRate,
           coverLetter: String(app.cover_letter ?? ''),
           experience: String(app.experience ?? ''),
           teamSize: Number(app.team_size ?? 1),
-          availableFrom: String(app.available_from ?? new Date().toISOString()),
+          availableFrom: startRaw
+            ? String(startRaw)
+            : new Date().toISOString().slice(0, 10),
           guaranteePeriod: app.guarantee_period ? `${String(app.guarantee_period)} miesięcy` : '12 miesięcy',
           attachments: formattedAttachments,
           certificates: Array.isArray(app.certificates) ? app.certificates.map((certificate) => String(certificate)) : [],

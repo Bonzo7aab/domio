@@ -7,6 +7,33 @@ import {
   cleanupTestData,
 } from '../helpers/offer-helpers';
 
+const DEFAULT_JOB_COVER =
+  'Mam wieloletnie doświadczenie w realizacji podobnych projektów. Oferuję wysoką jakość wykonania i terminowość.';
+
+async function fillRegularJobOfferDialog(
+  page: import('@playwright/test').Page,
+  price: string,
+  workingDays: string,
+  coverLetter: string = DEFAULT_JOB_COVER
+): Promise<void> {
+  const dialog = page.getByRole('dialog');
+  await dialog.locator('#netPrice').fill(price);
+  const start = new Date();
+  start.setDate(start.getDate() + 10);
+  await dialog.locator('#startDate').fill(start.toISOString().slice(0, 10));
+  await dialog.locator('#workingDays').fill(workingDays);
+  await dialog.locator('#guaranteeMonths').fill('12');
+  await dialog.locator('textarea').first().fill(coverLetter);
+}
+
+function submitRegularJobOfferButton(page: import('@playwright/test').Page) {
+  return page.getByRole('dialog').getByRole('button', { name: 'Wyślij wiążącą ofertę', exact: true });
+}
+
+function submitTenderOfferButton(page: import('@playwright/test').Page) {
+  return page.getByRole('dialog').getByRole('button', { name: 'Wyślij wiążącą ofertę w przetargu', exact: true });
+}
+
 test.describe('Contractor Making Offers', () => {
   // Track test data for cleanup
   const testData: { jobIds: string[]; tenderIds: string[]; companyIds: string[]; userEmails: string[] } = {
@@ -82,55 +109,29 @@ test.describe('Contractor Making Offers', () => {
         await expect(dialog).toBeVisible();
         await expect(dialog.getByText(/złóż ofertę/i)).toBeVisible();
 
-        // Fill form with valid data
-        const priceInput = page.locator('input[id="proposedPrice"]');
-        await priceInput.fill('15000');
-        
-        // Select estimated completion time - find combobox in the dialog
-        const timeSelect = page.getByRole('dialog').locator('button[role="combobox"]').first();
-        await expect(timeSelect).toBeVisible();
-        await timeSelect.click();
-        // Wait for dropdown to appear and select option
-        await page.waitForSelector('[role="option"]', { state: 'visible', timeout: 5000 });
-        const option = page.getByRole('option', { name: '1 miesiąc' });
-        await expect(option).toBeVisible();
-        await option.click();
-        // Wait a moment for the select value to update
-        await page.waitForTimeout(200);
-        
-        // Fill cover letter - find textarea by placeholder or by position (first textarea in dialog)
-        const coverLetterTextarea = page.getByPlaceholder(/opisz swoją ofertę/i).or(
-          page.getByRole('dialog').locator('textarea').first()
+        await fillRegularJobOfferDialog(
+          page,
+          '15000',
+          '20',
+          'Mam wieloletnie doświadczenie w realizacji podobnych projektów. Oferuję wysoką jakość wykonania i terminowość.'
         );
-        await expect(coverLetterTextarea).toBeVisible();
-        const coverLetterText = 'Mam wieloletnie doświadczenie w realizacji podobnych projektów. Oferuję wysoką jakość wykonania i terminowość.';
-        await coverLetterTextarea.fill(coverLetterText);
-        
-        // Verify all form fields are filled before submitting
-        const priceValue = await priceInput.inputValue();
-        const textareaValue = await coverLetterTextarea.inputValue();
-        // Check that select value is set by looking for the selected option text in the combobox
-        // const selectValue = await timeSelect.textContent(); // Unused variable - commented out
-        
-        // Ensure we have valid data
+
+        const priceValue = await page.getByRole('dialog').locator('#netPrice').inputValue();
+        const textareaValue = await page.getByRole('dialog').locator('textarea').first().inputValue();
+
         expect(Number(priceValue)).toBeGreaterThan(0);
         expect(textareaValue.length).toBeGreaterThanOrEqual(50);
-        
-        // Submit form
-        const submitButton = page.getByRole('button', { name: /wyślij ofertę/i });
+
+        const submitButton = submitRegularJobOfferButton(page);
         await expect(submitButton).toBeEnabled();
         await expect(submitButton).not.toBeDisabled();
-        
-        // Click submit button - this triggers handleSubmit which calls onApplicationSubmit
+
         await submitButton.click();
-        
-        // Wait for loading state to appear (button shows "Wysyłanie...")
+
         await page.waitForTimeout(500);
-        
-        // Wait for success message (toast) - sonner toasts use [data-sonner-toast]
-        // The modal simulates 1s delay, then the parent component makes the API call
+
         await expect(
-          page.locator('[data-sonner-toast]').filter({ hasText: /oferta została złożona pomyślnie/i }).first()
+          page.locator('[data-sonner-toast]').filter({ hasText: /wiążąca oferta została złożona/i }).first()
         ).toBeVisible({ timeout: 20000 });
 
         // Verify form closes after success
@@ -188,37 +189,24 @@ test.describe('Contractor Making Offers', () => {
         await expect(page.getByRole('dialog')).toBeVisible();
 
         // Fill required fields
-        await page.locator('input[id="proposedPrice"]').fill('20000');
-        const timeSelect = page.getByRole('dialog').locator('button[role="combobox"]').first();
-        await timeSelect.click();
-        await page.waitForSelector('[role="option"]', { state: 'visible', timeout: 5000 });
-        await page.getByRole('option', { name: '2 tygodnie' }).click();
-        
-        const coverLetterTextarea = page.getByPlaceholder(/opisz swoją ofertę/i).or(
-          page.getByRole('dialog').locator('textarea').first()
-        );
-        await coverLetterTextarea.fill(
+        await fillRegularJobOfferDialog(
+          page,
+          '20000',
+          '10',
           'Jestem doświadczonym wykonawcą z wieloletnim stażem. Gwarantuję profesjonalne podejście i terminową realizację projektu zgodnie z wymaganiami.'
         );
 
-        // Fill optional additional notes
-        const additionalNotesTextarea = page.getByPlaceholder(/dodatkowe informacje/i).or(
-          page.getByRole('dialog').locator('textarea').nth(1)
-        );
+        const additionalNotesTextarea = page.getByRole('dialog').locator('#additionalNotes');
         await additionalNotesTextarea.fill('Mogę rozpocząć pracę natychmiast po akceptacji oferty.');
 
-        // Submit form
-        const submitButton = page.getByRole('button', { name: /wyślij ofertę/i });
+        const submitButton = submitRegularJobOfferButton(page);
         await expect(submitButton).toBeEnabled();
         await submitButton.click();
 
-        // Wait for loading state to appear (button shows "Wysyłanie...")
         await page.waitForTimeout(500);
 
-        // Wait for success message (toast) - sonner toasts use [data-sonner-toast]
-        // The modal simulates 1s delay, then the parent component makes the API call
         await expect(
-          page.locator('[data-sonner-toast]').filter({ hasText: /oferta została złożona pomyślnie/i }).first()
+          page.locator('[data-sonner-toast]').filter({ hasText: /wiążąca oferta została złożona/i }).first()
         ).toBeVisible({ timeout: 20000 });
 
         // Verify form closes after success
@@ -290,7 +278,7 @@ test.describe('Contractor Making Offers', () => {
         );
 
         // Submit form
-        await page.getByRole('button', { name: /wyślij ofertę w przetargu/i }).click();
+        await submitTenderOfferButton(page).click();
 
         // Wait for success message (sonner toast)
         await expect(
@@ -369,7 +357,7 @@ test.describe('Contractor Making Offers', () => {
         await additionalNotesTextarea.fill('Jesteśmy gotowi do rozpoczęcia prac w ciągu tygodnia od podpisania umowy.');
 
         // Submit form
-        await page.getByRole('button', { name: /wyślij ofertę w przetargu/i }).click();
+        await submitTenderOfferButton(page).click();
 
         // Wait for loading state to appear (button shows "Wysyłanie...")
         await page.waitForTimeout(500);
@@ -499,16 +487,12 @@ test.describe('Contractor Making Offers', () => {
         // Wait for form modal
         await expect(page.getByRole('dialog')).toBeVisible();
 
-        // Try to submit without filling required fields
-        const submitButton = page.getByRole('button', { name: /wyślij ofertę/i });
+        const submitButton = submitRegularJobOfferButton(page);
         await submitButton.click();
 
-        // Should show validation errors
-        await expect(page.getByText(/wypełnij wszystkie wymagane pola/i).or(
-          page.getByText(/podaj proponowaną cenę/i).or(
-            page.getByText(/podaj przewidywany czas/i)
-          )
-        ).first()).toBeVisible({ timeout: 5000 });
+        await expect(
+          page.getByText(/wypełnij wszystkie wymagane pola/i).or(page.getByText(/podaj cenę netto/i)).first()
+        ).toBeVisible({ timeout: 5000 });
       } finally {
         // Cleanup is handled by afterEach hook, but also cleanup here as backup
         await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
@@ -561,27 +545,22 @@ test.describe('Contractor Making Offers', () => {
         // Wait for form modal
         await expect(page.getByRole('dialog')).toBeVisible();
 
-        // Fill with invalid price (0)
-        await page.locator('input[id="proposedPrice"]').fill('0');
-        const timeSelect = page.getByRole('dialog').locator('button[role="combobox"]').first();
-        await timeSelect.click();
-        await page.waitForSelector('[role="option"]', { state: 'visible', timeout: 5000 });
-        await page.getByRole('option', { name: '1 miesiąc' }).click();
-        
-        const coverLetterTextarea = page.getByPlaceholder(/opisz swoją ofertę/i).or(
-          page.getByRole('dialog').locator('textarea').first()
-        );
-        await coverLetterTextarea.fill(
+        const dialog = page.getByRole('dialog');
+        await dialog.locator('#netPrice').fill('0');
+        const start = new Date();
+        start.setDate(start.getDate() + 10);
+        await dialog.locator('#startDate').fill(start.toISOString().slice(0, 10));
+        await dialog.locator('#workingDays').fill('5');
+        await dialog.locator('#guaranteeMonths').fill('12');
+        await dialog.locator('textarea').first().fill(
           'Mam wieloletnie doświadczenie w realizacji podobnych projektów. Oferuję wysoką jakość wykonania i terminowość.'
         );
 
-        // Try to submit
-        await page.getByRole('button', { name: /wyślij ofertę/i }).click();
+        await submitRegularJobOfferButton(page).click();
 
-        // Should show validation error
-        await expect(page.getByText(/podaj prawidłową kwotę/i).or(
-          page.getByText(/wypełnij wszystkie wymagane pola/i)
-        ).first()).toBeVisible({ timeout: 5000 });
+        await expect(
+          page.getByText(/podaj prawidłową kwotę netto/i).or(page.getByText(/wypełnij wszystkie wymagane pola/i)).first()
+        ).toBeVisible({ timeout: 5000 });
       } finally {
         // Cleanup is handled by afterEach hook, but also cleanup here as backup
         await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
@@ -644,7 +623,7 @@ test.describe('Contractor Making Offers', () => {
           'Nasza firma posiada wieloletnie doświadczenie w realizacji podobnych projektów. Oferujemy kompleksowe rozwiązanie z pełnym wsparciem technicznym.'
         );
 
-        await page.getByRole('button', { name: /wyślij ofertę w przetargu/i }).click();
+        await submitTenderOfferButton(page).click();
         
         // Wait for success message (toast) - sonner toasts use [data-sonner-toast]
         await expect(
@@ -732,28 +711,19 @@ test.describe('Contractor Making Offers', () => {
         await page.getByRole('button', { name: /złóż ofertę/i }).click();
         await expect(page.getByRole('dialog')).toBeVisible();
 
-        await page.locator('input[id="proposedPrice"]').fill('15000');
-        const timeSelectLabel1 = page.getByText(/czas realizacji/i);
-        const timeSelect1 = timeSelectLabel1.locator('..').locator('button[role="combobox"]').first();
-        await timeSelect1.click();
-        await page.waitForSelector('[role="option"]', { state: 'visible', timeout: 5000 });
-        await page.getByRole('option', { name: '1 miesiąc' }).click();
-        
-        const coverLetterTextarea1 = page.getByPlaceholder(/opisz swoją ofertę/i).or(
-          page.getByRole('dialog').locator('textarea').first()
-        );
-        await coverLetterTextarea1.fill(
+        await fillRegularJobOfferDialog(
+          page,
+          '15000',
+          '20',
           'Mam wieloletnie doświadczenie w realizacji podobnych projektów. Oferuję wysoką jakość wykonania i terminowość.'
         );
 
-        await page.getByRole('button', { name: /wyślij ofertę/i }).click();
-        
-        // Wait for loading state
+        await submitRegularJobOfferButton(page).click();
+
         await page.waitForTimeout(500);
-        
-        // Wait for success message (toast) - sonner toasts use [data-sonner-toast]
+
         await expect(
-          page.locator('[data-sonner-toast]').filter({ hasText: /oferta została złożona pomyślnie/i }).first()
+          page.locator('[data-sonner-toast]').filter({ hasText: /wiążąca oferta została złożona/i }).first()
         ).toBeVisible({ timeout: 20000 });
 
         // Submit offer on second job with error handling
@@ -779,28 +749,19 @@ test.describe('Contractor Making Offers', () => {
         await page.getByRole('button', { name: /złóż ofertę/i }).click();
         await expect(page.getByRole('dialog')).toBeVisible();
 
-        await page.locator('input[id="proposedPrice"]').fill('20000');
-        const timeSelectLabel2 = page.getByText(/czas realizacji/i);
-        const timeSelect2 = timeSelectLabel2.locator('..').locator('button[role="combobox"]').first();
-        await timeSelect2.click();
-        await page.waitForSelector('[role="option"]', { state: 'visible', timeout: 5000 });
-        await page.getByRole('option', { name: '2 tygodnie' }).click();
-        
-        const coverLetterTextarea2 = page.getByPlaceholder(/opisz swoją ofertę/i).or(
-          page.getByRole('dialog').locator('textarea').first()
-        );
-        await coverLetterTextarea2.fill(
+        await fillRegularJobOfferDialog(
+          page,
+          '20000',
+          '15',
           'Jestem doświadczonym wykonawcą z wieloletnim stażem. Gwarantuję profesjonalne podejście i terminową realizację projektu.'
         );
 
-        await page.getByRole('button', { name: /wyślij ofertę/i }).click();
-        
-        // Wait for loading state
+        await submitRegularJobOfferButton(page).click();
+
         await page.waitForTimeout(500);
-        
-        // Wait for success message (toast) - sonner toasts use [data-sonner-toast]
+
         await expect(
-          page.locator('[data-sonner-toast]').filter({ hasText: /oferta została złożona pomyślnie/i }).first()
+          page.locator('[data-sonner-toast]').filter({ hasText: /wiążąca oferta została złożona/i }).first()
         ).toBeVisible({ timeout: 20000 });
       } finally {
         // Cleanup is handled by afterEach hook, but also cleanup here as backup
@@ -857,15 +818,15 @@ test.describe('Contractor Making Offers', () => {
         await expect(page.getByRole('dialog')).toBeVisible();
 
         // Verify form fields are visible
-        await expect(page.getByLabel(/proponowana cena/i)).toBeVisible();
+        await expect(page.getByLabel(/cena netto/i)).toBeVisible();
         const dialog = page.getByRole('dialog');
-        await expect(dialog.getByText(/czas realizacji/i).first()).toBeVisible();
-        await expect(dialog.getByText(/opis oferty/i)).toBeVisible();
-        await expect(dialog.getByText(/dodatkowe uwagi/i)).toBeVisible();
+        await expect(dialog.getByText(/termin rozpoczęcia/i).first()).toBeVisible();
+        await expect(dialog.getByText(/dni robocze/i).first()).toBeVisible();
+        await expect(dialog.getByText(/opis i podejście do zlecenia/i)).toBeVisible();
+        await expect(dialog.getByText(/dokumentacja dodatkowa/i)).toBeVisible();
 
-        // Verify buttons are visible
         await expect(page.getByRole('button', { name: /anuluj/i })).toBeVisible();
-        await expect(page.getByRole('button', { name: /wyślij ofertę/i })).toBeVisible();
+        await expect(submitRegularJobOfferButton(page)).toBeVisible();
       } finally {
         // Cleanup is handled by afterEach hook, but also cleanup here as backup
         await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
@@ -919,26 +880,12 @@ test.describe('Contractor Making Offers', () => {
         await expect(page.getByRole('dialog')).toBeVisible();
 
         // Fill form
-        await page.locator('input[id="proposedPrice"]').fill('15000');
-        const timeSelect = page.getByRole('dialog').locator('button[role="combobox"]').first();
-        await timeSelect.click();
-        await page.waitForSelector('[role="option"]', { state: 'visible', timeout: 5000 });
-        await page.getByRole('option', { name: '1 miesiąc' }).click();
-        
-        const coverLetterTextarea = page.getByPlaceholder(/opisz swoją ofertę/i).or(
-          page.getByRole('dialog').locator('textarea').first()
-        );
-        await coverLetterTextarea.fill(
-          'Mam wieloletnie doświadczenie w realizacji podobnych projektów. Oferuję wysoką jakość wykonania i terminowość.'
-        );
+        await fillRegularJobOfferDialog(page, '15000', '20');
 
-        // Submit and check for loading state
-        const submitButton = page.getByRole('button', { name: /wyślij ofertę/i });
+        const submitButton = submitRegularJobOfferButton(page);
         await submitButton.click();
 
-        // Check for loading indicator - button should become disabled or show "Wysyłanie..." text
-        // Use a locator that matches either button state (original or loading)
-        const loadingButton = page.getByRole('button', { name: /wyślij ofertę|wysyłanie/i });
+        const loadingButton = page.getByRole('button', { name: /wyślij wiążącą ofertę|wysyłanie/i });
         const hasLoadingState = await Promise.race([
           loadingButton.getByText(/wysyłanie/i).waitFor({ timeout: 2000 }).then(() => true),
           // Poll for disabled state
@@ -1007,7 +954,7 @@ test.describe('Contractor Making Offers', () => {
         await expect(page.getByRole('dialog')).toBeVisible();
 
         // Fill some fields
-        await page.locator('input[id="proposedPrice"]').fill('15000');
+        await page.getByRole('dialog').locator('#netPrice').fill('15000');
 
         // Click cancel button
         await page.getByRole('button', { name: /anuluj/i }).click();

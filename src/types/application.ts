@@ -12,6 +12,10 @@ export interface Application {
   contractorLocation: string;
   proposedPrice: number;
   proposedTimeline: string;
+  /** Raw `proposed_timeline` from DB (days), when set. */
+  timelineDays: number | null;
+  /** Stored VAT rate percent (8 or 23). */
+  vatRate: 8 | 23;
   coverLetter: string;
   experience: string;
   teamSize: number;

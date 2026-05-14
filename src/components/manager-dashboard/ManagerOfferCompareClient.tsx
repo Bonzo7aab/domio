@@ -32,6 +32,19 @@ import {
   TableRow,
 } from '../ui/table';
 
+function grossFromVat(net: number, vatPercent: number): number {
+  return Math.round(net * (1 + vatPercent / 100));
+}
+
+function jobDurationLabel(app: Application): string {
+  if (app.timelineDays != null && !Number.isNaN(app.timelineDays)) {
+    const d = app.timelineDays;
+    return `${d} ${d === 1 ? 'dzień roboczy' : 'dni roboczych'}`;
+  }
+  return app.proposedTimeline;
+}
+
+/** Tender bids do not store per-bid VAT in this flow; assume 23% for comparison. */
 const DEFAULT_VAT = 23;
 
 type CompareKind = 'job' | 'tender';
@@ -202,7 +215,6 @@ export function ManagerOfferCompareClient({
   }, [detailApp, detailBid, profiles]);
 
   const netFromBid = (bid: TenderBidLike): number => bid.totalPrice;
-  const gross = (net: number): number => Math.round(net * (1 + DEFAULT_VAT / 100));
 
   if (loading) {
     return (
@@ -252,17 +264,19 @@ export function ManagerOfferCompareClient({
                 ) : (
                   jobApps.map((app) => {
                     const net = app.proposedPrice;
-                    const brutto = gross(net);
+                    const vatRate = app.vatRate ?? 23;
+                    const brutto = grossFromVat(net, vatRate);
                     const p = profileForCompany(app.contractorCompanyId);
                     const stars = `⭐ ${app.contractorRating.toFixed(1)}`;
+                    const durationLabel = jobDurationLabel(app);
                     return (
                       <TableRow key={app.id}>
                         <TableCell className="font-medium">{app.contractorCompany}</TableCell>
                         <TableCell>{formatMoney(net)}</TableCell>
-                        <TableCell>{DEFAULT_VAT}%</TableCell>
+                        <TableCell>{vatRate}%</TableCell>
                         <TableCell className="font-semibold">{formatMoney(brutto)}</TableCell>
                         <TableCell>{formatDate(app.availableFrom)}</TableCell>
-                        <TableCell>{app.proposedTimeline}</TableCell>
+                        <TableCell>{durationLabel}</TableCell>
                         <TableCell>{app.guaranteePeriod}</TableCell>
                         <TableCell className="text-sm whitespace-nowrap">
                           {ocSummary(p)} / {stars}
@@ -307,7 +321,7 @@ export function ManagerOfferCompareClient({
                 ) : (
                   tenderBids.map((bid) => {
                     const net = netFromBid(bid);
-                    const brutto = gross(net);
+                    const brutto = grossFromVat(net, DEFAULT_VAT);
                     const p = profileForCompany(bid.contractorCompanyId);
                     const days = bid.proposedTimeline;
                     const durationLabel = `${days} ${days === 1 ? 'dzień' : 'dni'}`;
@@ -371,11 +385,15 @@ export function ManagerOfferCompareClient({
                       </div>
                       <div>
                         <span className="text-muted-foreground">VAT: </span>
-                        {DEFAULT_VAT}% ({formatMoney(gross(detailApp.proposedPrice) - detailApp.proposedPrice)})
+                        {(detailApp.vatRate ?? 23)}% (
+                        {formatMoney(
+                          grossFromVat(detailApp.proposedPrice, detailApp.vatRate ?? 23) - detailApp.proposedPrice
+                        )}
+                        )
                       </div>
                       <div>
                         <span className="text-muted-foreground">Kwota brutto: </span>
-                        <strong>{formatMoney(gross(detailApp.proposedPrice))}</strong>
+                        <strong>{formatMoney(grossFromVat(detailApp.proposedPrice, detailApp.vatRate ?? 23))}</strong>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Termin rozpoczęcia: </span>
@@ -383,7 +401,7 @@ export function ManagerOfferCompareClient({
                       </div>
                       <div>
                         <span className="text-muted-foreground">Czas realizacji: </span>
-                        {detailApp.proposedTimeline}
+                        {jobDurationLabel(detailApp)}
                       </div>
                       <div>
                         <span className="text-muted-foreground">Gwarancja: </span>
@@ -400,11 +418,12 @@ export function ManagerOfferCompareClient({
                       <div>
                         <span className="text-muted-foreground">VAT: </span>
                         {DEFAULT_VAT}% (
-                        {formatMoney(gross(netFromBid(detailBid)) - netFromBid(detailBid))})
+                        {formatMoney(grossFromVat(netFromBid(detailBid), DEFAULT_VAT) - netFromBid(detailBid))}
+                        )
                       </div>
                       <div>
                         <span className="text-muted-foreground">Kwota brutto: </span>
-                        <strong>{formatMoney(gross(netFromBid(detailBid)))}</strong>
+                        <strong>{formatMoney(grossFromVat(netFromBid(detailBid), DEFAULT_VAT))}</strong>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Termin rozpoczęcia: </span>

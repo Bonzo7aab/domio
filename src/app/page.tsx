@@ -4,7 +4,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import JobFilters from '../components/JobFilters';
 import JobList from '../components/JobList';
-import { JobApplicationModal } from '../components/JobApplicationModal';
+import {
+  JobApplicationModal,
+  type JobApplicationFormFields,
+  type JobApplicationSubmitPayload,
+} from '../components/JobApplicationModal';
 import { MapPlaceholder } from '../components/MapPlaceholder';
 import CategoryIconBar from '../components/CategoryIconBar';
 import { toast } from 'sonner';
@@ -60,11 +64,15 @@ function HomePageContent() {
   const [applicationModalOpen, setApplicationModalOpen] = useState(false);
   const [selectedApplicationJobId, setSelectedApplicationJobId] = useState<string | null>(null);
   const [selectedApplicationJob, setSelectedApplicationJob] = useState<Job | null>(null);
-  const [applicationForm, setApplicationForm] = useState({
+  const [applicationForm, setApplicationForm] = useState<JobApplicationFormFields>({
     proposedPrice: '',
+    vatRate: '23',
+    workingDays: '',
+    startDate: '',
+    guaranteeMonths: '12',
     estimatedCompletion: '',
     coverLetter: '',
-    additionalNotes: ''
+    additionalNotes: '',
   });
   const [showMessaging, setShowMessaging] = useState(false);
   const [loadedJobs, setLoadedJobs] = useState<Job[]>([]);
@@ -366,7 +374,7 @@ function HomePageContent() {
     setApplicationModalOpen(true);
   };
 
-  const handleApplicationSubmit = async (applicationData: Record<string, unknown>) => {
+  const handleApplicationSubmit = async (applicationData: JobApplicationSubmitPayload) => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany aby złożyć ofertę');
       return;
@@ -440,10 +448,17 @@ function HomePageContent() {
           selectedApplicationJobId,
           user.id,
           {
-            proposedPrice: typeof applicationData.proposedPrice === 'string' ? parseFloat(applicationData.proposedPrice) || 0 : (applicationData.proposedPrice as number) || 0,
-            estimatedCompletion: String(applicationData.estimatedCompletion || ''),
+            proposedPrice:
+              typeof applicationData.proposedPrice === 'string'
+                ? parseFloat(applicationData.proposedPrice) || 0
+                : applicationData.proposedPrice || 0,
             coverLetter: String(applicationData.coverLetter || ''),
             additionalNotes: applicationData.additionalNotes ? String(applicationData.additionalNotes) : undefined,
+            vatRate: applicationData.vatRate,
+            workingDays: applicationData.workingDays,
+            startDate: applicationData.startDate,
+            guaranteeMonths: applicationData.guaranteeMonths,
+            attachments: applicationData.attachments,
           }
         );
 
@@ -466,7 +481,9 @@ function HomePageContent() {
         }
 
         console.log('Application submitted successfully:', data);
-        toast.success('Oferta została złożona pomyślnie!');
+        toast.success(
+          'Wiążąca oferta została złożona. Nie możesz jej już edytować — zamawiający wkrótce ją zobaczy.'
+        );
       }
 
       setApplicationModalOpen(false);
@@ -474,9 +491,13 @@ function HomePageContent() {
       setSelectedApplicationJob(null);
       setApplicationForm({
         proposedPrice: '',
+        vatRate: '23',
+        workingDays: '',
+        startDate: '',
+        guaranteeMonths: '12',
         estimatedCompletion: '',
         coverLetter: '',
-        additionalNotes: ''
+        additionalNotes: '',
       });
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -490,9 +511,13 @@ function HomePageContent() {
     setSelectedApplicationJob(null);
     setApplicationForm({
       proposedPrice: '',
+      vatRate: '23',
+      workingDays: '',
+      startDate: '',
+      guaranteeMonths: '12',
       estimatedCompletion: '',
       coverLetter: '',
-      additionalNotes: ''
+      additionalNotes: '',
     });
   };
 
@@ -547,10 +572,11 @@ function HomePageContent() {
           onClose={handleApplicationModalClose}
           jobTitle={selectedApplicationJob?.title || getJobForApplication(selectedApplicationJobId).title}
           companyName={selectedApplicationJob?.company || getJobForApplication(selectedApplicationJobId).company}
+          jobId={selectedApplicationJobId}
           jobData={selectedApplicationJob as unknown as Record<string, unknown>}
           onApplicationSubmit={handleApplicationSubmit}
           applicationForm={applicationForm}
-          setApplicationForm={(form) => setApplicationForm(prev => ({ ...prev, ...form, additionalNotes: form.additionalNotes ?? prev.additionalNotes }))}
+          setApplicationForm={(form) => setApplicationForm(form)}
           postType={(selectedApplicationJob?.postType || getJobForApplication(selectedApplicationJobId).postType) as 'job' | 'tender'}
         />
       )}
