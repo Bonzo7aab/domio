@@ -35,8 +35,8 @@ export const JobNotifications: React.FC<JobNotificationsProps> = ({
     {
       id: '1',
       type: 'new_job',
-      title: 'Nowe pilne zlecenie: Sprzątanie klatek',
-      description: 'Wspólnota Mieszkaniowa w Warszawie opublikowała pilne zlecenie',
+      title: 'Nowe pilne zgłoszenie: Sprzątanie klatek',
+      description: 'Wspólnota Mieszkaniowa w Warszawie opublikowała pilne zgłoszenie',
       jobId: '1',
       timestamp: new Date(Date.now() - 5 * 60000),
       read: false,
@@ -46,7 +46,7 @@ export const JobNotifications: React.FC<JobNotificationsProps> = ({
       id: '2',
       type: 'saved_search',
       title: 'Nowe wyniki dla "elektryk kraków"',
-      description: '3 nowe zlecenia pasujące do Twojego wyszukiwania',
+      description: '3 nowe zgłoszenia pasujące do Twojego wyszukiwania',
       searchQuery: 'elektryk kraków',
       timestamp: new Date(Date.now() - 30 * 60000),
       read: false,
@@ -55,7 +55,7 @@ export const JobNotifications: React.FC<JobNotificationsProps> = ({
     {
       id: '3',
       type: 'price_alert',
-      title: 'Wysokopłatne zlecenie w Twojej okolicy',
+      title: 'Wysokopłatne zgłoszenie w Twojej okolicy',
       description: 'Remont elewacji - 120 zł/m² w Krakowie',
       jobId: '2',
       timestamp: new Date(Date.now() - 2 * 3600000),
@@ -66,7 +66,7 @@ export const JobNotifications: React.FC<JobNotificationsProps> = ({
       id: '4',
       type: 'deadline_reminder',
       title: 'Przypomnienie o terminie aplikacji',
-      description: 'Zlecenie "Serwis instalacji" kończy przyjmowanie ofert za 2 dni',
+      description: 'Zgłoszenie "Serwis instalacji" kończy przyjmowanie ofert za 2 dni',
       jobId: '3',
       timestamp: new Date(Date.now() - 4 * 3600000),
       read: true,
@@ -184,7 +184,7 @@ export const JobNotifications: React.FC<JobNotificationsProps> = ({
               )}
             </CardTitle>
             <CardDescription>
-              Najnowsze aktualizacje zleceń
+              Najnowsze aktualizacje zgłoszeń
             </CardDescription>
           </div>
           <Button
@@ -284,7 +284,7 @@ export const JobNotifications: React.FC<JobNotificationsProps> = ({
             
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">Nowe zlecenia</Label>
+                <Label className="text-xs">Nowe zgłoszenia</Label>
                 <Switch
                   checked={settings.newJobs}
                   onCheckedChange={(checked) => 

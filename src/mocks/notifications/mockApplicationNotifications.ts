@@ -23,8 +23,8 @@ export const mockApplicationNotifications: ApplicationNotificationMock[] = [
   {
     id: 'notif-1',
     type: 'new_application',
-    title: 'Nowa aplikacja na zlecenie',
-    message: 'Otrzymano nową aplikację na zlecenie sprzątania klatek schodowych',
+    title: 'Nowa aplikacja na zgłoszenie',
+    message: 'Otrzymano nową aplikację na zgłoszenie sprzątania klatek schodowych',
     contractorName: 'Jan Kowalski',
     contractorAvatar: '',
     contractorRating: 4.8,
@@ -37,7 +37,7 @@ export const mockApplicationNotifications: ApplicationNotificationMock[] = [
   {
     id: 'notif-2',
     type: 'new_application',
-    title: 'Nowa aplikacja na zlecenie',
+    title: 'Nowa aplikacja na zgłoszenie',
     message: 'Otrzymano nową aplikację na remont elewacji budynku',
     contractorName: 'Anna Nowak',
     contractorAvatar: '',

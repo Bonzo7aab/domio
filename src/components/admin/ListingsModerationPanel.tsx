@@ -137,7 +137,7 @@ export function ListingsModerationPanel({ jobs, tenders }: ListingsModerationPan
   return (
     <Tabs defaultValue="job">
       <TabsList className="grid w-full grid-cols-2 md:w-fit">
-        <TabsTrigger value="job">Zlecenia ({jobs.length})</TabsTrigger>
+        <TabsTrigger value="job">Zgłoszenia ({jobs.length})</TabsTrigger>
         <TabsTrigger value="tender">Przetargi ({tenders.length})</TabsTrigger>
       </TabsList>
       <TabsContent value="job" className="mt-4">
@@ -322,7 +322,7 @@ function JobListingDetails({ row }: { row: AdminJobListingRow }) {
         toast.error(res.error ?? 'Błąd');
         return;
       }
-      toast.success('Zlecenie wstrzymane');
+      toast.success('Zgłoszenie wstrzymane');
       window.location.reload();
     } finally {
       setBusy(false);
@@ -351,7 +351,7 @@ function JobListingDetails({ row }: { row: AdminJobListingRow }) {
         toast.error(res.error ?? 'Błąd');
         return;
       }
-      toast.success('Zlecenie aktywne');
+      toast.success('Zgłoszenie aktywne');
       window.location.reload();
     } finally {
       setBusy(false);
@@ -702,8 +702,8 @@ function PauseListingSection({
   onResume,
   busy,
 }: PauseListingSectionProps) {
-  const titleAction = kind === 'job' ? 'Zawieś zlecenie' : 'Zawieś przetarg';
-  const resumeAction = kind === 'job' ? 'Wznów zlecenie' : 'Wznów przetarg';
+  const titleAction = kind === 'job' ? 'Zawieś zgłoszenie' : 'Zawieś przetarg';
+  const resumeAction = kind === 'job' ? 'Wznów zgłoszenie' : 'Wznów przetarg';
   const pausedLabel = kind === 'job' ? 'Zawieszone' : 'Zawieszone';
   return (
     <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
@@ -718,7 +718,7 @@ function PauseListingSection({
       <div className="space-y-2">
         {paused && (
           <p className="text-xs text-muted-foreground">
-            {kind === 'job' ? 'Zlecenie' : 'Przetarg'} jest obecnie zawieszone. Wyślij zaktualizowaną wiadomość lub wznów ogłoszenie.
+            {kind === 'job' ? 'Zgłoszenie' : 'Przetarg'} jest obecnie zawieszone. Wyślij zaktualizowaną wiadomość lub wznów ogłoszenie.
           </p>
         )}
         <label className="text-xs uppercase tracking-wide text-muted-foreground">

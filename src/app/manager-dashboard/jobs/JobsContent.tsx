@@ -49,14 +49,14 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
       
       if (jobError || !jobData) {
         console.error('Error fetching job details:', jobError);
-        toast.error('Nie udało się załadować szczegółów zlecenia');
+        toast.error('Nie udało się załadować szczegółów zgłoszenia');
         setJobDetailsData(null);
       } else {
         setJobDetailsData(jobData);
       }
     } catch (err) {
       console.error('Error loading job details:', err);
-      toast.error('Wystąpił błąd podczas ładowania szczegółów zlecenia');
+      toast.error('Wystąpił błąd podczas ładowania szczegółów zgłoszenia');
       setJobDetailsData(null);
     } finally {
       setIsLoadingJobDetails(false);
@@ -67,7 +67,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
     <>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Zarządzanie zleceniami</h2>
+          <h2 className="text-2xl font-bold">Zarządzanie zgłoszeniami</h2>
         </div>
 
         <div className="grid gap-4">
@@ -125,7 +125,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
           }) : (
             <Card>
               <CardContent className="pt-6 text-center">
-                <p className="text-muted-foreground">Brak zleceń</p>
+                <p className="text-muted-foreground">Brak zgłoszeń</p>
               </CardContent>
             </Card>
           )}
@@ -141,9 +141,9 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Szczegóły zlecenia</DialogTitle>
+            <DialogTitle>Szczegóły zgłoszenia</DialogTitle>
             <DialogDescription>
-              Pełne informacje o zleceniu
+              Pełne informacje o zgłoszeniu
             </DialogDescription>
           </DialogHeader>
           
@@ -206,7 +206,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
 
               {jobDetailsData.description && (
                 <div>
-                  <h3 className="font-semibold mb-2">Opis zlecenia</h3>
+                  <h3 className="font-semibold mb-2">Opis zgłoszenia</h3>
                   <p className="text-gray-700 whitespace-pre-wrap">{jobDetailsData.description}</p>
                 </div>
               )}
@@ -267,7 +267,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">Nie udało się załadować szczegółów zlecenia</p>
+              <p className="text-muted-foreground">Nie udało się załadować szczegółów zgłoszenia</p>
             </div>
           )}
         </DialogContent>

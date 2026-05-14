@@ -234,7 +234,7 @@ export const JobApplicationForm: React.FC<JobApplicationFormProps> = ({
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <h2 className="text-xl font-semibold">Aplikuj na zlecenie</h2>
+            <h2 className="text-xl font-semibold">Aplikuj na zgłoszenie</h2>
             <p className="text-gray-600 mt-1">{jobTitle}</p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -348,7 +348,7 @@ export const JobApplicationForm: React.FC<JobApplicationFormProps> = ({
               </CardHeader>
               <CardContent>
                 <Textarea
-                  placeholder="Opisz dlaczego jesteś idealnym kandydatem do tego zlecenia. Uwzględnij swoje doświadczenie, podejście do pracy i to co wyróżnia Cię na tle konkurencji..."
+                  placeholder="Opisz dlaczego jesteś idealnym kandydatem do tego zgłoszenia. Uwzględnij swoje doświadczenie, podejście do pracy i to co wyróżnia Cię na tle konkurencji..."
                   value={formData.coverLetter}
                   onChange={(e) => handleInputChange('coverLetter', e.target.value)}
                   className={`min-h-[120px] ${errors.coverLetter ? 'border-red-500' : ''}`}

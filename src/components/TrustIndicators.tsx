@@ -73,7 +73,7 @@ export default function TrustIndicators({
             <TrustBadge 
               type="experience" 
               value={completedJobs}
-              tooltip={`Firma wykonała ${completedJobs} zleceń na platformie Urbi.eu`}
+              tooltip={`Firma wykonała ${completedJobs} zgłoszeń na platformie Urbi.eu`}
             />
           )}
         </div>
@@ -93,7 +93,7 @@ export default function TrustIndicators({
         <TrustBadge 
           type="experience" 
           value={completedJobs}
-          tooltip={`Wspólnota/spółdzielnia opublikowała ${completedJobs} zleceń na platformie Urbi.eu`}
+          tooltip={`Wspólnota/spółdzielnia opublikowała ${completedJobs} zgłoszeń na platformie Urbi.eu`}
         />
       )}
       

@@ -32,8 +32,8 @@ export default function TermsPage() {
                 <li><strong>Użytkownik:</strong> Osoba fizyczna, prawna lub jednostka organizacyjna korzystająca z Platformy</li>
                 <li><strong>Zarządca:</strong> Użytkownik zamieszczający ogłoszenia (m.in. zarząd nieruchomości, wspólnota, spółdzielnia)</li>
                 <li><strong>Wykonawca:</strong> Użytkownik świadczący usługi budowlane lub remontowe</li>
-                <li><strong>Zlecenie:</strong> Ogłoszenie o potrzebie wykonania usługi zamieszczone przez Ogłoszeniodawcę</li>
-                <li><strong>Oferta:</strong> Propozycja wykonania zlecenia złożona przez Wykonawcę</li>
+                <li><strong>Zgłoszenie:</strong> Ogłoszenie o potrzebie wykonania usługi zamieszczone przez Ogłoszeniodawcę</li>
+                <li><strong>Oferta:</strong> Propozycja wykonania zgłoszenia złożona przez Wykonawcę</li>
                 <li><strong>Przetarg:</strong> Procedura wyboru wykonawcy na podstawie złożonych ofert</li>
               </ul>
             </section>
@@ -66,18 +66,18 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-slate-900 mb-4">5. Zlecenia i oferty</h2>
-              <h3 className="text-xl font-semibold text-slate-900 mb-3">5.1. Zlecenia Ogłoszeniodawców:</h3>
+              <h2 className="text-2xl font-semibold text-slate-900 mb-4">5. Zgłoszenia i oferty</h2>
+              <h3 className="text-xl font-semibold text-slate-900 mb-3">5.1. Zgłoszenia Ogłoszeniodawców:</h3>
               <ul className="list-disc pl-6 space-y-2 text-slate-700 mb-4">
-                <li>Ogłoszeniodawcy mogą publikować zlecenia dotyczące usług budowlanych i remontowych</li>
-                <li>Zlecenie powinno zawierać dokładny opis prac, lokalizację, budżet i termin</li>
-                <li>Zarządca odpowiada za prawdziwość informacji zawartych w zleceniu</li>
-                <li>Platforma nie gwarantuje znalezienia wykonawcy dla każdego zlecenia</li>
+                <li>Ogłoszeniodawcy mogą publikować zgłoszenia dotyczące usług budowlanych i remontowych</li>
+                <li>Zgłoszenie powinno zawierać dokładny opis prac, lokalizację, budżet i termin</li>
+                <li>Zarządca odpowiada za prawdziwość informacji zawartych w zgłoszeniu</li>
+                <li>Platforma nie gwarantuje znalezienia wykonawcy dla każdego zgłoszenia</li>
               </ul>
 
               <h3 className="text-xl font-semibold text-slate-900 mb-3">5.2. Oferty Wykonawców:</h3>
               <ul className="list-disc pl-6 space-y-2 text-slate-700 mb-4">
-                <li>Wykonawcy mogą składać oferty na zlecenia odpowiadające ich kompetencjom</li>
+                <li>Wykonawcy mogą składać oferty na zgłoszenia odpowiadające ich kompetencjom</li>
                 <li>Oferta powinna zawierać cenę, termin realizacji i opis proponowanego rozwiązania</li>
                 <li>Wykonawca odpowiada za prawdziwość informacji zawartych w ofercie</li>
                 <li>Złożenie oferty nie jest równoznaczne z zawarciem umowy</li>
@@ -93,7 +93,7 @@ export default function TermsPage() {
               <ul className="list-disc pl-6 space-y-2 text-slate-700">
                 <li>Zawartość umów między Użytkownikami</li>
                 <li>Jakość wykonanych usług</li>
-                <li>Terminy realizacji zleceń</li>
+                <li>Terminy realizacji zgłoszeń</li>
                 <li>Wypadki lub szkody powstałe podczas wykonywania usług</li>
                 <li>Spory między Użytkownikami</li>
                 <li>Naruszenia prawa przez Użytkowników</li>
@@ -124,7 +124,7 @@ export default function TermsPage() {
               <ul className="list-disc pl-6 space-y-2 text-slate-700">
                 <li>Weryfikacja jest dobrowolna</li>
                 <li>Zweryfikowani użytkownicy otrzymują oznaczenie wizualne na profilu</li>
-                <li>Zweryfikowani użytkownicy mogą otrzymywać więcej zleceń/ofert</li>
+                <li>Zweryfikowani użytkownicy mogą otrzymywać więcej zgłoszeń/ofert</li>
                 <li>Dokumenty weryfikacyjne są przetwarzane zgodnie z Polityką Prywatności</li>
                 <li>Platforma zastrzega sobie prawo do odmowy weryfikacji bez podania przyczyny</li>
               </ul>

@@ -35,7 +35,7 @@ export function WelcomePage({ onBack, onGetStarted, onTutorial }: WelcomePagePro
   const managerFeatures = [
     {
       icon: FileText,
-      title: 'Darmowe publikowanie zleceń',
+      title: 'Darmowe publikowanie zgłoszeń',
       description: 'Publikuj ogłoszenia i przetargi bezpłatnie. Znajdź najlepszych wykonawców dla swoich projektów.',
       color: 'text-blue-600'
     },
@@ -75,8 +75,8 @@ export function WelcomePage({ onBack, onGetStarted, onTutorial }: WelcomePagePro
   const contractorFeatures = [
     {
       icon: FileText,
-      title: 'Dostęp do zweryfikowanych zleceń',
-      description: 'Przeglądaj ogłoszenia od sprawdzonych zarządców nieruchomości. Tylko prawdziwe, wiarygodne zlecenia.',
+      title: 'Dostęp do zweryfikowanych zgłoszeń',
+      description: 'Przeglądaj ogłoszenia od sprawdzonych zarządców nieruchomości. Tylko prawdziwe, wiarygodne zgłoszenia.',
       color: 'text-blue-600'
     },
     {
@@ -277,14 +277,14 @@ export function WelcomePage({ onBack, onGetStarted, onTutorial }: WelcomePagePro
             <div className="text-center space-y-4">
               <h3 className="text-xl font-semibold">
                 {isManager 
-                  ? 'Gotowy do publikowania pierwszego zlecenia?'
+                  ? 'Gotowy do publikowania pierwszego zgłoszenia?'
                   : 'Gotowy do znalezienia pierwszego projektu?'
                 }
               </h3>
               <p className="text-white/90">
                 {isManager
-                  ? 'Przeprowadzimy Cię przez proces tworzenia profilu firmy, dodawania nieruchomości i publikowania pierwszego zlecenia lub przetargu.'
-                  : 'Pokażemy Ci jak uzupełnić profil firmy, dodać portfolio projektów i aplikować o pierwsze zlecenia od zarządców.'
+                  ? 'Przeprowadzimy Cię przez proces tworzenia profilu firmy, dodawania nieruchomości i publikowania pierwszego zgłoszenia lub przetargu.'
+                  : 'Pokażemy Ci jak uzupełnić profil firmy, dodać portfolio projektów i aplikować o pierwsze zgłoszenia od zarządców.'
                 }
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">

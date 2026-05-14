@@ -220,13 +220,13 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
   const contractorQuestions: Question[] = [
     {
       id: 'current_challenges',
-      title: 'Jakie są Twoje największe wyzwania przy znajdowaniu zleceń?',
+      title: 'Jakie są Twoje największe wyzwania przy znajdowaniu zgłoszeń?',
       type: 'checkbox',
       options: [
         'Konkurencja cenowa',
         'Trudność w dotarciu do potencjalnych klientów',
         'Długie procesy negocjacyjne',
-        'Brak stałych zleceń',
+        'Brak stałych zgłoszeń',
         'Problemy z płatnościami',
         'Skomplikowane procedury przetargowe',
         'Ograniczony zasięg geograficzny'
@@ -234,7 +234,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
     },
     {
       id: 'current_methods',
-      title: 'Jak obecnie znajdujesz zlecenia?',
+      title: 'Jak obecnie znajdujesz zgłoszenia?',
       type: 'checkbox',
       options: [
         'Rekomendacje od obecnych klientów',
@@ -272,10 +272,10 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
     },
     {
       id: 'pricing_willingness',
-      title: 'Ile byłbyś skłonny płacić miesięcznie za dostęp do platformy ze zleceniami?',
+      title: 'Ile byłbyś skłonny płacić miesięcznie za dostęp do platformy ze zgłoszeniami?',
       type: 'radio',
       options: [
-        'Nic - tylko za prowizję od zleceń',
+        'Nic - tylko za prowizję od zgłoszeń',
         'Do 25 zł',
         '25-50 zł',
         '50-100 zł',
@@ -289,9 +289,9 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
       type: 'checkbox',
       options: [
         'Łatwe składanie ofert',
-        'Powiadomienia o nowych zleceniach',
+        'Powiadomienia o nowych zgłoszeniach',
         'System budowania reputacji',
-        'Filtrowanie zleceń po lokalizacji',
+        'Filtrowanie zgłoszeń po lokalizacji',
         'Komunikacja z zarządcami',
         'Historia współpracy',
         'Narzędzia do zarządzania projektami'
@@ -311,7 +311,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
     },
     {
       id: 'business_growth',
-      title: 'O ile chciałbyś zwiększyć liczbę zleceń? (w %)',
+      title: 'O ile chciałbyś zwiększyć liczbę zgłoszeń? (w %)',
       type: 'slider',
       min: 0,
       max: 200,
@@ -323,14 +323,14 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
       type: 'radio',
       options: [
         'Stały abonament miesięczny',
-        'Prowizja od każdego zdobytego zlecenia',
+        'Prowizja od każdego zdobytego zgłoszenia',
         'Płatność za kontakt z zarządcą',
         'Model mieszany (abonament + prowizja)'
       ]
     },
     {
       id: 'time_spent',
-      title: 'Ile czasu tygodniowo poświęcasz na poszukiwanie nowych zleceń?',
+      title: 'Ile czasu tygodniowo poświęcasz na poszukiwanie nowych zgłoszeń?',
       type: 'radio',
       options: [
         'Poniżej 2 godzin',
@@ -342,7 +342,7 @@ export function ValidationSurvey({ onComplete, onBack }: SurveyProps) {
     },
     {
       id: 'success_rate',
-      title: 'Jaki procent Twoich ofert kończy się zleceniem?',
+      title: 'Jaki procent Twoich ofert kończy się zgłoszeniem?',
       type: 'slider',
       min: 0,
       max: 100,

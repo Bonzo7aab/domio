@@ -381,7 +381,7 @@ function HomePageContent() {
     }
 
     if (!selectedApplicationJobId) {
-      toast.error('Błąd: brak ID zlecenia');
+      toast.error('Błąd: brak ID zgłoszenia');
       return;
     }
 

@@ -42,7 +42,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               <AlertCircle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-amber-700">
-                  Najpierw musisz <Link href="/account?tab=company" className="text-blue-700 underline">dodać dane firmy w profilu</Link>, aby móc tworzyć zlecenia i przetargi.
+                  Najpierw musisz <Link href="/account?tab=company" className="text-blue-700 underline">dodać dane firmy w profilu</Link>, aby móc tworzyć zgłoszenia i przetargi.
                 </p>
               </div>
             </div>
@@ -51,14 +51,14 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* Zlecenie Card */}
+          {/* Zgłoszenie Card */}
           <Card className="relative transition-all hover:shadow-lg border-2 hover:border-primary">
             <CardHeader className="text-center pb-4">
               <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                 <FileText className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl">Zlecenie</CardTitle>
-              <p className="text-gray-600">Szybkie i bezpośrednie zlecenia dla rutynowych prac</p>
+              <CardTitle className="text-2xl">Zgłoszenie</CardTitle>
+              <p className="text-gray-600">Szybkie i bezpośrednie zgłoszenia dla rutynowych prac</p>
             </CardHeader>
             <CardContent className="space-y-6">
               
@@ -103,7 +103,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h4 className="font-medium text-primary mb-2">Proces:</h4>
                 <div className="text-sm text-gray-700 space-y-1">
-                  <div>1. Publikujesz zlecenie</div>
+                  <div>1. Publikujesz zgłoszenie</div>
                   <div>2. Wykonawcy składają oferty</div>
                   <div>3. Wybierasz najlepszą ofertę</div>
                   <div>4. Rozpoczynasz współpracę</div>
@@ -116,11 +116,11 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                 </Button>
               ) : userType === 'manager' && hasCompany === false ? (
                 <Button disabled className="w-full" size="lg">
-                  Stwórz zlecenie
+                  Stwórz zgłoszenie
                 </Button>
               ) : (
                 <Button onClick={onSelectJob} className="w-full" size="lg">
-                  Stwórz zlecenie
+                  Stwórz zgłoszenie
                 </Button>
               )}
             </CardContent>

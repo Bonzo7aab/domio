@@ -75,7 +75,7 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Building className="w-5 h-5" />
-          Podobne {currentJobType === 'tender' ? 'przetargi' : 'zlecenia'}
+          Podobne {currentJobType === 'tender' ? 'przetargi' : 'zgłoszenia'}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -125,7 +125,7 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
         ))}
         
         <Button variant="outline" className="w-full text-xs" size="sm">
-          Zobacz więcej podobnych {currentJobType === 'tender' ? 'przetargów' : 'zleceń'}
+          Zobacz więcej podobnych {currentJobType === 'tender' ? 'przetargów' : 'zgłoszeń'}
         </Button>
       </CardContent>
     </Card>

@@ -822,7 +822,7 @@ test.describe('Contractor Making Offers', () => {
         const dialog = page.getByRole('dialog');
         await expect(dialog.getByText(/termin rozpoczęcia/i).first()).toBeVisible();
         await expect(dialog.getByText(/dni robocze/i).first()).toBeVisible();
-        await expect(dialog.getByText(/opis i podejście do zlecenia/i)).toBeVisible();
+        await expect(dialog.getByText(/opis i podejście do zgłoszenia/i)).toBeVisible();
         await expect(dialog.getByText(/dokumentacja dodatkowa/i)).toBeVisible();
 
         await expect(page.getByRole('button', { name: /anuluj/i })).toBeVisible();

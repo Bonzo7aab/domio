@@ -10,7 +10,7 @@
 INSERT INTO subscription_plans (name, slug, description, user_type, price_monthly, price_yearly, features, limitations, sort_order) VALUES
 -- Manager plans (free)
 ('Domio Free', 'domio-free', 'Darmowy plan dla zarządców nieruchomości', 'manager', 0, 0, 
- '["Nieograniczona liczba zleceń", "Podstawowe filtry wyszukiwania", "Profil firmy", "Standardowe aplikacje", "Email support"]',
+ '["Nieograniczona liczba zgłoszeń", "Podstawowe filtry wyszukiwania", "Profil firmy", "Standardowe aplikacje", "Email support"]',
  '[]', 1),
 
 -- Contractor plans
@@ -123,7 +123,7 @@ INSERT INTO document_templates (name, type, category, description, template_cont
  '{"sections": ["dane_wystawcy", "dane_nabywcy", "pozycje_faktury", "podsumowanie"], "required_fields": ["nazwa_firmy", "nip", "nazwa_usługi", "kwota_netto", "vat", "kwota_brutto"]}', true),
 
 ('Oferta cenowa', 'quote', 'contractor', 'Oferta cenowa na wykonanie prac',
- '{"sections": ["dane_firmy", "opis_zlecenia", "szczegółowy_kosztorys", "warunki", "termin_ważności"], "required_fields": ["nazwa_firmy", "opis_prac", "cena", "termin_realizacji"]}', true),
+ '{"sections": ["dane_firmy", "opis_zgloszenia", "szczegółowy_kosztorys", "warunki", "termin_ważności"], "required_fields": ["nazwa_firmy", "opis_prac", "cena", "termin_realizacji"]}', true),
 
 ('Umowa zarządzania nieruchomością', 'contract', 'manager', 'Umowa na zarządzanie nieruchomością',
  '{"sections": ["dane_zarządcy", "dane_właściciela", "przedmiot_umowy", "zakres_obowiązków", "wynagrodzenie", "termin"], "required_fields": ["nazwa_zarządcy", "adres_nieruchomości", "zakres_zarządzania", "wynagrodzenie"]}', true);
@@ -240,7 +240,7 @@ DROP FUNCTION IF EXISTS create_sample_portfolio_projects();
 -- Add sample user feedback (user_id can be NULL for anonymous feedback)
 INSERT INTO user_feedback (user_id, type, title, description, rating, category, status) VALUES
 (NULL, 'feature_request', 'Możliwość dodawania filmów w portfolio', 'Byłoby świetnie gdyby można było dodawać krótkie filmy pokazujące proces realizacji projektów.', 5, 'functionality', 'open'),
-(NULL, 'general_feedback', 'Świetna platforma!', 'Platforma Domio bardzo ułatwia znalezienie zleceń. Interfejs jest intuicyjny, a wykonawcy są wiarygodni.', 5, 'ui', 'resolved');
+(NULL, 'general_feedback', 'Świetna platforma!', 'Platforma Domio bardzo ułatwia znalezienie zgłoszeń. Interfejs jest intuicyjny, a wykonawcy są wiarygodni.', 5, 'ui', 'resolved');
 
 -- Note: Sample support tickets require user profiles to exist first
 -- They can be added after user registration in the application

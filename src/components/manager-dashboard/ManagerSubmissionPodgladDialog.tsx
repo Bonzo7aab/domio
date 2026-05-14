@@ -58,7 +58,7 @@ export function ManagerSubmissionPodgladDialog({
           const { data, error } = await fetchJobById(supabase, target.id);
           if (cancelled) return;
           if (error || !data) {
-            toast.error('Nie udało się wczytać zlecenia');
+            toast.error('Nie udało się wczytać zgłoszenia');
             setJob(null);
           } else {
             setJob(data);
@@ -87,7 +87,7 @@ export function ManagerSubmissionPodgladDialog({
   }, [open, target]);
 
   const title =
-    target?.kind === 'job' ? 'Szczegóły zlecenia' : 'Szczegóły przetargu';
+    target?.kind === 'job' ? 'Szczegóły zgłoszenia' : 'Szczegóły przetargu';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

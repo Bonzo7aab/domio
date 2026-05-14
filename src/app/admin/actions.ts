@@ -565,7 +565,7 @@ export async function pauseJobListingAction(jobId: string, feedback: string): Pr
   const { data: job, error: jErr } = await supabase.from('jobs').select('manager_id, title').eq('id', jobId).single();
 
   if (jErr || !job?.manager_id) {
-    return { ok: false, error: jErr?.message ?? 'Nie znaleziono zlecenia.' };
+    return { ok: false, error: jErr?.message ?? 'Nie znaleziono zgłoszenia.' };
   }
 
   const { error } = await supabase.from('jobs').update({ status: 'paused' }).eq('id', jobId);
@@ -577,7 +577,7 @@ export async function pauseJobListingAction(jobId: string, feedback: string): Pr
   await createNotificationWithPush({
     userId: job.manager_id as string,
     type: 'listing_admin_paused',
-    title: 'Zlecenie zawieszone przez administratora',
+    title: 'Zgłoszenie zawieszone przez administratora',
     message: `${job.title}: ${msg}`,
     actionUrl: `/manager-dashboard/zgloszenia`,
     sendPush: true,

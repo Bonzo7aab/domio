@@ -179,7 +179,7 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
       <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-semibold mb-2">Moje aplikacje</h2>
-          <p className="text-gray-600">Zarządzaj swoimi aplikacjami na zlecenia</p>
+          <p className="text-gray-600">Zarządzaj swoimi aplikacjami na zgłoszenia</p>
         </div>
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -206,7 +206,7 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                 </h3>
                 <p className="text-sm text-gray-500">
                   {selectedTab === 'all' 
-                    ? 'Nie masz jeszcze żadnych aplikacji. Przeglądaj zlecenia i aplikuj!'
+                    ? 'Nie masz jeszcze żadnych aplikacji. Przeglądaj zgłoszenia i aplikuj!'
                     : `Brak aplikacji o statusie "${selectedTab}".`
                   }
                 </p>
@@ -294,7 +294,7 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                   </p>
                   {selectedOffer.postType && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      {selectedOffer.postType === 'tender' ? 'Przetarg' : 'Zlecenie'}
+                      {selectedOffer.postType === 'tender' ? 'Przetarg' : 'Zgłoszenie'}
                     </p>
                   )}
                 </div>

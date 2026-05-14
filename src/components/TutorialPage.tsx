@@ -45,13 +45,13 @@ export function TutorialPage({ onBack, onComplete }: TutorialPageProps) {
               </li>
               <li className="flex items-start space-x-2">
                 <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                <span>Przeczytaj szczegóły zlecenia przed aplikowaniem</span>
+                <span>Przeczytaj szczegóły zgłoszenia przed aplikowaniem</span>
               </li>
             </ul>
           </div>
           <div className="bg-success/10 border border-success/20 p-3 rounded-lg">
             <p className="text-sm text-success-foreground">
-              <strong>Wskazówka:</strong> Regularne sprawdzanie nowych zleceń zwiększa Twoje szanse na znalezienie atrakcyjnych projektów.
+              <strong>Wskazówka:</strong> Regularne sprawdzanie nowych zgłoszeń zwiększa Twoje szanse na znalezienie atrakcyjnych projektów.
             </p>
           </div>
         </div>
@@ -163,7 +163,7 @@ export function TutorialPage({ onBack, onComplete }: TutorialPageProps) {
           </div>
           <div className="bg-info/10 border border-info/20 p-3 rounded-lg">
             <p className="text-sm text-info-foreground">
-              <strong>Ważne:</strong> Pozytywne opinie to klucz do otrzymywania lepszych zleceń i wyższych stawek w przyszłości.
+              <strong>Ważne:</strong> Pozytywne opinie to klucz do otrzymywania lepszych zgłoszeń i wyższych stawek w przyszłości.
             </p>
           </div>
         </div>
@@ -173,13 +173,13 @@ export function TutorialPage({ onBack, onComplete }: TutorialPageProps) {
 
   const managerSteps: TutorialStep[] = [
     {
-      title: 'Publikuj szczegółowe zlecenia',
+      title: 'Publikuj szczegółowe zgłoszenia',
       description: 'Opisz dokładnie zakres prac i wymagania',
       icon: FileText,
       content: (
         <div className="space-y-4">
           <div className="bg-muted/50 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">Co zawrzeć w zleceniu:</h4>
+            <h4 className="font-medium mb-2">Co zawrzeć w zgłoszeniu:</h4>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
@@ -213,7 +213,7 @@ export function TutorialPage({ onBack, onComplete }: TutorialPageProps) {
           </div>
           <div className="bg-success/10 border border-success/20 p-3 rounded-lg">
             <p className="text-sm text-success-foreground">
-              <strong>Wskazówka:</strong> Im bardziej szczegółowe zlecenie, tym dokładniejsze oferty otrzymasz od wykonawców.
+              <strong>Wskazówka:</strong> Im bardziej szczegółowe zgłoszenie, tym dokładniejsze oferty otrzymasz od wykonawców.
             </p>
           </div>
         </div>

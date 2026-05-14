@@ -46,7 +46,7 @@ BEGIN
     -- Job 1: Wind service
     (
         'Konserwacja i naprawa wind - 2 budynki mieszkalne',
-        'Spółdzielnia Mieszkaniowa "Panorama" poszukuje certyfikowanej firmy windowej do stałej obsługi serwisowej 8 wind w dwóch nowoczesnych budynkach mieszkalnych. Zlecenie obejmuje regularne przeglądy techniczne, bieżące naprawy, 24/7 obsługę awarii oraz modernizację starszych systemów.',
+        'Spółdzielnia Mieszkaniowa "Panorama" poszukuje certyfikowanej firmy windowej do stałej obsługi serwisowej 8 wind w dwóch nowoczesnych budynkach mieszkalnych. Zgłoszenie obejmuje regularne przeglądy techniczne, bieżące naprawy, 24/7 obsługę awarii oraz modernizację starszych systemów.',
         zarządzanie_cat_id,
         'Konserwacja',
         '00000000-0000-0000-0000-000000000001'::UUID, -- Will need actual user IDs

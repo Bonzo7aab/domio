@@ -83,7 +83,7 @@ export const mockMessages: { [conversationId: string]: Message[] } = {
       id: 'msg-1',
       senderId: 'user-2',
       senderName: 'Jan Nowak',
-      content: 'Dzień dobry, interesuje mnie Państwa zlecenie dotyczące sprzątania klatek schodowych.',
+      content: 'Dzień dobry, interesuje mnie Państwa zgłoszenie dotyczące sprzątania klatek schodowych.',
       timestamp: new Date('2024-01-15T10:15:00'),
       read: true,
       type: 'text'

@@ -147,7 +147,7 @@ BEGIN
     ) VALUES (
         gen_random_uuid(),
         'Konserwacja i naprawa wind - 2 budynki mieszkalne',
-        'Spółdzielnia Mieszkaniowa "Panorama" poszukuje certyfikowanej firmy windowej do stałej obsługi serwisowej 8 wind w dwóch nowoczesnych budynkach mieszkalnych. Zlecenie obejmuje regularne przeglądy techniczne, bieżące naprawy, 24/7 obsługę awarii oraz modernizację starszych systemów. Wymagamy najwyższej jakości usług oraz szybkiego czasu reakcji na zgłoszenia.',
+        'Spółdzielnia Mieszkaniowa "Panorama" poszukuje certyfikowanej firmy windowej do stałej obsługi serwisowej 8 wind w dwóch nowoczesnych budynkach mieszkalnych. Zgłoszenie obejmuje regularne przeglądy techniczne, bieżące naprawy, 24/7 obsługę awarii oraz modernizację starszych systemów. Wymagamy najwyższej jakości usług oraz szybkiego czasu reakcji na zgłoszenia.',
         zarzadzanie_cat_id,
         'Konserwacja',
         dummy_manager_id,

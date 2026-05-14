@@ -188,7 +188,7 @@ export function ContractorProfileHeader({ profile }: ContractorProfileHeaderProp
                     <div className="flex items-center gap-1.5">
                       <Briefcase className="w-4 h-4 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
                       <span className="text-sm font-medium text-gray-700">
-                        {contractorData.completedJobs} {contractorData.completedJobs === 1 ? 'zlecenie' : contractorData.completedJobs < 5 ? 'zlecenia' : 'zleceń'}
+                        {contractorData.completedJobs} {contractorData.completedJobs === 1 ? 'zgłoszenie' : contractorData.completedJobs < 5 ? 'zgłoszenia' : 'zgłoszeń'}
                       </span>
                     </div>
                   )}

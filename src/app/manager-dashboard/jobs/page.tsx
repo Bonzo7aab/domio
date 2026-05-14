@@ -152,7 +152,7 @@ async function JobsDataFetcher() {
 export default function JobsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <Suspense fallback={<LoadingFallback message="Ładowanie zleceń..." />}>
+      <Suspense fallback={<LoadingFallback message="Ładowanie zgłoszeń..." />}>
         <JobsDataFetcher />
       </Suspense>
     </div>

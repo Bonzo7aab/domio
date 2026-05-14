@@ -544,7 +544,7 @@ export default function JobList({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-bold">Dostępne zlecenia: {activeJobs.length}</h2>
+          <h2 className="text-lg sm:text-xl font-bold">Dostępne zgłoszenia: {activeJobs.length}</h2>
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2 sm:gap-0">
@@ -583,7 +583,7 @@ export default function JobList({
             });
           }}
         >
-          🔥 Pilne zlecenia
+          🔥 Pilne zgłoszenia
         </Badge>
         <Badge 
           variant={filters?.endingSoon ? "default" : "secondary"}
@@ -685,7 +685,7 @@ export default function JobList({
                 className="w-full justify-between p-0 h-auto hover:bg-transparent mb-4"
               >
                 <h3 className="text-base sm:text-lg font-semibold text-gray-600">
-                  Wygasłe zlecenia ({expiredJobs.length})
+                  Wygasłe zgłoszenia ({expiredJobs.length})
                 </h3>
                 {isExpiredJobsOpen ? (
                   <ChevronUp className="h-5 w-5 text-gray-600" />

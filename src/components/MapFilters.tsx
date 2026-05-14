@@ -140,7 +140,7 @@ export const MapFilters: React.FC<MapFiltersProps> = ({
                 onCheckedChange={() => handlePostTypeToggle('job')}
               />
               <label htmlFor="post-type-job" className="text-sm cursor-pointer">
-                Zlecenia
+                Zgłoszenia
               </label>
             </div>
             <div className="flex items-center gap-2 flex-1">
@@ -258,7 +258,7 @@ export const MapFilters: React.FC<MapFiltersProps> = ({
             onCheckedChange={handleUrgentToggle}
           />
           <label htmlFor="urgent-only" className="text-sm cursor-pointer font-medium">
-            Tylko pilne zlecenia
+            Tylko pilne zgłoszenia
           </label>
         </div>
 

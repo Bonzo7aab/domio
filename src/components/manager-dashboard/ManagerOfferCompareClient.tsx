@@ -482,7 +482,7 @@ export function ManagerOfferCompareClient({
                     </li>
                     <li>
                       <strong>Doświadczenie:</strong> {detailProfile.experience?.completedProjects ?? 0}{' '}
-                      zrealizowanych zleceń
+                      zrealizowanych zgłoszeń
                     </li>
                     <li>
                       <strong>Średnia ocen:</strong> ⭐{' '}

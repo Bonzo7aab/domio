@@ -554,7 +554,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                 <CardContent className="pt-6 text-center">
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie zleceń...</p>
+                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie zgłoszeń...</p>
                   </div>
                 </CardContent>
               </Card>
@@ -562,8 +562,8 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
               <Card>
                 <CardContent className="pt-6 text-center">
                   <Briefcase className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                  <h3 className="text-base sm:text-lg font-medium mb-2">Brak aktywnych zleceń i przetargów</h3>
-                  <p className="text-sm sm:text-base text-gray-600">Brak aktywnych zleceń i przetargów w tym momencie.</p>
+                  <h3 className="text-base sm:text-lg font-medium mb-2">Brak aktywnych zgłoszeń i przetargów</h3>
+                  <p className="text-sm sm:text-base text-gray-600">Brak aktywnych zgłoszeń i przetargów w tym momencie.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -571,7 +571,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                 {/* Active Jobs Section */}
                 {activeJobs.length > 0 && (
                   <div>
-                    <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Aktywne zlecenia</h3>
+                    <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-gray-900">Aktywne zgłoszenia</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       {activeJobs.map((job) => {
                         const jobCategories = job.job_categories as { name?: string } | undefined;
@@ -622,7 +622,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                                 size="sm"
                                 onClick={() => router.push(`/jobs/${job.id}`)}
                               >
-                                Przejdź do zlecenia
+                                Przejdź do zgłoszenia
                               </Button>
                             </div>
                           </CardContent>

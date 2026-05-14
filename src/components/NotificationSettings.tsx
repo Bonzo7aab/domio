@@ -371,9 +371,9 @@ export function NotificationSettings() {
 
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label>Aktualizacje zleceń</Label>
+              <Label>Aktualizacje zgłoszeń</Label>
               <p className="text-sm text-muted-foreground">
-                Powiadomienia o nowych zleceniach i aktualizacjach
+                Powiadomienia o nowych zgłoszeniach i aktualizacjach
               </p>
             </div>
             <Switch

@@ -64,7 +64,7 @@ export function OverviewContent({ data }: OverviewContentProps) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aktywne zlecenia</CardTitle>
+            <CardTitle className="text-sm font-medium">Aktywne zgłoszenia</CardTitle>
             <ClipboardList className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -106,7 +106,7 @@ export function OverviewContent({ data }: OverviewContentProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Najnowsze zlecenia</CardTitle>
+            <CardTitle>Najnowsze zgłoszenia</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {recentJobs.length > 0 ? recentJobs.slice(0, 3).map((job) => {
@@ -128,7 +128,7 @@ export function OverviewContent({ data }: OverviewContentProps) {
                 </div>
               );
             }) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Brak zleceń</p>
+              <p className="text-sm text-muted-foreground text-center py-4">Brak zgłoszeń</p>
             )}
           </CardContent>
         </Card>

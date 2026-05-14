@@ -245,7 +245,7 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
       onLocationChange?.(coordinates);
       setShowCitySelector(false);
       toast.success(`Lokalizacja ustawiona na ${cityName}`, {
-        description: `Pokazano zlecenia w promieniu ${searchRadius} km od ${cityName}.`
+        description: `Pokazano zgłoszenia w promieniu ${searchRadius} km od ${cityName}.`
       });
     }
   };
@@ -262,10 +262,10 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
     <div className={`relative ${isExpanded ? 'fixed inset-0 z-50' : 'w-96'}`} style={{ backgroundColor: '#ffffff', borderLeft: '1px solid #e2e8f0' }}>
       {/* Map Header */}
       <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid #e2e8f0' }}>
-        <h3 className="font-semibold">Mapa Zleceń</h3>
+        <h3 className="font-semibold">Mapa Zgłoszeń</h3>
         <div className="flex items-center space-x-2">
           <Badge variant="secondary" className="text-xs">
-            {filteredJobs.length} zleceń
+            {filteredJobs.length} zgłoszeń
           </Badge>
           
           {/* Filters Popover */}
@@ -330,7 +330,7 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Grupuj zlecenia</label>
+                    <label className="text-sm font-medium">Grupuj zgłoszenia</label>
                     <Switch 
                       checked={showJobClusters} 
                       onCheckedChange={setShowJobClusters}
@@ -531,7 +531,7 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
                     <Card className="w-80 max-h-96 overflow-y-auto shadow-xl animate-in fade-in-0 zoom-in-95 duration-200">
                       <CardContent className="p-3">
                         <div className="space-y-2">
-                          <h4 className="font-medium text-sm mb-3">{cluster.jobs.length} zleceń w tym obszarze</h4>
+                          <h4 className="font-medium text-sm mb-3">{cluster.jobs.length} zgłoszeń w tym obszarze</h4>
                           {cluster.jobs.map(job => (
                             <div 
                               key={job.id}
@@ -625,7 +625,7 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Nie można automatycznie wykryć Twojej lokalizacji. Wybierz miasto, aby zobaczyć zlecenia w pobliżu.
+                  Nie można automatycznie wykryć Twojej lokalizacji. Wybierz miasto, aby zobaczyć zgłoszenia w pobliżu.
                 </p>
                 <Select onValueChange={handleCitySelect}>
                   <SelectTrigger>
@@ -649,7 +649,7 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
           <div className="font-medium mb-2">Statystyki</div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <span>Widoczne zlecenia:</span>
+              <span>Widoczne zgłoszenia:</span>
               <span className="font-medium">{filteredJobs.length}</span>
             </div>
             <div className="flex justify-between">

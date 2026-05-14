@@ -265,7 +265,7 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="rating">Najwyższa ocena</SelectItem>
-                    <SelectItem value="jobs">Liczba zleceń</SelectItem>
+                    <SelectItem value="jobs">Liczba zgłoszeń</SelectItem>
                     <SelectItem value="reviews">Liczba opinii</SelectItem>
                     <SelectItem value="name">Nazwa A-Z</SelectItem>
                   </SelectContent>
@@ -409,7 +409,7 @@ export default function ContractorBrowsePage({ onBack, onContractorSelect }: Con
                       <div>
                         <div className="flex items-center space-x-1">
                           <Briefcase className="w-4 h-4" />
-                          <span>{contractor.completedJobs} zleceń</span>
+                          <span>{contractor.completedJobs} zgłoszeń</span>
                         </div>
                       </div>
                       <div>

@@ -166,10 +166,10 @@ export const createJobFromFormData = (formData: Record<string, unknown>): Job =>
 
 // Helper function to determine job type based on category and budget type
 const getJobType = (category: string, budgetType: string): string => {
-  if (budgetType === 'hourly') return 'Zlecenie godzinowe';
+  if (budgetType === 'hourly') return 'Zgłoszenie godzinowe';
   if (category.includes('Utrzymanie')) return 'Stały zleceniodawca';
-  if (category.includes('Remontowo')) return 'Jednorazowe zlecenie';
-  return 'Zlecenie okresowe';
+  if (category.includes('Remontowo')) return 'Jednorazowe zgłoszenie';
+  return 'Zgłoszenie okresowe';
 };
 
 // Helper function to format salary display

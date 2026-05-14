@@ -1116,7 +1116,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 <Card>
                   <CardContent className="p-6 space-y-6">
                     <div>
-                      <h3 className="text-lg font-semibold mb-3">Opis {job.postType === 'tender' ? 'przetargu' : 'zlecenia'}</h3>
+                      <h3 className="text-lg font-semibold mb-3">Opis {job.postType === 'tender' ? 'przetargu' : 'zgłoszenia'}</h3>
                       <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{job.description}</p>
                     </div>
 
@@ -1485,7 +1485,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ImageIcon className="w-5 h-5" />
-                    Zdjęcia zlecenia
+                    Zdjęcia zgłoszenia
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1496,7 +1496,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={imageUrl}
-                            alt={`Zdjęcie ${index + 1} zlecenia ${job.title}`}
+                            alt={`Zdjęcie ${index + 1} zgłoszenia ${job.title}`}
                             className="w-full h-full object-cover hover:scale-105 transition-transform duration-200 cursor-zoom-in"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = '/api/placeholder/800/600';

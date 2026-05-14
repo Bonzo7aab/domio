@@ -380,7 +380,7 @@ export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }
                     <div className="space-y-0.5">
                       <Label>Zaawansowane filtry</Label>
                       <div className="text-sm text-muted-foreground">
-                        Dodatkowe opcje filtrowania zleceń
+                        Dodatkowe opcje filtrowania zgłoszeń
                       </div>
                     </div>
                     <Switch

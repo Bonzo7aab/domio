@@ -64,7 +64,7 @@ export function ManagerMojeZgloszeniaContent({
   }, [submissions, statusFilter, search]);
 
   const compareHref = (row: ManagerSubmission): string => {
-    const typ = row.kind === 'tender' ? 'przetarg' : 'zlecenie';
+    const typ = row.kind === 'tender' ? 'przetarg' : 'zgłoszenie';
     return `/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=${typ}`;
   };
 

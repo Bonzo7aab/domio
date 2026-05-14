@@ -735,7 +735,7 @@ const MapComponent: React.FC<{
         >
           <DrawerContent className="max-h-[85vh] flex flex-col">
             <DrawerHeader className="pb-4 pt-6">
-              <DrawerTitle className="sr-only">Szczegóły zlecenia</DrawerTitle>
+              <DrawerTitle className="sr-only">Szczegóły zgłoszenia</DrawerTitle>
             </DrawerHeader>
             
             <div 

@@ -713,7 +713,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                     Weryfikacja konta {isContractor ? 'wykonawcy' : 'zarządcy'}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Zweryfikowane konto otrzymuje więcej {isContractor ? 'zleceń' : 'ofert'} i
+                    Zweryfikowane konto otrzymuje więcej {isContractor ? 'zgłoszeń' : 'ofert'} i
                     wyższą pozycję w wynikach wyszukiwania. Proces weryfikacji jest bezpłatny i
                     dobrowolny.
                   </p>

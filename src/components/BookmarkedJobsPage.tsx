@@ -96,7 +96,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
     if (postType === 'tender') {
       return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Przetarg</Badge>;
     }
-    return <Badge variant="outline">Zlecenie</Badge>;
+    return <Badge variant="outline">Zgłoszenie</Badge>;
   };
 
   return (

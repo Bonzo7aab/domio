@@ -23,7 +23,7 @@ export interface FilterState {
   budgetMin?: number;
   budgetMax?: number;
   clientTypes: string[];
-  postTypes: string[]; // Zlecenia vs Przetargi
+  postTypes: string[]; // Zgłoszenia vs Przetargi
   urgency: string[]; // ['low', 'medium', 'high']
   urgent?: boolean; // High priority jobs (urgent flag)
   searchQuery?: string; // Search by title
@@ -665,7 +665,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
     // Post types - always show when selected
     selectedPostTypes.forEach(type => {
       applied.push({
-        label: type === 'job' ? 'Zlecenia' : 'Przetargi',
+        label: type === 'job' ? 'Zgłoszenia' : 'Przetargi',
         value: `postType-${type}`,
         onRemove: () => {
           setSelectedPostTypes(prev => {
@@ -961,7 +961,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                     />
                     <Label htmlFor="job" className="text-sm cursor-pointer flex items-center space-x-2">
                       <Wrench className="w-4 h-4 text-primary" />
-                      <span className="text-foreground">Zlecenia</span>
+                      <span className="text-foreground">Zgłoszenia</span>
                     </Label>
                   </div>
 
@@ -1479,7 +1479,7 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 pl-2">
                 <div className="space-y-2">
-                {['Jednorazowe zlecenie', 'Stały zleceniodawca', 'Zlecenie okresowe', 'Serwis stały', 'Sezonowe zlecenie'].map(type => (
+                {['Jednorazowe zgłoszenie', 'Stały zleceniodawca', 'Zgłoszenie okresowe', 'Serwis stały', 'Sezonowe zgłoszenie'].map(type => (
                   <div key={type} className="flex items-center space-x-2">
                     <CustomCheckbox 
                       id={type}

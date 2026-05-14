@@ -510,7 +510,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Nie można automatycznie wykryć Twojej lokalizacji. Wybierz miasto, aby zobaczyć zlecenia w pobliżu.
+                  Nie można automatycznie wykryć Twojej lokalizacji. Wybierz miasto, aby zobaczyć zgłoszenia w pobliżu.
                 </p>
                 <Select onValueChange={handleCitySelect}>
                   <SelectTrigger>

@@ -115,7 +115,7 @@ const ExpertConsultationPage: React.FC<ExpertConsultationPageProps> = ({ onBack 
                   Wróć na stronę główną
                 </Button>
                 <Button onClick={onBack} className="bg-primary">
-                  Przeglądaj zlecenia
+                  Przeglądaj zgłoszenia
                 </Button>
               </div>
             </CardContent>

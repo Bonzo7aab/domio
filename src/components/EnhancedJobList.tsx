@@ -678,7 +678,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
                           className="w-full justify-between p-0 h-auto hover:bg-transparent mb-4"
                         >
                           <h3 className="text-base sm:text-lg font-semibold text-gray-600">
-                            Wygasłe zlecenia ({expiredJobs.length})
+                            Wygasłe zgłoszenia ({expiredJobs.length})
                           </h3>
                           {isExpiredJobsOpen ? (
                             <ChevronUp className="h-5 w-5 text-gray-600" />

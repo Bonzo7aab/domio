@@ -1,6 +1,6 @@
-// Kompletne szczegółowe dane dla zleceń i przetargów
+// Kompletne szczegółowe dane dla zgłoszeń i przetargów
 export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
-  // ZLECENIA BEZPOŚREDNIE - NOWE OGŁOSZENIA
+  // ZGŁOSZENIA BEZPOŚREDNIE - NOWE OGŁOSZENIA
   'job-new-1': {
     id: 'job-new-1',
     postType: 'job',
@@ -9,7 +9,7 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
     location: 'Gdańsk, Wrzeszcz',
     type: 'Serwis stały',
     salary: '200-300 zł/wizyta',
-    description: 'Spółdzielnia Mieszkaniowa "Panorama" poszukuje certyfikowanej firmy windowej do stałej obsługi serwisowej 8 wind w dwóch nowoczesnych budynkach mieszkalnych. Zlecenie obejmuje regularne przeglądy techniczne, bieżące naprawy, 24/7 obsługę awarii oraz modernizację starszych systemów. Wymagamy najwyższej jakości usług oraz szybkiego czasu reakcji na zgłoszenia.',
+    description: 'Spółdzielnia Mieszkaniowa "Panorama" poszukuje certyfikowanej firmy windowej do stałej obsługi serwisowej 8 wind w dwóch nowoczesnych budynkach mieszkalnych. Zgłoszenie obejmuje regularne przeglądy techniczne, bieżące naprawy, 24/7 obsługę awarii oraz modernizację starszych systemów. Wymagamy najwyższej jakości usług oraz szybkiego czasu reakcji na zgłoszenia.',
     requirements: [
       'Uprawnienia UDT do obsługi urządzeń dźwigowych',
       'Minimum 7 lat doświadczenia w serwisie wind',
@@ -68,7 +68,7 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
     title: 'Kompleksowa dezynsekcja i deratyzacja - osiedle 120 mieszkań',
     company: 'Wspólnota Mieszkaniowa "Zielone Osiedle"',
     location: 'Warszawa',
-    type: 'Zlecenie okresowe',
+    type: 'Zgłoszenie okresowe',
     salary: '45-65 zł/mieszkanie',
     description: 'Wspólnota Mieszkaniowa "Zielone Osiedle" zleca kompleksową dezynsekcję i deratyzację 4 budynków mieszkalnych (120 mieszkań + części wspólne + piwnice + garaże podziemne). Prace mają być wykonywane zgodnie z najwyższymi standardami sanitarnymi z zastosowaniem bezpiecznych dla mieszkańców preparatów. Wymagamy doświadczenia w pracy z budynkami mieszkalnymi oraz pełnej dokumentacji.',
     requirements: [
@@ -129,7 +129,7 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
     title: 'Wymiana ogrodzenia i bram wjazdowych - kompletne ogrodzenie osiedla',
     company: 'Administracja Osiedlowa "Sosnowy Las"',
     location: 'Kraków, Nowa Huta',
-    type: 'Jednorazowe zlecenie',
+    type: 'Jednorazowe zgłoszenie',
     salary: '150-200 zł/m',
     description: 'Administracja Osiedlowa "Sosnowy Las" zleca kompleksową wymianę ogrodzenia obwodowego osiedla mieszkaniowego wraz z modernizacją 2 bram wjazdowych. Obecne ogrodzenie z siatki wymaga wymiany na nowoczesne panelowe z elementami dekoracyjnymi. Projekt obejmuje 280 metrów ogrodzenia oraz automatyczne bramy z systemem kontroli dostępu. Wymagamy wysokiej jakości materiałów i profesjonalnego wykonania.',
     requirements: [
@@ -455,7 +455,7 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
     lng: 21.0422
   },
 
-  // STARE ZLECENIA (zachowane dla kompatybilności)
+  // STARE ZGŁOSZENIA (zachowane dla kompatybilności)
   '1': {
     id: '1',
     postType: 'job',
@@ -464,13 +464,13 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
     location: 'Warszawa, Mokotów',
     type: 'Stały zleceniodawca',
     salary: '45-60 zł/h',
-    description: 'Poszukujemy rzetelnej i doświadczonej firmy sprzątającej do regularnego utrzymania czystości w klatkach schodowych nowoczesnego budynku mieszkalnego. Budynek posiada 5 kondygnacji, windę, a także reprezentacyjne wejście główne wymagające szczególnej dbałości. Oczekujemy najwyższej jakości usług oraz profesjonalnego podejścia do zlecenia.',
+    description: 'Poszukujemy rzetelnej i doświadczonej firmy sprzątającej do regularnego utrzymania czystości w klatkach schodowych nowoczesnego budynku mieszkalnego. Budynek posiada 5 kondygnacji, windę, a także reprezentacyjne wejście główne wymagające szczególnej dbałości. Oczekujemy najwyższej jakości usług oraz profesjonalnego podejścia do zgłoszenia.',
     requirements: [
       'Minimum 3 lata doświadczenia w sprzątaniu budynków mieszkalnych',
       'Własne środki czystości i profesjonalny sprzęt',
       'Ubezpieczenie OC minimum 200 000 zł',
       'Dostępność 3 razy w tygodniu (pon, śr, pt)',
-      'Referencje z podobnych zleceń',
+      'Referencje z podobnych zgłoszeń',
       'Certyfikaty jakości lub branżowe'
     ],
     responsibilities: [
@@ -522,9 +522,9 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
     title: 'Remont elewacji budynku - 4-piętrowy budynek mieszkalny',
     company: 'Wspólnota Mieszkaniowa ul. Parkowa 24',
     location: 'Kraków, Podgórze',
-    type: 'Jednorazowe zlecenie',
+    type: 'Jednorazowe zgłoszenie',
     salary: '80-120 zł/m²',
-    description: 'Zlecenie na kompleksowy remont elewacji 4-piętrowego budynku mieszkalnego z lat 70-tych. Wymaga oczyszczenia metodą piaskowania lub wysokociśnieniową, gruntowania, malowania oraz naprawy drobnych uszkodzeń. Powierzchnia do remontu: około 800m². Budynek zlokalizowany przy ruchliwej ulicy, wymagane szczególne zabezpieczenia.',
+    description: 'Zgłoszenie na kompleksowy remont elewacji 4-piętrowego budynku mieszkalnego z lat 70-tych. Wymaga oczyszczenia metodą piaskowania lub wysokociśnieniową, gruntowania, malowania oraz naprawy drobnych uszkodzeń. Powierzchnia do remontu: około 800m². Budynek zlokalizowany przy ruchliwej ulicy, wymagane szczególne zabezpieczenia.',
     requirements: [
       'Minimum 5 lat doświadczenia w remontach elewacji budynków mieszkalnych',
       'Własne narzędzia do piaskowania lub czyszczenia wysokociśnieniowego',

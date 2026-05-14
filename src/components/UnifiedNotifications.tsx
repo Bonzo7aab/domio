@@ -611,7 +611,7 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
                 'grid-cols-2'
               }`}>
                 <TabsTrigger value="all" className="text-xs">Wszystkie</TabsTrigger>
-                <TabsTrigger value="jobs" className="text-xs">Zlecenia</TabsTrigger>
+                <TabsTrigger value="jobs" className="text-xs">Zgłoszenia</TabsTrigger>
                 {isMounted && user?.userType === 'manager' && (
                   <TabsTrigger value="applications" className="text-xs">Oferty</TabsTrigger>
                 )}

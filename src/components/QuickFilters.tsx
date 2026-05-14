@@ -33,11 +33,11 @@ interface QuickFiltersProps {
 const quickFilters: QuickFilter[] = [
   {
     id: 'urgent',
-    label: 'Pilne zlecenia',
+    label: 'Pilne zgłoszenia',
     icon: Zap,
     color: 'destructive',
     count: 12,
-    description: 'Zlecenia wymagające natychmiastowej realizacji'
+    description: 'Zgłoszenia wymagające natychmiastowej realizacji'
   },
   {
     id: 'verified',
@@ -53,7 +53,7 @@ const quickFilters: QuickFilter[] = [
     icon: DollarSign,
     color: 'warning',
     count: 34,
-    description: 'Zlecenia z najwyższymi stawkami godzinowymi'
+    description: 'Zgłoszenia z najwyższymi stawkami godzinowymi'
   },
   {
     id: 'premium',
@@ -61,7 +61,7 @@ const quickFilters: QuickFilter[] = [
     icon: Star,
     color: 'primary',
     count: 56,
-    description: 'Zlecenia zarezerwowane dla zweryfikowanych wykonawców'
+    description: 'Zgłoszenia zarezerwowane dla zweryfikowanych wykonawców'
   },
   {
     id: 'insured',
@@ -85,7 +85,7 @@ const quickFilters: QuickFilter[] = [
     icon: MapPin,
     color: 'default',
     count: 23,
-    description: 'Zlecenia w promieniu 25km'
+    description: 'Zgłoszenia w promieniu 25km'
   },
   {
     id: 'trending',
@@ -93,7 +93,7 @@ const quickFilters: QuickFilter[] = [
     icon: TrendingUp,
     color: 'primary',
     count: 18,
-    description: 'Najczęściej przeglądane zlecenia'
+    description: 'Najczęściej przeglądane zgłoszenia'
   }
 ];
 

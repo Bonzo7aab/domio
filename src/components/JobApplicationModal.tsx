@@ -231,7 +231,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
         basePayload.guaranteeMonths = Math.floor(Number(applicationForm.guaranteeMonths));
 
         if (!jobId || !user?.id) {
-          toast.error('Brak identyfikatora zlecenia — odśwież stronę i spróbuj ponownie.');
+          toast.error('Brak identyfikatora zgłoszenia — odśwież stronę i spróbuj ponownie.');
           setIsSubmitting(false);
           return;
         }
@@ -461,7 +461,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                   </CardHeader>
                   <CardContent>
                     <Textarea
-                      placeholder="Opisz swoją ofertę, podejście do realizacji zlecenia, doświadczenie i to co wyróżnia Cię na tle konkurencji..."
+                      placeholder="Opisz swoją ofertę, podejście do realizacji zgłoszenia, doświadczenie i to co wyróżnia Cię na tle konkurencji..."
                       value={applicationForm.coverLetter}
                       onChange={(e) => handleInputChange('coverLetter', e.target.value)}
                       className={`min-h-[120px] ${errors.coverLetter ? 'border-red-500' : ''}`}
@@ -479,7 +479,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
                   </CardHeader>
                   <CardContent>
                     <Textarea
-                      placeholder="Dodatkowe informacje, pytania lub uwagi dotyczące zlecenia..."
+                      placeholder="Dodatkowe informacje, pytania lub uwagi dotyczące zgłoszenia..."
                       value={applicationForm.additionalNotes}
                       onChange={(e) => handleInputChange('additionalNotes', e.target.value)}
                       className="min-h-[80px]"
@@ -574,7 +574,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Opis i podejście do zlecenia *</CardTitle>
+                    <CardTitle>Opis i podejście do zgłoszenia *</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Textarea

@@ -1830,7 +1830,7 @@ export async function fetchContractorRecentActivities(
         const timestamp = app.decision_at || app.reviewed_at || app.submitted_at;
         if (!timestamp) return;
 
-        const jobTitle = app.jobs?.title || 'zlecenie';
+        const jobTitle = app.jobs?.title || 'zgłoszenie';
         const jobId = app.jobs?.id || app.job_id;
         let activity: ContractorActivity | null = null;
 

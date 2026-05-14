@@ -70,7 +70,7 @@ export default function PrivacyPage() {
 
               <h3 className="text-xl font-semibold text-slate-900 mb-3">3.3. Dane związane z korzystaniem z platformy:</h3>
               <ul className="list-disc pl-6 space-y-2 text-slate-700 mb-4">
-                <li>Historia zleceń i ofert</li>
+                <li>Historia zgłoszeń i ofert</li>
                 <li>Wiadomości między użytkownikami</li>
                 <li>Recenzje i oceny</li>
                 <li>Lokalizacja (dla funkcji geograficznych)</li>
@@ -88,7 +88,7 @@ export default function PrivacyPage() {
                 <li>Rejestracja i utrzymanie kont użytkowników</li>
                 <li>Weryfikacja tożsamości i kwalifikacji użytkowników</li>
                 <li>Komunikacja między użytkownikami</li>
-                <li>Obsługa zleceń i ofert</li>
+                <li>Obsługa zgłoszeń i ofert</li>
                 <li>Analiza statystyczna i poprawa funkcjonalności</li>
                 <li>Zapewnienie bezpieczeństwa i przeciwdziałanie nadużyciom</li>
                 <li>Wypełnienie obowiązków prawnych</li>

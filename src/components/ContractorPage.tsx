@@ -917,7 +917,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
                 Profil użytkownika
               </Button>
               <Button onClick={onBrowseJobs}>
-                Przeglądaj zlecenia
+                Przeglądaj zgłoszenia
               </Button>
             </div>
           </div>
@@ -1020,7 +1020,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {contractorData.stats.avgJobValue > 0
-                      ? `Średnia wartość zlecenia: ${contractorData.stats.avgJobValue.toLocaleString()} zł`
+                      ? `Średnia wartość zgłoszenia: ${contractorData.stats.avgJobValue.toLocaleString()} zł`
                       : 'Brak danych o średniej wartości'}
                   </p>
                 </CardContent>

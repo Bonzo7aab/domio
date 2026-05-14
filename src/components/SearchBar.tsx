@@ -148,7 +148,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <Input
             ref={inputRef}
             type="text"
-            placeholder="Szukaj zleceń: sprzątanie, remont, elektryk..."
+            placeholder="Szukaj zgłoszeń: sprzątanie, remont, elektryk..."
             value={value || ''}
             onChange={(e) => onChange?.(e.target.value)}
             onFocus={handleInputFocus}

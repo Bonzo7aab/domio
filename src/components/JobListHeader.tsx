@@ -28,7 +28,7 @@ interface JobListHeaderProps {
 
 const sortOptions = [
   { value: 'newest', label: 'Najnowsze', description: 'Ostatnio dodane' },
-  { value: 'deadline', label: 'Termin realizacji', description: 'Pilne zlecenia i przetargi' },
+  { value: 'deadline', label: 'Termin realizacji', description: 'Pilne zgłoszenia i przetargi' },
   { value: 'budget', label: 'Budżet całkowity', description: 'Największe projekty' },
   { value: 'salary-high', label: 'Najwyższa stawka', description: 'Od najlepiej płatnych' },
   { value: 'salary-low', label: 'Najniższa stawka', description: 'Od najtańszych' },
@@ -64,7 +64,7 @@ export const JobListHeader: React.FC<JobListHeaderProps> = ({
         if (selectedPostTypes[0] === 'tender') {
           baseTitle = "Przetargi";
         } else {
-          baseTitle = "Zlecenia";
+          baseTitle = "Zgłoszenia";
         }
       }
     }

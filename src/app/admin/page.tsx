@@ -23,7 +23,7 @@ export default async function AdminHomePage() {
           <CardContent>
             <div className="text-3xl font-semibold">{postsNoOffers}</div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Zlecenia: {metrics.activeJobsWithoutApplications}, przetargi: {metrics.activeTendersWithoutBids}
+              Zgłoszenia: {metrics.activeJobsWithoutApplications}, przetargi: {metrics.activeTendersWithoutBids}
             </p>
             <Link href="/admin/listings" className="mt-2 inline-block text-sm text-primary underline">
               Moderuj listingu →

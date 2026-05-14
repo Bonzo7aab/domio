@@ -700,7 +700,7 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
                         <strong>Informacja RODO:</strong> Dokumenty potwierdzające certyfikaty i ubezpieczenia 
                         przetwarzamy w celu weryfikacji kwalifikacji i budowania zaufania na platformie. 
                         Przesłanie dokumentów jest dobrowolne - możesz korzystać z platformy bez weryfikacji, 
-                        ale zweryfikowane konto otrzymuje więcej zleceń.{' '}
+                        ale zweryfikowane konto otrzymuje więcej zgłoszeń.{' '}
                         <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
                           Więcej informacji w Polityce prywatności
                         </Link>.

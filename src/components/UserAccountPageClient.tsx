@@ -281,7 +281,7 @@ function VerificationNotice({ status, onAction }: VerificationNoticeProps) {
       <div className="min-w-0 flex-1">
         <div className="font-semibold text-amber-800">Konto wymaga weryfikacji</div>
         <p className="text-xs text-muted-foreground">
-          Zweryfikowane konto otrzymuje więcej zleceń i wyższą pozycję w wynikach wyszukiwania.
+          Zweryfikowane konto otrzymuje więcej zgłoszeń i wyższą pozycję w wynikach wyszukiwania.
           Proces jest bezpłatny i zajmuje 1–3 dni robocze.
         </p>
       </div>

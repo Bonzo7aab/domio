@@ -107,7 +107,7 @@ export function OffersModerationPanel({ applications, bids }: OffersModerationPa
   return (
     <Tabs defaultValue="job">
       <TabsList className="grid w-full grid-cols-2 md:w-fit">
-        <TabsTrigger value="job">Oferty na zlecenia ({applications.length})</TabsTrigger>
+        <TabsTrigger value="job">Oferty na zgłoszenia ({applications.length})</TabsTrigger>
         <TabsTrigger value="tender">Oferty przetargowe ({bids.length})</TabsTrigger>
       </TabsList>
       <TabsContent value="job" className="mt-4">
@@ -146,7 +146,7 @@ function JobApplicationsTable({ rows }: { rows: AdminJobApplicationRow[] }) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-8" />
-            <TableHead>Zlecenie</TableHead>
+            <TableHead>Zgłoszenie</TableHead>
             <TableHead>Wykonawca</TableHead>
             <TableHead>
               <SortableHeader<OfferSortKey> label="Status" sortKey="status" sort={sort} onSortChange={setSort} />

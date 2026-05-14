@@ -847,7 +847,7 @@ export function CompanyManagementForm({ user }: CompanyManagementFormProps) {
               return (
                 <div className="mt-4 p-3 bg-muted/50 rounded-md">
                   <p className="text-xs text-muted-foreground mb-2">
-                    💡 <strong>Wskazówka:</strong> Kompletny profil firmy zwiększa zaufanie i pomaga w zdobywaniu zleceń.
+                    💡 <strong>Wskazówka:</strong> Kompletny profil firmy zwiększa zaufanie i pomaga w zdobywaniu zgłoszeń.
                   </p>
                   <p className="text-xs">
                     <strong className="text-amber-700 dark:text-amber-500">Brakujące pola:</strong>{' '}

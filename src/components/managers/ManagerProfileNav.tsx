@@ -5,7 +5,7 @@ import { cn } from '../ui/utils';
 
 const tabs = [
   { id: 'overview', label: 'Przegląd', hash: '#overview' },
-  { id: 'active-jobs', label: 'Aktywne zlecenia', hash: '#active-jobs' },
+  { id: 'active-jobs', label: 'Aktywne zgłoszenia', hash: '#active-jobs' },
   { id: 'properties', label: 'Nieruchomości', hash: '#properties' },
   { id: 'team', label: 'Zespół', hash: '#team' },
   { id: 'reviews', label: 'Opinie', hash: '#reviews' },

@@ -57,7 +57,7 @@ export default function TrustBadge({ type, value, tooltip, className = "" }: Tru
         return (
           <div className={`flex items-center space-x-1 text-gray-600 text-xs ${className}`}>
             <Clock className="w-3 h-3" />
-            <span>{value} zleceń</span>
+            <span>{value} zgłoszeń</span>
           </div>
         );
       

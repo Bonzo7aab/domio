@@ -50,7 +50,7 @@ export default function JobApplicationsPage() {
             hint: jobError?.hint,
             rawError: jobError,
           });
-          toast.error("Nie udało się załadować danych zlecenia");
+          toast.error("Nie udało się załadować danych zgłoszenia");
           setJobData(null);
         } else {
           const budget = job.budget
@@ -132,7 +132,7 @@ export default function JobApplicationsPage() {
       ) : (
         <JobApplicationsList
           jobId={jobId}
-          jobTitle={jobData?.title || "Zlecenie"}
+          jobTitle={jobData?.title || "Zgłoszenie"}
           jobBudget={jobData?.budget}
           applications={applications}
           onStatusChange={handleStatusChange}

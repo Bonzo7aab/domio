@@ -145,7 +145,7 @@ BEGIN
         applications_count, views_count, published_at, created_at
     ) VALUES (
         'Konserwacja i naprawa wind - 2 budynki mieszkalne',
-        'Spółdzielnia Mieszkaniowa poszukuje certyfikowanej firmy windowej do stałej obsługi serwisowej 8 wind w dwóch nowoczesnych budynkach mieszkalnych. Zlecenie obejmuje regularne przeglądy techniczne, bieżące naprawy, 24/7 obsługę awarii oraz modernizację starszych systemów.',
+        'Spółdzielnia Mieszkaniowa poszukuje certyfikowanej firmy windowej do stałej obsługi serwisowej 8 wind w dwóch nowoczesnych budynkach mieszkalnych. Zgłoszenie obejmuje regularne przeglądy techniczne, bieżące naprawy, 24/7 obsługę awarii oraz modernizację starszych systemów.',
         COALESCE(instalacje_cat_id, remonty_cat_id),
         'Przegląd wind',
         dummy_manager_id,

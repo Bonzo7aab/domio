@@ -133,7 +133,7 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-semibold mb-2">Oferty na zlecenie</h2>
+        <h2 className="text-2xl font-semibold mb-2">Oferty na zgłoszenie</h2>
         <p className="text-gray-600">{jobTitle}</p>
         {jobBudget && (
           <p className="text-sm text-gray-500 mt-1">Budżet: {jobBudget}</p>
@@ -203,7 +203,7 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                 </h3>
                 <p className="text-gray-500">
                   {selectedTab === 'all' 
-                    ? 'Nie otrzymano jeszcze żadnych ofert na to zlecenie.'
+                    ? 'Nie otrzymano jeszcze żadnych ofert na to zgłoszenie.'
                     : `Brak ofert o statusie "${selectedTab}".`
                   }
                 </p>
@@ -232,7 +232,7 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                             </div>
                             <div className="flex items-center gap-1">
                               <CheckCircle className="h-4 w-4" />
-                              <span>{application.contractorCompletedJobs} zleceń</span>
+                              <span>{application.contractorCompletedJobs} zgłoszeń</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <MapPin className="h-4 w-4" />

@@ -326,7 +326,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
         
         if (jobError || !jobData) {
           console.error('Error fetching job data:', jobError);
-          toast.error('Nie udało się załadować danych zlecenia');
+          toast.error('Nie udało się załadować danych zgłoszenia');
           setSelectedJobData(null);
         } else {
           // Format budget from raw fields
@@ -385,14 +385,14 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
         
         if (jobError || !jobData) {
           console.error('Error fetching job details:', jobError);
-          toast.error('Nie udało się załadować szczegółów zlecenia');
+          toast.error('Nie udało się załadować szczegółów zgłoszenia');
           setJobDetailsData(null);
         } else {
           setJobDetailsData(jobData);
         }
       } catch (err) {
         console.error('Error loading job details:', err);
-        toast.error('Wystąpił błąd podczas ładowania szczegółów zlecenia');
+        toast.error('Wystąpił błąd podczas ładowania szczegółów zgłoszenia');
         setJobDetailsData(null);
       } finally {
         setIsLoadingJobDetails(false);
@@ -619,7 +619,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
 
         if (jobsError) {
           console.error('Error fetching jobs:', jobsError);
-          toast.error('Nie udało się załadować zleceń');
+          toast.error('Nie udało się załadować zgłoszeń');
           setRecentJobs([]);
           return;
         }
@@ -691,7 +691,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
         setLoadedTabs(prev => new Set(prev).add('jobs'));
       } catch (error) {
         console.error('Error fetching jobs data:', error);
-        toast.error('Nie udało się załadować zleceń');
+        toast.error('Nie udało się załadować zgłoszeń');
         setRecentJobs([]);
       } finally {
         setLoadingJobs(false);
@@ -1014,7 +1014,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
                 Utwórz przetarg
               </Button>
               <Button onClick={onPostJob} className="flex-1 md:flex-initial">
-                Opublikuj zlecenie
+                Opublikuj zgłoszenie
               </Button>
             </div>
           </div>
@@ -1027,7 +1027,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <TabsList className="grid w-full grid-cols-5 min-w-[500px] md:min-w-0">
               <TabsTrigger value="overview" className="text-xs md:text-sm whitespace-nowrap">Przegląd</TabsTrigger>
-              <TabsTrigger value="jobs" className="text-xs md:text-sm whitespace-nowrap">Zlecenia</TabsTrigger>
+              <TabsTrigger value="jobs" className="text-xs md:text-sm whitespace-nowrap">Zgłoszenia</TabsTrigger>
               <TabsTrigger value="tenders" className="text-xs md:text-sm whitespace-nowrap">Przetargi</TabsTrigger>
               <TabsTrigger value="properties" className="text-xs md:text-sm whitespace-nowrap">Nieruchomości</TabsTrigger>
               <TabsTrigger value="contractors" className="text-xs md:text-sm whitespace-nowrap">Wykonawcy</TabsTrigger>
@@ -1064,7 +1064,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Aktywne zlecenia</CardTitle>
+                      <CardTitle className="text-sm font-medium">Aktywne zgłoszenia</CardTitle>
                       <ClipboardList className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -1106,7 +1106,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Najnowsze zlecenia</CardTitle>
+                      <CardTitle>Najnowsze zgłoszenia</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {recentJobs.length > 0 ? recentJobs.slice(0, 3).map((job) => (
@@ -1136,7 +1136,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
                       </div>
                     </div>
                   )) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">Brak zleceń</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">Brak zgłoszeń</p>
                   )}
                 </CardContent>
               </Card>
@@ -1177,13 +1177,13 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           {/* Jobs Tab */}
           <TabsContent value="jobs" className="space-y-6">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-              <h2 className="text-xl md:text-2xl font-bold">Zarządzanie zleceniami</h2>
+              <h2 className="text-xl md:text-2xl font-bold">Zarządzanie zgłoszeniami</h2>
               <div className="flex flex-wrap gap-2 md:gap-3">
                 <Button variant="outline" onClick={handleTenderCreate} className="flex-1 md:flex-initial">
                   Utwórz przetarg
                 </Button>
                 <Button onClick={onPostJob} className="flex-1 md:flex-initial">
-                  Dodaj zlecenie
+                  Dodaj zgłoszenie
                 </Button>
               </div>
             </div>
@@ -1193,7 +1193,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
                 <CardContent className="pt-6 text-center">
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie zleceń...</p>
+                    <p className="ml-2 text-sm text-muted-foreground">Ładowanie zgłoszeń...</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1264,7 +1264,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
               )) : (
                 <Card>
                   <CardContent className="pt-6 text-center">
-                    <p className="text-muted-foreground">Brak zleceń</p>
+                    <p className="text-muted-foreground">Brak zgłoszeń</p>
                   </CardContent>
                 </Card>
               )}
@@ -1542,9 +1542,9 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Szczegóły zlecenia</DialogTitle>
+            <DialogTitle>Szczegóły zgłoszenia</DialogTitle>
             <DialogDescription>
-              Pełne informacje o zleceniu
+              Pełne informacje o zgłoszeniu
             </DialogDescription>
           </DialogHeader>
           
@@ -1606,7 +1606,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
               {/* Description */}
               {jobDetailsData.description && (
                 <div>
-                  <h3 className="font-semibold mb-2">Opis zlecenia</h3>
+                  <h3 className="font-semibold mb-2">Opis zgłoszenia</h3>
                   <p className="text-gray-700 whitespace-pre-wrap">{jobDetailsData.description}</p>
                 </div>
               )}
@@ -1692,7 +1692,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">Nie udało się załadować szczegółów zlecenia</p>
+              <p className="text-muted-foreground">Nie udało się załadować szczegółów zgłoszenia</p>
             </div>
           )}
         </DialogContent>

@@ -122,7 +122,7 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
                 <div className="flex items-center space-x-2">
                   <Clock className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-sm text-gray-500">Typ zlecenia</p>
+                    <p className="text-sm text-gray-500">Typ zgłoszenia</p>
                     <p className="font-medium">{job.type}</p>
                   </div>
                 </div>
@@ -158,7 +158,7 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
                 <div className="p-6">
                   <TabsContent value="details" className="space-y-4">
                     <div>
-                      <h3 className="font-semibold mb-2">Opis zlecenia</h3>
+                      <h3 className="font-semibold mb-2">Opis zgłoszenia</h3>
                       <p className="text-gray-700 leading-relaxed">{job.description}</p>
                     </div>
                     
@@ -310,7 +310,7 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
                 Złóż Ofertę
               </Button>
               <Button variant="outline" className="w-full mb-4">
-                Zapisz zlecenie
+                Zapisz zgłoszenie
               </Button>
               <div className="text-center text-sm text-gray-500">
                 <p>{job.applications} firm złożyło oferty</p>

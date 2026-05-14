@@ -1,5 +1,5 @@
 {
-  "name": "Domio - Platforma zleceń budowlanych",
+  "name": "Domio - Platforma zgłoszeń budowlanych",
   "short_name": "Domio",
   "description": "Mobilna aplikacja łącząca zarządców nieruchomości z wykonawcami budowlanymi",
   "start_url": "/",
@@ -17,14 +17,14 @@
       "sizes": "375x812",
       "type": "image/png",
       "platform": "narrow",
-      "label": "Lista zleceń"
+      "label": "Lista zgłoszeń"
     },
     {
       "src": "/screenshots/mobile-2.png", 
       "sizes": "375x812",
       "type": "image/png",
       "platform": "narrow",
-      "label": "Szczegóły zlecenia"
+      "label": "Szczegóły zgłoszenia"
     },
     {
       "src": "/screenshots/desktop-1.png",
@@ -86,9 +86,9 @@
   ],
   "shortcuts": [
     {
-      "name": "Znajdź zlecenia",
-      "short_name": "Zlecenia",
-      "description": "Przeglądaj dostępne zlecenia budowlane",
+      "name": "Znajdź zgłoszenia",
+      "short_name": "Zgłoszenia",
+      "description": "Przeglądaj dostępne zgłoszenia budowlane",
       "url": "/jobs",
       "icons": [
         {
