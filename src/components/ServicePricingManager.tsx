@@ -289,7 +289,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
   const handleSaveService = async () => {
     const nameTrim = (serviceFormData.name || formData.serviceName)?.trim();
     if (!nameTrim) {
-      toast.error('Podaj nazwę wykonywanej usługi');
+      toast.error('Podaj nazwę usługi');
       return;
     }
 
@@ -449,8 +449,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
       </div>
 
       {/* Services table */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-semibold">Twoje usługi</h3>
+      <div className="flex items-center justify-end mb-4">
         <Button 
           onClick={handleAddService}
           disabled={saving}
@@ -496,13 +495,15 @@ export default function ServicePricingManager({ companyId, services: initialServ
                   </Button>
                 </>
               ) : null}
-              <div ref={tableScrollRef} className="overflow-x-auto rounded-md border">
-            <Table className="min-w-[720px]">
+              <div
+                ref={tableScrollRef}
+                className="max-h-[min(70vh,560px)] overflow-auto rounded-md border"
+              >
+            <Table className="min-w-[560px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Kategoria usługi</TableHead>
                   <TableHead>Podkategoria usługi</TableHead>
-                  <TableHead>Wykonywana usługa</TableHead>
                   <TableHead>Jednostka miary</TableHead>
                   <TableHead>Cena netto</TableHead>
                   <TableHead>Stawka VAT</TableHead>
@@ -522,9 +523,6 @@ export default function ServicePricingManager({ companyId, services: initialServ
                     <TableRow key={service}>
                       <TableCell>{marketCategory || '—'}</TableCell>
                       <TableCell>{pricing?.subcategory || '—'}</TableCell>
-                      <TableCell className="max-w-[220px] truncate" title={pricing?.workDescription || service}>
-                        {pricing?.workDescription || service}
-                      </TableCell>
                       <TableCell>{pricing?.unit || '—'}</TableCell>
                       <TableCell>
                         {netDisplay !== undefined && Number(netDisplay) > 0
@@ -588,7 +586,7 @@ export default function ServicePricingManager({ companyId, services: initialServ
             <DialogTitle>{editingServiceName ? 'Edytuj pozycję cennika' : 'Dodaj pozycję cennika'}</DialogTitle>
             <DialogDescription>
               {editingServiceName
-                ? 'Zaktualizuj kategorię rynkową, opis wykonywanej usługi oraz ceny.'
+                ? 'Zaktualizuj kategorię rynkową, nazwę usługi oraz ceny.'
                 : 'Uzupełnij pola i zapisz — pozycja trafi do Twojego cennika i profilu usług (lista podstawowa).'}
             </DialogDescription>
           </DialogHeader>
@@ -673,12 +671,12 @@ export default function ServicePricingManager({ companyId, services: initialServ
                     </SelectContent>
                   </Select>
                 ) : null}
-                <p className="text-sm text-muted-foreground">Albo wpisz nową wykonywaną usługę poniżej.</p>
+                <p className="text-sm text-muted-foreground">Albo wpisz nazwę nowej usługi poniżej.</p>
               </div>
             ) : null}
 
             <div className="space-y-2">
-              <Label>Wykonywana usługa</Label>
+              <Label>Nazwa usługi</Label>
               <Input
                 type="text"
                 value={serviceFormData.name || formData.serviceName || ''}
