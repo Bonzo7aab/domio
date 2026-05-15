@@ -61,11 +61,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname
-  const isManagerOnlyPath =
-    pathname === '/account' ||
-    pathname.startsWith('/account/') ||
-    pathname === '/manager-dashboard' ||
-    pathname.startsWith('/manager-dashboard/')
+  // `/account` is shared (managers + contractors); only manager dashboard is manager-only.
+  const isAccountPath = pathname === '/account' || pathname.startsWith('/account/')
+  const isManagerDashboardPath =
+    pathname === '/manager-dashboard' || pathname.startsWith('/manager-dashboard/')
   const isContractorOnlyPath =
     pathname === '/contractor-dashboard' || pathname.startsWith('/contractor-dashboard/')
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
@@ -74,7 +73,11 @@ export async function updateSession(request: NextRequest) {
   // Fetch role only when we may need to act on it
   if (
     user &&
-    (isAuthEntryPath || isManagerOnlyPath || isContractorOnlyPath || isAdminPath)
+    (isAuthEntryPath ||
+      isAccountPath ||
+      isManagerDashboardPath ||
+      isContractorOnlyPath ||
+      isAdminPath)
   ) {
     const { data: profile } = await supabase
       .from('user_profiles')
@@ -100,13 +103,13 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // /account & /manager-dashboard are manager-only
-    if (isManagerOnlyPath && !isAdmin && !isManager) {
+    // /manager-dashboard is manager-only (contractors/admins are sent to their home)
+    if (isManagerDashboardPath && !isAdmin && !isManager) {
       const url = request.nextUrl.clone()
       url.pathname = homePathFor
       return NextResponse.redirect(url)
     }
-    if (isManagerOnlyPath && isAdmin) {
+    if ((isManagerDashboardPath || isAccountPath) && isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = '/admin'
       return NextResponse.redirect(url)
