@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } fr
 import { Plus, Edit, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Label } from './ui/label';
@@ -287,10 +287,12 @@ export default function ServicePricingManager({ companyId, services: initialServ
   };
 
   const handleSaveService = async () => {
-    const nameTrim = (serviceFormData.name || formData.serviceName)?.trim();
-    if (!nameTrim) {
-      toast.error('Podaj nazwę usługi');
-      return;
+    if (editingServiceName) {
+      const nameTrim = (serviceFormData.name || formData.serviceName)?.trim();
+      if (!nameTrim) {
+        toast.error('Podaj nazwę usługi');
+        return;
+      }
     }
 
     if (categoriesFromDb.length === 0) {
@@ -324,6 +326,11 @@ export default function ServicePricingManager({ companyId, services: initialServ
     try {
       setSaving(true);
 
+      const finalServiceName = editingServiceName
+        ? (serviceFormData.name || formData.serviceName || '').trim()
+        : jobMarketSubcategoryName.trim();
+      const serviceCategory = editingServiceName ? serviceFormData.category : 'primary';
+
       const updatedServices = { ...services };
 
       if (editingServiceName) {
@@ -336,24 +343,19 @@ export default function ServicePricingManager({ companyId, services: initialServ
           ...updatedServices.secondary,
           ...updatedServices.specializations,
         ];
-        if (serviceFormData.name !== editingServiceName && allServicesList.includes(serviceFormData.name)) {
+        if (finalServiceName !== editingServiceName && allServicesList.includes(finalServiceName)) {
           toast.error('Usługa o tej nazwie już istnieje');
           return;
         }
       } else {
-        const allServicesList = [
-          ...updatedServices.primary,
-          ...updatedServices.secondary,
-          ...updatedServices.specializations,
-        ];
-        if (allServicesList.includes(serviceFormData.name)) {
-          toast.error('Ta usługa już istnieje');
+        if (hasMonetaryPricing(servicePricing[finalServiceName])) {
+          toast.error('Ta usługa ma już wpisaną cenę w cenniku');
           return;
         }
       }
 
-      if (!updatedServices[serviceFormData.category].includes(serviceFormData.name)) {
-        updatedServices[serviceFormData.category] = [...updatedServices[serviceFormData.category], serviceFormData.name].sort();
+      if (!updatedServices[serviceCategory].includes(finalServiceName)) {
+        updatedServices[serviceCategory] = [...updatedServices[serviceCategory], finalServiceName].sort();
       }
 
       const { error } = await updateContractorServices(companyId, updatedServices);
@@ -361,8 +363,6 @@ export default function ServicePricingManager({ companyId, services: initialServ
         throw error;
       }
       setServices(updatedServices);
-
-      const finalServiceName = serviceFormData.name.trim();
       const nextPricing = { ...servicePricing };
 
       if (editingServiceName && editingServiceName !== finalServiceName) {
@@ -584,11 +584,6 @@ export default function ServicePricingManager({ companyId, services: initialServ
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingServiceName ? 'Edytuj pozycję cennika' : 'Dodaj pozycję cennika'}</DialogTitle>
-            <DialogDescription>
-              {editingServiceName
-                ? 'Zaktualizuj kategorię rynkową, nazwę usługi oraz ceny.'
-                : 'Uzupełnij pola i zapisz — pozycja trafi do Twojego cennika i profilu usług (lista podstawowa).'}
-            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -638,56 +633,21 @@ export default function ServicePricingManager({ companyId, services: initialServ
               </Select>
             </div>
 
-            {!editingServiceName && !serviceFormData.name && !formData.serviceName ? (
+            {editingServiceName ? (
               <div className="space-y-2">
-                <Label>Usługa z profilu (bez cennika)</Label>
-                {allServices.filter((s) => !hasMonetaryPricing(servicePricing[s])).length > 0 ? (
-                  <Select
-                    value={formData.serviceName || serviceFormData.name || ''}
-                    onValueChange={(value) => {
-                      let category: 'primary' | 'secondary' | 'specializations' = 'primary';
-                      if (services.primary.includes(value)) {
-                        category = 'primary';
-                      } else if (services.secondary.includes(value)) {
-                        category = 'secondary';
-                      } else if (services.specializations.includes(value)) {
-                        category = 'specializations';
-                      }
-                      setServiceFormData({ name: value, category });
-                      setFormData({ ...formData, serviceName: value });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Opcjonalnie: wybierz istniejącą usługę" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allServices
-                        .filter((s) => !hasMonetaryPricing(servicePricing[s]))
-                        .map((service) => (
-                          <SelectItem key={service} value={service}>
-                            {service}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                ) : null}
-                <p className="text-sm text-muted-foreground">Albo wpisz nazwę nowej usługi poniżej.</p>
+                <Label>Nazwa usługi</Label>
+                <Input
+                  type="text"
+                  value={serviceFormData.name || formData.serviceName || ''}
+                  onChange={(e) => {
+                    const newName = e.target.value;
+                    setServiceFormData({ ...serviceFormData, name: newName });
+                    setFormData({ ...formData, serviceName: newName });
+                  }}
+                  placeholder="np. Malowanie ścian w mieszkaniu"
+                />
               </div>
             ) : null}
-
-            <div className="space-y-2">
-              <Label>Nazwa usługi</Label>
-              <Input
-                type="text"
-                value={serviceFormData.name || formData.serviceName || ''}
-                onChange={(e) => {
-                  const newName = e.target.value;
-                  setServiceFormData({ ...serviceFormData, name: newName });
-                  setFormData({ ...formData, serviceName: newName });
-                }}
-                placeholder="np. Malowanie ścian w mieszkaniu"
-              />
-            </div>
 
             <div className="space-y-2">
               <Label>Jednostka miary</Label>
@@ -784,7 +744,13 @@ export default function ServicePricingManager({ companyId, services: initialServ
             <Button variant="outline" onClick={() => setShowDialog(false)}>
               Anuluj
             </Button>
-            <Button onClick={handleSaveService} disabled={saving || !(serviceFormData.name || formData.serviceName)?.trim()}>
+            <Button
+              onClick={handleSaveService}
+              disabled={
+                saving ||
+                (editingServiceName && !(serviceFormData.name || formData.serviceName)?.trim())
+              }
+            >
               {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

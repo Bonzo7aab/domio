@@ -153,7 +153,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
               <p className="ml-2 text-sm text-muted-foreground">Ładowanie szczegółów...</p>
             </div>
           ) : jobDetailsData ? (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h2 className="text-2xl font-bold">{jobDetailsData.title}</h2>
@@ -205,9 +205,9 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
               )}
 
               {jobDetailsData.description && (
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold mb-2">Opis zgłoszenia</h3>
-                  <p className="text-gray-700 whitespace-pre-wrap">{jobDetailsData.description}</p>
+                  <p className="max-w-full break-words text-gray-700 whitespace-pre-wrap">{jobDetailsData.description}</p>
                 </div>
               )}
 

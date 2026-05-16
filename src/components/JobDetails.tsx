@@ -155,11 +155,13 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
                   <TabsTrigger value="company">O kliencie</TabsTrigger>
                 </TabsList>
                 
-                <div className="p-6">
+                <div className="min-w-0 p-6">
                   <TabsContent value="details" className="space-y-4">
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="font-semibold mb-2">Opis zgłoszenia</h3>
-                      <p className="text-gray-700 leading-relaxed">{job.description}</p>
+                      <p className="max-w-full break-words text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {job.description}
+                      </p>
                     </div>
                     
                     {job.responsibilities && job.responsibilities.length > 0 && (
@@ -177,9 +179,9 @@ export default function JobDetails({ job, onBack }: JobDetailsProps) {
                     )}
 
                     {job.additionalInfo && (
-                      <div>
+                      <div className="min-w-0">
                         <h3 className="font-semibold mb-2">Dodatkowe informacje</h3>
-                        <p className="text-gray-700">{job.additionalInfo}</p>
+                        <p className="max-w-full break-words text-gray-700 whitespace-pre-wrap">{job.additionalInfo}</p>
                       </div>
                     )}
                   </TabsContent>

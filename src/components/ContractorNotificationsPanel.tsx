@@ -10,7 +10,6 @@ import {
 } from '../lib/database/contractor-account';
 import { getNotifications } from '../lib/database/notifications';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Switch } from './ui/switch';
 
@@ -30,29 +29,20 @@ const NotificationChannelField = ({
   checked,
   onChange,
   disabled,
-  rightSlot,
 }: {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
-  rightSlot?: React.ReactNode;
 }) => (
   <div
     className={`flex items-center justify-between rounded-md border p-3 gap-3 ${disabled ? 'bg-muted/40' : ''}`}
   >
     <div className="flex items-center gap-2 flex-wrap min-w-0">
       <span className="text-sm font-medium">{label}</span>
-      {rightSlot}
     </div>
     <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
   </div>
-);
-
-const SoonBadge = () => (
-  <Badge variant="secondary" className="text-[10px] font-semibold tracking-wide shrink-0">
-    SOON!
-  </Badge>
 );
 
 export function ContractorNotificationsPanel({ userId }: ContractorNotificationsPanelProps) {
@@ -145,13 +135,6 @@ export function ContractorNotificationsPanel({ userId }: ContractorNotifications
             label="Aplikacja"
             checked={channels.app}
             onChange={(checked) => setChannels((prev) => ({ ...prev, app: checked }))}
-          />
-          <NotificationChannelField
-            label="SMS"
-            checked={false}
-            onChange={() => {}}
-            disabled
-            rightSlot={<SoonBadge />}
           />
           <Button onClick={handleSave} disabled={isSaving}>
             Zapisz ustawienia

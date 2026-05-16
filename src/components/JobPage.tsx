@@ -469,6 +469,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const [isCheckingConversation, setIsCheckingConversation] = useState(false);
   const [managerId, setManagerId] = useState<string | null>(null);
   const hasIncrementedViews = useRef<string | null>(null);
+  const isManager = user?.userType === 'manager';
 
   // Fetch job data from database
   useEffect(() => {
@@ -1063,7 +1064,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 min-w-0 space-y-6">
 
             {/* Key Tender Information - only for tenders */}
             {job.postType === 'tender' && job.tenderInfo && (
@@ -1114,10 +1115,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
               {/* Overview Tab */}
               <TabsContent value="overview">
                 <Card>
-                  <CardContent className="p-6 space-y-6">
-                    <div>
+                  <CardContent className="min-w-0 space-y-6 p-6">
+                    <div className="min-w-0">
                       <h3 className="text-lg font-semibold mb-3">Opis {job.postType === 'tender' ? 'przetargu' : 'zgłoszenia'}</h3>
-                      <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{job.description}</p>
+                      <p className="max-w-full break-words text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {job.description}
+                      </p>
                     </div>
 
                   {job.responsibilities && job.responsibilities.length > 0 && (
@@ -1415,7 +1418,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
 
-            {/* Action Buttons */}
+            {/* Action Buttons — contractor actions only */}
+            {!isManager && (
             <Card>
               <CardContent className="p-6">
                 <div className="space-y-3">
@@ -1478,6 +1482,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 </div>
               </CardContent>
             </Card>
+            )}
 
             {/* Job Images */}
             {job.images && job.images.length > 0 && (

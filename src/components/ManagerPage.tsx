@@ -1554,7 +1554,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
               <p className="ml-2 text-sm text-muted-foreground">Ładowanie szczegółów...</p>
             </div>
           ) : jobDetailsData ? (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {/* Title and Status */}
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -1605,9 +1605,9 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
 
               {/* Description */}
               {jobDetailsData.description && (
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold mb-2">Opis zgłoszenia</h3>
-                  <p className="text-gray-700 whitespace-pre-wrap">{jobDetailsData.description}</p>
+                  <p className="max-w-full break-words text-gray-700 whitespace-pre-wrap">{jobDetailsData.description}</p>
                 </div>
               )}
 
