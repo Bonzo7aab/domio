@@ -218,8 +218,20 @@ export function Header({ initialUser }: HeaderProps) {
               )}
             </div>
 
-          {/* 3. Right Side Actions - Notifications and User Dropdown (Always visible) */}
-          <div className="flex items-center space-x-3 flex-shrink-0">
+          {/* 3. Right Side Actions - Messages (logged in), notifications, user */}
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+            {userIsAuthenticated && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                onClick={handleMessagingClick}
+                aria-label="Wiadomości"
+              >
+                <MessageCircle className="h-5 w-5" />
+              </Button>
+            )}
             {/* Unified Notifications - only visible for authenticated users */}
             {userIsAuthenticated && (
               <UnifiedNotifications 

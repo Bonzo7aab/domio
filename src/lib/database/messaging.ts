@@ -74,6 +74,8 @@ export interface MessageData {
   content: string;
   messageType: 'text' | 'image' | 'document' | 'system' | 'quote';
   attachments?: Array<Record<string, unknown>>;
+  /** When true, caller handles recipient notification (e.g. custom copy or server push). */
+  skipRecipientNotification?: boolean;
 }
 
 /**
@@ -136,6 +138,8 @@ export async function sendMessage(
       return { data: null, error };
     }
 
+    const messageId = (message as unknown as MessageRow)?.id || null;
+
     // Update conversation's last_message_at
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
@@ -146,10 +150,139 @@ export async function sendMessage(
       })
       .eq('id', data.conversationId);
 
-    return { data: (message as unknown as MessageRow)?.id || null, error: null };
+    if (messageId && !data.skipRecipientNotification) {
+      await notifyConversationMessageRecipient(supabase, {
+        conversationId: data.conversationId,
+        senderId: data.senderId,
+        messageId,
+        content: data.content,
+      });
+    }
+
+    return { data: messageId, error: null };
   } catch (err) {
     console.error('Error sending message:', err);
     return { data: null, error: err };
+  }
+}
+
+interface MessageNotificationPayload {
+  recipientId: string;
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  actionUrl: string;
+}
+
+/**
+ * Build in-app notification payload for a new conversation message.
+ */
+export async function buildMessageNotificationPayload(
+  supabase: SupabaseClient<Database>,
+  params: {
+    conversationId: string;
+    senderId: string;
+    messageId: string;
+    content: string;
+  },
+): Promise<MessageNotificationPayload | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: conv, error: convError } = await (supabase as any)
+      .from('conversations')
+      .select(`
+        id,
+        participant_1,
+        participant_2,
+        job_id,
+        tender_id,
+        job:jobs(title),
+        tender:tenders(title)
+      `)
+      .eq('id', params.conversationId)
+      .single();
+
+    if (convError || !conv) {
+      console.warn('buildMessageNotificationPayload: conversation not found', convError);
+      return null;
+    }
+
+    const participant1 = String(conv.participant_1);
+    const participant2 = String(conv.participant_2);
+    const recipientId =
+      participant1 === params.senderId ? participant2 : participant1;
+
+    if (!recipientId || recipientId === params.senderId) {
+      return null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: senderProfile } = await (supabase as any)
+      .from('user_profiles')
+      .select('first_name, last_name')
+      .eq('id', params.senderId)
+      .maybeSingle();
+
+    const senderName =
+      `${String(senderProfile?.first_name ?? '')} ${String(senderProfile?.last_name ?? '')}`.trim() ||
+      'Użytkownik';
+
+    const jobTitle =
+      String((conv.job as { title?: string } | null)?.title ?? '') ||
+      String((conv.tender as { title?: string } | null)?.title ?? '');
+    const preview = params.content.trim().slice(0, 160) || 'Nowa wiadomość';
+
+    const title = jobTitle
+      ? `Nowa wiadomość: ${jobTitle}`
+      : `Nowa wiadomość od ${senderName}`;
+    const message = jobTitle ? `${senderName}: ${preview}` : `${senderName}: ${preview}`;
+
+    return {
+      recipientId,
+      title,
+      message,
+      data: {
+        conversationId: params.conversationId,
+        messageId: params.messageId,
+        senderId: params.senderId,
+        jobId: conv.job_id ?? null,
+        tenderId: conv.tender_id ?? null,
+      },
+      actionUrl: `/messages?conversation=${params.conversationId}`,
+    };
+  } catch (err) {
+    console.warn('buildMessageNotificationPayload failed:', err);
+    return null;
+  }
+}
+
+/**
+ * Notify the other participant about a new message (in-app notification).
+ */
+export async function notifyConversationMessageRecipient(
+  supabase: SupabaseClient<Database>,
+  params: {
+    conversationId: string;
+    senderId: string;
+    messageId: string;
+    content: string;
+  },
+): Promise<void> {
+  const payload = await buildMessageNotificationPayload(supabase, params);
+  if (!payload) return;
+
+  const notificationResult = await createNotification(
+    supabase,
+    payload.recipientId,
+    'new_message',
+    payload.title,
+    payload.message,
+    payload.data,
+    payload.actionUrl,
+  );
+
+  if (notificationResult.error) {
+    console.warn('Failed to create message notification:', notificationResult.error);
   }
 }
 
@@ -178,6 +311,7 @@ export async function sendQuoteRequestMessage(
       content: message,
       messageType: 'quote',
       attachments: (attachments ? [attachments] : null) as Array<Record<string, unknown>> | null,
+      skipRecipientNotification: true,
     });
   } catch (err) {
     console.error('Error sending quote request message:', err);
@@ -642,69 +776,259 @@ export async function fetchUserConversations(
       };
     });
 
-    return { data: transformedConversations, error: null };
+    const enriched = await enrichConversationsWithMessageMeta(
+      supabase,
+      transformedConversations,
+      userId,
+    );
+
+    return { data: enriched, error: null };
   } catch (err) {
     console.error('Error fetching conversations:', err);
     return { data: null, error: err };
   }
 }
 
+interface SenderProfileRow {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+}
+
+function mapAttachments(raw: MessageRow['attachments']): Message['attachments'] {
+  if (raw == null) return undefined;
+  const list = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>);
+  if (list.length === 0) return undefined;
+  return list.map((att: Record<string, unknown>) => ({
+    id: (att.id as string) || '',
+    name: (att.name as string) || '',
+    url: (att.url as string) || '',
+    type: ((att.type as string) || 'other') as 'image' | 'document' | 'other',
+    size: (att.size as number) || 0,
+  }));
+}
+
+function formatMessagePreviewContent(
+  content: string,
+  attachments: MessageRow['attachments'],
+): string {
+  const trimmed = content.trim();
+  if (trimmed) return trimmed;
+  if (mapAttachments(attachments)?.length) return 'Przesłano plik';
+  return '';
+}
+
+async function enrichConversationsWithMessageMeta(
+  supabase: SupabaseClient<Database>,
+  conversations: Conversation[],
+  userId: string,
+): Promise<Conversation[]> {
+  const conversationIds = conversations.map((c) => c.id).filter(Boolean);
+  if (conversationIds.length === 0) return conversations;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: messageRows, error: messagesError } = await (supabase as any)
+    .from('messages')
+    .select('id, conversation_id, sender_id, content, message_type, attachments, created_at')
+    .in('conversation_id', conversationIds)
+    .order('created_at', { ascending: false });
+
+  if (messagesError) {
+    console.error('Error fetching conversation message previews:', messagesError);
+    return conversations;
+  }
+
+  const rows = (messageRows as MessageRow[]) || [];
+  const lastByConversation = new Map<string, MessageRow>();
+  const incomingIdsByConversation = new Map<string, string[]>();
+
+  for (const row of rows) {
+    const convId = String(row.conversation_id);
+    if (!lastByConversation.has(convId)) {
+      lastByConversation.set(convId, row);
+    }
+    if (String(row.sender_id) !== userId) {
+      const existing = incomingIdsByConversation.get(convId) ?? [];
+      existing.push(String(row.id));
+      incomingIdsByConversation.set(convId, existing);
+    }
+  }
+
+  const allIncomingIds = [...incomingIdsByConversation.values()].flat();
+  const readMessageIds = new Set<string>();
+
+  if (allIncomingIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: readRows, error: readError } = await (supabase as any)
+      .from('message_read_status')
+      .select('message_id')
+      .eq('user_id', userId)
+      .in('message_id', allIncomingIds);
+
+    if (readError) {
+      console.error('Error fetching message read status:', readError);
+    } else {
+      for (const row of (readRows as { message_id: string }[]) || []) {
+        readMessageIds.add(String(row.message_id));
+      }
+    }
+  }
+
+  const participantNameById = new Map<string, string>();
+  for (const conv of conversations) {
+    for (const participant of conv.participants) {
+      participantNameById.set(participant.id, participant.name);
+    }
+  }
+
+  return conversations.map((conv) => {
+    const lastRow = lastByConversation.get(conv.id);
+    const incomingIds = incomingIdsByConversation.get(conv.id) ?? [];
+    const unreadCount = incomingIds.filter((id) => !readMessageIds.has(id)).length;
+
+    let lastMessage: Message | undefined;
+    if (lastRow) {
+      const senderId = String(lastRow.sender_id);
+      const previewContent = formatMessagePreviewContent(
+        String(lastRow.content ?? ''),
+        lastRow.attachments,
+      );
+      lastMessage = {
+        id: String(lastRow.id),
+        senderId,
+        senderName: participantNameById.get(senderId) ?? '',
+        content: previewContent,
+        timestamp: new Date(String(lastRow.created_at)),
+        read: senderId === userId || readMessageIds.has(String(lastRow.id)),
+        type: 'text',
+        attachments: mapAttachments(lastRow.attachments),
+      };
+    }
+
+    return {
+      ...conv,
+      lastMessage,
+      unreadCount,
+      updatedAt: lastMessage?.timestamp ?? conv.updatedAt,
+    };
+  });
+}
+
 /**
- * Fetch all messages for a conversation
+ * Fetch all messages for a conversation.
+ * Loads messages and sender profiles in two steps so we do not depend on
+ * PostgREST embed FK names (which differ across deployments).
  */
 export async function fetchConversationMessages(
   supabase: SupabaseClient<Database>,
-  conversationId: string
+  conversationId: string,
+  currentUserId: string,
 ): Promise<{ data: Message[] | null; error: PostgrestError | null }> {
   try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: messages, error } = await (supabase as any)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rows, error } = await (supabase as any)
       .from('messages')
-      .select(`
-        id,
-        sender_id,
-        content,
-        message_type,
-        attachments: attachments as Record<string, unknown> | null,
-        created_at,
-        sender_profile:user_profiles!messages_sender_id_fkey(
-          id,
-          first_name,
-          last_name,
-          avatar_url
-        )
-      `)
+      .select('id, sender_id, content, message_type, attachments, created_at')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('Error fetching messages:', error);
+      console.error('Error fetching messages:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        conversationId,
+      });
       return { data: null, error };
     }
 
-    // Transform to Message format
-    const transformedMessages: Message[] = ((messages as MessageRow[]) || []).map((msg: MessageRow) => ({
-      id: msg.id as string,
-      senderId: msg.sender_id as string,
-      senderName: `${(msg.sender_profile as { first_name?: string; last_name?: string })?.first_name || ''} ${(msg.sender_profile as { first_name?: string; last_name?: string })?.last_name || ''}`.trim(),
-      senderAvatar: (msg.sender_profile as { avatar_url?: string | null })?.avatar_url || '',
-      content: msg.content as string,
-      timestamp: new Date(msg.created_at as string),
-      read: false, // TODO: Implement read status
-      type: msg.message_type === 'quote' ? 'text' : 'text', // Map to supported types
-      attachments: msg.attachments ? Object.values(msg.attachments as Record<string, unknown>).map((att: Record<string, unknown>) => ({
-        id: (att.id as string) || '',
-        name: (att.name as string) || '',
-        url: (att.url as string) || '',
-        type: ((att.type as string) || 'other') as 'image' | 'document' | 'other',
-        size: (att.size as number) || 0
-      })) : undefined
-    })) as Message[];
+    const messageRows = (rows as MessageRow[]) || [];
+    const senderIds = [...new Set(messageRows.map((m) => String(m.sender_id || '')).filter(Boolean))];
+
+    let profileById: Record<string, SenderProfileRow> = {};
+    if (senderIds.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: profiles, error: profileError } = await (supabase as any)
+        .from('user_profiles')
+        .select('id, first_name, last_name, avatar_url')
+        .in('id', senderIds);
+
+      if (profileError) {
+        console.error('Error fetching sender profiles for messages:', {
+          message: profileError.message,
+          code: profileError.code,
+          details: profileError.details,
+          hint: profileError.hint,
+          conversationId,
+          senderIds,
+        });
+      } else {
+        profileById = Object.fromEntries(
+          ((profiles as SenderProfileRow[]) || []).map((p) => [p.id, p]),
+        );
+      }
+    }
+
+    const messageIds = messageRows.map((m) => String(m.id)).filter(Boolean);
+    const readByUserId = new Map<string, Set<string>>();
+
+    if (messageIds.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: readRows, error: readError } = await (supabase as any)
+        .from('message_read_status')
+        .select('message_id, user_id')
+        .in('message_id', messageIds);
+
+      if (readError) {
+        console.error('Error fetching message read status:', {
+          message: readError.message,
+          code: readError.code,
+          conversationId,
+        });
+      } else {
+        for (const row of (readRows as { message_id: string; user_id: string }[]) || []) {
+          const msgId = String(row.message_id);
+          const uid = String(row.user_id);
+          if (!readByUserId.has(msgId)) {
+            readByUserId.set(msgId, new Set());
+          }
+          readByUserId.get(msgId)!.add(uid);
+        }
+      }
+    }
+
+    const transformedMessages: Message[] = messageRows.map((msg) => {
+      const prof = profileById[String(msg.sender_id)];
+      const senderName = prof
+        ? `${prof.first_name ?? ''} ${prof.last_name ?? ''}`.trim()
+        : '';
+      const senderId = String(msg.sender_id);
+      const msgId = String(msg.id);
+      const readers = readByUserId.get(msgId) ?? new Set<string>();
+      const isOutgoing = senderId === currentUserId;
+      const read = isOutgoing
+        ? [...readers].some((uid) => uid !== currentUserId)
+        : readers.has(currentUserId);
+
+      return {
+        id: msgId,
+        senderId,
+        senderName,
+        senderAvatar: prof?.avatar_url ?? '',
+        content: msg.content as string,
+        timestamp: new Date(msg.created_at as string),
+        read,
+        type: msg.message_type === 'quote' ? 'text' : 'text',
+        attachments: mapAttachments(msg.attachments),
+      };
+    });
 
     return { data: transformedMessages, error: null };
   } catch (err) {
     console.error('Error fetching messages:', err);
-    return { data: null, error: err };
+    return { data: null, error: err as PostgrestError };
   }
 }
 
@@ -744,9 +1068,8 @@ export async function markMessagesAsRead(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: insertError } = await (supabase as any)
       .from('message_read_status')
-      .upsert(readStatusInserts, { 
+      .upsert(readStatusInserts, {
         onConflict: 'message_id,user_id',
-        ignoreDuplicates: true 
       });
 
     if (insertError) {

@@ -375,9 +375,16 @@ CREATE POLICY "Users can update their own messages" ON messages
 -- MESSAGE READ STATUS POLICIES
 -- =============================================
 
--- Users can view read status for their messages
-CREATE POLICY "Users can view message read status" ON message_read_status
-    FOR SELECT USING (user_id = auth.uid());
+-- Participants can see read status for messages in their conversations (incl. recipient reads)
+CREATE POLICY "Participants can view read status in their conversations" ON message_read_status
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id
+            WHERE m.id = message_read_status.message_id
+            AND (c.participant_1 = auth.uid() OR c.participant_2 = auth.uid())
+        )
+    );
 
 -- Users can insert read status for their messages
 CREATE POLICY "Users can insert message read status" ON message_read_status

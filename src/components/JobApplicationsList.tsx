@@ -35,7 +35,7 @@ interface JobApplicationsListProps {
   jobBudget?: string;
   applications: JobApplication[];
   onStatusChange: (applicationId: string, status: string, notes?: string) => void;
-  onStartConversation: (contractorId: string) => void;
+  onStartConversation: (contractorId: string, applicationId: string) => void;
 }
 
 export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
@@ -352,7 +352,7 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pt-4 border-t">
                       <Button
                         variant="outline"
-                        onClick={() => onStartConversation(application.contractorId)}
+                        onClick={() => onStartConversation(application.contractorId, application.id)}
                         className="w-full sm:w-auto"
                       >
                         <MessageSquare className="h-4 w-4 mr-2" />

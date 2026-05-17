@@ -83,11 +83,25 @@ export interface SystemNotification {
   urgent: boolean;
 }
 
+export interface MessageNotification {
+  id: string;
+  category: 'message';
+  type: 'new_message';
+  title: string;
+  message: string;
+  conversationId?: string;
+  actionUrl?: string;
+  timestamp: Date;
+  read: boolean;
+  urgent: boolean;
+}
+
 export type UnifiedNotification =
   | JobNotification
   | ApplicationNotification
   | TenderNotification
-  | SystemNotification;
+  | SystemNotification
+  | MessageNotification;
 
 export interface UnifiedNotificationsProps {
   onJobSelect?: (jobId: string) => void;

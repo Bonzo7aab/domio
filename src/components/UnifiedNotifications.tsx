@@ -1,17 +1,16 @@
-import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, Search, ShieldCheck, ShieldX, Star, Trophy, UserCheck, X } from 'lucide-react';
+import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, MessageCircle, Search, ShieldCheck, ShieldX, Star, Trophy, UserCheck, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
 import { deleteNotification, getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '../lib/database/notifications';
 import { createClient } from '../lib/supabase/client';
 import type { Database } from '../types/database';
-import type { ApplicationNotification, JobNotification, SystemNotification, TenderNotification, UnifiedNotification, UnifiedNotificationsProps } from '../types/notification';
+import type { ApplicationNotification, JobNotification, MessageNotification, SystemNotification, TenderNotification, UnifiedNotification, UnifiedNotificationsProps } from '../types/notification';
 import { Alert, AlertDescription } from './ui/alert';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 
@@ -21,7 +20,7 @@ type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 function getNotificationCategoryAndType(
   dbType: NotificationRow['type'],
   data: Record<string, unknown> | null
-): { category: 'job' | 'application' | 'tender' | 'system'; type: string } | null {
+): { category: 'job' | 'application' | 'tender' | 'message' | 'system'; type: string } | null {
   switch (dbType) {
     // Job notifications
     case 'new_job':
@@ -57,8 +56,14 @@ function getNotificationCategoryAndType(
     case 'verification_rejected':
       return { category: 'system', type: 'verification_rejected' };
 
+    case 'new_message':
+      return { category: 'message', type: 'new_message' };
+
     default:
       // For other types, try to infer from data
+      if (data?.conversationId || data?.conversation_id) {
+        return { category: 'message', type: 'new_message' };
+      }
       if (data?.jobId && !data?.tenderId) {
         return { category: 'job', type: 'new_job' };
       } else if (data?.tenderId) {
@@ -147,6 +152,19 @@ function transformNotification(dbNotification: NotificationRow): UnifiedNotifica
       return systemNotif;
     }
 
+    case 'message': {
+      const messageNotif: MessageNotification = {
+        ...baseNotification,
+        category: 'message',
+        type: 'new_message',
+        title: dbNotification.title,
+        message: dbNotification.message,
+        conversationId: (data?.conversationId || data?.conversation_id) as string | undefined,
+        actionUrl: dbNotification.action_url ?? undefined,
+      };
+      return messageNotif;
+    }
+
     default:
       return null;
   }
@@ -161,7 +179,6 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
   const { user } = useUserProfile();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
   const [isMounted, setIsMounted] = useState(false);
   const [notifications, setNotifications] = useState<UnifiedNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -342,6 +359,16 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         router.push(target);
         break;
       }
+      case 'message': {
+        const messageNotif = notification as MessageNotification;
+        const target =
+          messageNotif.actionUrl ||
+          (messageNotif.conversationId
+            ? `/messages?conversation=${messageNotif.conversationId}`
+            : '/messages');
+        router.push(target);
+        break;
+      }
     }
 
     setIsOpen(false);
@@ -406,6 +433,8 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         }
         break;
       }
+      case 'message':
+        return <MessageCircle className={`h-4 w-4 ${iconClass}`} />;
     }
 
     return <Bell className={`h-4 w-4 ${iconClass}`} />;
@@ -422,19 +451,6 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
     if (minutes < 60) return `${minutes}m temu`;
     if (hours < 24) return `${hours}h temu`;
     return `${days}d temu`;
-  };
-
-  const getFilteredNotifications = () => {
-    switch (activeTab) {
-      case 'jobs':
-        return allNotifications.filter(n => n.category === 'job');
-      case 'applications':
-        return allNotifications.filter(n => n.category === 'application');
-      case 'tenders':
-        return allNotifications.filter(n => n.category === 'tender');
-      default:
-        return allNotifications;
-    }
   };
 
   const renderNotification = (notification: UnifiedNotification) => {
@@ -572,9 +588,6 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>
-              Najnowsze aktualizacje
-            </CardDescription>
           </div>
           <Button
             variant="ghost"
@@ -602,26 +615,6 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
             </div>
           )}
 
-          {/* Tabs for filtering */}
-          <div className="px-6 pb-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className={`grid w-full ${
-                isMounted && user?.userType === 'manager' ? 'grid-cols-3' :
-                isMounted && user?.userType === 'contractor' ? 'grid-cols-3' :
-                'grid-cols-2'
-              }`}>
-                <TabsTrigger value="all" className="text-xs">Wszystkie</TabsTrigger>
-                <TabsTrigger value="jobs" className="text-xs">Zgłoszenia</TabsTrigger>
-                {isMounted && user?.userType === 'manager' && (
-                  <TabsTrigger value="applications" className="text-xs">Oferty</TabsTrigger>
-                )}
-                {isMounted && user?.userType === 'contractor' && (
-                  <TabsTrigger value="tenders" className="text-xs">Przetargi</TabsTrigger>
-                )}
-              </TabsList>
-            </Tabs>
-          </div>
-
           {/* Notifications List */}
           <div className="max-h-96 overflow-y-auto">
             {isLoading ? (
@@ -635,14 +628,14 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               </div>
-            ) : getFilteredNotifications().length === 0 ? (
+            ) : allNotifications.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">
                 <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>Brak powiadomień</p>
               </div>
             ) : (
               <div className="space-y-1">
-                {getFilteredNotifications().map(renderNotification)}
+                {allNotifications.map(renderNotification)}
               </div>
             )}
           </div>

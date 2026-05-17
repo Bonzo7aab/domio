@@ -1,15 +1,32 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MessagingSystem } from '../../components/MessagingSystem';
 import { useUserProfile } from '../../contexts/AuthContext';
 import { createClient } from '../../lib/supabase/client';
 import { markMessagesAsRead } from '../../lib/database/messaging';
+import { sendConversationMessageAction } from './actions';
 import { getConversations, getMessages } from '../../lib/data';
 import { Conversation, Message } from '../../types/messaging';
 import { mockConversations } from '../../mocks';
 import { toast } from 'sonner';
+import type { PostgrestError } from '@supabase/supabase-js';
+
+function logPostgrestError(context: string, err: unknown, extra?: Record<string, unknown>) {
+  if (err && typeof err === 'object') {
+    const e = err as PostgrestError;
+    console.error(context, {
+      message: e.message,
+      code: e.code,
+      details: e.details,
+      hint: e.hint,
+      ...extra,
+    });
+  } else {
+    console.error(context, err, extra);
+  }
+}
 
 function LoadingState({ label }: { label: string }) {
   return (
@@ -37,11 +54,107 @@ function MessagesPageContent() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<{ [conversationId: string]: Message[] }>({});
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  // Get conversation ID from URL params
   const conversationId = searchParams.get('conversation');
+
+  const handleConversationChange = useCallback(
+    (id: string | null) => {
+      const path = id
+        ? `/messages?conversation=${encodeURIComponent(id)}`
+        : '/messages';
+      router.replace(path, { scroll: false });
+    },
+    [router],
+  );
+
+  const markConversationOpened = useCallback(
+    async (selectedConversationId: string) => {
+      if (!user) return;
+
+      const supabase = createClient();
+
+      const messagesResult = await getMessages(selectedConversationId, user.id);
+      if (messagesResult.error) {
+        logPostgrestError('Failed to load messages:', messagesResult.error, {
+          conversationId: selectedConversationId,
+        });
+        toast.error('Nie udało się załadować wiadomości');
+        return;
+      }
+
+      await markMessagesAsRead(supabase, selectedConversationId, user.id);
+
+      const refreshed = await getMessages(selectedConversationId, user.id);
+      const finalMessages =
+        refreshed.data ??
+        (messagesResult.data || []).map((msg) =>
+          msg.senderId !== user.id ? { ...msg, read: true } : msg,
+        );
+
+      setMessages((prev) => ({
+        ...prev,
+        [selectedConversationId]: finalMessages,
+      }));
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConversationId ? { ...c, unreadCount: 0 } : c,
+        ),
+      );
+    },
+    [user],
+  );
+
+  const refreshConversationMessages = useCallback(
+    async (selectedConversationId: string) => {
+      if (!user) return;
+
+      const refreshed = await getMessages(selectedConversationId, user.id);
+      if (refreshed.error) {
+        logPostgrestError('Failed to refresh messages:', refreshed.error, {
+          conversationId: selectedConversationId,
+        });
+        return;
+      }
+
+      if (refreshed.data) {
+        setMessages((prev) => ({
+          ...prev,
+          [selectedConversationId]: refreshed.data!,
+        }));
+      }
+    },
+    [user],
+  );
+
+  const handleRefreshPanel = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const conversationsResult = await getConversations(user.id);
+      if (conversationsResult.error) {
+        throw new Error('Nie udało się odświeżyć rozmów');
+      }
+
+      const fetchedConversations = conversationsResult.data || [];
+      const conversationList =
+        fetchedConversations.length === 0 ? mockConversations : fetchedConversations;
+      setConversations(conversationList);
+
+      const activeId = conversationId ?? null;
+      if (activeId && conversationList.some((c) => c.id === activeId)) {
+        await refreshConversationMessages(activeId);
+      }
+    } catch (err) {
+      console.error('Error refreshing messages panel:', err);
+      toast.error('Nie udało się odświeżyć rozmów');
+    }
+  }, [user, conversationId, refreshConversationMessages]);
+
+  const openedFromUrlRef = useRef<string | null>(null);
 
   // Prevent hydration mismatch by only rendering after mount
   useEffect(() => {
@@ -58,45 +171,31 @@ function MessagesPageContent() {
     }
   }, [user, isLoading, router]);
 
-  // Fetch conversations and messages when user is loaded
+  // Load conversation list once (avoid full-page spinner when picking a thread)
   useEffect(() => {
     if (!user) return;
 
-    const loadData = async () => {
+    const loadConversations = async () => {
       try {
         setIsLoadingData(true);
         setError(null);
-        
-        // Fetch conversations
+
         const conversationsResult = await getConversations(user.id);
-        
+
         if (conversationsResult.error) {
           throw new Error('Nie udało się załadować rozmów');
         }
 
         const fetchedConversations = conversationsResult.data || [];
-        setConversations(fetchedConversations);
+        const conversationList =
+          fetchedConversations.length === 0 ? mockConversations : fetchedConversations;
 
-        // If no conversations found, fall back to mock data for testing
         if (fetchedConversations.length === 0) {
           console.log('No conversations found in database, using mock data for testing');
-          setConversations(mockConversations);
         }
 
-        // If there's a specific conversation in URL, load its messages
-        if (conversationId && fetchedConversations.some(c => c.id === conversationId)) {
-          const messagesResult = await getMessages(conversationId);
-          
-          if (messagesResult.error) {
-            console.warn('Failed to load messages for conversation:', messagesResult.error);
-          } else {
-            setMessages(prev => ({
-              ...prev,
-              [conversationId]: messagesResult.data || []
-            }));
-          }
-        }
-
+        setConversations(conversationList);
+        setConversationsLoaded(true);
       } catch (err) {
         console.error('Error loading messages data:', err);
         setError(err instanceof Error ? err.message : 'Wystąpił błąd podczas ładowania danych');
@@ -106,41 +205,34 @@ function MessagesPageContent() {
       }
     };
 
-    loadData();
-  }, [user, conversationId]);
+    loadConversations();
+  }, [user]);
 
-  // Handle conversation selection
-  const handleConversationSelect = async (selectedConversationId: string) => {
-    if (!user) return;
+  // Reset URL-open guard when query param changes
+  useEffect(() => {
+    openedFromUrlRef.current = null;
+  }, [conversationId]);
 
-    // If messages already loaded, don't reload
-    if (messages[selectedConversationId]) {
-      return;
-    }
+  // Open thread from URL (notifications, shared links)
+  useEffect(() => {
+    if (!user?.id || !conversationsLoaded || !conversationId) return;
+    if (openedFromUrlRef.current === conversationId) return;
 
-    try {
-      const messagesResult = await getMessages(selectedConversationId);
-      
-      if (messagesResult.error) {
-        console.error('Failed to load messages:', messagesResult.error);
+    openedFromUrlRef.current = conversationId;
+    void markConversationOpened(conversationId);
+  }, [user?.id, conversationsLoaded, conversationId, markConversationOpened]);
+
+  const handleConversationSelect = useCallback(
+    async (selectedConversationId: string) => {
+      try {
+        await markConversationOpened(selectedConversationId);
+      } catch (err) {
+        console.error('Error loading conversation messages:', err);
         toast.error('Nie udało się załadować wiadomości');
-        return;
       }
-
-      setMessages(prev => ({
-        ...prev,
-        [selectedConversationId]: messagesResult.data || []
-      }));
-
-      // Mark messages as read
-      const supabase = createClient();
-      await markMessagesAsRead(supabase, selectedConversationId, user.id);
-      
-    } catch (err) {
-      console.error('Error loading conversation messages:', err);
-      toast.error('Nie udało się załadować wiadomości');
-    }
-  };
+    },
+    [markConversationOpened],
+  );
 
   // Handle sending a new message
   const handleSendMessage = async (conversationId: string, content: string) => {
@@ -166,55 +258,33 @@ function MessagesPageContent() {
       [conversationId]: [...(prev[conversationId] || []), optimisticMessage]
     }));
 
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conversationId
+          ? {
+              ...c,
+              lastMessage: optimisticMessage,
+              updatedAt: optimisticMessage.timestamp,
+            }
+          : c,
+      ),
+    );
+
     try {
-      const supabase = createClient();
+      const { messageId, error } = await sendConversationMessageAction(
+        conversationId,
+        content,
+      );
 
-      // First, let's check if the conversation exists and user is a participant
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: conversation, error: convError } = await (supabase as any)
-        .from('conversations')
-        .select('id, participant_1, participant_2')
-        .eq('id', conversationId)
-        .single() as { data: { id: string; participant_1: string; participant_2: string } | null; error: unknown };
-
-      if (convError) {
-        console.error('Conversation check error:', convError);
-        throw new Error('Nie można znaleźć rozmowy');
+      if (error || !messageId) {
+        throw new Error(error ?? 'Nie udało się wysłać wiadomości');
       }
 
-      // Check if user is a participant
-      if (conversation.participant_1 !== user.id && conversation.participant_2 !== user.id) {
-        console.error('User is not a participant in this conversation');
-        throw new Error('Nie masz uprawnień do wysyłania wiadomości w tej rozmowie');
-      }
-
-      // Send message to database
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: sendResult, error } = await (supabase as any)
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content,
-          message_type: 'text'
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('Database error:', error);
-        throw new Error('Nie udało się wysłać wiadomości');
-      }
-
-      // Update message with real ID (replace the optimistic update)
-      setMessages(prev => ({
+      setMessages((prev) => ({
         ...prev,
-        [conversationId]: prev[conversationId].map(msg => 
-          msg.id === tempId ? { 
-            ...msg, 
-            id: sendResult.id
-          } : msg
-        )
+        [conversationId]: prev[conversationId].map((msg) =>
+          msg.id === tempId ? { ...msg, id: messageId } : msg,
+        ),
       }));
 
       toast.success('Wiadomość wysłana');
@@ -278,6 +348,9 @@ function MessagesPageContent() {
         initialConversations={conversations}
         initialMessages={messages}
         onConversationSelect={handleConversationSelect}
+        onRefreshMessages={refreshConversationMessages}
+        onRefresh={handleRefreshPanel}
+        onConversationChange={handleConversationChange}
         onSendMessage={handleSendMessage}
       />
     </div>

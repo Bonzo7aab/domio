@@ -276,7 +276,7 @@ export async function getConversations(userId: string) {
  * Mock fetch function for messages
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mockFetchMessages(conversationId: string): any {
+function mockFetchMessages(conversationId: string, _userId: string): any {
   const messages = mockGetMessagesByConversationId(conversationId);
   return { data: messages, error: null };
 }
@@ -284,13 +284,15 @@ function mockFetchMessages(conversationId: string): any {
 /**
  * Fetch messages for a conversation
  * @param conversationId - Conversation ID
+ * @param userId - Current user ID (for read status)
  * @returns Messages list
  */
-export async function getMessages(conversationId: string) {
+export async function getMessages(conversationId: string, userId: string) {
   return fetchData(
     dbFetchConversationMessages,
     mockFetchMessages,
-    conversationId
+    conversationId,
+    userId,
   );
 }
 

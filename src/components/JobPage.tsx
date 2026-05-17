@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Bookmark, HelpCircle, Image as ImageIcon, FileText, ExternalLink } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Bookmark, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -470,6 +470,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const [managerId, setManagerId] = useState<string | null>(null);
   const hasIncrementedViews = useRef<string | null>(null);
   const isManager = user?.userType === 'manager';
+  const isContractorViewer = user?.userType === 'contractor';
 
   // Fetch job data from database
   useEffect(() => {
@@ -1192,23 +1193,33 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                                 <div className="text-xs text-muted-foreground mt-1">Do negocjacji</div>
                               )}
                             </div>
-                            {job.contactPerson && (
-                              <div>
-                                <div className="text-sm text-muted-foreground">Osoba kontaktowa</div>
-                                <div className="font-medium">{job.contactPerson}</div>
+                            {isContractorViewer ? (
+                              <div className="md:col-span-2">
+                                <p className="text-sm text-muted-foreground">
+                                  Kontakt z zamawiającym wyłącznie przez platformę — numer telefonu i e-mail nie są udostępniane przy zgłoszeniu.
+                                </p>
                               </div>
-                            )}
-                            {job.contactPhone && (
-                              <div>
-                                <div className="text-sm text-muted-foreground">Telefon</div>
-                                <div className="font-medium">{job.contactPhone}</div>
-                              </div>
-                            )}
-                            {job.contactEmail && (
-                              <div>
-                                <div className="text-sm text-muted-foreground">Email</div>
-                                <div className="font-medium">{job.contactEmail}</div>
-                              </div>
+                            ) : (
+                              <>
+                                {job.contactPerson && (
+                                  <div>
+                                    <div className="text-sm text-muted-foreground">Osoba kontaktowa</div>
+                                    <div className="font-medium">{job.contactPerson}</div>
+                                  </div>
+                                )}
+                                {job.contactPhone && (
+                                  <div>
+                                    <div className="text-sm text-muted-foreground">Telefon</div>
+                                    <div className="font-medium">{job.contactPhone}</div>
+                                  </div>
+                                )}
+                                {job.contactEmail && (
+                                  <div>
+                                    <div className="text-sm text-muted-foreground">Email</div>
+                                    <div className="font-medium">{job.contactEmail}</div>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
@@ -1462,8 +1473,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         onClick={() => router.push(`/messages?conversation=${existingConversationId}`)}
                         className="flex items-center gap-2"
                       >
-                        <ExternalLink className="w-4 h-4" />
-                        <span className="truncate">Konwersacja</span>
+                        <MessageCircle className="w-4 h-4" />
+                        <span className="truncate">Wiadomość</span>
                       </Button>
                     ) : (
                       <Button 
@@ -1472,9 +1483,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         className="flex items-center gap-2"
                         disabled={isCheckingConversation}
                       >
-                        <HelpCircle className="w-4 h-4" />
+                        <MessageCircle className="w-4 h-4" />
                         <span className="truncate">
-                          {isCheckingConversation ? 'Sprawdzanie...' : 'Pytanie'}
+                          {isCheckingConversation ? 'Sprawdzanie...' : 'Wiadomość'}
                         </span>
                       </Button>
                     )}

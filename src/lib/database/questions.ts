@@ -226,6 +226,7 @@ export async function submitQuestion(
             senderId: authenticatedUserId,
             content: question.trim(),
             messageType: 'text',
+            skipRecipientNotification: true,
           });
 
           if (messageResult.error) {

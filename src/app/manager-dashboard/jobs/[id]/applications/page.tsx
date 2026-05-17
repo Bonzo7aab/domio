@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "../../../../../lib/supabase/client";
 import { fetchJobById, fetchJobApplicationsByJobId } from "../../../../../lib/database/jobs";
+import { createConversation, findConversationByJob } from "../../../../../lib/database/messaging";
 import { Card, CardContent } from "../../../../../components/ui/card";
 import { Button } from "../../../../../components/ui/button";
 import JobApplicationsList from "../../../../../components/JobApplicationsList";
@@ -24,6 +25,7 @@ export default function JobApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [jobData, setJobData] = useState<SelectedJobData | null>(null);
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -106,9 +108,68 @@ export default function JobApplicationsPage() {
     );
   };
 
-  const handleStartConversation = (_contractorId: string) => {
-    toast.info("Czat będzie dostępny w kolejnej iteracji.");
-  };
+  const handleStartConversation = useCallback(
+    async (contractorId: string, applicationId: string) => {
+      if (!jobId || isStartingChat) return;
+
+      setIsStartingChat(true);
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          toast.error("Zaloguj się, aby wysłać wiadomość.");
+          router.push(`/login?redirectTo=${encodeURIComponent(`/manager-dashboard/jobs/${jobId}/applications`)}`);
+          return;
+        }
+
+        const { data: existingId, error: findError } = await findConversationByJob(
+          supabase,
+          jobId,
+          user.id,
+          contractorId,
+          false,
+        );
+
+        if (findError) {
+          console.error("findConversationByJob:", findError);
+          toast.error("Nie udało się sprawdzić istniejącej rozmowy.");
+          return;
+        }
+
+        let conversationId = existingId;
+
+        if (!conversationId) {
+          const appShort = applicationId.slice(0, 8);
+          const { data: newId, error: createError } = await createConversation(supabase, {
+            participant1: user.id,
+            participant2: contractorId,
+            subject: `Oferta w zgłoszeniu (${appShort})`,
+            jobId,
+            tenderId: null,
+          });
+
+          if (createError || !newId) {
+            console.error("createConversation:", createError);
+            toast.error("Nie udało się utworzyć rozmowy.");
+            return;
+          }
+          conversationId = newId;
+        }
+
+        router.push(`/messages?conversation=${conversationId}`);
+      } catch (e) {
+        console.error("handleStartConversation:", e);
+        toast.error("Wystąpił błąd podczas otwierania wiadomości.");
+      } finally {
+        setIsStartingChat(false);
+      }
+    },
+    [jobId, isStartingChat, router],
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
