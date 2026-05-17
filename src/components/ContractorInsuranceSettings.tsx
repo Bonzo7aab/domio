@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, ExternalLink, FileUp, ShieldCheck, Trash2 } from 'lucide-react';
+import { Calendar, CheckCircle2, ExternalLink, FileUp, ShieldCheck, Trash2 } from 'lucide-react';
+import { classifyOcForUser } from '../lib/contractor-oc-status';
 import { toast } from 'sonner';
 import {
   getContractorAccountSettings,
@@ -165,6 +166,8 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
     }
   };
 
+  const ocStatus = classifyOcForUser(ocValidUntil || null, Boolean(policyPath));
+
   if (isLoading) {
     return (
       <Card>
@@ -176,9 +179,15 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
   return (
     <Card id="oc-policy" className="scroll-mt-24">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheck className="h-4 w-4" />
-          Ubezpieczenie OC
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ShieldCheck className="h-4 w-4 shrink-0" />
+          <span>Ubezpieczenie OC</span>
+          {ocStatus.state === 'valid' && (
+            <CheckCircle2
+              className="h-5 w-5 shrink-0 text-emerald-600"
+              aria-label={`Polisa ważna do ${ocStatus.validUntilLabel}`}
+            />
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

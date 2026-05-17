@@ -26,45 +26,7 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Button } from './ui/button';
 import { Tabs, TabsContent } from './ui/tabs';
 import { cn } from './ui/utils';
-
-type OcState = 'missing' | 'no-date' | 'expired' | 'expiring' | 'valid';
-
-interface OcSnapshot {
-  state: OcState;
-  validUntilLabel: string | null;
-  daysLeft: number | null;
-}
-
-const OC_EXPIRING_THRESHOLD_DAYS = 30;
-
-/**
- * User-facing classification of the contractor's OC policy. We distinguish
- * "no scan" (`missing`) from "scan uploaded but no/invalid validity date"
- * (`no-date`) so the notice doesn't claim "Brak polisy OC" when a file is
- * actually attached.
- */
-function classifyOcForUser(ocValidUntil: string | null, hasOcScan: boolean): OcSnapshot {
-  if (!hasOcScan) {
-    return { state: 'missing', validUntilLabel: null, daysLeft: null };
-  }
-  if (!ocValidUntil) {
-    return { state: 'no-date', validUntilLabel: null, daysLeft: null };
-  }
-  const validUntilMs = Date.parse(ocValidUntil);
-  if (!Number.isFinite(validUntilMs)) {
-    return { state: 'no-date', validUntilLabel: ocValidUntil, daysLeft: null };
-  }
-  const validUntilLabel = new Date(validUntilMs).toLocaleDateString('pl-PL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-  const daysLeft = Math.ceil((validUntilMs - Date.now()) / (24 * 60 * 60 * 1000));
-  if (daysLeft < 0) return { state: 'expired', validUntilLabel, daysLeft };
-  if (daysLeft <= OC_EXPIRING_THRESHOLD_DAYS)
-    return { state: 'expiring', validUntilLabel, daysLeft };
-  return { state: 'valid', validUntilLabel, daysLeft };
-}
+import { classifyOcForUser } from '../lib/contractor-oc-status';
 
 interface OcPolicyNoticeProps {
   ocOnboarding: OcOnboarding;
@@ -81,19 +43,7 @@ function OcPolicyNotice({ ocOnboarding, onAction }: OcPolicyNoticeProps) {
   const oc = classifyOcForUser(ocOnboarding.ocValidUntil, ocOnboarding.hasOcScan);
 
   if (oc.state === 'valid') {
-    return (
-      <div className="mt-3 flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-          <ShieldCheck className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-emerald-700">Polisa OC dołączona</div>
-          <p className="text-xs text-muted-foreground">
-            Polisa ważna do {oc.validUntilLabel} · pozostało {oc.daysLeft} dni.
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (oc.state === 'expiring') {
@@ -507,18 +457,6 @@ export function UserAccountPageClient({
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-              {user.userType === 'contractor' && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => router.push('/contractor-dashboard')}
-                  className="w-full sm:w-auto"
-                >
-                  Panel Wykonawcy
-                </Button>
-              )}
             </div>
           </div>
 

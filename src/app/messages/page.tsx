@@ -155,6 +155,8 @@ function MessagesPageContent() {
   }, [user, conversationId, refreshConversationMessages]);
 
   const openedFromUrlRef = useRef<string | null>(null);
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
 
   // Prevent hydration mismatch by only rendering after mount
   useEffect(() => {
@@ -213,14 +215,22 @@ function MessagesPageContent() {
     openedFromUrlRef.current = null;
   }, [conversationId]);
 
-  // Open thread from URL (notifications, shared links)
+  // Open thread from URL (notifications, shared links).
+  // conversations are read via ref so the dependency array length stays fixed.
   useEffect(() => {
     if (!user?.id || !conversationsLoaded || !conversationId) return;
+    if (!conversationsRef.current.some((c) => c.id === conversationId)) return;
     if (openedFromUrlRef.current === conversationId) return;
 
     openedFromUrlRef.current = conversationId;
     void markConversationOpened(conversationId);
-  }, [user?.id, conversationsLoaded, conversationId, markConversationOpened]);
+  }, [
+    user?.id,
+    conversationsLoaded,
+    conversationId,
+    conversations.length,
+    markConversationOpened,
+  ]);
 
   const handleConversationSelect = useCallback(
     async (selectedConversationId: string) => {

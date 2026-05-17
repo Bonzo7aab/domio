@@ -511,7 +511,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
           currency: string;
           deadline: string;
-          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed' | 'inactive';
+          status: string;
           job_categories: { name: string } | null;
           location: string | { city?: string };
         }) => {
@@ -657,7 +657,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           budget_type: 'fixed' | 'hourly' | 'negotiable' | 'range';
           currency: string;
           deadline: string;
-          status: 'active' | 'paused' | 'cancelled' | 'draft' | 'completed' | 'inactive';
+          status: string;
           job_categories: { name: string } | null;
           location: string | { city?: string };
         }) => {
@@ -1491,7 +1491,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
                             </p>
                           </div>
                           <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                            <Button variant="outline" size="sm" className="w-full sm:w-auto">Wyślij wiadomość</Button>
+                            <Button variant="outline" size="sm" className="w-full sm:w-auto">Wiadomość</Button>
                             <Button 
                               variant="outline" 
                               size="sm"

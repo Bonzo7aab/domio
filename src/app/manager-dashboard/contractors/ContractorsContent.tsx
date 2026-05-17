@@ -55,7 +55,7 @@ export function ContractorsContent({ contractors }: ContractorsContentProps) {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">Wyślij wiadomość</Button>
+                    <Button variant="outline" size="sm">Wiadomość</Button>
                     <Button 
                       variant="outline" 
                       size="sm"
