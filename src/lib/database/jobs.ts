@@ -4,6 +4,14 @@ import type { Application } from '../../types/application';
 import type { Budget, BudgetInput } from '../../types/budget';
 import { budgetFromDatabase, budgetToDatabase, formatBudget } from '../../types/budget';
 import { fetchAllCategoriesWithSubcategories } from './categories';
+import { JOB_WORKFLOW_STATUSES } from '../job-workflow-status';
+
+/** Job statuses visible on the public map/listing (accepting or reviewing offers). */
+export const PUBLIC_LISTING_JOB_STATUSES = [
+  'active',
+  'collecting_offers',
+  'selecting_offer',
+] as const;
 
 export interface JobFilters {
   categories?: string[];
@@ -291,10 +299,14 @@ export async function updateManagerJob(
     }
 
     const status = existing.status as string;
-    if (status !== 'draft' && status !== 'active') {
+    const editableStatus =
+      status === 'active' ? 'collecting_offers' : status;
+    if (editableStatus !== 'draft' && editableStatus !== 'collecting_offers') {
       return {
         data: null,
-        error: new Error('Edycja jest możliwa tylko dla zgłoszeń ze statusem szkic lub aktywne') as PostgrestError,
+        error: new Error(
+          'Edycja jest możliwa tylko dla zgłoszeń ze statusem szkic lub zbieranie ofert',
+        ) as PostgrestError,
       };
     }
 
@@ -414,6 +426,66 @@ export async function updateManagerJob(
   }
 }
 
+export async function updateManagerJobWorkflowStatus(
+  supabase: SupabaseClient<Database>,
+  params: {
+    jobId: string;
+    managerId: string;
+    companyId: string;
+    status: string;
+  },
+): Promise<{ error: PostgrestError | null }> {
+  const allowed = new Set<string>([...JOB_WORKFLOW_STATUSES, 'draft']);
+
+  if (!allowed.has(params.status)) {
+    return {
+      error: new Error('Nieprawidłowy status zgłoszenia') as PostgrestError,
+    };
+  }
+
+  try {
+    const jobId = params.jobId.trim();
+    const { data: existing, error: fetchErr } = await supabase
+      .from('jobs')
+      .select('id, manager_id, company_id, status, published_at')
+      .eq('id', jobId)
+      .maybeSingle();
+
+    if (fetchErr || !existing) {
+      return { error: fetchErr || (new Error('Nie znaleziono zgłoszenia') as PostgrestError) };
+    }
+
+    if (existing.manager_id !== params.managerId) {
+      return { error: new Error('Brak uprawnień') as PostgrestError };
+    }
+
+    if (existing.company_id !== params.companyId) {
+      return { error: new Error('Zgłoszenie nie należy do tej firmy') as PostgrestError };
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      status: params.status,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (params.status !== 'draft' && existing.status === 'draft' && !existing.published_at) {
+      updatePayload.published_at = new Date().toISOString();
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase as any)
+      .from('jobs')
+      .update(updatePayload)
+      .eq('id', jobId)
+      .eq('manager_id', params.managerId);
+
+    return { error: updateError };
+  } catch (err) {
+    console.error('Error in updateManagerJobWorkflowStatus:', err);
+    return { error: err as PostgrestError };
+  }
+}
+
 // Helper types for tables not yet in Database type
 interface JobApplicationRow {
   id: string;
@@ -513,8 +585,16 @@ export async function fetchJobs(
           slug
         )
       `)
-      .eq('status', (filters.status || 'active') as 'active' | 'paused' | 'cancelled' | 'draft' | 'completed')
       .eq('is_public', true);
+
+    if (!filters.status || filters.status === 'all' || filters.status === 'active') {
+      query = query.in('status', [...PUBLIC_LISTING_JOB_STATUSES]);
+    } else {
+      query = query.eq(
+        'status',
+        filters.status as Database['public']['Tables']['jobs']['Row']['status'],
+      );
+    }
 
     // Apply category and subcategory filters
     // Jobs have category_id = main category, subcategory_id = subcategory (FK to job_categories)
@@ -740,7 +820,10 @@ export async function fetchTenders(
     // Only filter by status if explicitly set and not 'all'
     // If managerId is provided, RLS policies will allow them to see their own tenders regardless of status
     if (filters.status && filters.status !== 'all') {
-      query = query.eq('status', filters.status);
+      query = query.eq(
+        'status',
+        filters.status as Database['public']['Tables']['jobs']['Row']['status'],
+      );
     }
     // If no status filter and no managerId, default to active (public view)
     else if (!filters.status && !managerId) {
@@ -1949,7 +2032,7 @@ export async function createJob(
     projectDuration?: string;
     deadline?: Date | string;
     urgency?: 'low' | 'medium' | 'high';
-    status?: 'draft' | 'active';
+    status?: Database['public']['Tables']['jobs']['Row']['status'];
     type?: 'regular' | 'urgent' | 'premium';
     isPublic?: boolean;
     contactPerson?: string;
@@ -2063,7 +2146,7 @@ export async function createJob(
       project_duration: jobData.projectDuration || null,
       deadline: deadlineDate,
       urgency: jobData.urgency || 'medium',
-      status: jobData.status || 'active',
+      status: jobData.status || 'collecting_offers',
       type: jobData.type || 'regular',
       is_public: jobData.isPublic !== undefined ? jobData.isPublic : true,
       contact_person: jobData.contactPerson || null,
@@ -2077,7 +2160,10 @@ export async function createJob(
       responsibilities: jobData.responsibilities || null,
       skills_required: jobData.skillsRequired || null,
       images: jobData.images || null,
-      published_at: jobData.status === 'active' ? new Date().toISOString() : null,
+      published_at:
+        jobData.status && jobData.status !== 'draft'
+          ? new Date().toISOString()
+          : null,
     };
 
     console.log('Inserting job with data:', {

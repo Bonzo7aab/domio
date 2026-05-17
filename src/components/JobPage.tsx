@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Bookmark, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
@@ -28,6 +29,8 @@ import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { findConversationByJob } from '../lib/database/messaging';
 import { formatBudget, budgetFromDatabase, type Budget } from '../types/budget';
 import { type Job, type TenderInfo } from '../types/job';
+import { ManagerJobStatusSelect } from './manager-dashboard/ManagerJobStatusSelect';
+import { canManagerEditJobFields, getJobWorkflowStatusLabel } from '../lib/job-workflow-status';
 
 interface JobPageProps {
   jobId: string;
@@ -95,20 +98,8 @@ function getStatusBadgeVariant(status?: string) {
 
 // Get status label in Polish
 function getStatusLabel(status?: string): string {
-  switch (status) {
-    case 'active':
-      return 'Aktywne';
-    case 'draft':
-      return 'Szkic';
-    case 'paused':
-      return 'Wstrzymane';
-    case 'completed':
-      return 'Zakończone';
-    case 'cancelled':
-      return 'Anulowane';
-    default:
-      return 'Aktywne';
-  }
+  if (!status) return 'Zbieranie ofert';
+  return getJobWorkflowStatusLabel(status);
 }
 
 /**
@@ -471,6 +462,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const hasIncrementedViews = useRef<string | null>(null);
   const isManager = user?.userType === 'manager';
   const isContractorViewer = user?.userType === 'contractor';
+  const isJobOwner =
+    isManager && Boolean(user?.id && managerId && user.id === managerId && jobData?.postType === 'job');
+  const canManagerEditThisJob =
+    isJobOwner &&
+    Boolean(jobData?.status && canManagerEditJobFields(jobData.status)) &&
+    (jobData?.applications ?? 0) === 0;
 
   // Fetch job data from database
   useEffect(() => {
@@ -1428,6 +1425,47 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
+
+            {/* Manager: workflow status + edit */}
+            {isJobOwner && job && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Zarządzanie zgłoszeniem</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Status workflow</p>
+                    <ManagerJobStatusSelect
+                      jobId={job.id}
+                      status={job.status || 'collecting_offers'}
+                      className="w-full"
+                      onUpdated={(next) => {
+                        setJobData((prev) => (prev ? { ...prev, status: next as JobDisplayData['status'] } : prev));
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {canManagerEditThisJob && (
+                      <Button asChild className="w-full">
+                        <Link href={`/manager-dashboard/zgloszenia/edytuj/${job.id}`}>
+                          Edytuj zgłoszenie
+                        </Link>
+                      </Button>
+                    )}
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href="/manager-dashboard/zgloszenia">Moje zgłoszenia</Link>
+                    </Button>
+                    {(job.applications ?? 0) > 0 && (
+                      <Button asChild variant="secondary" className="w-full">
+                        <Link href={`/manager-dashboard/zgloszenia/porownaj/${job.id}?typ=zgłoszenie`}>
+                          Porównaj oferty
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Action Buttons — contractor actions only */}
             {!isManager && (

@@ -185,7 +185,6 @@ function HomePageContent() {
       
       // Fetch all jobs within bounds (with reasonable maximum to prevent overload)
       const dbFilters: DBJobFilters = {
-        status: 'active',
         limit: 500, // Reasonable maximum to prevent performance issues
         offset: 0,
         ...(bounds && { bounds }),

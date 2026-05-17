@@ -1,5 +1,6 @@
 import { createClient } from '../../../lib/supabase/client';
 import type { CompanyData } from '../../../lib/database/companies';
+import { getJobWorkflowStatusLabel } from '../../../lib/job-workflow-status';
 
 /**
  * Map company type to Polish display name
@@ -53,12 +54,26 @@ export function getBuildingImageUrl(imagePath: string | null | undefined): strin
  * Get status badge configuration
  */
 export function getStatusBadgeConfig(status: string) {
-  const statusConfig = {
-    active: { label: 'Aktywne', variant: 'default' as const, color: 'bg-blue-100 text-blue-800' },
-    completed: { label: 'Zakończone', variant: 'secondary' as const, color: 'bg-green-100 text-green-800' },
-    pending: { label: 'Oczekujące', variant: 'outline' as const, color: 'bg-yellow-100 text-yellow-800' },
-    cancelled: { label: 'Anulowane', variant: 'outline' as const, color: 'bg-gray-100 text-gray-800' }
+  const label = getJobWorkflowStatusLabel(status);
+  const colorByStatus: Record<string, string> = {
+    draft: 'bg-slate-100 text-slate-800',
+    collecting_offers: 'bg-blue-100 text-blue-800',
+    active: 'bg-blue-100 text-blue-800',
+    selecting_offer: 'bg-amber-100 text-amber-900',
+    in_progress: 'bg-violet-100 text-violet-900',
+    ready_for_acceptance: 'bg-orange-100 text-orange-900',
+    completed: 'bg-green-100 text-green-800',
+    paused: 'bg-yellow-100 text-yellow-800',
+    cancelled: 'bg-gray-100 text-gray-800',
+    inactive: 'bg-gray-100 text-gray-600',
   };
-  
-  return statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+
+  const normalized =
+    status === 'active' ? 'collecting_offers' : status;
+
+  return {
+    label,
+    variant: 'default' as const,
+    color: colorByStatus[normalized] || colorByStatus[status] || 'bg-yellow-100 text-yellow-800',
+  };
 }

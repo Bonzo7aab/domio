@@ -394,7 +394,17 @@ export interface Database {
           project_duration: string | null
           deadline: string | null
           urgency: 'low' | 'medium' | 'high'
-          status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled' | 'inactive'
+          status:
+            | 'draft'
+            | 'collecting_offers'
+            | 'selecting_offer'
+            | 'in_progress'
+            | 'ready_for_acceptance'
+            | 'active'
+            | 'paused'
+            | 'completed'
+            | 'cancelled'
+            | 'inactive'
           type: 'regular' | 'urgent' | 'premium'
           is_public: boolean
           contact_person: string | null
@@ -437,7 +447,16 @@ export interface Database {
           project_duration?: string | null
           deadline?: string | null
           urgency?: 'low' | 'medium' | 'high'
-          status?: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled'
+          status?:
+            | 'draft'
+            | 'collecting_offers'
+            | 'selecting_offer'
+            | 'in_progress'
+            | 'ready_for_acceptance'
+            | 'active'
+            | 'paused'
+            | 'completed'
+            | 'cancelled'
           type?: 'regular' | 'urgent' | 'premium'
           is_public?: boolean
           contact_person?: string | null
@@ -480,7 +499,17 @@ export interface Database {
           project_duration?: string | null
           deadline?: string | null
           urgency?: 'low' | 'medium' | 'high'
-          status?: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled'
+          status?:
+            | 'draft'
+            | 'collecting_offers'
+            | 'selecting_offer'
+            | 'in_progress'
+            | 'ready_for_acceptance'
+            | 'active'
+            | 'paused'
+            | 'completed'
+            | 'cancelled'
+            | 'inactive'
           type?: 'regular' | 'urgent' | 'premium'
           is_public?: boolean
           contact_person?: string | null

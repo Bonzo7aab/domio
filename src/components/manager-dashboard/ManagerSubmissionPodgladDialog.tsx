@@ -8,7 +8,7 @@ import { fetchJobById, fetchTenderById } from '../../lib/database/jobs';
 import type { JobWithCompany, TenderWithCompany } from '../../lib/database/jobs';
 import { getSubmissionStatusLabel, type ManagerSubmissionKind } from '../../lib/database/manager-submissions';
 import { budgetFromDatabase, formatBudget } from '../../types/budget';
-import { getStatusBadgeConfig } from './shared/utils';
+import { ManagerJobStatusSelect } from './ManagerJobStatusSelect';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import {
@@ -28,12 +28,14 @@ interface ManagerSubmissionPodgladDialogProps {
   target: ManagerSubmissionPodgladTarget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onJobStatusUpdated?: (status: string) => void;
 }
 
 export function ManagerSubmissionPodgladDialog({
   target,
   open,
   onOpenChange,
+  onJobStatusUpdated,
 }: ManagerSubmissionPodgladDialogProps): ReactElement {
   const [loading, setLoading] = useState(false);
   const [job, setJob] = useState<JobWithCompany | null>(null);
@@ -106,10 +108,16 @@ export function ManagerSubmissionPodgladDialog({
           <div className="space-y-4 text-sm">
             <div>
               <h2 className="text-2xl font-bold pr-8">{job.title}</h2>
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Badge className={getStatusBadgeConfig(job.status).color}>
-                  {getStatusBadgeConfig(job.status).label}
-                </Badge>
+              <div className="flex flex-wrap items-center gap-3 mt-2">
+                <ManagerJobStatusSelect
+                  jobId={job.id}
+                  status={job.status}
+                  className="w-[220px]"
+                  onUpdated={(next) => {
+                    setJob((prev) => (prev ? { ...prev, status: next } : prev));
+                    onJobStatusUpdated?.(next);
+                  }}
+                />
                 <span className="text-muted-foreground">{job.category?.name || 'Inne'}</span>
               </div>
             </div>

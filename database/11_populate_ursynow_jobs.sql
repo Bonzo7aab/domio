@@ -157,7 +157,7 @@ BEGIN
         '12 miesięcy - umowa serwisowa',
         CURRENT_DATE + INTERVAL '21 days',
         'medium',
-        'active',
+        'collecting_offers',
         'premium',
         true,
         'Jan Kowalski',
@@ -195,7 +195,7 @@ BEGIN
         '3 miesiące - 3 zabiegi',
         CURRENT_DATE + INTERVAL '14 days',
         'high',
-        'active',
+        'collecting_offers',
         'urgent',
         true,
         'Anna Nowak',
@@ -233,7 +233,7 @@ BEGIN
         '2 miesiące',
         CURRENT_DATE + INTERVAL '60 days',
         'medium',
-        'active',
+        'collecting_offers',
         'premium',
         true,
         'Piotr Wiśniewski',
@@ -271,7 +271,7 @@ BEGIN
         'Umowa stała',
         CURRENT_DATE + INTERVAL '14 days',
         'medium',
-        'active',
+        'collecting_offers',
         'regular',
         true,
         'Maria Kowalska',
@@ -309,7 +309,7 @@ BEGIN
         '3 miesiące',
         CURRENT_DATE + INTERVAL '90 days',
         'high',
-        'active',
+        'collecting_offers',
         'urgent',
         true,
         'Adam Nowak',
@@ -347,7 +347,7 @@ BEGIN
         'Sezonowo - kwiecień do październik',
         CURRENT_DATE + INTERVAL '30 days',
         'medium',
-        'active',
+        'collecting_offers',
         'regular',
         true,
         'Ewa Zielińska',
@@ -382,5 +382,5 @@ SELECT
     status,
     applications_count
 FROM jobs
-WHERE status = 'active'
+WHERE status IN ('collecting_offers', 'selecting_offer', 'in_progress', 'active')
 ORDER BY created_at DESC;

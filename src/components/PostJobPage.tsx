@@ -166,8 +166,10 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
         return;
       }
       const st = (job.status || "").toLowerCase();
-      if (st !== "draft" && st !== "active") {
-        toast.error("Edycja jest dostępna tylko dla zgłoszeń aktywnych lub w szkicu");
+      if (st !== "draft" && st !== "active" && st !== "collecting_offers") {
+        toast.error(
+          "Edycja jest dostępna tylko dla zgłoszeń w szkicu lub zbierających oferty",
+        );
         setLoadingJob(false);
         onBack();
         return;
@@ -417,7 +419,7 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
           currency: budgetInput.currency || "PLN",
           deadline,
           urgency,
-          status: "active",
+          status: "collecting_offers",
           type,
           isPublic: true,
           additionalInfo: formData.additionalInfo.trim() || undefined,

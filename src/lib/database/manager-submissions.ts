@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
+import { getJobWorkflowStatusLabel } from '../job-workflow-status';
 
 export type ManagerSubmissionKind = 'job' | 'tender';
 
@@ -18,15 +19,7 @@ export interface ManagerSubmission {
 }
 
 function jobStatusLabel(status: string): string {
-  const map: Record<string, string> = {
-    draft: 'Szkic',
-    active: 'Aktywne',
-    paused: 'Wstrzymane',
-    completed: 'Zakończone',
-    cancelled: 'Anulowane',
-    inactive: 'Nieaktywne',
-  };
-  return map[status] || status;
+  return getJobWorkflowStatusLabel(status);
 }
 
 function tenderStatusLabel(status: string): string {
@@ -135,7 +128,9 @@ export async function fetchManagerSubmissions(
     lastOfferAt: jobLastOfferAt[j.id] ?? null,
     createdAt: j.created_at,
     canEdit:
-      (j.status === 'draft' || j.status === 'active') &&
+      (j.status === 'draft' ||
+        j.status === 'active' ||
+        j.status === 'collecting_offers') &&
       (jobOfferCounts[j.id]?.total ?? 0) === 0,
   }));
 
