@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createTestUser, deleteTestUser, loginViaUI, clearAuthState } from '../helpers/auth-helpers';
+import { createTestUser, deleteTestUser, loginViaUI, clearAuthState, getAuthState } from '../helpers/auth-helpers';
 import { ROUTES } from '../config/constants';
 
 test.describe('Logout', () => {
