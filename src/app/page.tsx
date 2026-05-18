@@ -335,6 +335,8 @@ function HomePageContent() {
   // Listen for application modal open event from map drawer
   useEffect(() => {
     const handleOpenApplicationModal = (event: CustomEvent<{ jobId: string }>) => {
+      if (!user) return;
+
       const jobId = event.detail.jobId;
       setSelectedApplicationJobId(jobId);
       const job = jobs.find(j => j.id === jobId);
@@ -349,7 +351,7 @@ function HomePageContent() {
     return () => {
       window.removeEventListener('openApplicationModal', handleOpenApplicationModal as EventListener);
     };
-  }, [jobs]);
+  }, [jobs, user]);
 
   const handleCitySelectorClose = () => {
     setShowCitySelector(false);
@@ -357,13 +359,9 @@ function HomePageContent() {
 
   // Application modal handlers
   const handleApplyClick = (jobId: string, jobData?: Job) => {
-    if (!user) {
-      toast.error('Musisz się zalogować, aby składać oferty');
-      router.push('/login');
-      return;
-    }
-    
-    if (user?.userType !== 'contractor') {
+    if (!user) return;
+
+    if (user.userType !== 'contractor') {
       toast.error('Tylko wykonawcy mogą składać oferty');
       return;
     }

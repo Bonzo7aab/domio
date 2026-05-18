@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
 import { useUserProfile } from '../contexts/AuthContext';
 import type { Job } from '../types/job';
+import { AuthPromptPopover, AUTH_PROMPT_APPLY_OFFER } from './AuthPromptPopover';
 
 interface JobCardProps {
   job: Partial<Job> & {
@@ -39,6 +40,45 @@ function formatNumberWithSpaces(num: number): string {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
+interface ApplyOfferButtonProps {
+  className?: string;
+  isLoggedIn: boolean;
+  onApply: (e: React.MouseEvent) => void;
+}
+
+function ApplyOfferButton({ className, isLoggedIn, onApply }: ApplyOfferButtonProps) {
+  if (!isLoggedIn) {
+    return (
+      <div
+        className="w-full md:w-auto"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <AuthPromptPopover
+          title={AUTH_PROMPT_APPLY_OFFER.title}
+          description={AUTH_PROMPT_APPLY_OFFER.description}
+          align="center"
+        >
+          <Button
+            type="button"
+            className={className}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            Złóż ofertę
+          </Button>
+        </AuthPromptPopover>
+      </div>
+    );
+  }
+
+  return (
+    <Button type="button" className={className} onClick={onApply}>
+      Złóż ofertę
+    </Button>
+  );
+}
+
 const JobCard = React.memo(function JobCard({ 
   job, 
   onClick, 
@@ -52,6 +92,7 @@ const JobCard = React.memo(function JobCard({
 }: JobCardProps) {
   const { user } = useUserProfile();
   const isManager = user?.userType === 'manager';
+  const isLoggedIn = Boolean(user);
 
   const handleBookmarkClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -218,12 +259,11 @@ const JobCard = React.memo(function JobCard({
                   )}
                 </div>
                 {!isManager && (
-                  <Button 
-                    onClick={handleApplyClick}
+                  <ApplyOfferButton
                     className="w-full sm:w-auto"
-                  >
-                    Złóż ofertę
-                  </Button>
+                    isLoggedIn={isLoggedIn}
+                    onApply={handleApplyClick}
+                  />
                 )}
               </div>
             </div>
@@ -522,12 +562,11 @@ const JobCard = React.memo(function JobCard({
               {/* Apply button at bottom */}
               {!isManager && (
                 <div className="flex md:flex-wrap md:content-end">
-                  <Button
+                  <ApplyOfferButton
                     className="bg-blue-800 hover:bg-blue-900 text-white w-full md:w-auto"
-                    onClick={handleApplyClick}
-                  >
-                    Złóż ofertę
-                  </Button>
+                    isLoggedIn={isLoggedIn}
+                    onApply={handleApplyClick}
+                  />
                 </div>
               )}
             </div>

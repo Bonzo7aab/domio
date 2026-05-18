@@ -20,6 +20,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from './ui/drawer';
+import { AuthPromptPopover, AUTH_PROMPT_MESSAGES } from './AuthPromptPopover';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import type { AuthUser } from '../types/auth';
 import { useNavigationWithLoading } from '../hooks/useNavigationWithLoading';
@@ -218,9 +219,9 @@ export function Header({ initialUser }: HeaderProps) {
               )}
             </div>
 
-          {/* 3. Right Side Actions - Messages (logged in), notifications, user */}
+          {/* 3. Right Side Actions - Messages (always visible), notifications, user */}
           <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-            {userIsAuthenticated && (
+            {userIsAuthenticated ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -231,6 +232,21 @@ export function Header({ initialUser }: HeaderProps) {
               >
                 <MessageCircle className="h-5 w-5" />
               </Button>
+            ) : (
+              <AuthPromptPopover
+                title={AUTH_PROMPT_MESSAGES.title}
+                description={AUTH_PROMPT_MESSAGES.description}
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                  aria-label="Wiadomości"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                </Button>
+              </AuthPromptPopover>
             )}
             {/* Unified Notifications - only visible for authenticated users */}
             {userIsAuthenticated && (

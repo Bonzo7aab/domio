@@ -12,6 +12,8 @@ import {
   DrawerTitle,
 } from './ui/drawer';
 import { useIsMobile } from './ui/use-mobile';
+import { useUserProfile } from '../contexts/AuthContext';
+import { AuthPromptPopover, AUTH_PROMPT_APPLY_OFFER } from './AuthPromptPopover';
 
 interface GoogleMapProps {
   markers?: MapMarker[];
@@ -204,6 +206,7 @@ const MapComponent: React.FC<{
   isMapExpanded?: boolean;
   isSmallMap?: boolean;
 }> = ({ markers, center, zoom, onMapClick, onMarkerClick: _onMarkerClick, onBoundsChanged, isMapExpanded = false, isSmallMap = false }) => {
+  const { user } = useUserProfile();
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map>();
   const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
@@ -767,22 +770,39 @@ const MapComponent: React.FC<{
                 >
                   Zamknij
                 </button>
-                <button
-                  onClick={() => {
-                    if (selectedJobForMobile) {
-                      // Dispatch custom event to open application modal
-                      window.dispatchEvent(new CustomEvent('openApplicationModal', {
-                        detail: { jobId: selectedJobForMobile.id }
-                      }));
-                      // Close the drawer
-                      setSelectedJobForMobile(null);
-                    }
-                  }}
-                  className="flex-1 py-4 px-6 bg-primary text-primary-foreground rounded-lg font-semibold text-base hover:bg-primary/90 transition-colors"
-                  aria-label="Złóż ofertę"
-                >
-                  Złóż ofertę
-                </button>
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedJobForMobile) {
+                        window.dispatchEvent(
+                          new CustomEvent('openApplicationModal', {
+                            detail: { jobId: selectedJobForMobile.id },
+                          }),
+                        );
+                        setSelectedJobForMobile(null);
+                      }
+                    }}
+                    className="flex-1 py-4 px-6 bg-primary text-primary-foreground rounded-lg font-semibold text-base hover:bg-primary/90 transition-colors"
+                    aria-label="Złóż ofertę"
+                  >
+                    Złóż ofertę
+                  </button>
+                ) : (
+                  <AuthPromptPopover
+                    title={AUTH_PROMPT_APPLY_OFFER.title}
+                    description={AUTH_PROMPT_APPLY_OFFER.description}
+                    align="center"
+                  >
+                    <button
+                      type="button"
+                      className="flex-1 py-4 px-6 bg-primary text-primary-foreground rounded-lg font-semibold text-base hover:bg-primary/90 transition-colors"
+                      aria-label="Złóż ofertę"
+                    >
+                      Złóż ofertę
+                    </button>
+                  </AuthPromptPopover>
+                )}
               </div>
             </div>
           </DrawerContent>
