@@ -3,6 +3,8 @@
 import { createClient } from '../supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { getRegistrationSettingsForRegister } from '../database/platform-settings'
+import { registrationClosedMessage } from '../registration-settings-shared'
 
 export interface LoginData {
   email: string
@@ -108,11 +110,17 @@ export async function loginAction(
   return { success: true, redirectTo }
 }
 
+export type RegisterActionResult =
+  | { success: true; redirectTo: string }
+  | { error: string }
+
 /**
  * Server Action for user registration
  * Creates auth user, user_profiles, companies, and user_companies.
  */
-export async function registerAction(formData: FormData) {
+export async function registerAction(
+  formData: FormData
+): Promise<RegisterActionResult | void> {
   const supabase = await createClient()
 
   const email = (formData.get('email') as string)?.trim()
@@ -163,6 +171,14 @@ export async function registerAction(formData: FormData) {
 
   if (password !== confirmPassword) {
     redirect(`/register?error=${encodeURIComponent('Hasła nie są identyczne')}`)
+  }
+
+  const registrationSettings = await getRegistrationSettingsForRegister()
+  if (userType === 'contractor' && !registrationSettings.contractorOpen) {
+    redirect(`/register?error=${encodeURIComponent(registrationClosedMessage('contractor'))}`)
+  }
+  if (userType === 'manager' && !registrationSettings.managerOpen) {
+    redirect(`/register?error=${encodeURIComponent(registrationClosedMessage('manager'))}`)
   }
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -267,10 +283,21 @@ export async function registerAction(formData: FormData) {
 
   revalidatePath('/', 'layout')
 
+  const successMessage = encodeURIComponent(
+    'Konto zostało utworzone pomyślnie. Zostałeś automatycznie zalogowany.'
+  )
+
   if (authData.session) {
-    redirect(`/?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Zostałeś automatycznie zalogowany.')}`)
+    const redirectTo =
+      userType === 'contractor'
+        ? `/verification?message=${successMessage}`
+        : `/account?message=${successMessage}`
+    return { success: true, redirectTo }
   }
-  redirect(`/login?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')}`)
+
+  redirect(
+    `/login?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')}`
+  )
 }
 
 /**

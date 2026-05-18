@@ -1,7 +1,18 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Search, User, MessageCircle, GraduationCap, Play, Bookmark, LogOut, ClipboardList } from 'lucide-react';
+import {
+  Search,
+  User,
+  MessageCircle,
+  GraduationCap,
+  Play,
+  Bookmark,
+  LogOut,
+  ClipboardList,
+  ChevronDown,
+} from 'lucide-react';
+import { VerificationAttentionIcon } from './VerificationAttentionIcon';
 import { Button } from './ui/button';
 import { UnifiedNotifications } from './UnifiedNotifications';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -24,6 +35,10 @@ import { AuthPromptPopover, AUTH_PROMPT_MESSAGES } from './AuthPromptPopover';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import type { AuthUser } from '../types/auth';
 import { useNavigationWithLoading } from '../hooks/useNavigationWithLoading';
+import {
+  needsVerificationAttention,
+  verificationMenuLabel,
+} from '../lib/verification/needs-verification-attention';
 
 interface HeaderProps {
   initialUser?: AuthUser | null;
@@ -42,10 +57,11 @@ export function Header({ initialUser }: HeaderProps) {
     }, 0);
   }, []);
   
-  // Authentication state: use context (which is immediately true when session exists)
-  // Only use after mount to prevent hydration mismatch
-  const userIsAuthenticated = isMounted ? contextIsAuthenticated : false
-  
+  // Authentication state: use context when mounted; before mount, trust server initialUser
+  const userIsAuthenticated = isMounted
+    ? contextIsAuthenticated
+    : !!(initialUser || contextIsAuthenticated)
+
   // Determine current user for display:
   // Priority: contextUser > initialUser > temporary user from session
   // This ensures we show user info immediately after login, even if profile is still loading
@@ -57,7 +73,9 @@ export function Header({ initialUser }: HeaderProps) {
       lastName: session.user.user_metadata?.last_name || '',
       userType: session.user.user_metadata?.user_type || 'contractor',
     } as AuthUser : null)
-  
+
+  const showVerificationAttention = needsVerificationAttention(currentUser)
+
   // Enhanced logout that redirects to login
   // We don't call router.refresh() to avoid race condition where server might still see session cookie
   // The context state update will handle the UI update, then we redirect
@@ -98,11 +116,15 @@ export function Header({ initialUser }: HeaderProps) {
 
 
   const handleLoginClick = () => {
-    router.push('/user-type-selection')
+    router.push('/login')
   }
 
   const handleRegisterClick = () => {
     router.push('/register')
+  }
+
+  const handleVerificationClick = () => {
+    router.push('/verification')
   }
 
   const handleAccountClick = () => {
@@ -138,6 +160,24 @@ export function Header({ initialUser }: HeaderProps) {
     router.push('/profile-completion')
   }
 
+  const renderAvatarTrigger = (className?: string) => (
+    <Button
+      variant="ghost"
+      className={`relative h-8 w-8 rounded-full bg-gray-200 hover:bg-gray-300 ${className ?? ''}`}
+    >
+      <Avatar className="h-8 w-8">
+        <AvatarFallback className="bg-primary text-primary-foreground">
+          {currentUser?.firstName?.[0]}
+          {currentUser?.lastName?.[0]}
+        </AvatarFallback>
+      </Avatar>
+      {showVerificationAttention && (
+        <span className="absolute -top-1 -right-1" aria-label="Wymagana weryfikacja">
+          <VerificationAttentionIcon className="h-4 w-4 fill-amber-50" />
+        </span>
+      )}
+    </Button>
+  )
 
   const handleHomeClick = () => {
     router.push('/')
@@ -265,7 +305,7 @@ export function Header({ initialUser }: HeaderProps) {
             )}
             
             {/* User Actions */}
-            {!isMounted || isLoading ? (
+            {((isMounted && isLoading && !currentUser) || (!isMounted && !initialUser)) ? (
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse"></div>
                 <span className="text-sm text-gray-500">Ładowanie...</span>
@@ -275,21 +315,18 @@ export function Header({ initialUser }: HeaderProps) {
                 {/* Mobile: Drawer */}
                 <div className="md:hidden">
                   <Drawer>
-                    <DrawerTrigger asChild>
-                      <Button variant="ghost" className="relative h-8 w-8 rounded-full bg-gray-200 hover:bg-gray-300">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary text-primary-foreground">
-                            {currentUser?.firstName?.[0]}{currentUser?.lastName?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Button>
-                    </DrawerTrigger>
+                    <DrawerTrigger asChild>{renderAvatarTrigger()}</DrawerTrigger>
                   <DrawerContent>
                     <DrawerHeader className="border-b">
                       <DrawerTitle>
                         <div className="flex flex-col space-y-1">
-                          <p className="text-sm font-medium leading-none">
-                            {currentUser?.firstName} {currentUser?.lastName}
+                          <p className="text-sm font-medium leading-none flex items-center gap-1.5">
+                            <span>
+                              {currentUser?.firstName} {currentUser?.lastName}
+                            </span>
+                            {showVerificationAttention && (
+                              <VerificationAttentionIcon className="h-4 w-4 shrink-0" />
+                            )}
                           </p>
                           {currentUser?.userType !== 'manager' && (
                             <p className="text-xs leading-none text-muted-foreground">
@@ -333,6 +370,16 @@ export function Header({ initialUser }: HeaderProps) {
                               <User className="mr-2 h-4 w-4" />
                               <span>Konto</span>
                             </Button>
+                            {showVerificationAttention && (
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start text-amber-700"
+                                onClick={handleVerificationClick}
+                              >
+                                <VerificationAttentionIcon className="mr-2 h-4 w-4" />
+                                <span>{verificationMenuLabel(currentUser)}</span>
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               className="w-full justify-start"
@@ -448,15 +495,7 @@ export function Header({ initialUser }: HeaderProps) {
                 {/* Desktop: DropdownMenu */}
                 <div className="hidden md:block">
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="relative h-8 w-8 rounded-full bg-gray-200 hover:bg-gray-300">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary text-primary-foreground">
-                            {currentUser?.firstName?.[0]}{currentUser?.lastName?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Button>
-                    </DropdownMenuTrigger>
+                    <DropdownMenuTrigger asChild>{renderAvatarTrigger()}</DropdownMenuTrigger>
                     <DropdownMenuContent 
                       className="w-56 border border-gray-200 shadow-lg" 
                       align="end" 
@@ -465,8 +504,13 @@ export function Header({ initialUser }: HeaderProps) {
                     >
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {currentUser?.firstName} {currentUser?.lastName}
+                        <p className="text-sm font-medium leading-none flex items-center gap-1.5">
+                          <span>
+                            {currentUser?.firstName} {currentUser?.lastName}
+                          </span>
+                          {showVerificationAttention && (
+                            <VerificationAttentionIcon className="h-4 w-4 shrink-0" />
+                          )}
                         </p>
                         {currentUser?.userType !== 'manager' && (
                           <p className="text-xs leading-none text-muted-foreground">
@@ -497,6 +541,12 @@ export function Header({ initialUser }: HeaderProps) {
                           <User className="mr-2 h-4 w-4" />
                           <span>Konto</span>
                         </DropdownMenuItem>
+                        {showVerificationAttention && (
+                          <DropdownMenuItem onClick={handleVerificationClick}>
+                            <VerificationAttentionIcon className="mr-2 h-4 w-4" />
+                            <span>{verificationMenuLabel(currentUser)}</span>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={handleOffersClick}>
                           <Bookmark className="mr-2 h-4 w-4" />
                           <span>Oferty</span>
@@ -572,7 +622,7 @@ export function Header({ initialUser }: HeaderProps) {
               </>
             ) : (
               <>
-                {/* Mobile: Drawer - Dodaj Zgłoszenie, Zaloguj się, Zarejestruj się */}
+                {/* Mobile: Dodaj Zgłoszenie + Konto */}
                 <div className="md:hidden flex items-center space-x-2">
                   <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
                     Dodaj Zgłoszenie
@@ -581,7 +631,8 @@ export function Header({ initialUser }: HeaderProps) {
                     <DrawerTrigger asChild>
                       <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
                         <User className="h-4 w-4 mr-2" />
-                        Zaloguj się
+                        Konto
+                        <ChevronDown className="h-4 w-4 ml-1" />
                       </Button>
                     </DrawerTrigger>
                     <DrawerContent>
@@ -612,14 +663,27 @@ export function Header({ initialUser }: HeaderProps) {
                   </Drawer>
                 </div>
 
-                {/* Desktop: [Dodaj Zgłoszenie] [Zaloguj się] [Zarejestruj się] - Add Job is in separate div above */}
-                <div className="hidden md:flex items-center space-x-2">
-                  <Button variant="ghost" size="sm" onClick={handleLoginClick} className="text-sm hover:bg-gray-200">
-                    Zaloguj się
-                  </Button>
-                  <Button variant="default" size="sm" onClick={handleRegisterClick} className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
-                    Zarejestruj się
-                  </Button>
+                {/* Desktop: single Konto dropdown */}
+                <div className="hidden md:block">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
+                        <User className="h-4 w-4 mr-2" />
+                        Konto
+                        <ChevronDown className="h-4 w-4 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={handleLoginClick}>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Zaloguj się</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleRegisterClick}>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Zarejestruj się</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </>
             )}

@@ -68,6 +68,38 @@ export interface Database {
           }
         ]
       }
+      platform_settings: {
+        Row: {
+          id: number
+          contractor_registration_enabled: boolean
+          manager_registration_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: number
+          contractor_registration_enabled?: boolean
+          manager_registration_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: number
+          contractor_registration_enabled?: boolean
+          manager_registration_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       companies: {
         Row: {
           id: string

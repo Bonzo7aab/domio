@@ -817,3 +817,19 @@ export async function clearVerificationDocumentReviewAction(
   revalidatePath(`/admin/verification/${subjectUserId}`);
   return { ok: true };
 }
+
+export async function updateRegistrationSettingsAction(
+  contractorOpen: boolean,
+  managerOpen: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const { userId: actorId } = await requirePlatformAdmin('/admin/settings');
+  const { updateRegistrationSettings } = await import('../../lib/database/platform-settings');
+  const result = await updateRegistrationSettings(contractorOpen, managerOpen, actorId);
+
+  if (result.ok) {
+    revalidatePath('/admin/settings');
+    revalidatePath('/register');
+  }
+
+  return result;
+}

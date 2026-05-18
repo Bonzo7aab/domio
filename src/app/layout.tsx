@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import './globals.css'
 import { Toaster } from '../components/ui/sonner'
 import AuthProvider from '../contexts/AuthContext'
-import { Header } from '../components/Header'
+import { HeaderWithSession } from '../components/HeaderWithSession'
 import { LayoutProvider } from '../components/ConditionalFooter'
 import { FilterProvider } from '../contexts/FilterContext'
 import { JobsProvider } from '../contexts/JobsContext'
@@ -68,7 +68,7 @@ export default function RootLayout({
               <FilterProvider>
                 <JobsProvider>
                   <LayoutProvider>
-                    <Header />
+                    <HeaderWithSession />
                     <main className="min-h-[calc(100vh-10rem)] pb-20 lg:pb-0">
                       {children}
                     </main>

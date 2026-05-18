@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ClipboardCheck, FileWarning, Building2 } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, FileWarning, Building2, Settings } from 'lucide-react';
 import { cn } from '../ui/utils';
 
 const links = [
@@ -10,6 +10,7 @@ const links = [
   { href: '/admin/verification', label: 'Weryfikacja', icon: ClipboardCheck },
   { href: '/admin/offers', label: 'Oferty wykonawców', icon: FileWarning },
   { href: '/admin/listings', label: 'Zgłoszenia zarządców', icon: Building2 },
+  { href: '/admin/settings', label: 'Ustawienia', icon: Settings },
 ];
 
 export function AdminNav() {
