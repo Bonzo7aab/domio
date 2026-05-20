@@ -1,5 +1,6 @@
 'use server'
 
+import { instrumentServerAction } from '../sentry/instrument-server-action'
 import { createClient } from '../supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -38,7 +39,7 @@ export interface UpdateUserData {
  * Server Action for user login
  * Returns success/error and a role-correct redirect target so the client can navigate.
  */
-export async function loginAction(
+async function loginActionImpl(
   formData: FormData
 ): Promise<{ success: true; redirectTo: string } | { error: string }> {
   const supabase = await createClient()
@@ -112,7 +113,7 @@ export async function loginAction(
  * Server Action for user registration
  * Creates auth user, user_profiles, companies, and user_companies.
  */
-export async function registerAction(formData: FormData) {
+async function registerActionImpl(formData: FormData) {
   const supabase = await createClient()
 
   const email = (formData.get('email') as string)?.trim()
@@ -276,7 +277,7 @@ export async function registerAction(formData: FormData) {
 /**
  * Server Action for user logout
  */
-export async function logoutAction() {
+async function logoutActionImpl() {
   const supabase = await createClient()
   
   const { error } = await supabase.auth.signOut()
@@ -292,7 +293,7 @@ export async function logoutAction() {
 /**
  * Server Action for updating user profile
  */
-export async function updateUserAction(userData: UpdateUserData) {
+async function updateUserActionImpl(userData: UpdateUserData) {
   const supabase = await createClient()
   
   const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -325,7 +326,7 @@ function getPublicAppOrigin(): string {
 /**
  * Sends Supabase password recovery email (PKCE). Link lands on `/auth/callback` then `/auth/update-password`.
  */
-export async function requestPasswordResetEmailAction(
+async function requestPasswordResetEmailActionImpl(
   email: string
 ): Promise<{ success: true } | { error: string }> {
   const supabase = await createClient()
@@ -359,7 +360,7 @@ export async function resetPasswordAction(email: string) {
  * This permanently deletes the user from auth.users, which cascades to delete
  * user_profiles and all related data via database CASCADE constraints
  */
-export async function deleteAccountAction() {
+async function deleteAccountActionImpl() {
   try {
     const supabase = await createClient()
     
@@ -433,3 +434,13 @@ export async function deleteAccountAction() {
     return { error: error instanceof Error ? error.message : 'Wystąpił błąd podczas usuwania konta' }
   }
 }
+
+export const loginAction = instrumentServerAction('loginAction', loginActionImpl)
+export const registerAction = instrumentServerAction('registerAction', registerActionImpl)
+export const logoutAction = instrumentServerAction('logoutAction', logoutActionImpl)
+export const updateUserAction = instrumentServerAction('updateUserAction', updateUserActionImpl)
+export const requestPasswordResetEmailAction = instrumentServerAction(
+  'requestPasswordResetEmailAction',
+  requestPasswordResetEmailActionImpl
+)
+export const deleteAccountAction = instrumentServerAction('deleteAccountAction', deleteAccountActionImpl)

@@ -1,5 +1,6 @@
 'use client'
 
+import * as Sentry from '@sentry/nextjs'
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js'
 import { createClient } from '../lib/supabase/client'
@@ -89,6 +90,7 @@ export default function AuthProvider({
   const logout = async () => {
     try {
       await supabase.auth.signOut()
+      Sentry.setUser(null)
       setSession(null)
       setUser(null)
     } catch (error) {
@@ -99,6 +101,14 @@ export default function AuthProvider({
   // Computed isAuthenticated value
   // User is authenticated if they have a session, even if profile is still loading
   const isAuthenticated = !!session
+
+  useEffect(() => {
+    if (user?.id) {
+      Sentry.setUser({ id: user.id })
+    } else if (!session) {
+      Sentry.setUser(null)
+    }
+  }, [user?.id, session])
 
   useEffect(() => {
     let mounted = true
