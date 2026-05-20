@@ -1,5 +1,6 @@
 'use server';
 
+import { instrumentServerAction } from '../../lib/sentry/instrument-server-action';
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '../../lib/supabase/admin';
 import { createClient } from '../../lib/supabase/server';
@@ -25,7 +26,7 @@ async function logAdminAction(
   });
 }
 
-export async function approveVerificationSubjectAction(subjectUserId: string): Promise<{ ok: boolean; error?: string }> {
+async function approveVerificationSubjectActionImpl(subjectUserId: string): Promise<{ ok: boolean; error?: string }> {
   const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -93,7 +94,7 @@ export async function approveVerificationSubjectAction(subjectUserId: string): P
   return { ok: true };
 }
 
-export async function rejectVerificationSubjectAction(
+async function rejectVerificationSubjectActionImpl(
   subjectUserId: string,
   reason: string
 ): Promise<{ ok: boolean; error?: string }> {
@@ -177,7 +178,7 @@ export async function rejectVerificationSubjectAction(
   return { ok: true };
 }
 
-export async function addAdminNoteAction(
+async function addAdminNoteActionImpl(
   subjectUserId: string,
   body: string
 ): Promise<{ ok: boolean; error?: string; id?: string }> {
@@ -208,7 +209,7 @@ export async function addAdminNoteAction(
   return { ok: true, id: (data as { id: string } | null)?.id };
 }
 
-export async function getOcPreviewSignedUrlAction(subjectUserId: string): Promise<{ url: string | null; error?: string }> {
+async function getOcPreviewSignedUrlActionImpl(subjectUserId: string): Promise<{ url: string | null; error?: string }> {
   await requirePlatformAdmin('/admin');
   const client = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -235,7 +236,7 @@ export async function getOcPreviewSignedUrlAction(subjectUserId: string): Promis
   return { url: signed.signedUrl };
 }
 
-export async function suspendJobApplicationAction(
+async function suspendJobApplicationActionImpl(
   applicationId: string,
   feedback: string
 ): Promise<{ ok: boolean; error?: string }> {
@@ -285,7 +286,7 @@ export async function suspendJobApplicationAction(
   return { ok: true };
 }
 
-export async function unsuspendJobApplicationAction(applicationId: string): Promise<{ ok: boolean; error?: string }> {
+async function unsuspendJobApplicationActionImpl(applicationId: string): Promise<{ ok: boolean; error?: string }> {
   const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -309,7 +310,7 @@ export async function unsuspendJobApplicationAction(applicationId: string): Prom
   return { ok: true };
 }
 
-export async function suspendTenderBidAction(bidId: string, feedback: string): Promise<{ ok: boolean; error?: string }> {
+async function suspendTenderBidActionImpl(bidId: string, feedback: string): Promise<{ ok: boolean; error?: string }> {
   const msg = feedback.trim();
   if (!msg) {
     return { ok: false, error: 'Podaj treść powiadomienia dla wykonawcy.' };
@@ -356,7 +357,7 @@ export async function suspendTenderBidAction(bidId: string, feedback: string): P
   return { ok: true };
 }
 
-export async function unsuspendTenderBidAction(bidId: string): Promise<{ ok: boolean; error?: string }> {
+async function unsuspendTenderBidActionImpl(bidId: string): Promise<{ ok: boolean; error?: string }> {
   const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -463,7 +464,7 @@ function pickAllowed(input: Record<string, unknown>, allowed: Set<string>): Reco
   return out;
 }
 
-export async function updateJobApplicationAdminAction(
+async function updateJobApplicationAdminActionImpl(
   applicationId: string,
   patch: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
@@ -486,7 +487,7 @@ export async function updateJobApplicationAdminAction(
   return { ok: true };
 }
 
-export async function updateTenderBidAdminAction(
+async function updateTenderBidAdminActionImpl(
   bidId: string,
   patch: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
@@ -509,7 +510,7 @@ export async function updateTenderBidAdminAction(
   return { ok: true };
 }
 
-export async function updateJobListingAdminAction(
+async function updateJobListingAdminActionImpl(
   jobId: string,
   patch: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
@@ -532,7 +533,7 @@ export async function updateJobListingAdminAction(
   return { ok: true };
 }
 
-export async function updateTenderListingAdminAction(
+async function updateTenderListingAdminActionImpl(
   tenderId: string,
   patch: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
@@ -555,7 +556,7 @@ export async function updateTenderListingAdminAction(
   return { ok: true };
 }
 
-export async function pauseJobListingAction(jobId: string, feedback: string): Promise<{ ok: boolean; error?: string }> {
+async function pauseJobListingActionImpl(jobId: string, feedback: string): Promise<{ ok: boolean; error?: string }> {
   const msg = feedback.trim();
   if (!msg) {
     return { ok: false, error: 'Podaj powód / instrukcję dla zarządcy.' };
@@ -589,7 +590,7 @@ export async function pauseJobListingAction(jobId: string, feedback: string): Pr
   return { ok: true };
 }
 
-export async function resumeJobListingAction(jobId: string): Promise<{ ok: boolean; error?: string }> {
+async function resumeJobListingActionImpl(jobId: string): Promise<{ ok: boolean; error?: string }> {
   const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
 
   const { error } = await supabase.from('jobs').update({ status: 'active' }).eq('id', jobId);
@@ -604,7 +605,7 @@ export async function resumeJobListingAction(jobId: string): Promise<{ ok: boole
   return { ok: true };
 }
 
-export async function pauseTenderListingAction(
+async function pauseTenderListingActionImpl(
   tenderId: string,
   feedback: string
 ): Promise<{ ok: boolean; error?: string }> {
@@ -647,7 +648,7 @@ export async function pauseTenderListingAction(
   return { ok: true };
 }
 
-export async function resumeTenderListingAction(tenderId: string): Promise<{ ok: boolean; error?: string }> {
+async function resumeTenderListingActionImpl(tenderId: string): Promise<{ ok: boolean; error?: string }> {
   const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -690,7 +691,7 @@ interface DocumentReviewEntry {
  * document type). Cleared automatically when the overall verification decision
  * is recorded.
  */
-export async function reviewVerificationDocumentAction(
+async function reviewVerificationDocumentActionImpl(
   subjectUserId: string,
   documentKey: string,
   status: 'approved' | 'rejected',
@@ -760,7 +761,7 @@ export async function reviewVerificationDocumentAction(
 /**
  * Remove a per-document review (e.g. admin wants to re-evaluate from scratch).
  */
-export async function clearVerificationDocumentReviewAction(
+async function clearVerificationDocumentReviewActionImpl(
   subjectUserId: string,
   documentKey: string
 ): Promise<{ ok: boolean; error?: string }> {
@@ -818,7 +819,7 @@ export async function clearVerificationDocumentReviewAction(
   return { ok: true };
 }
 
-export async function updateRegistrationSettingsAction(
+async function updateRegistrationSettingsActionImpl(
   contractorOpen: boolean,
   managerOpen: boolean
 ): Promise<{ ok: boolean; error?: string }> {
@@ -833,3 +834,71 @@ export async function updateRegistrationSettingsAction(
 
   return result;
 }
+
+export const approveVerificationSubjectAction = instrumentServerAction(
+  'approveVerificationSubjectAction',
+  approveVerificationSubjectActionImpl
+);
+export const rejectVerificationSubjectAction = instrumentServerAction(
+  'rejectVerificationSubjectAction',
+  rejectVerificationSubjectActionImpl
+);
+export const addAdminNoteAction = instrumentServerAction('addAdminNoteAction', addAdminNoteActionImpl);
+export const getOcPreviewSignedUrlAction = instrumentServerAction(
+  'getOcPreviewSignedUrlAction',
+  getOcPreviewSignedUrlActionImpl
+);
+export const suspendJobApplicationAction = instrumentServerAction(
+  'suspendJobApplicationAction',
+  suspendJobApplicationActionImpl
+);
+export const unsuspendJobApplicationAction = instrumentServerAction(
+  'unsuspendJobApplicationAction',
+  unsuspendJobApplicationActionImpl
+);
+export const suspendTenderBidAction = instrumentServerAction(
+  'suspendTenderBidAction',
+  suspendTenderBidActionImpl
+);
+export const unsuspendTenderBidAction = instrumentServerAction(
+  'unsuspendTenderBidAction',
+  unsuspendTenderBidActionImpl
+);
+export const updateJobApplicationAdminAction = instrumentServerAction(
+  'updateJobApplicationAdminAction',
+  updateJobApplicationAdminActionImpl
+);
+export const updateTenderBidAdminAction = instrumentServerAction(
+  'updateTenderBidAdminAction',
+  updateTenderBidAdminActionImpl
+);
+export const updateJobListingAdminAction = instrumentServerAction(
+  'updateJobListingAdminAction',
+  updateJobListingAdminActionImpl
+);
+export const updateTenderListingAdminAction = instrumentServerAction(
+  'updateTenderListingAdminAction',
+  updateTenderListingAdminActionImpl
+);
+export const pauseJobListingAction = instrumentServerAction('pauseJobListingAction', pauseJobListingActionImpl);
+export const resumeJobListingAction = instrumentServerAction('resumeJobListingAction', resumeJobListingActionImpl);
+export const pauseTenderListingAction = instrumentServerAction(
+  'pauseTenderListingAction',
+  pauseTenderListingActionImpl
+);
+export const resumeTenderListingAction = instrumentServerAction(
+  'resumeTenderListingAction',
+  resumeTenderListingActionImpl
+);
+export const reviewVerificationDocumentAction = instrumentServerAction(
+  'reviewVerificationDocumentAction',
+  reviewVerificationDocumentActionImpl
+);
+export const clearVerificationDocumentReviewAction = instrumentServerAction(
+  'clearVerificationDocumentReviewAction',
+  clearVerificationDocumentReviewActionImpl
+);
+export const updateRegistrationSettingsAction = instrumentServerAction(
+  'updateRegistrationSettingsAction',
+  updateRegistrationSettingsActionImpl
+);
