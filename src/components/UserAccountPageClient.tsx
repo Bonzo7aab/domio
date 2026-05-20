@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Clock,
   FileWarning,
-  Shield,
   ShieldCheck,
   ShieldX,
   Upload,
@@ -26,6 +25,7 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Button } from './ui/button';
 import { Tabs, TabsContent } from './ui/tabs';
 import { cn } from './ui/utils';
+import { VerificationAttentionIcon } from './VerificationAttentionIcon';
 import { classifyOcForUser } from '../lib/contractor-oc-status';
 
 interface OcPolicyNoticeProps {
@@ -225,8 +225,8 @@ function VerificationNotice({ status, onAction }: VerificationNoticeProps) {
   // unsubmitted
   return (
     <div className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 sm:flex-row sm:items-center">
-      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
-        <Shield className="h-5 w-5" />
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15">
+        <VerificationAttentionIcon className="h-5 w-5" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="font-semibold text-amber-800">Konto wymaga weryfikacji</div>
@@ -436,7 +436,7 @@ export function UserAccountPageClient({
                           <ShieldX className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
                         )}
                         {verificationStatus.state === 'unsubmitted' && (
-                          <Shield className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
+                          <VerificationAttentionIcon className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                         )}
                         <span
                           className={cn(

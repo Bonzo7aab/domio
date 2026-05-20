@@ -1,10 +1,6 @@
-'use client'
-
-import { Suspense, useEffect } from 'react';
-import React from 'react';
-import { RegisterPage } from '../../components/RegisterPage';
-import { useUserProfile } from '../../contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { getRegistrationSettings } from '../../lib/database/platform-settings';
+import { RegisterPageClient } from '../../components/RegisterPageClient';
 
 function LoadingState({ label }: { label: string }) {
   return (
@@ -17,39 +13,12 @@ function LoadingState({ label }: { label: string }) {
   );
 }
 
-export default function Register() {
+export default async function Register() {
+  const registrationSettings = await getRegistrationSettings();
+
   return (
     <Suspense fallback={<LoadingState label="Ładowanie strony rejestracji..." />}>
-      <RegisterContent />
+      <RegisterPageClient registrationSettings={registrationSettings} />
     </Suspense>
-  );
-}
-
-function RegisterContent() {
-  const { user, isLoading } = useUserProfile();
-  const router = useRouter();
-
-  // Redirect to homepage if already logged in
-  // Note: Middleware also handles this, but client-side redirect ensures tests pass
-  useEffect(() => {
-    if (!isLoading && user) {
-      router.replace('/');
-    }
-  }, [user, isLoading, router]);
-
-  // Show loading while checking auth
-  if (isLoading) {
-    return <LoadingState label="Sprawdzanie..." />;
-  }
-
-  // Don't render register page if user is authenticated (will redirect via useEffect or middleware)
-  if (user) {
-    return <LoadingState label="Przekierowywanie..." />;
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
-      <RegisterPage />
-    </div>
   );
 }

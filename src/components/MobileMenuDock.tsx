@@ -140,9 +140,9 @@ export function MobileMenuDock() {
           {
             title: 'Zaloguj',
             icon: <User className="size-6" />,
-            href: '/user-type-selection',
+            href: '/login',
             onClick: () => {
-              router.push('/user-type-selection');
+              router.push('/login');
               setMenuDrawerOpen(false);
             },
           } as FloatingDockItem,

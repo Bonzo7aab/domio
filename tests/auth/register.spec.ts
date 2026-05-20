@@ -89,11 +89,17 @@ test.describe('Registration Page', () => {
 
     await page.click('button[type="submit"]');
 
-    // Wait for redirect (either to home or login with success message)
-    await page.waitForURL((url) => !url.pathname.includes('/register'), { timeout: 15000 });
+    // Wait for redirect to verification (auto-login) or login (email confirm)
+    await page.waitForURL(
+      (url) =>
+        url.pathname.includes('/verification') ||
+        url.pathname.includes('/login'),
+      { timeout: 15000 }
+    );
 
-    // Should be redirected away from register page
-    expect(page.url()).not.toContain('/register');
+    if (page.url().includes('/verification')) {
+      expect(page.url()).toContain('/verification');
+    }
 
     // Cleanup: delete the created user
     await deleteTestUser(email);
@@ -125,11 +131,17 @@ test.describe('Registration Page', () => {
 
     await page.click('button[type="submit"]');
 
-    // Wait for redirect
-    await page.waitForURL((url) => !url.pathname.includes('/register'), { timeout: 15000 });
+    // Wait for redirect to account (auto-login) or login (email confirm)
+    await page.waitForURL(
+      (url) =>
+        url.pathname.includes('/account') ||
+        url.pathname.includes('/login'),
+      { timeout: 15000 }
+    );
 
-    // Should be redirected away from register page
-    expect(page.url()).not.toContain('/register');
+    if (page.url().includes('/account')) {
+      expect(page.url()).toContain('/account');
+    }
 
     // Cleanup: delete the created user
     await deleteTestUser(email);

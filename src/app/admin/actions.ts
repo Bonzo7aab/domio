@@ -819,6 +819,22 @@ async function clearVerificationDocumentReviewActionImpl(
   return { ok: true };
 }
 
+async function updateRegistrationSettingsActionImpl(
+  contractorOpen: boolean,
+  managerOpen: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const { userId: actorId } = await requirePlatformAdmin('/admin/settings');
+  const { updateRegistrationSettings } = await import('../../lib/database/platform-settings');
+  const result = await updateRegistrationSettings(contractorOpen, managerOpen, actorId);
+
+  if (result.ok) {
+    revalidatePath('/admin/settings');
+    revalidatePath('/register');
+  }
+
+  return result;
+}
+
 export const approveVerificationSubjectAction = instrumentServerAction(
   'approveVerificationSubjectAction',
   approveVerificationSubjectActionImpl
@@ -881,4 +897,8 @@ export const reviewVerificationDocumentAction = instrumentServerAction(
 export const clearVerificationDocumentReviewAction = instrumentServerAction(
   'clearVerificationDocumentReviewAction',
   clearVerificationDocumentReviewActionImpl
+);
+export const updateRegistrationSettingsAction = instrumentServerAction(
+  'updateRegistrationSettingsAction',
+  updateRegistrationSettingsActionImpl
 );

@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { useFormStatus } from 'react-dom';
-import { Building, User, Phone, Mail, Lock, Eye, EyeOff, MapPin } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Building, User, Phone, Mail, Lock, Eye, EyeOff, MapPin, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -14,33 +13,35 @@ import { Checkbox } from './ui/checkbox';
 import { registerAction } from '../lib/auth/actions';
 import { getAllCategoryConfigs } from '../lib/config/categoryConfig';
 import { WARSAW_DISTRICTS, DEFAULT_CITY } from '../lib/config/warsawDistricts';
+import { useUserProfile } from '../contexts/AuthContext';
+import {
+  registrationClosedMessage,
+  type RegistrationSettings,
+} from '../lib/registration-settings-shared';
 
-function SubmitButton({
-  disabled: customDisabled,
-}: {
-  disabled?: boolean;
-}) {
-  const { pending } = useFormStatus();
-  const disabled = pending || customDisabled;
-  return (
-    <Button
-      type="submit"
-      disabled={disabled}
-      className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 group disabled:opacity-50"
-    >
-      <User className="mr-2 h-5 w-5" />
-      {pending ? 'Rejestracja...' : 'Zarejestruj się'}
-    </Button>
-  );
+interface RegisterPageProps {
+  registrationSettings: RegistrationSettings;
 }
 
-export function RegisterPage() {
+export function RegisterPage({ registrationSettings }: RegisterPageProps) {
+  const router = useRouter();
+  const { refreshSession } = useUserProfile();
+  const [isPending, startTransition] = useTransition();
+  const [formError, setFormError] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const error = searchParams?.get('error') || undefined;
+  const error = formError || searchParams?.get('error') || undefined;
   const message = searchParams?.get('message') || undefined;
-  const defaultUserType = (searchParams?.get('userType') as 'contractor' | 'manager') || 'contractor';
+  const defaultUserTypeParam = searchParams?.get('userType') as 'contractor' | 'manager' | null;
 
-  const [selectedUserType, setSelectedUserType] = useState<'contractor' | 'manager'>(defaultUserType);
+  const resolvedDefaultType: 'contractor' | 'manager' = (() => {
+    if (defaultUserTypeParam === 'manager' && registrationSettings.managerOpen) return 'manager';
+    if (defaultUserTypeParam === 'contractor' && registrationSettings.contractorOpen) return 'contractor';
+    if (registrationSettings.contractorOpen) return 'contractor';
+    if (registrationSettings.managerOpen) return 'manager';
+    return 'contractor';
+  })();
+
+  const [selectedUserType, setSelectedUserType] = useState<'contractor' | 'manager'>(resolvedDefaultType);
   const [organizationType, setOrganizationType] = useState<'spółdzielnia' | 'wspólnota'>('wspólnota');
   const [district, setDistrict] = useState<string>('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -56,8 +57,43 @@ export function RegisterPage() {
     );
   };
 
+  const roleRegistrationClosed =
+    (selectedUserType === 'contractor' && !registrationSettings.contractorOpen) ||
+    (selectedUserType === 'manager' && !registrationSettings.managerOpen);
+
   const submitDisabled =
-    !acceptTerms || (selectedUserType === 'contractor' && selectedCategories.length === 0);
+    !acceptTerms ||
+    roleRegistrationClosed ||
+    (selectedUserType === 'contractor' && selectedCategories.length === 0);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (roleRegistrationClosed) {
+      setFormError(registrationClosedMessage(selectedUserType));
+      return;
+    }
+
+    const formData = new FormData(e.currentTarget);
+
+    startTransition(async () => {
+      const result = await registerAction(formData);
+
+      if (result && 'error' in result) {
+        setFormError(result.error);
+        return;
+      }
+
+      if (result && 'success' in result && result.success) {
+        await refreshSession();
+        router.refresh();
+        setTimeout(() => {
+          router.push(result.redirectTo);
+        }, 100);
+      }
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 py-16" data-testid="register-page">
@@ -81,9 +117,22 @@ export function RegisterPage() {
             </Alert>
           )}
 
+          {!registrationSettings.contractorOpen && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertDescription>
+                {registrationClosedMessage('contractor')}
+              </AlertDescription>
+            </Alert>
+          )}
+          {!registrationSettings.managerOpen && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertDescription>{registrationClosedMessage('manager')}</AlertDescription>
+            </Alert>
+          )}
+
           <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-6">
-              <form action={registerAction} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <input type="hidden" name="userType" value={selectedUserType} />
 
                 {/* Typ konta */}
@@ -98,11 +147,16 @@ export function RegisterPage() {
                         id="manager"
                         checked={selectedUserType === 'manager'}
                         onChange={() => setSelectedUserType('manager')}
+                        disabled={!registrationSettings.managerOpen}
                         className="sr-only peer"
                       />
                       <Label
                         htmlFor="manager"
-                        className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg cursor-pointer transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300"
+                        className={`flex items-center space-x-3 p-3 border border-slate-200 rounded-lg transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300 ${
+                          registrationSettings.managerOpen
+                            ? 'cursor-pointer'
+                            : 'cursor-not-allowed opacity-50'
+                        }`}
                       >
                         <Building className="h-5 w-5 text-slate-600" />
                         <div>
@@ -118,11 +172,16 @@ export function RegisterPage() {
                         id="contractor"
                         checked={selectedUserType === 'contractor'}
                         onChange={() => setSelectedUserType('contractor')}
+                        disabled={!registrationSettings.contractorOpen}
                         className="sr-only peer"
                       />
                       <Label
                         htmlFor="contractor"
-                        className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg cursor-pointer transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300"
+                        className={`flex items-center space-x-3 p-3 border border-slate-200 rounded-lg transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300 ${
+                          registrationSettings.contractorOpen
+                            ? 'cursor-pointer'
+                            : 'cursor-not-allowed opacity-50'
+                        }`}
                       >
                         <User className="h-5 w-5 text-slate-600" />
                         <div>
@@ -437,7 +496,23 @@ export function RegisterPage() {
                   value={acceptTerms ? '1' : '0'}
                 />
 
-                <SubmitButton disabled={submitDisabled} />
+                <Button
+                  type="submit"
+                  disabled={submitDisabled || isPending}
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 group disabled:opacity-50"
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Rejestracja...
+                    </>
+                  ) : (
+                    <>
+                      <User className="mr-2 h-5 w-5" />
+                      Zarejestruj się
+                    </>
+                  )}
+                </Button>
               </form>
 
               {/* Budowanie zaufania */}
