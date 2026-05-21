@@ -5,6 +5,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 import { addJobBookmark as addJobBookmarkDb, removeJobBookmark as removeJobBookmarkDb } from '../lib/database/bookmarks';
 import type { Budget } from '../types/budget';
+import {
+  decrementBookmarkCountOverride,
+  incrementBookmarkCountOverride,
+} from './bookmarkCountOverrides';
 
 export interface BookmarkedJob {
   id: string;
@@ -32,7 +36,8 @@ export const getBookmarkedJobs = (): BookmarkedJob[] => {
 export const addBookmark = async (
   job: Omit<BookmarkedJob, 'bookmarkedAt'>,
   supabase?: SupabaseClient<Database>,
-  userId?: string
+  userId?: string,
+  bookmarksCountBaseline?: number,
 ): Promise<void> => {
   try {
     // Sync with database if authenticated
@@ -58,6 +63,11 @@ export const addBookmark = async (
     const updatedBookmarks = [newBookmark, ...filteredBookmarks];
     
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));
+
+    if (bookmarksCountBaseline !== undefined) {
+      incrementBookmarkCountOverride(job.id, bookmarksCountBaseline);
+    }
+
     console.log('✅ Job bookmarked:', job.id);
   } catch (error) {
     console.error('Error adding bookmark:', error);
@@ -67,7 +77,8 @@ export const addBookmark = async (
 export const removeBookmark = async (
   jobId: string,
   supabase?: SupabaseClient<Database>,
-  userId?: string
+  userId?: string,
+  bookmarksCountBaseline?: number,
 ): Promise<void> => {
   try {
     // Sync with database if authenticated
@@ -83,6 +94,9 @@ export const removeBookmark = async (
     const bookmarks = getBookmarkedJobs();
     const updatedBookmarks = bookmarks.filter(bookmark => bookmark.id !== jobId);
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));
+
+    decrementBookmarkCountOverride(jobId, bookmarksCountBaseline);
+
     console.log('✅ Bookmark removed:', jobId);
   } catch (error) {
     console.error('Error removing bookmark:', error);

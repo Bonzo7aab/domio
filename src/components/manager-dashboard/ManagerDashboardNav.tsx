@@ -8,7 +8,6 @@ const tabs = [
   { id: 'overview', label: 'Przegląd', href: '/manager-dashboard/overview' },
   { id: 'zgloszenia', label: 'Zgłoszenia', href: '/manager-dashboard/zgloszenia' },
   { id: 'ocena', label: 'Ocena Zgłoszeń', href: '/manager-dashboard/ocena-zgloszen' },
-  { id: 'contractors', label: 'Wykonawcy', href: '/manager-dashboard/contractors' },
 ];
 
 export function ManagerDashboardNav() {
@@ -24,8 +23,7 @@ export function ManagerDashboardNav() {
               (tab.id === 'overview' &&
                 (pathname === '/manager-dashboard' || pathname === '/manager-dashboard/')) ||
               (tab.id === 'zgloszenia' && pathname.startsWith('/manager-dashboard/zgloszenia')) ||
-              (tab.id === 'ocena' && pathname.startsWith('/manager-dashboard/ocena-zgloszen')) ||
-              (tab.id === 'contractors' && pathname.startsWith('/manager-dashboard/contractors'));
+              (tab.id === 'ocena' && pathname.startsWith('/manager-dashboard/ocena-zgloszen'));
             return (
               <Link
                 key={tab.id}

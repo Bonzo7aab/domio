@@ -85,7 +85,7 @@ export default function TrustIndicators({
             <span>{visits_count} wyświetleń</span>
           )}
           {bookmarks_count !== undefined && bookmarks_count > 0 && (
-            <span>{bookmarks_count} zapisów</span>
+            <span>{bookmarks_count} ulubionych</span>
           )}
         </div>
       )}

@@ -6,7 +6,8 @@ import { useNavigationWithLoading } from '../hooks/useNavigationWithLoading';
 import { 
   Home, 
   Search, 
-  Bookmark, 
+  Bookmark,
+  Heart,
   MessageCircle, 
   User,
   Briefcase,
@@ -58,7 +59,7 @@ export function MobileMenuDock() {
       'Strona główna': '/',
       'Wykonawcy': '/contractors',
       'Zarządcy': '/managers',
-      'Zapisane': '/bookmarked-jobs',
+      'Ulubione': '/bookmarked-jobs',
       'Wiadomości': '/messages',
       'Profil': '/account',
     };
@@ -103,8 +104,8 @@ export function MobileMenuDock() {
       },
     },
     {
-      title: 'Zapisane',
-      icon: <Bookmark className="size-6" />,
+      title: 'Ulubione',
+      icon: <Heart className="size-6" />,
       href: '/bookmarked-jobs',
       onClick: () => {
         router.push('/bookmarked-jobs');

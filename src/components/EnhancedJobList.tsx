@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { addBookmark, getBookmarkedJobs, removeBookmark } from '../utils/bookmarkStorage';
+import {
+  BOOKMARK_COUNT_CHANGED_EVENT,
+  readBookmarkCountOverrides,
+} from '../utils/bookmarkCountOverrides';
 import { getStoredJobs, Job as StorageJob } from '../utils/jobStorage';
 import JobCard from './JobCard';
 import { FilterState } from './JobFilters';
@@ -52,14 +56,9 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   const [isExpiredJobsOpen, setIsExpiredJobsOpen] = useState(false);
   
   // Load bookmark count updates from sessionStorage on mount
-  const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>(() => {
-    try {
-      const stored = sessionStorage.getItem('bookmark-count-updates');
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>(
+    () => readBookmarkCountOverrides(),
+  );
   
   // Load view count updates from sessionStorage on mount
   const [viewCountUpdates, setViewCountUpdates] = useState<Record<string, number>>(() => {
@@ -71,14 +70,17 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     }
   });
   
-  // Persist bookmark count updates to sessionStorage
   useEffect(() => {
-    try {
-      sessionStorage.setItem('bookmark-count-updates', JSON.stringify(bookmarkCountUpdates));
-      } catch {
-        // Ignore errors when saving bookmark count updates
-    }
-  }, [bookmarkCountUpdates]);
+    const syncBookmarkCounts = () => {
+      setBookmarkCountUpdates(readBookmarkCountOverrides());
+    };
+    window.addEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkCounts);
+    window.addEventListener('focus', syncBookmarkCounts);
+    return () => {
+      window.removeEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkCounts);
+      window.removeEventListener('focus', syncBookmarkCounts);
+    };
+  }, []);
 
   // Load view count updates from sessionStorage when jobs change
   useEffect(() => {
@@ -133,35 +135,6 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
   
-  // Merge bookmark count updates with fresh server data
-  // Keep optimistic updates but update with server data if it's higher (to handle other users' bookmarks)
-  useEffect(() => {
-    if (jobs && jobs.length > 0) {
-      // Use setTimeout to avoid synchronous setState in effect
-      setTimeout(() => {
-        setBookmarkCountUpdates(prev => {
-          const newUpdates: Record<string, number> = { ...prev };
-          // Update counts from server data, but keep optimistic updates if they're higher
-          // This ensures user's actions are reflected while also showing other users' bookmarks
-          jobs.forEach(job => {
-            const serverCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
-            const optimisticCount = prev[job.id];
-            
-            if (optimisticCount !== undefined) {
-              // Keep the optimistic count if it's higher (user just bookmarked)
-              // Otherwise use server count (which includes other users' bookmarks)
-              newUpdates[job.id] = Math.max(optimisticCount, serverCount);
-            } else if (serverCount > 0) {
-              // No optimistic update, but server has a count - use it
-            // Don't set it here, let it come from props naturally
-          }
-        });
-        return newUpdates;
-        });
-      }, 0);
-    }
-  }, [jobs]);
-
   // Use jobs from props, fallback to stored jobs if needed, and apply bookmark count updates
   const allJobs = useMemo(() => {
     let jobsToReturn: Job[] = [];
@@ -345,14 +318,8 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
     const currentCount = job.bookmarks_count || 0;
     
     if (isCurrentlyBookmarked) {
-      // Remove bookmark
-      removeBookmark(jobId);
+      void removeBookmark(jobId, undefined, undefined, currentCount);
       setBookmarkedJobs(prev => prev.filter(id => id !== jobId));
-      // Optimistically decrement bookmark count
-      setBookmarkCountUpdates(prev => ({
-        ...prev,
-        [jobId]: Math.max(0, currentCount - 1)
-      }));
     } else {
       // Add bookmark
       const bookmarkData = {
@@ -369,18 +336,21 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
         },
         deadline: job.deadline
       };
-      addBookmark({
-        ...bookmarkData,
-        budget: typeof bookmarkData.budget === 'object' && 'min' in bookmarkData.budget && 'max' in bookmarkData.budget
-          ? bookmarkData.budget as Budget
-          : String(bookmarkData.budget || '')
-      });
+      void addBookmark(
+        {
+          ...bookmarkData,
+          budget:
+            typeof bookmarkData.budget === 'object' &&
+            'min' in bookmarkData.budget &&
+            'max' in bookmarkData.budget
+              ? (bookmarkData.budget as Budget)
+              : String(bookmarkData.budget || ''),
+        },
+        undefined,
+        undefined,
+        currentCount,
+      );
       setBookmarkedJobs(prev => [...prev, jobId]);
-      // Optimistically increment bookmark count
-      setBookmarkCountUpdates(prev => ({
-        ...prev,
-        [jobId]: currentCount + 1
-      }));
     }
   }, [bookmarkedJobs]);
 

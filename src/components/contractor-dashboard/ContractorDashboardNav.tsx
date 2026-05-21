@@ -6,6 +6,7 @@ import { cn } from '../ui/utils';
 
 const tabs = [
   { id: 'offers', label: 'Moje Oferty', href: '/contractor-dashboard/applications' },
+  { id: 'favorites', label: 'Ulubione Zgłoszenia', href: '/contractor-dashboard/favorites' },
   { id: 'ratings', label: 'Ocena Zgłoszeń', href: '/contractor-dashboard/ratings' },
   { id: 'services', label: 'Usługi', href: '/contractor-dashboard/pricing' },
 ];
@@ -20,6 +21,8 @@ export function ContractorDashboardNav() {
           {tabs.map((tab) => {
             const isActive =
               pathname === tab.href ||
+              (tab.id === 'favorites' &&
+                pathname.startsWith('/contractor-dashboard/favorites')) ||
               (tab.id === 'offers' &&
                 (pathname === '/contractor-dashboard' ||
                   pathname === '/contractor-dashboard/' ||

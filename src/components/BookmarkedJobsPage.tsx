@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Bookmark, Calendar, MapPin, Building, Trash2, Eye, Search } from 'lucide-react';
+import { ArrowLeft, Heart, Calendar, MapPin, Building, Trash2, Eye, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -11,11 +11,14 @@ import { toast } from 'sonner';
 interface BookmarkedJobsPageProps {
   onBack: () => void;
   onJobSelect: (jobId: string) => void;
+  /** When true, omits full-page chrome (for contractor dashboard tab). */
+  embedded?: boolean;
 }
 
 export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
   onBack,
-  onJobSelect
+  onJobSelect,
+  embedded = false,
 }) => {
   const [bookmarks, setBookmarks] = useState<BookmarkedJob[]>([]);
   const [filteredBookmarks, setFilteredBookmarks] = useState<BookmarkedJob[]>([]);
@@ -79,7 +82,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
   const handleRemoveBookmark = (jobId: string, jobTitle: string) => {
     removeBookmark(jobId);
     loadBookmarks();
-    toast.success(`Usunięto z zapisanych: ${jobTitle}`);
+    toast.success(`Usunięto z ulubionych: ${jobTitle}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -100,35 +103,45 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={onBack} className="hidden md:flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Powrót
-              </Button>
-              <div>
-                <h1 className="text-xl font-semibold">Zapisane ogłoszenia</h1>
-                <p className="text-sm text-muted-foreground">
-                  {bookmarks.length} {bookmarks.length === 1 ? 'ogłoszenie' : 'ogłoszeń'}
-                </p>
+    <div className={embedded ? '' : 'min-h-screen bg-background'}>
+      {!embedded && (
+        <div className="border-b border-border bg-card">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" onClick={onBack} className="hidden md:flex items-center gap-2">
+                  <ArrowLeft className="w-4 h-4" />
+                  Powrót
+                </Button>
+                <div>
+                  <h1 className="text-xl font-semibold">Ulubione zgłoszenia</h1>
+                  <p className="text-sm text-muted-foreground">
+                    {bookmarks.length} {bookmarks.length === 1 ? 'ogłoszenie' : 'ogłoszeń'}
+                  </p>
+                </div>
               </div>
+              <Heart className="w-6 h-6 text-primary fill-primary" />
             </div>
-            <Bookmark className="w-6 h-6 text-primary" />
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="container mx-auto px-4 py-6">
+      {embedded && (
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold">Ulubione zgłoszenia</h2>
+          <p className="text-sm text-muted-foreground">
+            {bookmarks.length} {bookmarks.length === 1 ? 'ogłoszenie' : 'ogłoszeń'}
+          </p>
+        </div>
+      )}
+
+      <div className={embedded ? '' : 'container mx-auto px-4 py-6'}>
         {bookmarks.length > 0 && (
           <div className="mb-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Szukaj w zapisanych ogłoszeniach..."
+                placeholder="Szukaj w ulubionych zgłoszeniach..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -147,12 +160,12 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
           </div>
         ) : filteredBookmarks.length === 0 ? (
           <div className="text-center py-12">
-            <Bookmark className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Brak zapisanych ogłoszeń</h3>
+            <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Brak ulubionych zgłoszeń</h3>
             <p className="text-muted-foreground mb-6">
-              Nie masz jeszcze żadnych zapisanych ogłoszeń.
+              Nie masz jeszcze żadnych ulubionych zgłoszeń.
               <br />
-              Możesz zapisywać interesujące Cię oferty klikając ikonę zakładki.
+              Dodaj serce przy ogłoszeniu na liście zgłoszeń, aby je tu zobaczyć.
             </p>
             <Button onClick={onBack}>
               Przeglądaj ogłoszenia
@@ -168,7 +181,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
                       <div className="flex items-center gap-2 mb-2">
                         {getPostTypeBadge(bookmark.postType)}
                         <span className="text-sm text-muted-foreground">
-                          Zapisano: {formatDate(bookmark.bookmarkedAt)}
+                          Dodano: {formatDate(bookmark.bookmarkedAt)}
                         </span>
                       </div>
                       <CardTitle className="text-lg line-clamp-2 cursor-pointer hover:text-primary"

@@ -112,11 +112,11 @@ export const sitemapEntries: SitemapEntry[] = [
   },
   {
     category: "Konto",
-    label: "Zapisane Ogłoszenia",
+    label: "Ulubione Zgłoszenia",
     path: "/bookmarked-jobs",
     icon: Bookmark,
-    description: "Przeglądaj zapisane ogłoszenia",
-    keywords: ["zapisane", "bookmark", "ulubione", "favorites"],
+    description: "Przeglądaj ulubione zgłoszenia",
+    keywords: ["ulubione", "favorites", "bookmark", "zgłoszenia"],
     requiresAuth: true
   },
   {

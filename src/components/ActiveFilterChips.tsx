@@ -97,6 +97,15 @@ export function ActiveFilterChips({
     });
   }
 
+  if (filters.favoritesOnly) {
+    chips.push({
+      label: 'Ulubione',
+      value: 'favorites',
+      onRemove: () =>
+        onFilterChange((prev) => ({ ...prev, favoritesOnly: false })),
+    });
+  }
+
   const showLocationBadge =
     primaryLocation && primaryLocation !== 'Polska' && primaryLocation !== WARSAW_CITY;
 

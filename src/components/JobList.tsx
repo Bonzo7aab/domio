@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowUpDown, Map } from 'lucide-react';
+import { ArrowUpDown, Map, Heart } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
@@ -7,6 +7,10 @@ import JobCard from './JobCard';
 import { ActiveFilterChips } from './ActiveFilterChips';
 import type { FilterState } from '../lib/filters/filter-state';
 import { getBookmarkedJobs, addBookmark, removeBookmark } from '../utils/bookmarkStorage';
+import {
+  BOOKMARK_COUNT_CHANGED_EVENT,
+  readBookmarkCountOverrides,
+} from '../utils/bookmarkCountOverrides';
 import { isJobExpired } from '../utils/jobHelpers';
 import {
   jobMatchesFilters,
@@ -15,6 +19,7 @@ import {
 } from '../lib/filters/filter-logic';
 import { useFilterContext } from '../contexts/FilterContext';
 import type { Job } from '../types/job';
+import { cn } from './ui/utils';
 
 interface JobListProps {
   jobs?: Job[];
@@ -46,14 +51,9 @@ export default function JobList({
       return [];
     }
   });
-  const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>(() => {
-    try {
-      const stored = sessionStorage.getItem('bookmark-count-updates');
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>(
+    () => readBookmarkCountOverrides(),
+  );
   const [viewCountUpdates, setViewCountUpdates] = useState<Record<string, number>>(() => {
     try {
       const stored = sessionStorage.getItem('view-count-updates');
@@ -64,12 +64,16 @@ export default function JobList({
   });
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem('bookmark-count-updates', JSON.stringify(bookmarkCountUpdates));
-    } catch (error) {
-      console.error('Error saving bookmark count updates:', error);
-    }
-  }, [bookmarkCountUpdates]);
+    const syncBookmarkCounts = () => {
+      setBookmarkCountUpdates(readBookmarkCountOverrides());
+    };
+    window.addEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkCounts);
+    window.addEventListener('focus', syncBookmarkCounts);
+    return () => {
+      window.removeEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkCounts);
+      window.removeEventListener('focus', syncBookmarkCounts);
+    };
+  }, []);
 
   useEffect(() => {
     const loadBookmarks = () => {
@@ -92,7 +96,7 @@ export default function JobList({
       const serverCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
       const optimisticCount = bookmarkCountUpdates[job.id];
       if (optimisticCount !== undefined) {
-        merged[job.id] = Math.max(optimisticCount, serverCount);
+        merged[job.id] = optimisticCount;
       }
     }
     return merged;
@@ -126,37 +130,37 @@ export default function JobList({
     const currentCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
 
     if (isCurrentlyBookmarked) {
-      removeBookmark(jobId);
+      void removeBookmark(jobId, undefined, undefined, currentCount);
       setBookmarkedJobs((prev) => prev.filter((id) => id !== jobId));
-      setBookmarkCountUpdates((prev) => ({
-        ...prev,
-        [jobId]: Math.max(0, currentCount - 1),
-      }));
     } else {
-      addBookmark({
-        id: job.id,
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        postType: (job.postType || 'job') as 'job' | 'tender',
-        budget: job.budget || job.salary,
-        deadline: job.deadline,
-      });
+      void addBookmark(
+        {
+          id: job.id,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          postType: (job.postType || 'job') as 'job' | 'tender',
+          budget: job.budget || job.salary,
+          deadline: job.deadline,
+        },
+        undefined,
+        undefined,
+        currentCount,
+      );
       setBookmarkedJobs((prev) => [...prev, jobId]);
-      setBookmarkCountUpdates((prev) => ({
-        ...prev,
-        [jobId]: currentCount + 1,
-      }));
     }
   };
 
   const filteredJobs = useMemo(() => {
     return availableJobs.filter((job) => {
       if (isJobExpired(job)) return false;
+      if (filters?.favoritesOnly && !bookmarkedJobs.includes(job.id)) {
+        return false;
+      }
       if (!filters) return true;
       return jobMatchesFilters(job, filters);
     });
-  }, [filters, availableJobs]);
+  }, [filters, availableJobs, bookmarkedJobs]);
 
   const sortedJobs = useMemo(() => {
     const sorted = [...filteredJobs];
@@ -193,12 +197,52 @@ export default function JobList({
   }, [filteredJobs, sortBy]);
 
 
+  const setListingTab = (favoritesOnly: boolean) => {
+    if (!onFilterChange) return;
+    onFilterChange((prev) => ({
+      ...(prev ?? filters ?? { categories: [], subcategories: [], sublocalities: [], deadline: [], postTypes: ['job', 'tender'], favoritesOnly: false }),
+      favoritesOnly,
+    }));
+  };
+
+  const showFavoritesTab = filters?.favoritesOnly === true;
+
   return (
     <div className="flex-1 p-2 sm:p-4 max-w-full overflow-x-hidden">
+      {onFilterChange && (
+        <div className="flex gap-1 mb-4 p-1 bg-muted rounded-lg w-fit max-w-full">
+          <button
+            type="button"
+            onClick={() => setListingTab(false)}
+            className={cn(
+              'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+              !showFavoritesTab
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Wszystkie
+          </button>
+          <button
+            type="button"
+            onClick={() => setListingTab(true)}
+            className={cn(
+              'px-3 py-1.5 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1.5',
+              showFavoritesTab
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Heart className={cn('w-3.5 h-3.5', showFavoritesTab && 'fill-current text-primary')} />
+            Ulubione
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-xl font-bold">
-            Dostępne zgłoszenia: {sortedJobs.length}
+            {showFavoritesTab ? 'Ulubione zgłoszenia' : 'Dostępne zgłoszenia'}: {sortedJobs.length}
           </h2>
         </div>
 
@@ -262,7 +306,9 @@ export default function JobList({
       {!isLoadingJobs && sortedJobs.length === 0 && availableJobs.length > 0 && (
         <div className="text-center py-8">
           <div className="text-muted-foreground mb-2">
-            Brak ogłoszeń pasujących do filtrów
+            {showFavoritesTab
+              ? 'Brak ulubionych zgłoszeń. Dodaj serce przy ogłoszeniu, aby je tu zobaczyć.'
+              : 'Brak ogłoszeń pasujących do filtrów'}
           </div>
         </div>
       )}

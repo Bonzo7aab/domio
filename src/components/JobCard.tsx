@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useState } from 'react';
-import { MapPin, Clock, BookmarkIcon, Eye, Gavel, Wrench, Users, Calendar } from 'lucide-react';
+import { MapPin, Clock, Heart, Eye, Gavel, Wrench, Users, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
@@ -227,7 +227,7 @@ const JobCard = React.memo(function JobCard({
                   className={`text-muted-foreground hover:text-foreground flex-shrink-0 ${isBookmarked ? 'text-primary' : ''}`}
                   onClick={handleBookmarkClick}
                 >
-                  <BookmarkIcon className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                  <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
                 </Button>
               </div>
               
@@ -356,12 +356,12 @@ const JobCard = React.memo(function JobCard({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 cursor-default">
-                              <BookmarkIcon className="w-3.5 h-3.5" />
+                              <Heart className="w-3.5 h-3.5" />
                               <span>{job.bookmarks_count}</span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Zapisane</p>
+                            <p>Ulubione</p>
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -374,7 +374,7 @@ const JobCard = React.memo(function JobCard({
                   className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
                   onClick={handleBookmarkClick}
                 >
-                  <BookmarkIcon className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                  <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
                 </Button>
               </div>
             </div>
@@ -434,12 +434,12 @@ const JobCard = React.memo(function JobCard({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 cursor-default">
-                              <BookmarkIcon className="w-3.5 h-3.5" />
+                              <Heart className="w-3.5 h-3.5" />
                               <span>{job.bookmarks_count}</span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Zapisane</p>
+                            <p>Ulubione</p>
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -452,7 +452,7 @@ const JobCard = React.memo(function JobCard({
                   className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
                   onClick={handleBookmarkClick}
                 >
-                  <BookmarkIcon className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                  <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
                 </Button> 
               </div>
             </div>

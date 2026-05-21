@@ -23,6 +23,8 @@ export interface FilterState {
   deadline: DeadlineFilterKey[];
   /** Always both types on homepage; kept for URL backward compatibility */
   postTypes: string[];
+  /** Show only jobs/tenders saved to favorites (local bookmarks). */
+  favoritesOnly?: boolean;
 }
 
 export const defaultFilters: FilterState = {
@@ -32,6 +34,7 @@ export const defaultFilters: FilterState = {
   searchQuery: '',
   deadline: [],
   postTypes: [...DEFAULT_POST_TYPES],
+  favoritesOnly: false,
 };
 
 export function isDefaultPostTypes(postTypes: string[]): boolean {

@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Play,
   Bookmark,
+  Heart,
   LogOut,
   ClipboardList,
   ChevronDown,
@@ -32,7 +33,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from './ui/drawer';
-import { AuthPromptPopover, AUTH_PROMPT_MESSAGES } from './AuthPromptPopover';
+import { AuthPromptPopover, AUTH_PROMPT_FAVORITES, AUTH_PROMPT_MESSAGES } from './AuthPromptPopover';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import type { AuthUser } from '../types/auth';
 import { useNavigationWithLoading } from '../hooks/useNavigationWithLoading';
@@ -250,6 +251,33 @@ export function Header({ initialUser }: HeaderProps) {
               </AuthPromptPopover>
             )}
             {/* Unified Notifications - only visible for authenticated users */}
+            {userIsAuthenticated ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                onClick={handleBookmarkedJobsClick}
+                aria-label="Ulubione zgłoszenia"
+              >
+                <Heart className="h-5 w-5" />
+              </Button>
+            ) : (
+              <AuthPromptPopover
+                title={AUTH_PROMPT_FAVORITES.title}
+                description={AUTH_PROMPT_FAVORITES.description}
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                  aria-label="Ulubione zgłoszenia"
+                >
+                  <Heart className="h-5 w-5" />
+                </Button>
+              </AuthPromptPopover>
+            )}
             {userIsAuthenticated && (
               <UnifiedNotifications 
                 onJobSelect={handleJobSelect}
@@ -392,8 +420,8 @@ export function Header({ initialUser }: HeaderProps) {
                               className="w-full justify-start"
                               onClick={handleBookmarkedJobsClick}
                             >
-                              <Bookmark className="mr-2 h-4 w-4" />
-                              <span>Zapisane ogłoszenia</span>
+                              <Heart className="mr-2 h-4 w-4" />
+                              <span>Ulubione zgłoszenia</span>
                             </Button>
                             <Button
                               variant="ghost"
@@ -542,8 +570,8 @@ export function Header({ initialUser }: HeaderProps) {
                         </DropdownMenuItem>
 
                         <DropdownMenuItem onClick={handleBookmarkedJobsClick}>
-                          <Bookmark className="mr-2 h-4 w-4" />
-                          <span>Zapisane ogłoszenia</span>
+                          <Heart className="mr-2 h-4 w-4" />
+                          <span>Ulubione zgłoszenia</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleMessagingClick}>
                           <MessageCircle className="mr-2 h-4 w-4" />

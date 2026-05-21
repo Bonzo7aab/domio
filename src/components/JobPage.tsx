@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Bookmark, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Heart, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -22,6 +22,10 @@ import SimilarJobs from './SimilarJobs';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getStoredJobs, Job as StoredJob } from '../utils/jobStorage';
 import { addBookmark, removeBookmark, isJobBookmarked } from '../utils/bookmarkStorage';
+import {
+  BOOKMARK_COUNT_CHANGED_EVENT,
+  readBookmarkCountOverrides,
+} from '../utils/bookmarkCountOverrides';
 import { toast } from 'sonner';
 import { getJobById, getTenderById } from '../lib/data';
 import { incrementJobViews, incrementTenderViews, createJobApplication, createTenderBid, type JobWithCompany, type TenderWithCompany } from '../lib/database/jobs';
@@ -604,11 +608,27 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     loadJobData();
   }, [jobId, supabase]);
 
-  // Check if job is bookmarked
+  // Check if job is bookmarked; sync count after changes from other views
   useEffect(() => {
-    if (jobData) {
+    if (!jobData) return;
+
+    const syncBookmarkState = () => {
       setIsBookmarked(isJobBookmarked(jobData.id));
-    }
+      const overrides = readBookmarkCountOverrides();
+      if (jobData.id in overrides) {
+        setJobData((prev) =>
+          prev ? { ...prev, bookmarks_count: overrides[jobData.id] } : prev,
+        );
+      }
+    };
+
+    syncBookmarkState();
+    window.addEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkState);
+    window.addEventListener('focus', syncBookmarkState);
+    return () => {
+      window.removeEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkState);
+      window.removeEventListener('focus', syncBookmarkState);
+    };
   }, [jobData]);
 
   // Check if user has already submitted a bid for this tender
@@ -899,11 +919,18 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
   const handleBookmark = () => {
     if (!job) return;
-    
+
+    const currentCount = job.bookmarks_count ?? 0;
+
     if (isBookmarked) {
-      removeBookmark(job.id);
+      void removeBookmark(job.id, supabase ?? undefined, user?.id, currentCount);
       setIsBookmarked(false);
-      toast.success('Usunięto z zapisanych');
+      setJobData((prev) =>
+        prev
+          ? { ...prev, bookmarks_count: Math.max(0, currentCount - 1) }
+          : prev,
+      );
+      toast.success('Usunięto z ulubionych');
     } else {
       const bookmarkData = {
         id: job.id,
@@ -912,11 +939,19 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         location: typeof job.location === 'string' ? job.location : job.location?.city || 'Unknown',
         postType: job.postType,
         budget: formatBudget(job.budget),
-        deadline: job.deadline
+        deadline: job.deadline,
       };
-      addBookmark(bookmarkData);
+      void addBookmark(
+        bookmarkData,
+        supabase ?? undefined,
+        user?.id,
+        currentCount,
+      );
       setIsBookmarked(true);
-      toast.success('Dodano do zapisanych');
+      setJobData((prev) =>
+        prev ? { ...prev, bookmarks_count: currentCount + 1 } : prev,
+      );
+      toast.success('Dodano do ulubionych');
     }
   };
 
@@ -1507,9 +1542,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       onClick={handleBookmark}
                       className="flex items-center gap-2"
                     >
-                      <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                      <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
                       <span className="truncate">
-                        {isBookmarked ? 'Zapisano' : 'Zapisz'}
+                        {isBookmarked ? 'W ulubionych' : 'Dodaj do ulubionych'}
                       </span>
                     </Button>
                     
@@ -1587,7 +1622,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   <span className="font-semibold">{job.applications || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Zapisane</span>
+                  <span className="text-sm text-muted-foreground">Ulubione</span>
                   <span className="font-semibold">{job.bookmarks_count || 0}</span>
                 </div>
               </CardContent>

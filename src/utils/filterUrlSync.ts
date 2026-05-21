@@ -35,6 +35,9 @@ export function filtersToSearchParams(filters: FilterState): URLSearchParams {
   if (filters.postTypes.length > 0 && !isDefaultPostTypes(filters.postTypes)) {
     params.set('postTypes', filters.postTypes.join(','));
   }
+  if (filters.favoritesOnly) {
+    params.set('favorites', '1');
+  }
 
   return params;
 }
@@ -94,6 +97,10 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
     filters.postTypes = postTypes.split(',').filter(Boolean);
   }
 
+  if (searchParams.get('favorites') === '1') {
+    filters.favoritesOnly = true;
+  }
+
   return filters;
 }
 
@@ -111,6 +118,7 @@ export function hasActiveFilters(filters: FilterState): boolean {
     filters.budgetMax != null ||
     (filters.searchQuery && filters.searchQuery.trim()) ||
     filters.deadline.length > 0 ||
-    !isDefaultPostTypes(filters.postTypes)
+    !isDefaultPostTypes(filters.postTypes) ||
+    filters.favoritesOnly
   );
 }
