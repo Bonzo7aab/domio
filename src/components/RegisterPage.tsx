@@ -3,24 +3,88 @@
 import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Building, User, Phone, Mail, Lock, Eye, EyeOff, MapPin, Loader2 } from 'lucide-react';
+import {
+  Building,
+  User,
+  Phone,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  MapPin,
+  Loader2,
+  ChevronRight,
+  ClipboardList,
+  FileCheck,
+  UserCircle,
+  Megaphone,
+  MessagesSquare,
+  LayoutDashboard,
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Card, CardContent } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { Checkbox } from './ui/checkbox';
 import { registerAction } from '../lib/auth/actions';
-import { getAllCategoryConfigs } from '../lib/config/categoryConfig';
 import { WARSAW_DISTRICTS, DEFAULT_CITY } from '../lib/config/warsawDistricts';
 import { useUserProfile } from '../contexts/AuthContext';
 import {
   registrationClosedMessage,
   type RegistrationSettings,
 } from '../lib/registration-settings-shared';
+import {
+  AuthFormPanel,
+  AuthFormSection,
+  AuthPageLayout,
+  authFieldClassName,
+} from './auth/AuthPageLayout';
+import { cn } from './ui/utils';
 
 interface RegisterPageProps {
   registrationSettings: RegistrationSettings;
+}
+
+function RoleOption({
+  id,
+  checked,
+  disabled,
+  onSelect,
+  icon: Icon,
+  label,
+}: {
+  id: string;
+  checked: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  icon: typeof Building;
+  label: string;
+}) {
+  return (
+    <div className="relative">
+      <input
+        type="radio"
+        id={id}
+        checked={checked}
+        onChange={onSelect}
+        disabled={disabled}
+        className="peer sr-only"
+      />
+      <Label
+        htmlFor={id}
+        className={cn(
+          'flex cursor-pointer items-center gap-3 rounded-xl border-2 border-border/60 bg-background p-4 transition-all',
+          'hover:border-primary/40 peer-checked:border-primary peer-checked:bg-primary/5',
+          disabled && 'cursor-not-allowed opacity-50',
+        )}
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+          <Icon className="h-5 w-5 text-muted-foreground" />
+        </span>
+        <span className="font-medium text-foreground">{label}</span>
+      </Label>
+    </div>
+  );
 }
 
 export function RegisterPage({ registrationSettings }: RegisterPageProps) {
@@ -44,27 +108,15 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
   const [selectedUserType, setSelectedUserType] = useState<'contractor' | 'manager'>(resolvedDefaultType);
   const [organizationType, setOrganizationType] = useState<'spółdzielnia' | 'wspólnota'>('wspólnota');
   const [district, setDistrict] = useState<string>('');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const categories = getAllCategoryConfigs();
-
-  const toggleCategory = (slug: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
-    );
-  };
 
   const roleRegistrationClosed =
     (selectedUserType === 'contractor' && !registrationSettings.contractorOpen) ||
     (selectedUserType === 'manager' && !registrationSettings.managerOpen);
 
-  const submitDisabled =
-    !acceptTerms ||
-    roleRegistrationClosed ||
-    (selectedUserType === 'contractor' && selectedCategories.length === 0);
+  const submitDisabled = !acceptTerms || roleRegistrationClosed;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -95,455 +147,389 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
     });
   };
 
+  const sideFeatures =
+    selectedUserType === 'contractor'
+      ? [
+          {
+            icon: ClipboardList,
+            title: 'Przeglądaj zlecenia i składaj oferty',
+            description: 'Dopasuj ofertę do budżetu i terminu realizacji.',
+          },
+          {
+            icon: FileCheck,
+            title: 'Weryfikacja, kiedy chcesz',
+            description: 'Dokumenty możesz przesłać od razu albo później z konta.',
+          },
+          {
+            icon: UserCircle,
+            title: 'Profil firmy w jednym miejscu',
+            description: 'NIP, dane kontaktowe i kwalifikacje — uzupełnisz stopniowo.',
+          },
+        ]
+      : [
+          {
+            icon: Megaphone,
+            title: 'Publikuj zlecenia dla wykonawców',
+            description: 'Ogłoszenia widoczne na mapie i w liście zleceń.',
+          },
+          {
+            icon: MessagesSquare,
+            title: 'Bezpieczny kontakt z firmami',
+            description: 'Komunikacja tylko z wybranymi wykonawcami.',
+          },
+          {
+            icon: LayoutDashboard,
+            title: 'Zarządzaj współpracą',
+            description: 'Oferty, statusy i historia w panelu zarządcy.',
+          },
+        ];
+
   return (
-    <div className="min-h-screen bg-slate-50 py-16" data-testid="register-page">
-      <div className="container mx-auto px-4">
-        <div className="max-w-xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2" data-testid="register-heading">
-              Zarejestruj się
-            </h1>
-            <p className="text-slate-600">Wypełnij formularz aby założyć nowe konto</p>
-          </div>
+    <AuthPageLayout
+      testId="register-page"
+      headingTestId="register-heading"
+      contentMaxWidth="lg"
+      title="Zarejestruj się"
+      subtitle="Kilka pól — i możesz korzystać z platformy."
+      side={{
+        heading:
+          selectedUserType === 'contractor'
+            ? 'Dołącz jako wykonawca'
+            : 'Dołącz jako zarządca',
+        body:
+          selectedUserType === 'contractor'
+            ? 'Załóż konto firmy, a dokumenty weryfikacyjne prześlesz wtedy, kiedy będziesz gotowy.'
+            : 'Opublikuj zlecenia i znajdź sprawdzonych wykonawców w Warszawie.',
+        features: sideFeatures,
+      }}
+      footer={
+        <>
+          Masz już konto?{' '}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            Zaloguj się
+          </Link>
+        </>
+      }
+    >
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {message && (
+        <Alert className="mb-4 border-emerald-500/30 bg-emerald-500/5">
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      )}
 
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {message && (
-            <Alert className="mb-6">
-              <AlertDescription>{message}</AlertDescription>
-            </Alert>
-          )}
+      {!registrationSettings.contractorOpen && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{registrationClosedMessage('contractor')}</AlertDescription>
+        </Alert>
+      )}
+      {!registrationSettings.managerOpen && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{registrationClosedMessage('manager')}</AlertDescription>
+        </Alert>
+      )}
 
-          {!registrationSettings.contractorOpen && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertDescription>
-                {registrationClosedMessage('contractor')}
-              </AlertDescription>
-            </Alert>
-          )}
-          {!registrationSettings.managerOpen && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertDescription>{registrationClosedMessage('manager')}</AlertDescription>
-            </Alert>
-          )}
+      <AuthFormPanel>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <input type="hidden" name="userType" value={selectedUserType} />
 
-          <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <input type="hidden" name="userType" value={selectedUserType} />
+          <AuthFormSection title="Typ konta">
+            <div className="grid grid-cols-2 gap-3">
+              <RoleOption
+                id="register-manager"
+                checked={selectedUserType === 'manager'}
+                disabled={!registrationSettings.managerOpen}
+                onSelect={() => setSelectedUserType('manager')}
+                icon={Building}
+                label="Zarządca"
+              />
+              <RoleOption
+                id="register-contractor"
+                checked={selectedUserType === 'contractor'}
+                disabled={!registrationSettings.contractorOpen}
+                onSelect={() => setSelectedUserType('contractor')}
+                icon={User}
+                label="Wykonawca"
+              />
+            </div>
+          </AuthFormSection>
 
-                {/* Typ konta */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-slate-900">Typ konta</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative">
-                      <input
-                        type="radio"
-                        name="userType"
-                        value="manager"
-                        id="manager"
-                        checked={selectedUserType === 'manager'}
-                        onChange={() => setSelectedUserType('manager')}
-                        disabled={!registrationSettings.managerOpen}
-                        className="sr-only peer"
-                      />
-                      <Label
-                        htmlFor="manager"
-                        className={`flex items-center space-x-3 p-3 border border-slate-200 rounded-lg transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300 ${
-                          registrationSettings.managerOpen
-                            ? 'cursor-pointer'
-                            : 'cursor-not-allowed opacity-50'
-                        }`}
-                      >
-                        <Building className="h-5 w-5 text-slate-600" />
-                        <div>
-                          <h3 className="font-medium text-slate-900">Zarządca</h3>
-                        </div>
-                      </Label>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="radio"
-                        name="userType"
-                        value="contractor"
-                        id="contractor"
-                        checked={selectedUserType === 'contractor'}
-                        onChange={() => setSelectedUserType('contractor')}
-                        disabled={!registrationSettings.contractorOpen}
-                        className="sr-only peer"
-                      />
-                      <Label
-                        htmlFor="contractor"
-                        className={`flex items-center space-x-3 p-3 border border-slate-200 rounded-lg transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300 ${
-                          registrationSettings.contractorOpen
-                            ? 'cursor-pointer'
-                            : 'cursor-not-allowed opacity-50'
-                        }`}
-                      >
-                        <User className="h-5 w-5 text-slate-600" />
-                        <div>
-                          <h3 className="font-medium text-slate-900">Wykonawca</h3>
-                        </div>
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Zarządca: Typ organizacji */}
-                {selectedUserType === 'manager' && (
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-slate-900">Typ organizacji</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="relative">
-                        <input
-                          type="radio"
-                          name="organizationType"
-                          value="spółdzielnia"
-                          id="org-spoldzielnia"
-                          checked={organizationType === 'spółdzielnia'}
-                          onChange={() => setOrganizationType('spółdzielnia')}
-                          className="sr-only peer"
-                        />
-                        <Label
-                          htmlFor="org-spoldzielnia"
-                          className="flex items-center justify-center p-3 border border-slate-200 rounded-lg cursor-pointer transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300"
-                        >
-                          Spółdzielnia
-                        </Label>
-                      </div>
-                      <div className="relative">
-                        <input
-                          type="radio"
-                          name="organizationType"
-                          value="wspólnota"
-                          id="org-wspolnota"
-                          checked={organizationType === 'wspólnota'}
-                          onChange={() => setOrganizationType('wspólnota')}
-                          className="sr-only peer"
-                        />
-                        <Label
-                          htmlFor="org-wspolnota"
-                          className="flex items-center justify-center p-3 border border-slate-200 rounded-lg cursor-pointer transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300"
-                        >
-                          Wspólnota
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* NIP + Nazwa */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="nip" className="text-sm font-medium text-slate-900">
-                      NIP *
+          {selectedUserType === 'manager' && (
+            <AuthFormSection title="Typ organizacji">
+              <div className="grid grid-cols-2 gap-3">
+                {(['spółdzielnia', 'wspólnota'] as const).map(type => (
+                  <div key={type} className="relative">
+                    <input
+                      type="radio"
+                      name="organizationType"
+                      value={type}
+                      id={`org-${type}`}
+                      checked={organizationType === type}
+                      onChange={() => setOrganizationType(type)}
+                      className="peer sr-only"
+                    />
+                    <Label
+                      htmlFor={`org-${type}`}
+                      className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-border/60 p-3 text-sm font-medium transition-all hover:border-primary/40 peer-checked:border-primary peer-checked:bg-primary/5"
+                    >
+                      {type === 'spółdzielnia' ? 'Spółdzielnia' : 'Wspólnota'}
                     </Label>
+                  </div>
+                ))}
+              </div>
+            </AuthFormSection>
+          )}
+
+          <AuthFormSection title="Firma">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="nip">NIP</Label>
+                <Input
+                  id="nip"
+                  name="nip"
+                  placeholder="0000000000"
+                  className={authFieldClassName}
+                  required
+                  disabled={isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Nazwa</Label>
+                <div className="relative">
+                  <Building className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="companyName"
+                    name="companyName"
+                    placeholder={
+                      selectedUserType === 'manager'
+                        ? 'np. Wspólnota Mieszkaniowa Osiedle Zielone'
+                        : 'np. Firma Budowlana ABC'
+                    }
+                    className={`pl-10 ${authFieldClassName}`}
+                    required
+                    disabled={isPending}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {selectedUserType === 'manager' && (
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="street">Ulica</Label>
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      id="nip"
-                      name="nip"
-                      placeholder="0000000000"
-                      className="h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
+                      id="street"
+                      name="street"
+                      placeholder="ul. Przykładowa 1"
+                      className={`pl-10 ${authFieldClassName}`}
                       required
+                      disabled={isPending}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName" className="text-sm font-medium text-slate-900">
-                      Nazwa *
-                    </Label>
-                    <div className="relative">
-                      <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
-                      <Input
-                        id="companyName"
-                        name="companyName"
-                        placeholder={
-                          selectedUserType === 'manager'
-                            ? 'np. Wspólnota Mieszkaniowa Osiedle Zielone'
-                            : 'np. Firma Budowlana ABC'
-                        }
-                        className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                        required
-                      />
-                    </div>
-                  </div>
                 </div>
-
-                {/* Adres – tylko Zarządca */}
-                {selectedUserType === 'manager' && (
-                  <div className="space-y-4">
-                    <Label className="text-sm font-medium text-slate-900">Adres *</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="street" className="text-xs text-slate-600">
-                          Ulica
-                        </Label>
-                        <div className="relative">
-                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
-                          <Input
-                            id="street"
-                            name="street"
-                            placeholder="ul. Przykładowa 1"
-                            className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                            required
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="district" className="text-xs text-slate-600">
-                          Dzielnica *
-                        </Label>
-                        <select
-                          id="district"
-                          name="district"
-                          value={district}
-                          onChange={(e) => setDistrict(e.target.value)}
-                          required
-                          className="flex h-11 w-full rounded-md border border-slate-200 bg-gray-50 px-3 py-2 text-sm text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        >
-                          <option value="">Wybierz dzielnicę</option>
-                          {WARSAW_DISTRICTS.map((d) => (
-                            <option key={d} value={d}>
-                              {d}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <input type="hidden" name="city" value={DEFAULT_CITY} />
-                  </div>
-                )}
-
-                {/* Osoba kontaktowa */}
-                <div className="space-y-4">
-                  <Label className="text-sm font-medium text-slate-900">Osoba kontaktowa *</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName" className="text-xs text-slate-600">
-                        Imię
-                      </Label>
-                      <Input
-                        id="firstName"
-                        name="firstName"
-                        placeholder="Jan"
-                        className="h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName" className="text-xs text-slate-600">
-                        Nazwisko
-                      </Label>
-                      <Input
-                        id="lastName"
-                        name="lastName"
-                        placeholder="Kowalski"
-                        className="h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-xs text-slate-600">
-                        Telefon *
-                      </Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
-                        <Input
-                          id="phone"
-                          name="phone"
-                          type="tel"
-                          placeholder="+48 123 456 789"
-                          className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-xs text-slate-600">
-                        Mail *
-                      </Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          placeholder="twoj@email.pl"
-                          className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Kategoria – tylko Wykonawca */}
-                {selectedUserType === 'contractor' && (
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-slate-900">
-                      Kategoria * (wybierz specjalizacje)
-                    </Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">
-                      {categories.map((cat) => (
-                        <label
-                          key={cat.slug}
-                          className="flex items-center gap-3 cursor-pointer rounded-md hover:bg-slate-50 p-2"
-                        >
-                          <Checkbox
-                            checked={selectedCategories.includes(cat.slug)}
-                            onCheckedChange={() => toggleCategory(cat.slug)}
-                          />
-                          <span className="text-sm text-slate-700">{cat.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {selectedCategories.map((slug) => (
-                      <input
-                        key={slug}
-                        type="hidden"
-                        name="categories"
-                        value={slug}
-                      />
-                    ))}
-                    {selectedCategories.length === 0 && (
-                      <p className="text-xs text-amber-600">
-                        Wybierz co najmniej jedną kategorię.
-                      </p>
+                <div className="space-y-2">
+                  <Label htmlFor="district">Dzielnica</Label>
+                  <select
+                    id="district"
+                    name="district"
+                    value={district}
+                    onChange={e => setDistrict(e.target.value)}
+                    required
+                    disabled={isPending}
+                    className={cn(
+                      'flex w-full rounded-md border border-border/80 bg-background px-3 py-2 text-sm shadow-sm',
+                      'h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
                     )}
-                  </div>
-                )}
-
-                {/* Hasło + Potwierdź hasło */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-slate-900">
-                      Hasło *
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
-                      <Input
-                        id="password"
-                        name="password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Co najmniej 6 znaków"
-                        className="pl-10 pr-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-sm font-medium text-slate-900">
-                      Potwierdź hasło *
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
-                      <Input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        placeholder="Powtórz hasło"
-                        className="pl-10 pr-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-5 w-5" />
-                        ) : (
-                          <Eye className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Akceptuję regulamin */}
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    id="acceptTerms"
-                    checked={acceptTerms}
-                    onCheckedChange={(v) => setAcceptTerms(v === true)}
-                  />
-                  <label
-                    htmlFor="acceptTerms"
-                    className="text-sm text-slate-600 cursor-pointer leading-tight"
                   >
-                    Akceptuję{' '}
-                    <Link href="/terms" className="text-blue-600 hover:underline">
-                      regulamin
-                    </Link>{' '}
-                    i{' '}
-                    <Link href="/privacy" className="text-blue-600 hover:underline">
-                      politykę prywatności
-                    </Link>
-                    .
-                  </label>
+                    <option value="">Wybierz dzielnicę</option>
+                    {WARSAW_DISTRICTS.map(d => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <input
-                  type="hidden"
-                  name="acceptTerms"
-                  value={acceptTerms ? '1' : '0'}
-                />
-
-                <Button
-                  type="submit"
-                  disabled={submitDisabled || isPending}
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 group disabled:opacity-50"
-                >
-                  {isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Rejestracja...
-                    </>
-                  ) : (
-                    <>
-                      <User className="mr-2 h-5 w-5" />
-                      Zarejestruj się
-                    </>
-                  )}
-                </Button>
-              </form>
-
-              {/* Budowanie zaufania */}
-              <div className="mt-6 pt-6 border-t border-slate-200">
-                {selectedUserType === 'manager' && (
-                  <p className="text-sm text-slate-600">
-                    Twoje dane są bezpieczne i służą jedynie do kontaktu z wybranymi wykonawcami.
-                  </p>
-                )}
-                {selectedUserType === 'contractor' && (
-                  <p className="text-sm text-slate-600">
-                    Po rejestracji przejdziesz proces weryfikacji, aby otrzymać odznakę
-                    Zweryfikowany Wykonawca.
-                  </p>
-                )}
+                <input type="hidden" name="city" value={DEFAULT_CITY} />
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </AuthFormSection>
 
-          <div className="mt-6 text-center">
-            <span className="text-slate-600">Masz już konto? </span>
-            <Link
-              href="/login"
-              className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
-            >
-              Zaloguj się
-            </Link>
+          <AuthFormSection title="Osoba kontaktowa">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">Imię</Label>
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  placeholder="Jan"
+                  className={authFieldClassName}
+                  required
+                  disabled={isPending}
+                  autoComplete="given-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Nazwisko</Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  placeholder="Kowalski"
+                  className={authFieldClassName}
+                  required
+                  disabled={isPending}
+                  autoComplete="family-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefon</Label>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    placeholder="+48 123 456 789"
+                    className={`pl-10 ${authFieldClassName}`}
+                    required
+                    disabled={isPending}
+                    autoComplete="tel"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="twoj@email.pl"
+                    className={`pl-10 ${authFieldClassName}`}
+                    required
+                    disabled={isPending}
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+            </div>
+          </AuthFormSection>
+
+          <AuthFormSection title="Hasło">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="password">Hasło</Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Co najmniej 6 znaków"
+                    className={`pl-10 pr-10 ${authFieldClassName}`}
+                    required
+                    disabled={isPending}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Potwierdź hasło</Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Powtórz hasło"
+                    className={`pl-10 pr-10 ${authFieldClassName}`}
+                    required
+                    disabled={isPending}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                    aria-label={showConfirmPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </AuthFormSection>
+
+          <div className="flex items-start gap-3 rounded-lg border border-border/50 bg-muted/30 p-3">
+            <Checkbox
+              id="acceptTerms"
+              checked={acceptTerms}
+              onCheckedChange={v => setAcceptTerms(v === true)}
+              disabled={isPending}
+            />
+            <label htmlFor="acceptTerms" className="cursor-pointer text-sm leading-snug text-muted-foreground">
+              Akceptuję{' '}
+              <Link href="/terms" className="font-medium text-primary hover:underline">
+                regulamin
+              </Link>{' '}
+              i{' '}
+              <Link href="/privacy" className="font-medium text-primary hover:underline">
+                politykę prywatności
+              </Link>
+              .
+            </label>
           </div>
-        </div>
-      </div>
-    </div>
+          <input type="hidden" name="acceptTerms" value={acceptTerms ? '1' : '0'} />
+
+          <Button
+            type="submit"
+            disabled={submitDisabled || isPending}
+            className="h-11 w-full"
+            data-testid="register-submit"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {selectedUserType === 'contractor' ? 'Tworzenie konta...' : 'Rejestracja...'}
+              </>
+            ) : selectedUserType === 'contractor' ? (
+              <>
+                Dalej
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </>
+            ) : (
+              'Zarejestruj się'
+            )}
+          </Button>
+
+          <p className="text-center text-xs text-muted-foreground">
+            {selectedUserType === 'contractor'
+              ? 'Po rejestracji wybierzesz, czy chcesz od razu przesłać dokumenty weryfikacyjne.'
+              : 'Twoje dane służą wyłącznie do kontaktu z wybranymi wykonawcami.'}
+          </p>
+        </form>
+      </AuthFormPanel>
+    </AuthPageLayout>
   );
 }
 

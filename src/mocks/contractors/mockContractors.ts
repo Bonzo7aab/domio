@@ -677,7 +677,7 @@ export const mockContractors: ContractorProfile[] = [
           budget: '980 000 zł',
           duration: '5 miesięcy',
           year: 2023,
-          category: 'Systemy bezpieczeństwa'
+          category: 'Systemy bezpieczeństwa i niskie prądy (CCTV, Domofony, Kontrola dostępu)'
         }
       ]
     },

@@ -18,6 +18,11 @@ import { fetchAllCategoriesWithSubcategories } from "../lib/database/categories"
 import type { CategoryWithSubcategories } from "../lib/database/categories";
 import { fetchCompanyBuildings } from "../lib/database/buildings";
 import type { Building } from "../types/building";
+import {
+  formatGroupedBuildingLabel,
+  groupBuildingsForSelection,
+  resolvePrimaryBuildingId,
+} from "../lib/buildings/grouping";
 import Link from "next/link";
 import type { BudgetInput } from "../types/budget";
 import { uploadJobAttachments, deleteJobAttachments } from "../lib/storage/job-attachments";
@@ -105,6 +110,19 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
   const [isUploading, setIsUploading] = useState(false);
   const [categoriesFromDb, setCategoriesFromDb] = useState<CategoryWithSubcategories[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  const groupedBuildingOptions = useMemo(
+    () => groupBuildingsForSelection(buildings),
+    [buildings],
+  );
+
+  useEffect(() => {
+    if (!buildingId || buildings.length === 0) return;
+    const primaryId = resolvePrimaryBuildingId(buildingId, buildings);
+    if (primaryId !== buildingId) {
+      setBuildingId(primaryId);
+    }
+  }, [buildingId, buildings]);
 
   useEffect(() => {
     const checkCompany = async () => {
@@ -555,9 +573,9 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
                       <SelectValue placeholder="Wybierz nieruchomość" />
                     </SelectTrigger>
                     <SelectContent>
-                      {buildings.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
-                          {b.name} — {b.city}
+                      {groupedBuildingOptions.map((group) => (
+                        <SelectItem key={group.key} value={group.primaryBuildingId}>
+                          {formatGroupedBuildingLabel(group)}
                         </SelectItem>
                       ))}
                     </SelectContent>

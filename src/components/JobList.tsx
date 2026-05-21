@@ -1,21 +1,24 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react';
-import { Button } from './ui/button';
+import { ArrowUpDown, Map } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Badge } from './ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
 import JobCard from './JobCard';
-import { FilterState } from './JobFilters';
+import { ActiveFilterChips } from './ActiveFilterChips';
+import type { FilterState } from '../lib/filters/filter-state';
 import { getBookmarkedJobs, addBookmark, removeBookmark } from '../utils/bookmarkStorage';
-import { extractCity, extractSublocality, getProvinceForCity } from '../utils/locationMapping';
-import { isTenderEndingSoon } from '../utils/tenderHelpers';
 import { isJobExpired } from '../utils/jobHelpers';
+import {
+  jobMatchesFilters,
+  parseJobBudgetAmount,
+  getJobDeadline,
+} from '../lib/filters/filter-logic';
+import { useFilterContext } from '../contexts/FilterContext';
 import type { Job } from '../types/job';
 
 interface JobListProps {
   jobs?: Job[];
   filters?: FilterState;
-  // Supports both direct values and functional updates (like React's setState)
   onFilterChange?: (filters: FilterState | ((prev: FilterState) => FilterState)) => void;
   onJobSelect?: (jobId: string) => void;
   onToggleMap?: () => void;
@@ -24,21 +27,25 @@ interface JobListProps {
   onApplyClick?: (jobId: string, jobData?: Job) => void;
 }
 
-export default function JobList({ 
+export default function JobList({
   jobs: jobsProp,
   filters,
   onFilterChange,
-  onJobSelect, 
-  onToggleMap: _onToggleMap, 
-  isMapVisible: _isMapVisible = true,
+  onJobSelect,
+  onToggleMap,
+  isMapVisible = false,
   isLoadingJobs = false,
-  onApplyClick
+  onApplyClick,
 }: JobListProps) {
+  const { primaryLocation } = useFilterContext();
   const [sortBy, setSortBy] = useState('newest');
-  const [bookmarkedJobs, setBookmarkedJobs] = useState<string[]>([]);
-  const [isExpiredJobsOpen, setIsExpiredJobsOpen] = useState(false);
-  
-  // Load bookmark count updates from sessionStorage on mount
+  const [bookmarkedJobs, setBookmarkedJobs] = useState<string[]>(() => {
+    try {
+      return getBookmarkedJobs().map((b) => b.id);
+    } catch {
+      return [];
+    }
+  });
   const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>(() => {
     try {
       const stored = sessionStorage.getItem('bookmark-count-updates');
@@ -47,8 +54,6 @@ export default function JobList({
       return {};
     }
   });
-  
-  // Load view count updates from sessionStorage on mount
   const [viewCountUpdates, setViewCountUpdates] = useState<Record<string, number>>(() => {
     try {
       const stored = sessionStorage.getItem('view-count-updates');
@@ -57,8 +62,7 @@ export default function JobList({
       return {};
     }
   });
-  
-  // Persist bookmark count updates to sessionStorage
+
   useEffect(() => {
     try {
       sessionStorage.setItem('bookmark-count-updates', JSON.stringify(bookmarkCountUpdates));
@@ -67,455 +71,120 @@ export default function JobList({
     }
   }, [bookmarkCountUpdates]);
 
-  // Load view count updates from sessionStorage when jobs change
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem('view-count-updates');
-      const updates = stored ? JSON.parse(stored) : {};
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setViewCountUpdates(updates);
-    } catch (error) {
-      console.error('Error loading view count updates:', error);
-    }
-  }, [jobsProp]);
-
-  // Load bookmarked jobs from localStorage
   useEffect(() => {
     const loadBookmarks = () => {
       try {
         const bookmarks = getBookmarkedJobs();
-        const bookmarkedIds = bookmarks.map(b => b.id);
-        setBookmarkedJobs(bookmarkedIds);
+        setBookmarkedJobs(bookmarks.map((b) => b.id));
       } catch (error) {
         console.error('Error loading bookmarks:', error);
       }
     };
-
-    loadBookmarks();
-
-    // Reload bookmarks when window regains focus
-    const handleFocus = () => {
-      loadBookmarks();
-    };
-
+    const handleFocus = () => loadBookmarks();
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Merge bookmark count updates with fresh server data
-  // Keep optimistic updates but update with server data if it's higher (to handle other users' bookmarks)
-  useEffect(() => {
-    if (jobsProp && jobsProp.length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBookmarkCountUpdates(prev => {
-        const newUpdates: Record<string, number> = { ...prev };
-        // Update counts from server data, but keep optimistic updates if they're higher
-        // This ensures user's actions are reflected while also showing other users' bookmarks
-        jobsProp.forEach(job => {
-          const serverCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
-          const optimisticCount = prev[job.id];
-          
-          if (optimisticCount !== undefined) {
-            // Keep the optimistic count if it's higher (user just bookmarked)
-            // Otherwise use server count (which includes other users' bookmarks)
-            newUpdates[job.id] = Math.max(optimisticCount, serverCount);
-          } else if (serverCount > 0) {
-            // No optimistic update, but server has a count - use it
-            // Don't set it here, let it come from props naturally
-          }
-        });
-        return newUpdates;
-      });
+  const effectiveBookmarkCounts = useMemo(() => {
+    const merged = { ...bookmarkCountUpdates };
+    if (!jobsProp?.length) return merged;
+    for (const job of jobsProp) {
+      const serverCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
+      const optimisticCount = bookmarkCountUpdates[job.id];
+      if (optimisticCount !== undefined) {
+        merged[job.id] = Math.max(optimisticCount, serverCount);
+      }
     }
-  }, [jobsProp]);
+    return merged;
+  }, [jobsProp, bookmarkCountUpdates]);
 
-  // Use jobs from props and apply bookmark and view count updates
   const availableJobs = useMemo(() => {
     const jobs = jobsProp || [];
-    return jobs.map(job => {
+    return jobs.map((job) => {
       let updatedJob = { ...job };
-      const bookmarkCountUpdate = bookmarkCountUpdates[job.id];
+      const bookmarkCountUpdate = effectiveBookmarkCounts[job.id];
       if (bookmarkCountUpdate !== undefined) {
         updatedJob = { ...updatedJob, bookmarks_count: bookmarkCountUpdate };
       }
       const viewCountUpdate = viewCountUpdates[job.id];
       if (viewCountUpdate !== undefined) {
-        updatedJob = { 
-          ...updatedJob, 
+        updatedJob = {
+          ...updatedJob,
           visits_count: viewCountUpdate,
-          metrics: {
-            ...updatedJob.metrics,
-            visits: viewCountUpdate,
-          },
+          metrics: { ...updatedJob.metrics, visits: viewCountUpdate },
         };
       }
       return updatedJob;
     });
-  }, [jobsProp, bookmarkCountUpdates, viewCountUpdates]);
+  }, [jobsProp, effectiveBookmarkCounts, viewCountUpdates]);
 
   const handleBookmark = (jobId: string) => {
-    const job = availableJobs.find(j => j.id === jobId);
+    const job = availableJobs.find((j) => j.id === jobId);
     if (!job) return;
 
     const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
     const currentCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
-    
+
     if (isCurrentlyBookmarked) {
       removeBookmark(jobId);
-      setBookmarkedJobs(prev => prev.filter(id => id !== jobId));
-      // Optimistically decrement bookmark count
-      setBookmarkCountUpdates(prev => ({
+      setBookmarkedJobs((prev) => prev.filter((id) => id !== jobId));
+      setBookmarkCountUpdates((prev) => ({
         ...prev,
-        [jobId]: Math.max(0, currentCount - 1)
+        [jobId]: Math.max(0, currentCount - 1),
       }));
     } else {
-      const jobData = job as Job;
-      const bookmarkData = {
-        id: jobData.id,
-        title: jobData.title,
-        company: jobData.company,
-        location: jobData.location,
-        postType: (jobData.postType || 'job') as 'job' | 'tender',
-        budget: jobData.budget || jobData.salary,
-        deadline: jobData.deadline
-      };
-      addBookmark(bookmarkData);
-      setBookmarkedJobs(prev => [...prev, jobId]);
-      // Optimistically increment bookmark count
-      setBookmarkCountUpdates(prev => ({
+      addBookmark({
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        postType: (job.postType || 'job') as 'job' | 'tender',
+        budget: job.budget || job.salary,
+        deadline: job.deadline,
+      });
+      setBookmarkedJobs((prev) => [...prev, jobId]);
+      setBookmarkCountUpdates((prev) => ({
         ...prev,
-        [jobId]: currentCount + 1
+        [jobId]: currentCount + 1,
       }));
     }
   };
 
-  // Filter jobs based on filters
   const filteredJobs = useMemo(() => {
-    if (!filters) return availableJobs;
-    
-    return availableJobs.filter(job => {
-      // Filter by postTypes (job vs tender)
-      // Defensive check: if postTypes is empty, show all jobs (shouldn't happen due to guard clauses, but handle gracefully)
-      if (filters.postTypes && filters.postTypes.length > 0) {
-        const jobPostType = ('postType' in job && job.postType) ? job.postType : 'job';
-        if (!filters.postTypes.includes(jobPostType)) {
-          return false;
-        }
-      } else if (filters.postTypes && filters.postTypes.length === 0) {
-        // Empty array should not happen due to guard clauses, but if it does, show all jobs
-        // (no return false, so job passes this filter)
-      }
-      
-      // Filter by categories
-      if (filters.categories && filters.categories.length > 0) {
-        const jobCategory = typeof job.category === 'string' 
-          ? job.category 
-          : (job.category?.name || 'Inne');
-        if (!filters.categories.includes(jobCategory)) {
-          return false;
-        }
-      }
-      
-      // Filter by subcategories
-      if (filters.subcategories && filters.subcategories.length > 0) {
-        // If job has no subcategory, skip this filter unless explicitly empty
-        if (job.subcategory && !filters.subcategories.includes(job.subcategory)) {
-          return false;
-        }
-        // If filter has subcategories but job has none, include it (don't exclude)
-      }
-      
-      // Filter by contract types
-      if (filters.contractTypes && filters.contractTypes.length > 0) {
-        if (!filters.contractTypes.includes(job.type)) {
-          return false;
-        }
-      }
-      
-      // Filter by cities and sublocalities
-      if ((filters.cities && filters.cities.length > 0) || (filters.sublocalities && filters.sublocalities.length > 0)) {
-        const jobCity = extractCity(job.location);
-        const jobSublocality = extractSublocality(job.location);
-        
-        // If sublocalities are selected, prioritize sublocality matching
-        if (filters.sublocalities && filters.sublocalities.length > 0) {
-          const matchesSublocality = filters.sublocalities.some(sublocalityKey => {
-            const [filterCity, filterSublocality] = sublocalityKey.split(':');
-            return jobCity === filterCity && jobSublocality === filterSublocality;
-          });
-          
-          if (matchesSublocality) {
-            // Job matches a selected sublocality, include it
-            // Continue to next filter check
-          } else {
-            // Check if city is explicitly selected (not just auto-selected via sublocality)
-            // Get cities that have selected sublocalities
-            const citiesWithSelectedSublocalities = new Set(
-              filters.sublocalities.map(s => s.split(':')[0])
-            );
-            
-            // If city is selected AND doesn't have any selected sublocalities, include all jobs in that city
-            // Otherwise, exclude jobs that don't match sublocalities
-            const cityExplicitlySelected = filters.cities && filters.cities.some(city => 
-              city === jobCity && !citiesWithSelectedSublocalities.has(city)
-            );
-            
-            if (cityExplicitlySelected) {
-              // City is selected without sublocalities, include all jobs in city
-              // Continue to next filter check
-            } else {
-              // No match, exclude job
-              return false;
-            }
-          }
-        } else if (filters.cities && filters.cities.length > 0) {
-          // Only cities selected, no sublocalities
-          if (!jobCity || !filters.cities.includes(jobCity)) {
-            return false;
-          }
-        }
-      }
-
-      // Filter by provinces
-      if (filters.provinces && filters.provinces.length > 0) {
-        const jobCity = extractCity(job.location);
-        const jobProvince = jobCity ? getProvinceForCity(jobCity) : null;
-        if (!jobProvince || !filters.provinces.includes(jobProvince)) {
-          return false;
-        }
-      }
-
-      // Legacy location filter support (for backward compatibility)
-      if (filters.locations && filters.locations.length > 0) {
-        const jobLocationString = typeof job.location === 'string' ? job.location : job.location?.city || '';
-        if (!filters.locations.includes(jobLocationString)) {
-          return false;
-        }
-      }
-      
-      // Filter by client types
-      if (filters.clientTypes && filters.clientTypes.length > 0) {
-        // If job has no clientType, include it (don't exclude)
-        if (job.clientType && !filters.clientTypes.includes(job.clientType)) {
-          return false;
-        }
-      }
-
-      // Filter by urgency (only if job has urgency field)
-      if (filters.urgency && filters.urgency.length > 0) {
-        if ('urgency' in job && job.urgency && !filters.urgency.includes(job.urgency)) {
-          return false;
-        }
-      }
-
-      // Filter by urgent flag (high priority)
-      if (filters.urgent === true) {
-        if (!('urgent' in job) || !job.urgent) {
-          return false;
-        }
-      }
-
-      // Filter by ending soon (tenders ending in less than 7 days)
-      if (filters.endingSoon && 'postType' in job && job.postType === 'tender' && 'tenderInfo' in job && job.tenderInfo?.submissionDeadline) {
-        if (!isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline))) {
-          return false;
-        }
-      }
-      
-      // Filter by budget ranges (checkboxes)
-      if (filters.budgetRanges && filters.budgetRanges.length > 0) {
-        // Get job budget values (budget_min and budget_max from job data)
-        const jobBudgetMin = ('budget_min' in job ? job.budget_min : undefined) as number | undefined;
-        const jobBudgetMax = ('budget_max' in job ? job.budget_max : undefined) as number | undefined;
-        
-        // Check if job has budget info (null/undefined check, but 0 is valid)
-        const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
-        const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
-        
-        // If job has no budget info, skip budget range filtering (include the job)
-        if (!hasBudgetMin && !hasBudgetMax) {
-          // Job has no budget, skip range filtering
-        } else {
-          // Use actual min/max values, handling nulls appropriately
-          // If max is null, use min as both min and max (single value)
-          // If min is null but max exists, use 0 as min
-          const min = hasBudgetMin ? Number(jobBudgetMin) : (hasBudgetMax ? 0 : 0);
-          const max = hasBudgetMax ? Number(jobBudgetMax) : (hasBudgetMin ? Number(jobBudgetMin) : Infinity);
-
-          let matchesRange = false;
-          for (const range of filters.budgetRanges) {
-            if (range === '<5000') {
-              // Match if job's max budget is less than 5000
-              if (max < 5000) {
-                matchesRange = true;
-                break;
-              }
-            } else if (range === '5000-20000') {
-              // Match if job's budget range overlaps with 5000-20000
-              // Overlap occurs when: min <= 20000 AND max >= 5000
-              if (min <= 20000 && max >= 5000) {
-                matchesRange = true;
-                break;
-              }
-            } else if (range === '20000+') {
-              // Match if job's min budget is >= 20000
-              if (min >= 20000) {
-                matchesRange = true;
-                break;
-              }
-            }
-          }
-          
-          if (!matchesRange) {
-            return false;
-          }
-        }
-      }
-
-      // Filter by budget min/max inputs
-      if (filters.budgetMin !== undefined && filters.budgetMin !== null) {
-        const jobBudgetMin = job.budget?.min ?? null;
-        const jobBudgetMax = job.budget?.max ?? null;
-        
-        // If job has no budget info, skip this filter (include the job)
-        if (jobBudgetMin === null && jobBudgetMax === null) {
-          // Skip filter
-        } else {
-          // Job must have budget_max >= filters.budgetMin (or budget_min if max is null)
-          const jobMaxBudget = jobBudgetMax ?? jobBudgetMin ?? 0;
-          if (jobMaxBudget < filters.budgetMin) {
-            return false;
-          }
-        }
-      }
-
-      if (filters.budgetMax !== undefined && filters.budgetMax !== null) {
-        const jobBudgetMin = job.budget?.min ?? null;
-        const jobBudgetMax = job.budget?.max ?? null;
-        
-        // If job has no budget info, skip this filter (include the job)
-        if (jobBudgetMin === null && jobBudgetMax === null) {
-          // Skip filter
-        } else {
-          // Job must have budget_min <= filters.budgetMax (or budget_max if min is null)
-          const jobMinBudget = jobBudgetMin ?? jobBudgetMax ?? 0;
-          if (jobMinBudget > filters.budgetMax) {
-            return false;
-          }
-        }
-      }
-      
-      // Filter by search query (title only)
-      if (filters.searchQuery && filters.searchQuery.trim().length > 0) {
-        const searchTerm = filters.searchQuery.toLowerCase().trim();
-        const jobTitle = (job.title || '').toLowerCase();
-        
-        if (!jobTitle.includes(searchTerm)) {
-          return false;
-        }
-      }
-
-      // Filter by date added (created_at)
-      if (filters.dateAdded && filters.dateAdded.length > 0) {
-        // Get job's postedTime timestamp (ISO string from database)
-        const jobCreatedAt = job.postedTime;
-        if (!jobCreatedAt) {
-          // If job has no created_at, skip this filter (include the job)
-        } else {
-          // Parse the ISO timestamp string to Date
-          const jobDate = new Date(jobCreatedAt);
-          
-          // Validate the date
-          if (isNaN(jobDate.getTime())) {
-            // Invalid date, skip filter
-            return true;
-          }
-          
-          const now = new Date();
-          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          todayStart.setHours(0, 0, 0, 0);
-          
-          // Normalize jobDate to start of day for consistent comparison
-          const jobDateStart = new Date(jobDate.getFullYear(), jobDate.getMonth(), jobDate.getDate());
-          jobDateStart.setHours(0, 0, 0, 0);
-          
-          let matchesDateFilter = false;
-          for (const dateFilter of filters.dateAdded) {
-            let filterStartDate: Date;
-            
-            switch (dateFilter) {
-              case 'today':
-                filterStartDate = new Date(todayStart);
-                if (jobDateStart >= filterStartDate) {
-                  matchesDateFilter = true;
-                }
-                break;
-              case 'last-week':
-                // Last 7 days (including today)
-                filterStartDate = new Date(todayStart);
-                filterStartDate.setTime(filterStartDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-                if (jobDateStart >= filterStartDate) {
-                  matchesDateFilter = true;
-                }
-                break;
-              case 'last-month':
-                // Last 30 days (including today)
-                filterStartDate = new Date(todayStart);
-                filterStartDate.setTime(filterStartDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-                if (jobDateStart >= filterStartDate) {
-                  matchesDateFilter = true;
-                }
-                break;
-              case 'last-3-months':
-                // Last 90 days (including today)
-                filterStartDate = new Date(todayStart);
-                filterStartDate.setTime(filterStartDate.getTime() - 90 * 24 * 60 * 60 * 1000);
-                if (jobDateStart >= filterStartDate) {
-                  matchesDateFilter = true;
-                }
-                break;
-              case 'last-6-months':
-                // Last 180 days (including today)
-                filterStartDate = new Date(todayStart);
-                filterStartDate.setTime(filterStartDate.getTime() - 180 * 24 * 60 * 60 * 1000);
-                if (jobDateStart >= filterStartDate) {
-                  matchesDateFilter = true;
-                }
-                break;
-              case 'last-year':
-                // Last 365 days (including today)
-                filterStartDate = new Date(todayStart);
-                filterStartDate.setTime(filterStartDate.getTime() - 365 * 24 * 60 * 60 * 1000);
-                if (jobDateStart >= filterStartDate) {
-                  matchesDateFilter = true;
-                }
-                break;
-            }
-            
-            if (matchesDateFilter) break;
-          }
-          
-          if (!matchesDateFilter) {
-            return false;
-          }
-        }
-      }
-      
-      return true;
+    return availableJobs.filter((job) => {
+      if (isJobExpired(job)) return false;
+      if (!filters) return true;
+      return jobMatchesFilters(job, filters);
     });
   }, [filters, availableJobs]);
 
   const sortedJobs = useMemo(() => {
-    const sorted = [...filteredJobs].sort((a, b) => {
+    const sorted = [...filteredJobs];
+    const noDeadline = (j: Job) => Number.MAX_SAFE_INTEGER;
+
+    sorted.sort((a, b) => {
       switch (sortBy) {
         case 'newest':
-          return new Date(a.postedTime).getTime() - new Date(b.postedTime).getTime();
-        case 'salary-high':
-          return parseInt(b.salary.match(/\d+/)?.[0] || '0') - parseInt(a.salary.match(/\d+/)?.[0] || '0');
-        case 'salary-low':
-          return parseInt(a.salary.match(/\d+/)?.[0] || '0') - parseInt(b.salary.match(/\d+/)?.[0] || '0');
-        case 'applications':
-          return b.applications - a.applications;
+          return (
+            new Date(b.postedTime).getTime() - new Date(a.postedTime).getTime()
+          );
+        case 'budget-high':
+          return parseJobBudgetAmount(b) - parseJobBudgetAmount(a);
+        case 'budget-low':
+          return parseJobBudgetAmount(a) - parseJobBudgetAmount(b);
+        case 'deadline-soon': {
+          const da = getJobDeadline(a)?.getTime() ?? noDeadline(a);
+          const db = getJobDeadline(b)?.getTime() ?? noDeadline(b);
+          return da - db;
+        }
+        case 'deadline-far': {
+          const da = getJobDeadline(a)?.getTime() ?? 0;
+          const db = getJobDeadline(b)?.getTime() ?? 0;
+          if (da === 0 && db === 0) return 0;
+          if (da === 0) return 1;
+          if (db === 0) return -1;
+          return db - da;
+        }
         default:
           return 0;
       }
@@ -523,148 +192,87 @@ export default function JobList({
     return sorted;
   }, [filteredJobs, sortBy]);
 
-  // Separate jobs into active and expired
-  const { activeJobs, expiredJobs } = useMemo(() => {
-    const active: Job[] = [];
-    const expired: Job[] = [];
-    
-    sortedJobs.forEach(job => {
-      if (isJobExpired(job)) {
-        expired.push(job);
-      } else {
-        active.push(job);
-      }
-    });
-    
-    return { activeJobs: active, expiredJobs: expired };
-  }, [sortedJobs]);
 
   return (
     <div className="flex-1 p-2 sm:p-4 max-w-full overflow-x-hidden">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-bold">Dostępne zgłoszenia: {activeJobs.length}</h2>
+          <h2 className="text-lg sm:text-xl font-bold">
+            Dostępne zgłoszenia: {sortedJobs.length}
+          </h2>
         </div>
-        
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2 sm:gap-0">
-          {/* Sort */}
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-48">
-              <ArrowUpDown className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Najnowsze</SelectItem>
-              <SelectItem value="salary-high">Najwyższa stawka</SelectItem>
-              <SelectItem value="salary-low">Najniższa stawka</SelectItem>
-              <SelectItem value="applications">Najwięcej aplikacji</SelectItem>
-            </SelectContent>
-          </Select>
+
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:inline">Sortuj:</span>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full sm:w-52">
+                <ArrowUpDown className="w-4 h-4 mr-2 shrink-0" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Od najnowszych</SelectItem>
+                <SelectItem value="budget-high">Budżet malejąco</SelectItem>
+                <SelectItem value="budget-low">Budżet rosnąco</SelectItem>
+                <SelectItem value="deadline-soon">Bliski termin</SelectItem>
+                <SelectItem value="deadline-far">Daleki termin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {onToggleMap && (
+            <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-1.5">
+              <Map className="w-4 h-4 text-muted-foreground shrink-0" />
+              <Label htmlFor="map-toggle" className="text-sm cursor-pointer whitespace-nowrap">
+                Zobacz mapę
+              </Label>
+              <Switch
+                id="map-toggle"
+                checked={isMapVisible}
+                onCheckedChange={() => onToggleMap()}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Quick Filters - Using functional updates to prevent stale closure issues */}
-      <div className="flex flex-wrap items-center gap-2 mb-4 overflow-x-auto">
-        <Badge 
-          variant={filters?.urgency?.includes('high') ? "default" : "secondary"} 
-          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors select-none"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // Use functional update to always get latest state
-            onFilterChange?.((prev) => {
-              const currentUrgency = prev.urgency || [];
-              if (currentUrgency.includes('high')) {
-                return { ...prev, urgency: currentUrgency.filter(u => u !== 'high') };
-              } else {
-                return { ...prev, urgency: [...currentUrgency, 'high'] };
-              }
-            });
-          }}
-        >
-          🔥 Pilne zgłoszenia
-        </Badge>
-        <Badge 
-          variant={filters?.endingSoon ? "default" : "secondary"}
-          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors select-none"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // Use functional update to always get latest state
-            onFilterChange?.((prev) => ({
-              ...prev,
-              endingSoon: prev.endingSoon ? false : true
-            }));
-          }}
-        >
-          ⏰ Kończące się wkrótce
-        </Badge>
-        <Badge 
-          variant={filters?.budgetRanges?.includes('20000+') ? "default" : "secondary"}
-          className="cursor-pointer hover:border-gray-300 text-xs whitespace-nowrap transition-colors select-none"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // Use functional update to always get latest state
-            onFilterChange?.((prev) => {
-              const currentBudgetRanges = prev.budgetRanges || [];
-              if (currentBudgetRanges.includes('20000+')) {
-                return { ...prev, budgetRanges: currentBudgetRanges.filter(r => r !== '20000+') };
-              } else {
-                return { ...prev, budgetRanges: [...currentBudgetRanges, '20000+'] };
-              }
-            });
-          }}
-        >
-          💰 Wysokobudżetowe (20k+)
-        </Badge>
-      </div>
+      {filters && onFilterChange && (
+        <ActiveFilterChips
+          filters={filters}
+          onFilterChange={onFilterChange}
+          primaryLocation={primaryLocation}
+        />
+      )}
 
-      {/* Loading State - Show when loading and no jobs */}
-      {isLoadingJobs && activeJobs.length === 0 && expiredJobs.length === 0 && (
+      {isLoadingJobs && sortedJobs.length === 0 && (
         <div className="text-center py-8">
           <div className="flex flex-col items-center space-y-2">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             <div className="text-muted-foreground mb-2">Ładowanie ogłoszeń...</div>
           </div>
         </div>
       )}
 
-      {/* Empty State */}
-      {!isLoadingJobs && activeJobs.length === 0 && expiredJobs.length === 0 && availableJobs.length === 0 && (
+      {!isLoadingJobs && sortedJobs.length === 0 && availableJobs.length === 0 && (
         <div className="text-center py-8">
           <div className="text-muted-foreground mb-2">Brak ogłoszeń</div>
         </div>
       )}
 
-      {/* Debug info - remove in production */}
-      {!isLoadingJobs && activeJobs.length === 0 && expiredJobs.length === 0 && availableJobs.length > 0 && (
+      {!isLoadingJobs && sortedJobs.length === 0 && availableJobs.length > 0 && (
         <div className="text-center py-8">
           <div className="text-muted-foreground mb-2">
-            Znaleziono {availableJobs.length} ogłoszeń, ale zostały przefiltrowane
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Dostępne: {availableJobs.length}, Filtrowane: {filteredJobs.length}
+            Brak ogłoszeń pasujących do filtrów
           </div>
         </div>
       )}
 
-      {/* Active Job Cards - Show even when loading to allow overlay */}
-      {activeJobs.length > 0 && (
-        <div className="space-y-2 max-w-full overflow-x-hidden relative">
-          {isLoadingJobs && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
-              <div className="flex flex-col items-center space-y-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <div className="text-sm text-muted-foreground">Filtrowanie ogłoszeń...</div>
-              </div>
-            </div>
-          )}
-          {activeJobs.map(job => (
-            <JobCard 
-              key={job.id} 
-              job={job} 
+      {sortedJobs.length > 0 && (
+        <div className="space-y-2 max-w-full overflow-x-hidden">
+          {sortedJobs.map((job) => (
+            <JobCard
+              key={job.id}
+              job={job}
               onClick={() => onJobSelect?.(job.id)}
               onBookmark={handleBookmark}
               isBookmarked={bookmarkedJobs.includes(job.id)}
@@ -674,45 +282,6 @@ export default function JobList({
           ))}
         </div>
       )}
-
-      {/* Expired Jobs Section */}
-      {!isLoadingJobs && expiredJobs.length > 0 && (
-        <div className="mt-8">
-          <Collapsible open={isExpiredJobsOpen} onOpenChange={setIsExpiredJobsOpen}>
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-between p-0 h-auto hover:bg-transparent mb-4"
-              >
-                <h3 className="text-base sm:text-lg font-semibold text-gray-600">
-                  Wygasłe zgłoszenia ({expiredJobs.length})
-                </h3>
-                {isExpiredJobsOpen ? (
-                  <ChevronUp className="h-5 w-5 text-gray-600" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-gray-600" />
-                )}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="space-y-2 max-w-full overflow-x-hidden">
-                {expiredJobs.map(job => (
-                  <JobCard 
-                    key={job.id} 
-                    job={job} 
-                    onClick={() => onJobSelect?.(job.id)}
-                    onBookmark={handleBookmark}
-                    isBookmarked={bookmarkedJobs.includes(job.id)}
-                    onApplyClick={onApplyClick}
-                    isExpired={true}
-                  />
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      )}
-
     </div>
   );
 }

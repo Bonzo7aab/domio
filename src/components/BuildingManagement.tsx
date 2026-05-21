@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, MapPin, Loader2, X, Check, Upload } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Building2, Plus, Edit2, Trash2, MapPin, Loader2, X, Check, Upload, LayoutGrid, List } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -35,13 +35,28 @@ import { createClient } from '../lib/supabase/client';
 import { fetchCompanyBuildings, createBuilding, updateBuilding, deleteBuilding } from '../lib/database/buildings';
 import { uploadBuildingImages } from '../lib/storage/building-images';
 import type { Building, BuildingFormData } from '../types/building';
+import { filterBuildings } from '../lib/buildings/grouping';
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table';
 
 interface BuildingManagementProps {
   companyId: string;
 }
 
+type BuildingViewMode = 'gallery' | 'list';
+
 export function BuildingManagement({ companyId }: BuildingManagementProps) {
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [viewMode, setViewMode] = useState<BuildingViewMode>('gallery');
+  const [nameFilter, setNameFilter] = useState('');
+  const [streetFilter, setStreetFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -54,6 +69,15 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
+
+  const filteredBuildings = useMemo(
+    () =>
+      filterBuildings(buildings, {
+        nameQuery: nameFilter,
+        streetQuery: streetFilter,
+      }),
+    [buildings, nameFilter, streetFilter],
+  );
 
   const [formData, setFormData] = useState<BuildingFormData>({
     name: '',
@@ -466,8 +490,100 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
             </p>
           </div>
         ) : (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="grid flex-1 grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="filter-building-name">Nazwa nieruchomości</Label>
+                  <Input
+                    id="filter-building-name"
+                    value={nameFilter}
+                    onChange={(e) => setNameFilter(e.target.value)}
+                    placeholder="Filtruj po nazwie…"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="filter-building-street">Ulica</Label>
+                  <Input
+                    id="filter-building-street"
+                    value={streetFilter}
+                    onChange={(e) => setStreetFilter(e.target.value)}
+                    placeholder="Filtruj po ulicy…"
+                  />
+                </div>
+              </div>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={viewMode}
+                onValueChange={(value) => {
+                  if (value === 'gallery' || value === 'list') {
+                    setViewMode(value);
+                  }
+                }}
+                aria-label="Tryb widoku nieruchomości"
+              >
+                <ToggleGroupItem value="gallery" aria-label="Widok galerii">
+                  <LayoutGrid className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="list" aria-label="Widok listy">
+                  <List className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+
+            {filteredBuildings.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Brak nieruchomości pasujących do filtrów.
+              </p>
+            ) : viewMode === 'list' ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nazwa</TableHead>
+                    <TableHead>Ulica</TableHead>
+                    <TableHead>Miasto</TableHead>
+                    <TableHead className="text-right">Akcje</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredBuildings.map((building) => (
+                    <TableRow key={building.id}>
+                      <TableCell className="font-medium">{building.name}</TableCell>
+                      <TableCell>
+                        {building.street_address}
+                        {building.postal_code ? `, ${building.postal_code}` : ''}
+                      </TableCell>
+                      <TableCell>{building.city}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleOpenEditDialog(building)}
+                            aria-label="Edytuj nieruchomość"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleOpenDeleteDialog(building)}
+                            aria-label="Usuń nieruchomość"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {buildings.map((building) => (
+            {filteredBuildings.map((building) => (
               <Card
                 key={building.id}
                 className={cn(
@@ -573,6 +689,8 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                 </CardContent>
               </Card>
             ))}
+          </div>
+            )}
           </div>
         )}
       </div>

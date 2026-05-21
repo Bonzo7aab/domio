@@ -18,6 +18,10 @@ import {
   Download,
   ExternalLink,
   RefreshCw,
+  Building2,
+  Award,
+  Users,
+  type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -28,6 +32,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
+import { cn } from './ui/utils';
 import { useUserProfile } from '../contexts/AuthContext';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from './ui/dropzone';
 import type { FileRejection } from 'react-dropzone';
@@ -43,6 +48,7 @@ import type {
   DocumentReviewMap,
   VerificationDocumentEntry,
 } from '../lib/database/admin-verification';
+import { ContractorProfessionalQualificationsSettings } from './ContractorProfessionalQualificationsSettings';
 
 interface VerificationPageProps {
   initialStatus: VerificationStatus;
@@ -53,6 +59,10 @@ interface VerificationPageProps {
    * understands which files passed and which need re-submission.
    */
   documentReviews?: DocumentReviewMap;
+  /** When true, renders without standalone page chrome (for /account tab). */
+  embedded?: boolean;
+  /** Contractor user id — renders uprawnienia zawodowe after Referencje in account tab. */
+  userId?: string;
 }
 
 type DocumentReviewState = 'approved' | 'rejected' | 'pending' | 'stale';
@@ -85,6 +95,38 @@ function formatFileSize(bytes: number): string {
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+function getDocumentIcon(type: string): LucideIcon {
+  switch (type) {
+    case 'company_registration':
+      return Building2;
+    case 'insurance':
+      return Shield;
+    case 'certifications':
+    case 'management_license':
+      return Award;
+    case 'references':
+      return Users;
+    default:
+      return FileText;
+  }
+}
+
+function isRequiredDocComplete(
+  doc: { type: string; required: boolean },
+  existingByKey: Record<string, VerificationDocumentEntry>,
+  uploads: Record<string, DocumentUpload>,
+  isContractor: boolean,
+  hasOcPolicyInAccount: boolean,
+): boolean {
+  if (!doc.required) return true;
+  const hasExisting = Boolean(existingByKey[doc.type]);
+  const hasNew = Boolean(uploads[doc.type]?.file);
+  if (doc.type === 'insurance' && isContractor) {
+    return hasNew || hasExisting || hasOcPolicyInAccount;
+  }
+  return hasNew || hasExisting;
 }
 
 interface StateBannerProps {
@@ -277,29 +319,29 @@ function ExistingDocChip({
   const uploadedLabel = formatDateTime(doc.uploadedAt);
   return (
     <div className="space-y-2">
-      <div className="flex flex-col gap-2 rounded-md border bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
-          <FileText className="h-4 w-4 flex-shrink-0 text-primary" />
+      <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background border">
+            <FileText className="h-4 w-4 text-primary" />
+          </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Aktualny plik
-              </span>
+              <span className="text-xs font-medium text-foreground">Przesłany plik</span>
               <ReviewBadge state={reviewState} />
             </div>
-            <div className="truncate text-sm" title={doc.filename}>
+            <div className="truncate text-sm font-medium" title={doc.filename}>
               {doc.filename}
             </div>
             {uploadedLabel && (
               <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                 <CalendarClock className="h-3 w-3" />
-                Przesłano: {uploadedLabel}
+                {uploadedLabel}
               </div>
             )}
             {doc.error && <div className="text-xs text-destructive">{doc.error}</div>}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 sm:justify-end">
           {onReplace && (
             <Button
               type="button"
@@ -382,6 +424,8 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   initialStatus,
   existingDocuments,
   documentReviews,
+  embedded = false,
+  userId,
 }) => {
   const { user } = useUserProfile();
   const router = useRouter();
@@ -614,14 +658,20 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 
   // A required doc is "covered" if there's a new file OR a previously uploaded
   // file. Contractor OC is also covered by an OC scan stored in account settings.
-  const requiredDocumentsUploaded = documents.filter(doc => doc.required).every(doc => {
-    const hasExisting = Boolean(existingByKey[doc.type]);
-    const hasNew = Boolean(uploads[doc.type]?.file);
-    if (doc.type === 'insurance' && isContractor) {
-      return hasNew || hasExisting || hasOcPolicyInAccount;
-    }
-    return hasNew || hasExisting;
-  });
+  const requiredDocumentsUploaded = documents
+    .filter(doc => doc.required)
+    .every(doc =>
+      isRequiredDocComplete(doc, existingByKey, uploads, isContractor, hasOcPolicyInAccount),
+    );
+
+  const requiredDocs = documents.filter(doc => doc.required);
+  const requiredCompleteCount = requiredDocs.filter(doc =>
+    isRequiredDocComplete(doc, existingByKey, uploads, isContractor, hasOcPolicyInAccount),
+  ).length;
+  const requiredProgressPct =
+    requiredDocs.length > 0
+      ? Math.round((requiredCompleteCount / requiredDocs.length) * 100)
+      : 100;
 
   const newUploadsCount = documents.reduce(
     (count, doc) => count + (uploads[doc.type]?.file ? 1 : 0),
@@ -647,36 +697,20 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
           ? 'Weryfikacja została odrzucona — możesz przesłać dokumenty ponownie'
           : 'Prześlij dokumenty aby zweryfikować swoje konto';
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/account')}
-              className="hidden md:flex text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Powrót
-            </Button>
-            <div>
-              <h1>Weryfikacja konta</h1>
-              <p className="text-sm text-muted-foreground">{headerSubtitle}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 py-8">
+  const content = (
+    <div className={embedded ? 'space-y-6' : 'max-w-4xl mx-auto px-4 py-8'}>
         <div className="space-y-6">
-          {/* State banner */}
-          <VerificationStateBanner
-            status={initialStatus}
-            onAction={status === 'approved' ? () => router.push('/account') : undefined}
-          />
+          {/* State banner — skip duplicate unsubmitted prompt in account tab */}
+          {!(embedded && status === 'unsubmitted') && (
+            <VerificationStateBanner
+              status={initialStatus}
+              onAction={
+                status === 'approved' && !embedded
+                  ? () => router.push('/account')
+                  : undefined
+              }
+            />
+          )}
 
           {/* Approved: read-only documents list */}
           {status === 'approved' && existingDocuments.length > 0 && (
@@ -703,80 +737,97 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             </Card>
           )}
 
-          {/* Info Header — keep on every state for context */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="pt-6">
-              <div className="flex items-start space-x-4">
-                <Shield className="h-8 w-8 text-primary flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-primary mb-2">
-                    Weryfikacja konta {isContractor ? 'wykonawcy' : 'zarządcy'}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Zweryfikowane konto otrzymuje więcej {isContractor ? 'zgłoszeń' : 'ofert'} i
-                    wyższą pozycję w wynikach wyszukiwania. Proces weryfikacji jest bezpłatny i
-                    dobrowolny.
-                  </p>
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <Check className="h-4 w-4 text-success" />
-                        <span>Bezpłatna weryfikacja</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Check className="h-4 w-4 text-success" />
-                        <span>Pełna ochrona danych</span>
-                      </div>
+          {!showUploadForm && !embedded && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-primary">
+                      Weryfikacja konta {isContractor ? 'wykonawcy' : 'zarządcy'}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Zweryfikowane konto otrzymuje więcej {isContractor ? 'zgłoszeń' : 'ofert'} i
+                      wyższą pozycję w wynikach wyszukiwania.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {showUploadForm && (
+            <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+              <div className="border-b bg-muted/30 px-4 py-4 sm:px-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Shield className="h-5 w-5" />
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <Check className="h-4 w-4 text-success" />
-                        <span>Weryfikacja w 1-3 dni</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Check className="h-4 w-4 text-success" />
-                        <span>Oznaczenie &quot;Zweryfikowany&quot;</span>
-                      </div>
+                    <div className="min-w-0">
+                      <h2 className="text-base font-semibold tracking-tight">
+                        {existingDocuments.length > 0
+                          ? 'Twoje dokumenty weryfikacyjne'
+                          : 'Dokumenty do weryfikacji'}
+                      </h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Zweryfikowane konto buduje zaufanie i poprawia widoczność w wynikach.
+                        Weryfikacja jest bezpłatna i trwa zwykle 1–3 dni robocze.
+                      </p>
+                      {existingDocuments.length > 0 && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Użyj „Zastąp”, aby wymienić plik w wybranym polu.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-full shrink-0 lg:w-52">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-muted-foreground">Wymagane dokumenty</span>
+                      <span className="tabular-nums font-semibold text-foreground">
+                        {requiredCompleteCount}/{requiredDocs.length}
+                      </span>
+                    </div>
+                    <div
+                      className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
+                      role="progressbar"
+                      aria-valuenow={requiredProgressPct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all duration-300',
+                          requiredDocumentsUploaded ? 'bg-emerald-500' : 'bg-primary',
+                        )}
+                        style={{ width: `${requiredProgressPct}%` }}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {showUploadForm && (
-            <>
-              {/* Documents Upload */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">
-                    {existingDocuments.length > 0 ? 'Twoje dokumenty' : 'Dokumenty do przesłania'}
-                  </h3>
-                  {existingDocuments.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Wybierz nowy plik dla danego dokumentu, aby go zastąpić.
-                    </p>
-                  )}
-                </div>
-
-                {(() => {
-                  const rejectedCount = existingDocuments.filter(d => {
-                    const r = reviewByKey[d.key] ?? null;
-                    return deriveDocumentReviewState(d, r) === 'rejected';
-                  }).length;
-                  if (rejectedCount === 0) return null;
-                  return (
-                    <Alert variant="destructive">
+              {(() => {
+                const rejectedCount = existingDocuments.filter(d => {
+                  const r = reviewByKey[d.key] ?? null;
+                  return deriveDocumentReviewState(d, r) === 'rejected';
+                }).length;
+                if (rejectedCount === 0) return null;
+                return (
+                  <div className="border-b border-destructive/20 bg-destructive/5 px-4 py-3 sm:px-6">
+                    <Alert variant="destructive" className="border-0 bg-transparent p-0 shadow-none">
                       <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
+                      <AlertDescription className="text-sm">
                         {rejectedCount === 1
-                          ? 'Jeden z Twoich dokumentów został odrzucony przez administratora. Zastąp go zaktualizowanym plikiem i prześlij ponownie.'
-                          : `Liczba odrzuconych dokumentów: ${rejectedCount}. Zastąp je zaktualizowanymi plikami i prześlij ponownie.`}
+                          ? 'Jeden dokument został odrzucony — zastąp go i wyślij ponownie.'
+                          : `${rejectedCount} dokumentów odrzuconych — zastąp je i wyślij ponownie.`}
                       </AlertDescription>
                     </Alert>
-                  );
-                })()}
+                  </div>
+                );
+              })()}
 
+              <div className="divide-y">
                 {documents.map(doc => {
                   const existing = existingByKey[doc.type];
                   const newFile = uploads[doc.type]?.file ?? null;
@@ -790,43 +841,72 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                   // doc (initial submission) or when the user explicitly opted
                   // into replacing the existing one via the "Zastąp" button.
                   const showUploadSection = !existing || isReplacing;
-                  const cardBorder =
-                    reviewState === 'rejected'
-                      ? 'border-destructive/40'
-                      : reviewState === 'approved'
-                        ? 'border-emerald-500/30'
-                        : '';
+                  const DocIcon = getDocumentIcon(doc.type);
+                  const isComplete = isRequiredDocComplete(
+                    doc,
+                    existingByKey,
+                    uploads,
+                    isContractor,
+                    hasOcPolicyInAccount,
+                  );
 
                   return (
-                    <Card key={doc.type} className={cardBorder}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <CardTitle className="text-base flex items-center space-x-2">
-                              <FileText className="h-4 w-4" />
-                              <span>{doc.name}</span>
-                              {doc.required && <span className="text-destructive text-sm">*</span>}
-                            </CardTitle>
-                            <CardDescription>{doc.description}</CardDescription>
+                    <React.Fragment key={doc.type}>
+                    <section
+                      id={doc.type === 'insurance' && isContractor ? 'oc-policy' : undefined}
+                      className={cn(
+                        'px-4 py-5 sm:px-6',
+                        reviewState === 'rejected' && 'bg-destructive/[0.03]',
+                        reviewState === 'approved' && existing && 'bg-emerald-500/[0.03]',
+                      )}
+                    >
+                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 gap-3">
+                          <div
+                            className={cn(
+                              'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border',
+                              isComplete && doc.required
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                                : 'border-border bg-muted/50 text-muted-foreground',
+                            )}
+                          >
+                            <DocIcon className="h-5 w-5" />
                           </div>
-                          <div className="flex flex-col items-end gap-1.5">
-                            {existing ? (
-                              <ReviewBadge state={reviewState} />
-                            ) : doc.required ? (
-                              <Badge variant="destructive">Wymagany</Badge>
-                            ) : (
-                              <Badge variant="outline">Opcjonalny</Badge>
-                            )}
-                            {willReplace && (
-                              <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">
-                                <RefreshCw className="h-3 w-3" />
-                                Zostanie zastąpiony
-                              </Badge>
-                            )}
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-sm font-semibold">{doc.name}</h3>
+                              {doc.required ? (
+                                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
+                                  Wymagany
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Opcjonalny
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 text-xs text-muted-foreground">{doc.description}</p>
                           </div>
                         </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                          {existing ? (
+                            <ReviewBadge state={reviewState} />
+                          ) : doc.required && isComplete ? (
+                            <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
+                              <Check className="h-3 w-3" />
+                              Gotowe
+                            </Badge>
+                          ) : null}
+                          {willReplace && (
+                            <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">
+                              <RefreshCw className="h-3 w-3" />
+                              Do zastąpienia
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
                         {existing && (
                           <ExistingDocChip
                             doc={existing}
@@ -838,33 +918,35 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                         )}
 
                         {doc.type === 'insurance' && isContractor && (
-                          <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-                            <Label
-                              htmlFor="oc-valid-until-verification"
-                              className="flex items-center gap-2 text-sm"
-                            >
-                              <Calendar className="h-4 w-4 text-primary" />
-                              Data ważności OC
-                            </Label>
-                            <p className="text-xs text-muted-foreground">
-                              Uzupełnij datę ważności polisy OC. Wartość jest współdzielona z
-                              ustawieniami konta wykonawcy.
-                            </p>
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                              <Input
-                                id="oc-valid-until-verification"
-                                type="date"
-                                value={ocValidUntil}
-                                onChange={e => setOcValidUntil(e.target.value)}
-                                disabled={isSavingOcDate}
-                                className="sm:max-w-xs"
-                              />
+                          <div className="rounded-lg border border-dashed border-border/80 bg-muted/15 p-3 sm:p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                              <div className="min-w-0 flex-1 space-y-1.5">
+                                <Label
+                                  htmlFor="oc-valid-until-verification"
+                                  className="flex items-center gap-1.5 text-xs font-medium"
+                                >
+                                  <Calendar className="h-3.5 w-3.5 text-primary" />
+                                  Data ważności polisy OC
+                                </Label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Współdzielone z ustawieniami konta wykonawcy.
+                                </p>
+                                <Input
+                                  id="oc-valid-until-verification"
+                                  type="date"
+                                  value={ocValidUntil}
+                                  onChange={e => setOcValidUntil(e.target.value)}
+                                  disabled={isSavingOcDate}
+                                  className="max-w-xs bg-background"
+                                />
+                              </div>
                               <Button
                                 type="button"
                                 size="sm"
                                 variant={ocDateDirty ? 'default' : 'outline'}
                                 disabled={!ocDateDirty || isSavingOcDate}
                                 onClick={handleSaveOcValidUntil}
+                                className="shrink-0"
                               >
                                 {isSavingOcDate ? 'Zapisywanie...' : 'Zapisz datę'}
                               </Button>
@@ -873,180 +955,196 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                         )}
 
                         {showUploadSection && (
-                          <>
-                            <div className="space-y-2">
-                              {!existing && <Label>Plik dokumentu</Label>}
-                              <Dropzone
-                                accept={{
-                                  'application/pdf': ['.pdf'],
-                                  'image/*': ['.jpg', '.jpeg', '.png'],
-                                }}
-                                maxFiles={1}
-                                maxSize={10 * 1024 * 1024}
-                                minSize={1024}
-                                onDrop={(acceptedFiles, fileRejections) =>
-                                  handleFileDrop(doc.type, acceptedFiles, fileRejections)
-                                }
-                                disabled={isSubmitting}
-                                src={newFile ? [newFile] : []}
-                                className={existing ? '' : 'mt-2'}
-                              >
-                                <DropzoneEmptyState>
-                                  <div className="flex flex-col items-center justify-center">
-                                    <div className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                                      <Upload className="h-4 w-4" />
-                                    </div>
-                                    <p className="my-2 w-full truncate text-wrap font-medium text-sm">
-                                      Przeciągnij plik tutaj lub kliknij, aby wybrać
-                                    </p>
-                                    <p className="w-full truncate text-wrap text-muted-foreground text-xs">
-                                      Obsługiwane formaty: PDF, JPG, PNG. Maksymalnie 10MB.
-                                    </p>
-                                  </div>
-                                </DropzoneEmptyState>
-                                <DropzoneContent>
-                                  {newFile && (
-                                    <div className="flex flex-col items-center justify-center w-full">
-                                      <div className="flex items-center space-x-2 mb-2">
-                                        <FileText className="h-5 w-5 text-primary" />
-                                        <span className="text-sm font-medium truncate max-w-[200px]">
-                                          {newFile.name}
-                                        </span>
-                                        <div className="flex items-center space-x-1 text-success">
-                                          <Check className="h-4 w-4" />
-                                          <span className="text-xs">Wybrano</span>
-                                        </div>
+                          <div className="rounded-lg border border-dashed border-border/80 bg-muted/10 p-3 sm:p-4 overflow-hidden">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+                              <div className="flex min-w-0 flex-col gap-1.5 overflow-hidden">
+                                <Label className="text-xs font-medium text-foreground">
+                                  Plik dokumentu
+                                </Label>
+                                <Dropzone
+                                  accept={{
+                                    'application/pdf': ['.pdf'],
+                                    'image/*': ['.jpg', '.jpeg', '.png'],
+                                  }}
+                                  maxFiles={1}
+                                  maxSize={10 * 1024 * 1024}
+                                  minSize={1024}
+                                  onDrop={(acceptedFiles, fileRejections) =>
+                                    handleFileDrop(doc.type, acceptedFiles, fileRejections)
+                                  }
+                                  disabled={isSubmitting}
+                                  src={newFile ? [newFile] : []}
+                                  className="!h-[5.5rem] !max-h-[5.5rem] !min-h-0 w-full !p-3 shrink-0"
+                                >
+                                  <DropzoneEmptyState>
+                                    <div className="flex flex-col items-center justify-center gap-1 py-1">
+                                      <div className="flex size-6 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                        <Upload className="h-3.5 w-3.5" />
                                       </div>
-                                      <p className="text-xs text-muted-foreground">
-                                        {formatFileSize(newFile.size)} • Kliknij, aby zmienić
+                                      <p className="text-xs font-medium text-center">
+                                        Przeciągnij lub kliknij, aby wybrać plik
+                                      </p>
+                                      <p className="text-[11px] text-muted-foreground text-center">
+                                        PDF, JPG, PNG · max 10 MB
                                       </p>
                                     </div>
-                                  )}
-                                </DropzoneContent>
-                              </Dropzone>
-                              {newFile && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => removeFile(doc.type)}
-                                  className="w-full"
-                                >
-                                  <X className="h-4 w-4 mr-2" />
-                                  Usuń wybrany plik
-                                </Button>
-                              )}
-                            </div>
+                                  </DropzoneEmptyState>
+                                  <DropzoneContent>
+                                    {newFile && (
+                                      <div className="flex w-full flex-col items-center justify-center gap-0.5 py-1">
+                                        <div className="flex items-center gap-1.5">
+                                          <FileText className="h-4 w-4 text-primary" />
+                                          <span className="max-w-[140px] truncate text-xs font-medium sm:max-w-[180px]">
+                                            {newFile.name}
+                                          </span>
+                                          <Check className="h-3.5 w-3.5 text-success" />
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground">
+                                          {formatFileSize(newFile.size)} · kliknij, aby zmienić
+                                        </p>
+                                      </div>
+                                    )}
+                                  </DropzoneContent>
+                                </Dropzone>
+                                {newFile && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeFile(doc.type)}
+                                    className="w-full"
+                                  >
+                                    <X className="h-4 w-4 mr-2" />
+                                    Usuń wybrany plik
+                                  </Button>
+                                )}
+                              </div>
 
-                            <div className="space-y-2">
-                              <Label htmlFor={`desc-${doc.type}`}>
-                                Dodatkowe informacje (opcjonalnie)
-                              </Label>
-                              <Textarea
-                                id={`desc-${doc.type}`}
-                                placeholder="Dodaj komentarz do dokumentu..."
-                                value={uploads[doc.type]?.description || ''}
-                                onChange={e => handleDescriptionChange(doc.type, e.target.value)}
-                                rows={2}
-                              />
+                              <div className="flex min-w-0 flex-col gap-1.5">
+                                <Label htmlFor={`desc-${doc.type}`} className="text-xs font-medium">
+                                  Komentarz (opcjonalnie)
+                                </Label>
+                                <Textarea
+                                  id={`desc-${doc.type}`}
+                                  placeholder="Np. zakres uprawnień, numer polisy..."
+                                  value={uploads[doc.type]?.description || ''}
+                                  onChange={e =>
+                                    handleDescriptionChange(doc.type, e.target.value)
+                                  }
+                                  className="h-[5.5rem] min-h-[5.5rem] max-h-40 resize-y bg-background"
+                                  rows={3}
+                                />
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </section>
+                    {doc.type === 'references' && userId && isContractor && (
+                      <ContractorProfessionalQualificationsSettings
+                        userId={userId}
+                        variant="section"
+                      />
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </div>
 
-              {/* Additional Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Dodatkowe informacje</CardTitle>
-                  <CardDescription>
-                    Możesz dodać dodatkowe informacje które pomogą w procesie weryfikacji
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+              <div className="space-y-4 border-t bg-muted/20 px-4 py-5 sm:px-6">
+                <div className="space-y-2">
+                  <Label htmlFor="verification-additional-info" className="text-sm font-medium">
+                    Uwagi do całego wniosku (opcjonalnie)
+                  </Label>
                   <Textarea
+                    id="verification-additional-info"
                     value={additionalInfo}
                     onChange={e => setAdditionalInfo(e.target.value)}
-                    placeholder="Opisz dodatkowe kwalifikacje, doświadczenie lub inne informacje które mogą być istotne dla weryfikacji..."
-                    rows={4}
+                    placeholder="Doświadczenie, dodatkowe kwalifikacje lub kontekst pomocny przy weryfikacji..."
+                    rows={3}
+                    className="bg-background"
                   />
-                </CardContent>
-              </Card>
-
-              {/* Warnings */}
-              <Alert variant="destructive" className="bg-red-50 border-red-200 border-2">
-                <div className="flex gap-3 w-max">
-                  <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-                  <AlertDescription className="text-red-900">
-                    <strong className="text-base block mb-2">Ważne informacje:</strong>
-                    <ul className="space-y-1.5 text-sm">
-                      <li>• Dokumenty muszą być aktualne (nie starsze niż 6 miesięcy)</li>
-                      <li>• Wszystkie dane muszą być czytelne</li>
-                      <li>• W przypadku dokumentów w językach obcych dołącz tłumaczenie</li>
-                      <li className="font-semibold pt-1">
-                        • Przesłanie fałszywych dokumentów skutkuje trwałym zablokowaniem konta
-                      </li>
-                    </ul>
-                  </AlertDescription>
                 </div>
-              </Alert>
 
-              {/* Submit */}
-              <div className="flex justify-end space-x-4">
-                <Button variant="outline" onClick={() => router.push('/account')}>
-                  Anuluj
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!requiredDocumentsUploaded || isSubmitting}
-                  className="min-w-32"
-                >
-                  {isSubmitting ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Przesyłanie...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      {submitLabel}
-                    </>
-                  )}
-                </Button>
-              </div>
+                <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 sm:p-4">
+                  <p className="text-xs font-semibold text-amber-900">Przed wysłaniem</p>
+                  <ul className="mt-2 space-y-1 text-xs text-amber-900/90">
+                    <li>· Dokumenty aktualne (nie starsze niż 6 miesięcy) i czytelne</li>
+                    <li>· Do dokumentów obcojęzycznych dołącz tłumaczenie</li>
+                    <li className="font-medium">
+                      · Fałszywe dokumenty skutkują trwałym zablokowaniem konta
+                    </li>
+                  </ul>
+                </div>
 
-              {!requiredDocumentsUploaded && (
-                <Alert>
-                  <AlertDescription>
-                    Aby przesłać dokumenty, musisz załączyć wszystkie wymagane pliki oznaczone
-                    gwiazdką (*).
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* RODO Information */}
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Informacja o przetwarzaniu danych osobowych (RODO):</strong>
-                  <br />
-                  Przesłane dokumenty przetwarzamy wyłącznie w celu weryfikacji kwalifikacji i
-                  budowania zaufania na platformie. Podstawą prawną jest uzasadniony interes
-                  (art. 6 ust. 1 lit. f RODO). Dokumenty przechowujemy bezpiecznie, a dostęp mają
-                  tylko upoważnieni pracownicy. Po zakończeniu weryfikacji dokumenty są
-                  automatycznie usuwane.{' '}
-                  <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
-                    Więcej informacji w Polityce prywatności
+                <div className="rounded-lg border bg-background/80 p-3 text-xs leading-relaxed text-muted-foreground">
+                  <Info className="mb-1 inline h-3.5 w-3.5 text-primary" />{' '}
+                  <strong className="text-foreground">RODO:</strong> dokumenty przetwarzamy wyłącznie
+                  w celu weryfikacji (art. 6 ust. 1 lit. f RODO), przechowujemy bezpiecznie i
+                  usuwamy po zakończeniu procesu.{' '}
+                  <Link href="/privacy" className="font-medium text-primary hover:underline">
+                    Polityka prywatności
                   </Link>
-                </AlertDescription>
-              </Alert>
-            </>
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end sm:gap-3">
+                  {!embedded && (
+                    <Button variant="outline" onClick={() => router.push('/account')}>
+                      Anuluj
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!requiredDocumentsUploaded || isSubmitting}
+                    className="w-full sm:min-w-40 sm:w-auto"
+                    size="lg"
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Przesyłanie...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        {submitLabel}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
+    </div>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="border-b bg-card">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/account')}
+              className="hidden md:flex text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Powrót
+            </Button>
+            <div>
+              <h1>Weryfikacja konta</h1>
+              <p className="text-sm text-muted-foreground">{headerSubtitle}</p>
+            </div>
+          </div>
+        </div>
       </div>
+      {content}
     </div>
   );
 };

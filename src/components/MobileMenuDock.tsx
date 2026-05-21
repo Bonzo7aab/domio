@@ -28,6 +28,7 @@ import { useLayoutContext } from './ConditionalFooter';
 import { useFilterContext } from '../contexts/FilterContext';
 import { useJobsContext } from '../contexts/JobsContext';
 import JobFilters from './JobFilters';
+import { HeaderJobSearch } from './HeaderJobSearch';
 
 export function MobileMenuDock() {
   const router = useNavigationWithLoading();
@@ -38,6 +39,7 @@ export function MobileMenuDock() {
   const { loadedJobs } = useJobsContext();
   
   const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
+  const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -78,13 +80,7 @@ export function MobileMenuDock() {
       title: 'Szukaj',
       icon: <Search className="size-6" />,
       onClick: () => {
-        // Trigger command palette
-        const event = new KeyboardEvent('keydown', {
-          key: 'k',
-          metaKey: true,
-          ctrlKey: navigator.platform.includes('Mac') ? false : true,
-        });
-        document.dispatchEvent(event);
+        setSearchDrawerOpen(true);
         setMenuDrawerOpen(false);
       },
     },
@@ -193,15 +189,7 @@ export function MobileMenuDock() {
       isActive: false, // Search doesn't have a specific path
       onClick: () => {
         setMenuDrawerOpen(false);
-        setTimeout(() => {
-          // Trigger command palette
-          const event = new KeyboardEvent('keydown', {
-            key: 'k',
-            metaKey: true,
-            ctrlKey: navigator.platform.includes('Mac') ? false : true,
-          });
-          document.dispatchEvent(event);
-        }, 150);
+        setTimeout(() => setSearchDrawerOpen(true), 150);
       },
     },
   ];
@@ -233,6 +221,17 @@ export function MobileMenuDock() {
   if (isCompactMode) {
     return (
       <>
+        <Drawer open={searchDrawerOpen} onOpenChange={setSearchDrawerOpen}>
+          <DrawerContent className="max-h-[50vh]">
+            <DrawerHeader>
+              <DrawerTitle>Szukaj ogłoszeń</DrawerTitle>
+            </DrawerHeader>
+            <div className="p-4 pb-8">
+              <HeaderJobSearch className="flex-col sm:flex-row w-full max-w-none" />
+            </div>
+          </DrawerContent>
+        </Drawer>
+
         {/* Filters Drawer - always rendered */}
         <Drawer open={filtersDrawerOpen} onOpenChange={setFiltersDrawerOpen}>
           <DrawerContent className="max-h-[85vh]">
@@ -283,7 +282,7 @@ export function MobileMenuDock() {
         </Drawer>
 
         {/* Dock container - hidden when filters drawer is open, visible on mobile and tablet */}
-        {!filtersDrawerOpen && (
+        {!filtersDrawerOpen && !searchDrawerOpen && (
           <div className="lg:hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
             <FloatingDock
               items={compactDockItems}

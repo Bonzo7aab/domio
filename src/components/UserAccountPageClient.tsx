@@ -1,15 +1,6 @@
 'use client'
 
-import {
-  CalendarClock,
-  ChevronRight,
-  Clock,
-  FileWarning,
-  ShieldCheck,
-  ShieldX,
-  Upload,
-  User,
-} from 'lucide-react';
+import { Clock, ShieldCheck, ShieldX, User } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -18,248 +9,28 @@ import { PasswordForm } from './PasswordForm';
 import { ProfileForm } from './ProfileForm';
 import { CompanyManagementForm } from './CompanyManagementForm';
 import { DeleteAccountSection } from './DeleteAccountSection';
-import { ContractorInsuranceSettings } from './ContractorInsuranceSettings';
-import { ContractorProfessionalQualificationsSettings } from './ContractorProfessionalQualificationsSettings';
+import { ContractorDocumentsTab } from './ContractorDocumentsTab';
+import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
+import type {
+  DocumentReviewMap,
+  VerificationDocumentEntry,
+} from '../lib/database/admin-verification';
 import { ContractorNotificationsPanel } from './ContractorNotificationsPanel';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { Button } from './ui/button';
 import { Tabs, TabsContent } from './ui/tabs';
 import { cn } from './ui/utils';
 import { VerificationAttentionIcon } from './VerificationAttentionIcon';
-import { classifyOcForUser } from '../lib/contractor-oc-status';
-
-interface OcPolicyNoticeProps {
-  ocOnboarding: OcOnboarding;
-  onAction: () => void;
-}
-
-/**
- * Mirrors `VerificationNotice` styling so the two onboarding tasks read as a
- * cohesive set. Hidden entirely when OC is in good shape so we don't clutter
- * the header with a "you're fine" message that wastes space; we leave a tiny
- * confirmation strip instead.
- */
-function OcPolicyNotice({ ocOnboarding, onAction }: OcPolicyNoticeProps) {
-  const oc = classifyOcForUser(ocOnboarding.ocValidUntil, ocOnboarding.hasOcScan);
-
-  if (oc.state === 'valid') {
-    return null;
-  }
-
-  if (oc.state === 'expiring') {
-    return (
-      <div className="mt-3 flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 sm:flex-row sm:items-center">
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
-          <Clock className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-amber-800">Polisa OC wkrótce wygasa</div>
-          <p className="text-xs text-muted-foreground">
-            Wygasa {oc.validUntilLabel} ({oc.daysLeft} dni). Zaktualizuj dane, aby Twoje oferty
-            pozostały widoczne.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAction}
-          className="border-amber-500/40 text-amber-800 hover:bg-amber-500/10"
-        >
-          <CalendarClock className="mr-1 h-3.5 w-3.5" /> Zaktualizuj OC
-          <ChevronRight className="ml-1 h-3.5 w-3.5" />
-        </Button>
-      </div>
-    );
-  }
-
-  if (oc.state === 'expired') {
-    return (
-      <div className="mt-3 flex flex-col gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/5 px-4 py-3 sm:flex-row sm:items-center">
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
-          <ShieldX className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-destructive">Polisa OC wygasła</div>
-          <p className="text-xs text-muted-foreground">
-            Wygasła {oc.validUntilLabel}. Twoje oferty mogą zostać zawieszone — wgraj aktualną
-            polisę i ustaw nową datę ważności.
-          </p>
-        </div>
-        <Button variant="destructive" size="sm" onClick={onAction}>
-          <Upload className="mr-1 h-3.5 w-3.5" /> Zaktualizuj OC
-          <ChevronRight className="ml-1 h-3.5 w-3.5" />
-        </Button>
-      </div>
-    );
-  }
-
-  if (oc.state === 'no-date') {
-    return (
-      <div className="mt-3 flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 sm:flex-row sm:items-center">
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
-          <CalendarClock className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-amber-800">Uzupełnij datę ważności OC</div>
-          <p className="text-xs text-muted-foreground">
-            Skan polisy OC jest dołączony, ale brakuje daty ważności. Uzupełnij ją, aby Twoje
-            oferty mogły być publikowane.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAction}
-          className="border-amber-500/40 text-amber-800 hover:bg-amber-500/10"
-        >
-          <CalendarClock className="mr-1 h-3.5 w-3.5" /> Dodaj datę
-          <ChevronRight className="ml-1 h-3.5 w-3.5" />
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3 flex flex-col gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/5 px-4 py-3 sm:flex-row sm:items-center">
-      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
-        <FileWarning className="h-5 w-5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold text-destructive">Brak polisy OC</div>
-        <p className="text-xs text-muted-foreground">
-          Dodaj skan polisy OC oraz datę ważności w ustawieniach konta wykonawcy. Bez polisy nie
-          możemy przeprowadzić weryfikacji ani opublikować Twoich ofert.
-        </p>
-      </div>
-      <Button size="sm" onClick={onAction}>
-        <Upload className="mr-1 h-3.5 w-3.5" /> Dodaj polisę OC
-        <ChevronRight className="ml-1 h-3.5 w-3.5" />
-      </Button>
-    </div>
-  );
-}
-
-interface VerificationNoticeProps {
-  status: VerificationStatus;
-  onAction: () => void;
-}
-
-/**
- * Unified verification status notice rendered above the account tabs. Each
- * state has a distinct color/icon palette plus an inline CTA so the user
- * always sees one cohesive box rather than a mix of inline badges, separate
- * buttons, and an alert.
- */
-function VerificationNotice({ status, onAction }: VerificationNoticeProps) {
-  if (status.state === 'approved') {
-    return (
-      <div className="mt-4 flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-          <ShieldCheck className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-emerald-700">Konto zweryfikowane</div>
-          <p className="text-xs text-muted-foreground">
-            Twoja firma posiada oznaczenie „Zweryfikowany”.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status.state === 'pending') {
-    return (
-      <div className="mt-4 flex flex-col gap-3 rounded-lg border border-blue-500/30 bg-blue-500/5 px-4 py-3 sm:flex-row sm:items-center">
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
-          <Clock className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-blue-700">Weryfikacja w toku</div>
-          <p className="text-xs text-muted-foreground">
-            Sprawdzimy Twoje dokumenty w 1–3 dni robocze. Powiadomimy Cię o wyniku.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAction}
-          className="border-blue-500/40 text-blue-700 hover:bg-blue-500/10"
-        >
-          Sprawdź status
-          <ChevronRight className="ml-1 h-3.5 w-3.5" />
-        </Button>
-      </div>
-    );
-  }
-
-  if (status.state === 'rejected') {
-    return (
-      <div className="mt-4 space-y-3 rounded-lg border-2 border-destructive/40 bg-destructive/5 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
-            <ShieldX className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="font-semibold text-destructive">Weryfikacja odrzucona</div>
-            <p className="text-xs text-muted-foreground">
-              Popraw wskazane elementy i prześlij dokumenty ponownie.
-            </p>
-          </div>
-          <Button variant="destructive" size="sm" onClick={onAction}>
-            Prześlij ponownie
-            <ChevronRight className="ml-1 h-3.5 w-3.5" />
-          </Button>
-        </div>
-        {status.reason && (
-          <div className="rounded-md border border-destructive/30 bg-background p-3">
-            <div className="text-xs font-medium uppercase tracking-wide text-destructive">
-              Powód odrzucenia
-            </div>
-            <p className="mt-1 whitespace-pre-line text-sm text-foreground">{status.reason}</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // unsubmitted
-  return (
-    <div className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 sm:flex-row sm:items-center">
-      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15">
-        <VerificationAttentionIcon className="h-5 w-5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold text-amber-800">Konto wymaga weryfikacji</div>
-        <p className="text-xs text-muted-foreground">
-          Zweryfikowane konto otrzymuje więcej zgłoszeń i wyższą pozycję w wynikach wyszukiwania.
-          Proces jest bezpłatny i zajmuje 1–3 dni robocze.
-        </p>
-      </div>
-      <Button size="sm" onClick={onAction}>
-        Zweryfikuj konto
-        <ChevronRight className="ml-1 h-3.5 w-3.5" />
-      </Button>
-    </div>
-  );
-}
-
-interface OcOnboarding {
-  ocValidUntil: string | null;
-  hasOcScan: boolean;
-}
 
 interface UserAccountPageClientProps {
   verificationStatus: VerificationStatus;
-  /**
-   * Contractor-only OC policy snapshot. `null` for managers (who do not have
-   * an OC requirement) so the notice block is skipped entirely.
-   */
-  ocOnboarding: OcOnboarding | null;
+  verificationDocuments?: VerificationDocumentEntry[];
+  documentReviews?: DocumentReviewMap;
 }
 
 export function UserAccountPageClient({
   verificationStatus,
-  ocOnboarding,
+  verificationDocuments = [],
+  documentReviews,
 }: UserAccountPageClientProps) {
   const { user, isLoading, session } = useUserProfile();
   const router = useRouter();
@@ -270,53 +41,88 @@ export function UserAccountPageClient({
   // Priority 1 & 5: Controlled tabs with URL persistence
   const [activeTab, setActiveTab] = React.useState('profile');
 
-  const hasInitializedTabFromUrl = React.useRef(false);
+  const ACCOUNT_TABS = [
+    'profile',
+    'company',
+    'security',
+    'contractor-data',
+    'documents',
+    'contractor-notifications',
+  ] as const;
+
+  const resolveTabFromUrl = React.useCallback(
+    (tabFromUrl: string | null): string | null => {
+      if (!tabFromUrl) return null;
+      const normalizedTab =
+        tabFromUrl === 'notifications' ? 'contractor-notifications' : tabFromUrl;
+      if (!ACCOUNT_TABS.includes(normalizedTab as (typeof ACCOUNT_TABS)[number])) {
+        return null;
+      }
+      if (normalizedTab === 'company') {
+        return 'profile';
+      }
+      if (user?.userType === 'manager' && normalizedTab === 'documents') {
+        return 'profile';
+      }
+      if (user?.userType === 'contractor' && normalizedTab === 'profile') {
+        return 'contractor-data';
+      }
+      return normalizedTab;
+    },
+    [user?.userType],
+  );
 
   // Track client-side mount to prevent hydration mismatch
   React.useEffect(() => {
     setIsMounted(true);
-    
-    // Priority 5: Initialize tab from URL on mount (only once)
-    if (!hasInitializedTabFromUrl.current) {
-      const tabFromUrl = searchParams.get('tab');
-      const normalizedTab =
-        tabFromUrl === 'notifications' ? 'contractor-notifications' : tabFromUrl;
-      if (
-        normalizedTab &&
-        ['profile', 'company', 'security', 'contractor-data', 'contractor-notifications'].includes(
-          normalizedTab,
-        )
-      ) {
-        // Managers no longer use a separate „Dane firmy” tab — deep links still work.
-        setActiveTab(normalizedTab === 'company' ? 'profile' : normalizedTab);
+  }, []);
+
+  const applyTabToUrl = React.useCallback(
+    (tab: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      const isDefaultTab =
+        (user?.userType === 'contractor' && tab === 'contractor-data') ||
+        (user?.userType === 'manager' && tab === 'profile');
+
+      if (isDefaultTab) {
+        params.delete('tab');
+      } else {
+        const urlTab = tab === 'contractor-notifications' ? 'notifications' : tab;
+        params.set('tab', urlTab);
       }
-      hasInitializedTabFromUrl.current = true;
-    }
-  }, [searchParams]);
 
-  // Priority 5: Persist tab state in URL
-  React.useEffect(() => {
-    if (!isMounted || !hasInitializedTabFromUrl.current) return;
-    
-    const currentTab = searchParams.get('tab') || 'profile';
-    if (currentTab === activeTab) return; // No change needed
-    
-    const params = new URLSearchParams(searchParams);
-    if (activeTab !== 'profile') {
-      params.set('tab', activeTab);
-    } else {
-      params.delete('tab');
-    }
+      const hash = typeof window !== 'undefined' ? window.location.hash : '';
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}${hash}` : `${window.location.pathname}${hash}`, {
+        scroll: false,
+      });
+    },
+    [router, searchParams, user?.userType],
+  );
 
-    // Preserve any hash anchor (e.g. #oc-policy) so deep links from the
-    // verification / OC notice still scroll to the relevant card after the
-    // forced tab switch for contractors.
-    const hash = typeof window !== 'undefined' ? window.location.hash : '';
-    const newUrl = params.toString()
-      ? `?${params.toString()}${hash}`
-      : `${window.location.pathname}${hash}`;
-    router.replace(newUrl, { scroll: false });
-  }, [activeTab, isMounted, router, searchParams]);
+  const handleTabChange = React.useCallback(
+    (tab: string) => {
+      setActiveTab(tab);
+      if (user) {
+        applyTabToUrl(tab);
+      }
+    },
+    [applyTabToUrl, user],
+  );
+
+  // URL → state (menu / deep links). useLayoutEffect so we apply before persist-style races.
+  React.useLayoutEffect(() => {
+    if (!isMounted || !user) return;
+    const tabParam = searchParams.get('tab');
+    const resolved = resolveTabFromUrl(tabParam);
+    if (resolved) {
+      setActiveTab(resolved);
+      return;
+    }
+    if (!tabParam) {
+      setActiveTab(user.userType === 'contractor' ? 'contractor-data' : 'profile');
+    }
+  }, [isMounted, user, searchParams, resolveTabFromUrl]);
 
   // Scroll to the target anchor (e.g. `#oc-policy`) once the active tab's
   // content has had a chance to render. Runs whenever the active tab changes
@@ -343,18 +149,6 @@ export function UserAccountPageClient({
       hasCheckedAuth.current = true;
     }
   }, [isLoading]);
-
-  React.useEffect(() => {
-    if (!user) {
-      return;
-    }
-    if (user.userType === 'contractor' && activeTab === 'profile') {
-      setActiveTab('contractor-data');
-    }
-    if (user.userType === 'manager' && activeTab === 'company') {
-      setActiveTab('profile');
-    }
-  }, [user, activeTab]);
 
   // Redirect to login only after we've confirmed no user and no session
   // This is a fallback in case middleware doesn't catch it (e.g., in test environment)
@@ -396,6 +190,8 @@ export function UserAccountPageClient({
   if (!user) {
     return null; // Will redirect to login
   }
+
+  const showDocumentsTabAttention = needsVerificationAttention(user);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -460,18 +256,6 @@ export function UserAccountPageClient({
             </div>
           </div>
 
-          {user.userType !== 'manager' && (
-            <VerificationNotice
-              status={verificationStatus}
-              onAction={() => router.push('/verification')}
-            />
-          )}
-          {ocOnboarding && (
-            <OcPolicyNotice
-              ocOnboarding={ocOnboarding}
-              onAction={() => router.push('/account?tab=contractor-data#oc-policy')}
-            />
-          )}
         </div>
       </div>
 
@@ -480,20 +264,42 @@ export function UserAccountPageClient({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-1 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {user.userType === 'contractor' ? (
-              <button
-                onClick={() => setActiveTab('contractor-data')}
-                className={cn(
-                  "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                  activeTab === 'contractor-data'
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-                )}
-              >
-                Twoje dane
-              </button>
+              <>
+                <button
+                  onClick={() => handleTabChange('contractor-data')}
+                  className={cn(
+                    'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                    activeTab === 'contractor-data'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                  )}
+                >
+                  Twoje dane
+                </button>
+                <button
+                  onClick={() => handleTabChange('documents')}
+                  className={cn(
+                    'relative px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                    showDocumentsTabAttention && 'pr-7 sm:pr-4',
+                    activeTab === 'documents'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                  )}
+                >
+                  Dokumenty
+                  {showDocumentsTabAttention && (
+                    <span
+                      className="absolute top-1 -right-0.5 sm:top-1.5 sm:right-0"
+                      aria-label="Wymagana weryfikacja dokumentów"
+                    >
+                      <VerificationAttentionIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-amber-50" />
+                    </span>
+                  )}
+                </button>
+              </>
             ) : (
               <button
-                onClick={() => setActiveTab('profile')}
+                onClick={() => handleTabChange('profile')}
                 className={cn(
                   "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
                   activeTab === 'profile'
@@ -505,7 +311,7 @@ export function UserAccountPageClient({
               </button>
             )}
             <button
-              onClick={() => setActiveTab('security')}
+              onClick={() => handleTabChange('security')}
               className={cn(
                 "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
                 activeTab === 'security'
@@ -516,7 +322,7 @@ export function UserAccountPageClient({
               Bezpieczeństwo
             </button>
             <button
-              onClick={() => setActiveTab('contractor-notifications')}
+              onClick={() => handleTabChange('contractor-notifications')}
               className={cn(
                 "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
                 activeTab === 'contractor-notifications'
@@ -532,7 +338,7 @@ export function UserAccountPageClient({
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsContent value="profile" className="space-y-6">
             <ProfileForm user={user} />
             {user.userType === 'manager' && <CompanyManagementForm user={user} />}
@@ -540,8 +346,15 @@ export function UserAccountPageClient({
 
           <TabsContent value="contractor-data" className="space-y-6">
             <ProfileForm user={user} includeBusinessData />
-            <ContractorInsuranceSettings userId={user.id} />
-            <ContractorProfessionalQualificationsSettings userId={user.id} />
+          </TabsContent>
+
+          <TabsContent value="documents" className="space-y-6">
+            <ContractorDocumentsTab
+              userId={user.id}
+              initialStatus={verificationStatus}
+              existingDocuments={verificationDocuments}
+              documentReviews={documentReviews}
+            />
           </TabsContent>
 
           <TabsContent value="security" className="space-y-6">

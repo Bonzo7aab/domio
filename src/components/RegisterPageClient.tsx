@@ -39,9 +39,5 @@ export function RegisterPageClient({ registrationSettings }: RegisterPageClientP
     return <LoadingState label="Przekierowywanie..." />;
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <RegisterPage registrationSettings={registrationSettings} />
-    </div>
-  );
+  return <RegisterPage registrationSettings={registrationSettings} />;
 }

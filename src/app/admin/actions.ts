@@ -162,7 +162,7 @@ async function rejectVerificationSubjectActionImpl(
     type: 'verification_rejected',
     title: 'Weryfikacja odrzucona',
     message: trimmed,
-    actionUrl: '/verification',
+    actionUrl: '/account?tab=documents',
     sendPush: true,
   });
 

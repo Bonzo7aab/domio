@@ -27,7 +27,9 @@ export default function Onboarding() {
   return (
     <OnboardingFlow 
       onComplete={() => router.push('/')}
-      onVerificationClick={() => router.push('/verification')}
+      onVerificationClick={() =>
+        router.push('/account?tab=documents')
+      }
     />
   );
 }

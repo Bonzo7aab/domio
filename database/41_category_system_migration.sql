@@ -127,7 +127,8 @@ BEGIN
     ('Instalacje wodno-kanalizacyjne i C.O.', 'instalacje-wodno-kanalizacyjne-co', 'Instalacje wodne, kanalizacyjne, centralne ogrzewanie', instalacje_id, 1, TRUE),
     ('Instalacje elektryczne i oświetlenie', 'instalacje-elektryczne-oswietlenie', 'Instalacje elektryczne, oświetlenie części wspólnych', instalacje_id, 2, TRUE),
     ('Serwis i modernizacja wind', 'serwis-modernizacja-wind', 'Konserwacja, naprawa i modernizacja wind', instalacje_id, 3, TRUE),
-    ('Systemy bezpieczeństwa', 'systemy-bezpieczenstwa', 'CCTV, domofony, systemy PPOŻ, monitoring', instalacje_id, 4, TRUE)
+    ('Systemy bezpieczeństwa i niskie prądy (CCTV, Domofony, Kontrola dostępu)', 'systemy-bezpieczenstwa-niskie-prady', 'CCTV, domofony, kontrola dostępu, instalacje niskoprądowe', instalacje_id, 4, TRUE),
+    ('Systemy i zabezpieczenia PPOŻ', 'systemy-zabezpieczenia-ppoz', 'Systemy przeciwpożarowe, zabezpieczenia PPOŻ, monitoring pożarowy', instalacje_id, 5, TRUE)
     ON CONFLICT (slug) DO UPDATE SET
       name = EXCLUDED.name,
       description = EXCLUDED.description,
@@ -156,9 +157,11 @@ BEGIN
     
     -- Subcategories for Przeglądy i Obsługa Techniczna
     INSERT INTO job_categories (name, slug, description, parent_id, sort_order, is_active) VALUES
-    ('Obowiązkowe przeglądy techniczne', 'obowiazkowe-przeglady-techniczne', 'Przeglądy roczne i 5-letnie, certyfikaty', przeglady_id, 1, TRUE),
-    ('Inspekcje kominiarskie i wentylacja', 'inspekcje-kominiarskie-wentylacja', 'Kontrola kominów, drożność wentylacji', przeglady_id, 2, TRUE),
-    ('Serwis bram wjazdowych i automatyki', 'serwis-bram-automatyka', 'Naprawa i konserwacja bram, szlabanów, automatyki', przeglady_id, 3, TRUE)
+    ('Przeglądy ogólnobudowlane i konstrukcyjne (roczne / 5-letnie)', 'przeglady-ogolnobudowlane-konstrukcyjne', 'Przeglądy roczne i 5-letnie, konstrukcja budynku, stan techniczny', przeglady_id, 1, TRUE),
+    ('Przeglądy instalacji elektrycznych i piorunochronnych', 'przeglady-instalacji-elektrycznych-piorunochronnych', 'Przeglądy instalacji elektrycznych, uziemienia i piorunochronów', przeglady_id, 2, TRUE),
+    ('Inspekcje kominiarskie i drożność wentylacji', 'inspekcje-kominiarskie-droznosc-wentylacji', 'Kontrola kominów, drożność przewodów wentylacyjnych', przeglady_id, 3, TRUE),
+    ('Przeglądy instalacji gazowych (szczelność)', 'przeglady-instalacji-gazowych-szczelnosc', 'Przeglądy szczelności instalacji gazowych, certyfikaty', przeglady_id, 4, TRUE),
+    ('Serwis bram wjazdowych, szlabanów i automatyki', 'serwis-bram-szlabanow-automatyki', 'Naprawa i konserwacja bram wjazdowych, szlabanów, automatyki', przeglady_id, 5, TRUE)
     ON CONFLICT (slug) DO UPDATE SET
       name = EXCLUDED.name,
       description = EXCLUDED.description,

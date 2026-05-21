@@ -146,7 +146,7 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
             {[1, 2, 3, 4, 5, 6].map(i => (
               <div
                 key={i}
-                className="flex-shrink-0 w-36 sm:w-40 h-28 sm:h-32 bg-muted rounded-xl border border-border animate-pulse"
+                className="flex-shrink-0 w-36 sm:w-40 h-28 sm:h-32 bg-muted/40 rounded-xl animate-pulse"
               />
             ))}
           </div>
@@ -198,23 +198,19 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
                   key={category.id}
                   onClick={() => handleCategoryClick(category.name)}
                   className={cn(
-                    "flex-shrink-0 flex flex-col items-center gap-2",
-                    "w-36 sm:w-40 h-24 sm:h-28",
-                    "rounded-xl border transition-all duration-200",
-                    "pt-3 pb-2.5",
-                    "hover:shadow-md",
-                    "focus:outline-none",
+                    'flex-shrink-0 flex flex-col items-center gap-2',
+                    'w-36 sm:w-40 h-24 sm:h-28',
+                    'rounded-xl transition-colors duration-200',
+                    'pt-3 pb-2.5',
+                    'focus:outline-none',
                     isSelected
-                      ? "border-primary shadow-sm bg-primary/5 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/20"
-                      : "border-border bg-card hover:bg-accent/50 hover:border-accent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/30"
+                      ? 'bg-primary/5 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/20'
+                      : 'bg-transparent hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/30'
                   )}
                   style={
                     isSelected
                       ? {
-                          borderColor: config.color,
                           backgroundColor: `${config.color}08`,
-                          '--tw-ring-color': `${config.color}20`,
-                          boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.1)',
                         } as React.CSSProperties
                       : undefined
                   }
