@@ -352,7 +352,7 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
       case 'system': {
         const systemNotif = notification as SystemNotification;
         const verificationPath =
-          user?.userType === 'manager' ? '/account' : '/verification';
+          user?.userType === 'manager' ? '/account' : '/account?tab=documents';
         const target =
           systemNotif.actionUrl ||
           (systemNotif.type === 'verification_rejected' ? verificationPath : '/account');

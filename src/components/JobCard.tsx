@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { MapPin, Clock, BookmarkIcon, Eye, Gavel, Wrench, Users, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -9,6 +9,9 @@ import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
 import { useUserProfile } from '../contexts/AuthContext';
 import type { Job } from '../types/job';
 import { AuthPromptPopover, AUTH_PROMPT_APPLY_OFFER } from './AuthPromptPopover';
+import { VerificationRequiredApplyDialog } from './VerificationRequiredApplyDialog';
+import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
+import type { AuthUser } from '../types/auth';
 
 interface JobCardProps {
   job: Partial<Job> & {
@@ -43,10 +46,23 @@ function formatNumberWithSpaces(num: number): string {
 interface ApplyOfferButtonProps {
   className?: string;
   isLoggedIn: boolean;
+  user: AuthUser | null;
   onApply: (e: React.MouseEvent) => void;
 }
 
-function ApplyOfferButton({ className, isLoggedIn, onApply }: ApplyOfferButtonProps) {
+function ApplyOfferButton({ className, isLoggedIn, user, onApply }: ApplyOfferButtonProps) {
+  const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
+  const blockApply = needsVerificationAttention(user);
+
+  const handleApplyClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (blockApply) {
+      setVerificationDialogOpen(true);
+      return;
+    }
+    onApply(e);
+  };
+
   if (!isLoggedIn) {
     return (
       <div
@@ -73,9 +89,15 @@ function ApplyOfferButton({ className, isLoggedIn, onApply }: ApplyOfferButtonPr
   }
 
   return (
-    <Button type="button" className={className} onClick={onApply}>
-      Złóż ofertę
-    </Button>
+    <>
+      <Button type="button" className={className} onClick={handleApplyClick}>
+        Złóż ofertę
+      </Button>
+      <VerificationRequiredApplyDialog
+        open={verificationDialogOpen}
+        onOpenChange={setVerificationDialogOpen}
+      />
+    </>
   );
 }
 
@@ -262,6 +284,7 @@ const JobCard = React.memo(function JobCard({
                   <ApplyOfferButton
                     className="w-full sm:w-auto"
                     isLoggedIn={isLoggedIn}
+                    user={user}
                     onApply={handleApplyClick}
                   />
                 )}
@@ -565,6 +588,7 @@ const JobCard = React.memo(function JobCard({
                   <ApplyOfferButton
                     className="bg-blue-800 hover:bg-blue-900 text-white w-full md:w-auto"
                     isLoggedIn={isLoggedIn}
+                    user={user}
                     onApply={handleApplyClick}
                   />
                 </div>

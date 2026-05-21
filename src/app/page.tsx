@@ -22,6 +22,8 @@ import { useJobsContext } from '../contexts/JobsContext';
 import { createClient } from '../lib/supabase/client';
 import { createJobApplication, createTenderBid } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { VerificationRequiredApplyDialog } from '../components/VerificationRequiredApplyDialog';
+import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
 
 // Dynamically import heavy components to reduce initial bundle size
 const EnhancedMapViewGoogleMaps = dynamic(
@@ -62,6 +64,7 @@ function HomePageContent() {
   const [searchRadius, setSearchRadius] = useState(25);
   // Keep map-related state for when map is expanded
   const [applicationModalOpen, setApplicationModalOpen] = useState(false);
+  const [verificationApplyDialogOpen, setVerificationApplyDialogOpen] = useState(false);
   const [selectedApplicationJobId, setSelectedApplicationJobId] = useState<string | null>(null);
   const [selectedApplicationJob, setSelectedApplicationJob] = useState<Job | null>(null);
   const [applicationForm, setApplicationForm] = useState<JobApplicationFormFields>({
@@ -332,26 +335,36 @@ function HomePageContent() {
     setLocationChangeHandler(handleLocationChangeRequest);
   }, [setLocationChangeHandler]);
 
+  const openApplicationFlow = React.useCallback(
+    (jobId: string, jobData?: Job) => {
+      setSelectedApplicationJobId(jobId);
+      setSelectedApplicationJob(jobData ?? jobs.find(j => j.id === jobId) ?? null);
+      setApplicationModalOpen(true);
+    },
+    [jobs],
+  );
+
   // Listen for application modal open event from map drawer
   useEffect(() => {
     const handleOpenApplicationModal = (event: CustomEvent<{ jobId: string }>) => {
       if (!user) return;
-
-      const jobId = event.detail.jobId;
-      setSelectedApplicationJobId(jobId);
-      const job = jobs.find(j => j.id === jobId);
-      if (job) {
-        setSelectedApplicationJob(job);
+      if (user.userType !== 'contractor') {
+        toast.error('Tylko wykonawcy mogą składać oferty');
+        return;
       }
-      setApplicationModalOpen(true);
+      if (needsVerificationAttention(user)) {
+        setVerificationApplyDialogOpen(true);
+        return;
+      }
+      openApplicationFlow(event.detail.jobId);
     };
 
     window.addEventListener('openApplicationModal', handleOpenApplicationModal as EventListener);
-    
+
     return () => {
       window.removeEventListener('openApplicationModal', handleOpenApplicationModal as EventListener);
     };
-  }, [jobs, user]);
+  }, [user, openApplicationFlow]);
 
   const handleCitySelectorClose = () => {
     setShowCitySelector(false);
@@ -365,10 +378,13 @@ function HomePageContent() {
       toast.error('Tylko wykonawcy mogą składać oferty');
       return;
     }
-    
-    setSelectedApplicationJobId(jobId);
-    setSelectedApplicationJob(jobData);
-    setApplicationModalOpen(true);
+
+    if (needsVerificationAttention(user)) {
+      setVerificationApplyDialogOpen(true);
+      return;
+    }
+
+    openApplicationFlow(jobId, jobData);
   };
 
   const handleApplicationSubmit = async (applicationData: JobApplicationSubmitPayload) => {
@@ -562,6 +578,11 @@ function HomePageContent() {
 
   return (
       <>
+      <VerificationRequiredApplyDialog
+        open={verificationApplyDialogOpen}
+        onOpenChange={setVerificationApplyDialogOpen}
+      />
+
       {/* Job Application Modal */}
       {applicationModalOpen && selectedApplicationJobId && (
         <JobApplicationModal
@@ -643,7 +664,7 @@ function HomePageContent() {
                 onFilterChange={setFilters}
                 onJobSelect={handleJobSelect}
                 onToggleMap={handleToggleMap}
-                isMapVisible={false}
+                isMapVisible={isMapExpanded}
                 isLoadingJobs={isLoadingJobs}
                 onApplyClick={handleApplyClick}
               />

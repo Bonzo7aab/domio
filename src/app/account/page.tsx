@@ -1,6 +1,11 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../../lib/supabase/server';
 import { getUserVerificationStatus } from '../../lib/database/verification';
+import {
+  fetchVerificationDocumentReviews,
+  getVerificationDocumentSignedUrls,
+  type VerificationDocumentEntry,
+} from '../../lib/database/admin-verification';
 import { UserAccountPageClient } from '../../components/UserAccountPageClient';
 
 export default async function Account() {
@@ -33,8 +38,9 @@ export default async function Account() {
       }
     : await getUserVerificationStatus(user.id, supabase);
 
-  let ocValidUntil: string | null = null;
-  let hasOcScan = false;
+  let existingDocuments: VerificationDocumentEntry[] = [];
+  let documentReviews: Awaited<ReturnType<typeof fetchVerificationDocumentReviews>> = {};
+
   if (isContractor) {
     const [casResult, profileDocsResult] = await Promise.all([
       sb
@@ -48,17 +54,28 @@ export default async function Account() {
         .eq('id', user.id)
         .maybeSingle(),
     ]);
-    ocValidUntil = (casResult.data?.oc_valid_until as string | null) ?? null;
     const accountOcPath = (casResult.data?.oc_policy_scan_path as string | null) ?? null;
     const verificationPaths =
       (profileDocsResult.data?.verification_document_paths as Record<string, string> | null | undefined) ?? {};
-    hasOcScan = Boolean(accountOcPath || verificationPaths.insurance);
+
+    const docPaths = {
+      ...verificationPaths,
+      ...(accountOcPath && !verificationPaths.insurance
+        ? { insurance: accountOcPath }
+        : {}),
+    };
+
+    [existingDocuments, documentReviews] = await Promise.all([
+      getVerificationDocumentSignedUrls(supabase, docPaths),
+      fetchVerificationDocumentReviews(supabase, user.id),
+    ]);
   }
 
   return (
     <UserAccountPageClient
       verificationStatus={verificationStatus}
-      ocOnboarding={isContractor ? { ocValidUntil, hasOcScan } : null}
+      verificationDocuments={isContractor ? existingDocuments : undefined}
+      documentReviews={isContractor ? documentReviews : undefined}
     />
   );
 }

@@ -13,6 +13,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { VerificationAttentionIcon } from './VerificationAttentionIcon';
+import { HeaderJobSearch } from './HeaderJobSearch';
 import { Button } from './ui/button';
 import { UnifiedNotifications } from './UnifiedNotifications';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -39,6 +40,7 @@ import {
   needsVerificationAttention,
   verificationMenuLabel,
 } from '../lib/verification/needs-verification-attention';
+import { CONTRACTOR_VERIFICATION_DOCUMENTS_PATH } from '../lib/verification/documents-route';
 
 interface HeaderProps {
   initialUser?: AuthUser | null;
@@ -106,15 +108,6 @@ export function Header({ initialUser }: HeaderProps) {
     router.push('/admin')
   }
 
-  const handleManagerPageClick = () => {
-    router.push('/managers')
-  }
-
-  const handleContractorPageClick = () => {
-    router.push('/contractors')
-  }
-
-
   const handleLoginClick = () => {
     router.push('/login')
   }
@@ -124,8 +117,12 @@ export function Header({ initialUser }: HeaderProps) {
   }
 
   const handleVerificationClick = () => {
-    router.push('/verification')
-  }
+    if (currentUser?.userType !== 'contractor') {
+      router.push('/account');
+      return;
+    }
+    router.push(CONTRACTOR_VERIFICATION_DOCUMENTS_PATH);
+  };
 
   const handleAccountClick = () => {
     router.push('/account')
@@ -192,45 +189,9 @@ export function Header({ initialUser }: HeaderProps) {
             <h1 className="text-2xl font-bold cursor-pointer" style={{ color: '#1e40af' }} onClick={handleHomeClick}>Domio</h1>
           </div>
 
-          {/* 2. Center Content - Navigation and Search Bar (Hidden on mobile) */}
-          <div className="hidden md:flex items-center space-x-4 flex-1 justify-center">
-            {/* Navigation buttons */}
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="sm" onClick={handleContractorPageClick} className="text-sm hover:bg-gray-200">
-                Wykonawcy
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleManagerPageClick} className="text-sm hover:bg-gray-200">
-                Zarządcy Nieruchomości
-              </Button>
-            </div>
-            
-            {/* Fixed Width Search Bar */}
-            <div className="hidden lg:block">
-              <Button
-                variant="outline"
-                className="flex items-center justify-between h-10 w-64 text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  // This will be handled by the GlobalCommandPalette component
-                  const event = new KeyboardEvent('keydown', {
-                    key: 'k',
-                    metaKey: true,
-                    ctrlKey: typeof window !== 'undefined' && navigator.platform.includes('Mac') ? true : false,
-                  });
-                  document.dispatchEvent(event);
-                }}
-              >
-                <div className="flex items-center space-x-2">
-                  <Search className="h-4 w-4" />
-                  <span className="text-sm">Szukaj...</span>
-                </div>
-                <div className="flex items-center space-x-1 text-xs">
-                  <kbd className="px-1.5 py-0.5 bg-muted border rounded text-xs">
-                    {isMounted && typeof window !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}
-                  </kbd>
-                  <kbd className="px-1.5 py-0.5 bg-muted border rounded text-xs">K</kbd>
-                </div>
-              </Button>
-            </div>
+          {/* 2. Center - Search (hidden on mobile) */}
+          <div className="hidden md:flex items-center flex-1 justify-center">
+            <HeaderJobSearch className="max-w-md lg:max-w-xl" />
           </div>
 
             {/* Add Job button - visible for unauthenticated (redirects to login) and authenticated managers.
@@ -622,54 +583,14 @@ export function Header({ initialUser }: HeaderProps) {
               </>
             ) : (
               <>
-                {/* Mobile: Dodaj Zgłoszenie + Konto */}
                 <div className="md:hidden flex items-center space-x-2">
                   <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
                     Dodaj Zgłoszenie
                   </Button>
-                  <Drawer>
-                    <DrawerTrigger asChild>
-                      <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
-                        <User className="h-4 w-4 mr-2" />
-                        Konto
-                        <ChevronDown className="h-4 w-4 ml-1" />
-                      </Button>
-                    </DrawerTrigger>
-                    <DrawerContent>
-                      <DrawerHeader className="border-b">
-                        <DrawerTitle>Konto</DrawerTitle>
-                      </DrawerHeader>
-                      <div className="overflow-y-auto flex-1 p-4">
-                        <div className="space-y-1">
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={handleLoginClick}
-                          >
-                            <User className="mr-2 h-4 w-4" />
-                            <span>Zaloguj się</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={handleRegisterClick}
-                          >
-                            <User className="mr-2 h-4 w-4" />
-                            <span>Zarejestruj się</span>
-                          </Button>
-                        </div>
-                      </div>
-                    </DrawerContent>
-                  </Drawer>
-                </div>
-
-                {/* Desktop: single Konto dropdown */}
-                <div className="hidden md:block">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="default" size="sm" className="text-sm bg-gray-200 hover:bg-gray-300 text-black">
-                        <User className="h-4 w-4 mr-2" />
-                        Konto
+                      <Button variant="default" size="sm" className="text-sm bg-blue-800 hover:bg-blue-900 text-white">
+                        Zaloguj się
                         <ChevronDown className="h-4 w-4 ml-1" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -679,8 +600,27 @@ export function Header({ initialUser }: HeaderProps) {
                         <span>Zaloguj się</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={handleRegisterClick}>
+                        <span className="text-sm text-muted-foreground">Załóż konto</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <div className="hidden md:block">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="default" size="sm" className="text-sm bg-blue-800 hover:bg-blue-900 text-white">
+                        Zaloguj się
+                        <ChevronDown className="h-4 w-4 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={handleLoginClick}>
                         <User className="mr-2 h-4 w-4" />
-                        <span>Zarejestruj się</span>
+                        <span>Zaloguj się</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleRegisterClick}>
+                        <span className="text-sm text-muted-foreground">Załóż konto</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

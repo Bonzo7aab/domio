@@ -1,819 +1,219 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronUp, MapPin, Clock, Gavel, Wrench, Check, X, Edit3, ChevronDown as ArrowDown, AlertCircle, Calendar } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  MapPin,
+  Check,
+  Edit3,
+  Calendar,
+} from 'lucide-react';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { Label } from './ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { extractCity, extractSublocality, getProvinceForCity, getProvincesFromCities } from '../utils/locationMapping';
-import { isTenderEndingSoon } from '../utils/tenderHelpers';
 import { createClient } from '../lib/supabase/client';
 import { fetchAllCategoriesWithSubcategories } from '../lib/database/categories';
 import type { Job } from '../types/job';
 import type { CategoryWithSubcategories } from '../lib/database/categories';
+import type { FilterState, DeadlineFilterKey } from '../lib/filters/filter-state';
+import { defaultFilters, WARSAW_CITY } from '../lib/filters/filter-state';
+import { extractCity, extractSublocality } from '../utils/locationMapping';
+import { jobMatchesFilters, getWarsawDistrictsFromJobs } from '../lib/filters/filter-logic';
+import { DEADLINE_FILTER_OPTIONS } from '../lib/filters/deadline-labels';
 
-export interface FilterState {
-  categories: string[];
-  subcategories: string[];
-  contractTypes: string[];
-  locations: string[];
-  cities: string[];
-  sublocalities: string[]; // Format: "city:sublocality" e.g., "Warszawa:Ursynów"
-  provinces: string[];
-  budgetRanges: string[]; // ['<5000', '5000-20000', '20000+']
-  budgetMin?: number;
-  budgetMax?: number;
-  clientTypes: string[];
-  postTypes: string[]; // Zgłoszenia vs Przetargi
-  urgency: string[]; // ['low', 'medium', 'high']
-  urgent?: boolean; // High priority jobs (urgent flag)
-  searchQuery?: string; // Search by title
-  endingSoon?: boolean; // Tenders ending in less than 7 days
-  dateAdded: string[]; // ['today', 'last-week', 'last-month', 'last-3-months', 'last-6-months', 'last-year']
-}
+export type { FilterState } from '../lib/filters/filter-state';
+
+const EXPANDED_SECTIONS = ['categories', 'location', 'deadline', 'budget'] as const;
 
 interface JobFiltersProps {
   onFilterChange?: (filters: FilterState) => void;
   primaryLocation?: string;
   onLocationChange?: () => void;
-  jobs?: Job[]; // Available jobs to calculate dynamic categories/subcategories
-  initialFilters?: FilterState; // Initial filters from parent
-  isMapView?: boolean; // If true, applies map-specific padding adjustments
+  jobs?: Job[];
+  initialFilters?: FilterState;
+  isMapView?: boolean;
 }
 
-// Custom Checkbox Component to match the image styling
 const CustomCheckbox: React.FC<{
   id: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
-}> = ({ id, checked, onCheckedChange }) => {
+}> = ({ id, checked, onCheckedChange }) => (
+  <div className="relative">
+    <input
+      type="checkbox"
+      id={id}
+      checked={checked}
+      onChange={(e) => onCheckedChange(e.target.checked)}
+      className="sr-only"
+    />
+    <label
+      htmlFor={id}
+      className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center ${
+        checked
+          ? 'bg-blue-800 border-blue-800'
+          : 'bg-white border-gray-300 hover:border-gray-400'
+      }`}
+    >
+      {checked && <Check className="w-3 h-3 text-white" />}
+    </label>
+  </div>
+);
+
+function SectionTrigger({
+  title,
+  open,
+}: {
+  title: string;
+  open: boolean;
+}) {
   return (
-    <div className="relative">
-      <input
-        type="checkbox"
-        id={id}
-        checked={checked}
-        onChange={(e) => onCheckedChange(e.target.checked)}
-        className="sr-only"
-      />
-      <label
-        htmlFor={id}
-        className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center ${
-          checked 
-            ? 'bg-blue-800 border-blue-800' 
-            : 'bg-white border-gray-300 hover:border-gray-400'
-        }`}
-      >
-        {checked && <Check className="w-3 h-3 text-white" />}
-      </label>
-    </div>
+    <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+      <Label className="text-sm font-bold text-gray-900 cursor-pointer">{title}</Label>
+      {open ? (
+        <ChevronUp className="w-4 h-4 text-gray-600" />
+      ) : (
+        <ChevronDown className="w-4 h-4 text-gray-600" />
+      )}
+    </CollapsibleTrigger>
   );
-};
+}
 
-
-export default function JobFilters({ onFilterChange, primaryLocation, onLocationChange, jobs = [], initialFilters, isMapView = false }: JobFiltersProps) {
-  const [expandedFilterSections, setExpandedFilterSections] = useState<string[]>(['post-type', 'search']);
-  const [expandedCities, setExpandedCities] = useState<Set<string>>(new Set());
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
-  const [selectedContractTypes, setSelectedContractTypes] = useState<string[]>([]);
-  const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const [selectedSublocalities, setSelectedSublocalities] = useState<string[]>([]); // Format: "city:sublocality"
-  const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
-  const [selectedClientTypes, setSelectedClientTypes] = useState<string[]>([]);
-  const [selectedPostTypes, setSelectedPostTypes] = useState<string[]>(['job', 'tender']);
-  const [selectedUrgency, setSelectedUrgency] = useState<string[]>([]);
-  const [selectedBudgetRanges, setSelectedBudgetRanges] = useState<string[]>([]);
-  const [budgetMin, setBudgetMin] = useState<string>('');
-  const [budgetMax, setBudgetMax] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [endingSoon, setEndingSoon] = useState(false);
-  const [selectedDateAdded, setSelectedDateAdded] = useState<string[]>([]);
-  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+export default function JobFilters({
+  onFilterChange,
+  primaryLocation,
+  onLocationChange,
+  jobs = [],
+  initialFilters,
+  isMapView = false,
+}: JobFiltersProps) {
+  const [expandedFilterSections, setExpandedFilterSections] = useState<string[]>([
+    ...EXPANDED_SECTIONS,
+  ]);
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
+  const [local, setLocal] = useState<FilterState>(initialFilters ?? defaultFilters);
+  const [budgetMinStr, setBudgetMinStr] = useState(() =>
+    initialFilters?.budgetMin != null ? String(initialFilters.budgetMin) : '',
+  );
+  const [budgetMaxStr, setBudgetMaxStr] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUpdatingFromSelfRef = useRef(false);
-  const previousFilterStateRef = useRef<FilterState | null>(null);
-  const isInitialMountRef = useRef(true);
-  const [categoriesFromDb, setCategoriesFromDb] = useState<CategoryWithSubcategories[]>([]);
+  const previousEmittedRef = useRef<string>('');
   const supabase = createClient();
+  const [categoriesFromDb, setCategoriesFromDb] = useState<CategoryWithSubcategories[]>([]);
 
-  // Sync local state with incoming filters (from quick filters or URL)
-  /* eslint-disable react-hooks/set-state-in-effect */
+  /* eslint-disable react-hooks/set-state-in-effect -- mirror URL/context filters into sidebar draft state */
   useEffect(() => {
     if (initialFilters && !isUpdatingFromSelfRef.current) {
-      if (initialFilters.categories !== undefined) setSelectedCategories(initialFilters.categories);
-      if (initialFilters.subcategories !== undefined) setSelectedSubcategories(initialFilters.subcategories);
-      if (initialFilters.contractTypes !== undefined) setSelectedContractTypes(initialFilters.contractTypes);
-      if (initialFilters.cities !== undefined) setSelectedCities(initialFilters.cities);
-      if (initialFilters.sublocalities !== undefined) setSelectedSublocalities(initialFilters.sublocalities);
-      if (initialFilters.provinces !== undefined) setSelectedProvinces(initialFilters.provinces);
-      if (initialFilters.clientTypes !== undefined) setSelectedClientTypes(initialFilters.clientTypes);
-      if (initialFilters.postTypes !== undefined) {
-        // Ensure at least one postType is selected
-        const postTypes = initialFilters.postTypes.length > 0 ? initialFilters.postTypes : ['job', 'tender'];
-        setSelectedPostTypes(postTypes);
+      setLocal(initialFilters);
+      if (initialFilters.budgetMin != null) {
+        setBudgetMinStr(String(initialFilters.budgetMin));
       }
-      if (initialFilters.urgency !== undefined) setSelectedUrgency(initialFilters.urgency);
-      if (initialFilters.budgetRanges !== undefined) setSelectedBudgetRanges(initialFilters.budgetRanges);
-      if (initialFilters.budgetMin !== undefined) setBudgetMin(initialFilters.budgetMin.toString());
-      if (initialFilters.budgetMax !== undefined) setBudgetMax(initialFilters.budgetMax.toString());
-      if (initialFilters.searchQuery !== undefined) setSearchQuery(initialFilters.searchQuery);
-      if (initialFilters.endingSoon !== undefined) setEndingSoon(initialFilters.endingSoon);
-      if (initialFilters.dateAdded !== undefined) setSelectedDateAdded(initialFilters.dateAdded);
+      if (initialFilters.budgetMax != null) {
+        setBudgetMaxStr(String(initialFilters.budgetMax));
+      }
     }
-    // Reset the flag after syncing
     isUpdatingFromSelfRef.current = false;
-  }, [initialFilters, isMapView]);
+  }, [initialFilters]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Fetch categories from database
   useEffect(() => {
-    const loadCategories = async () => {
+    const load = async () => {
       const { data } = await fetchAllCategoriesWithSubcategories(supabase);
-      if (data) {
-        setCategoriesFromDb(data);
-      }
+      if (data) setCategoriesFromDb(data);
     };
-    loadCategories();
+    load();
   }, [supabase]);
 
-  // Calculate category counts from jobs
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    
-    jobs.forEach(job => {
-      const categoryName = typeof job.category === 'string' 
-        ? job.category 
-        : (job.category?.name || '');
-      
-      if (categoryName) {
-        counts[categoryName] = (counts[categoryName] || 0) + 1;
-      }
+    jobs.forEach((job) => {
+      const name =
+        typeof job.category === 'string' ? job.category : job.category?.name || '';
+      if (name) counts[name] = (counts[name] || 0) + 1;
     });
-
     return counts;
   }, [jobs]);
 
-  // Calculate subcategory counts from jobs
-  // Count all jobs by subcategory to show available counts in filters
   const subcategoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    
-    jobs.forEach(job => {
+    jobs.forEach((job) => {
       if (job.subcategory) {
         counts[job.subcategory] = (counts[job.subcategory] || 0) + 1;
       }
     });
-
     return counts;
   }, [jobs]);
 
-  // Extract unique cities and their sublocalities from jobs
-  const citiesWithSublocalities = useMemo(() => {
-    if (!jobs || jobs.length === 0) {
-      return new Map<string, Set<string>>();
+  const warsawDistricts = useMemo(() => getWarsawDistrictsFromJobs(jobs), [jobs]);
+
+  const filteredJobsCount = useMemo(
+    () => jobs.filter((job) => jobMatchesFilters(job, local)).length,
+    [jobs, local]
+  );
+
+  useEffect(() => {
+    const budgetMin =
+      budgetMinStr.trim() !== '' ? parseFloat(budgetMinStr) : undefined;
+    const budgetMax =
+      budgetMaxStr.trim() !== '' ? parseFloat(budgetMaxStr) : undefined;
+
+    const next: FilterState = {
+      ...local,
+      budgetMin: budgetMin != null && !isNaN(budgetMin) ? budgetMin : undefined,
+      budgetMax: budgetMax != null && !isNaN(budgetMax) ? budgetMax : undefined,
+      postTypes: defaultFilters.postTypes,
+    };
+
+    const serialized = JSON.stringify(next);
+    if (onFilterChange && serialized !== previousEmittedRef.current) {
+      previousEmittedRef.current = serialized;
+      isUpdatingFromSelfRef.current = true;
+      onFilterChange(next);
     }
+  }, [local, budgetMinStr, budgetMaxStr, onFilterChange]);
 
-    const citySublocalityMap = new Map<string, Set<string>>();
-    
-    jobs.forEach(job => {
-      if (job.location) {
-        const city = extractCity(job.location);
-        const sublocality = extractSublocality(job.location);
-        
-        if (city) {
-          if (!citySublocalityMap.has(city)) {
-            citySublocalityMap.set(city, new Set<string>());
-          }
-          
-          if (sublocality) {
-            citySublocalityMap.get(city)!.add(sublocality);
-          }
-        }
-      }
-    });
-
-    return citySublocalityMap;
-  }, [jobs]);
-
-  // Get sorted list of cities
-  const cities = useMemo(() => {
-    return Array.from(citiesWithSublocalities.keys()).sort();
-  }, [citiesWithSublocalities]);
-
-  // Get sublocalities for a specific city
-  const getSublocalitiesForCity = (city: string): string[] => {
-    const sublocalities = citiesWithSublocalities.get(city);
-    return sublocalities ? Array.from(sublocalities).sort() : [];
+  const patch = (partial: Partial<FilterState>) => {
+    setLocal((prev) => ({ ...prev, ...partial }));
   };
 
-  // Get available provinces based on selected cities
-  const availableProvinces = useMemo(() => {
-    if (selectedCities.length === 0) {
-      return [];
-    }
-    return getProvincesFromCities(selectedCities);
-  }, [selectedCities]);
-
-  // Calculate client type counts from jobs
-  const clientTypeCounts = useMemo(() => {
-    if (!jobs || jobs.length === 0) {
-      return {};
-    }
-
-    const counts: Record<string, number> = {};
-    const clientTypes = ['Wspólnota Mieszkaniowa', 'Spółdzielnia Mieszkaniowa'];
-    
-    // Initialize counts for all client types
-    clientTypes.forEach(type => {
-      counts[type] = 0;
-    });
-
-    // Count jobs for each client type
-    jobs.forEach(job => {
-      if (job.clientType && clientTypes.includes(job.clientType)) {
-        counts[job.clientType]++;
-      }
-    });
-
-    return counts;
-  }, [jobs]);
-
-  // Calculate filtered jobs count based on current filter state
-  const filteredJobsCount = useMemo(() => {
-    if (!jobs || jobs.length === 0) return 0;
-    
-    const budgetMinNum = budgetMin && budgetMin.trim() ? parseFloat(budgetMin) : undefined;
-    const budgetMaxNum = budgetMax && budgetMax.trim() ? parseFloat(budgetMax) : undefined;
-    
-    return jobs.filter(job => {
-      // Filter by postTypes (job vs tender)
-      if (selectedPostTypes && selectedPostTypes.length > 0) {
-        const jobPostType = ('postType' in job && job.postType) ? job.postType : 'job';
-        if (!selectedPostTypes.includes(jobPostType)) {
-          return false;
-        }
-      }
-      
-      // Filter by categories
-      if (selectedCategories && selectedCategories.length > 0) {
-        const jobCategory = typeof job.category === 'string' 
-          ? job.category 
-          : (job.category?.name || 'Inne');
-        if (!selectedCategories.includes(jobCategory)) {
-          return false;
-        }
-      }
-      
-      // Filter by subcategories
-      if (selectedSubcategories && selectedSubcategories.length > 0) {
-        if (job.subcategory && !selectedSubcategories.includes(job.subcategory)) {
-          return false;
-        }
-      }
-      
-      // Filter by contract types
-      if (selectedContractTypes && selectedContractTypes.length > 0) {
-        if (!selectedContractTypes.includes(job.type)) {
-          return false;
-        }
-      }
-      
-      // Filter by cities and sublocalities
-      if ((selectedCities && selectedCities.length > 0) || (selectedSublocalities && selectedSublocalities.length > 0)) {
-        const jobCity = extractCity(job.location);
-        const jobSublocality = extractSublocality(job.location);
-        
-        if (selectedSublocalities && selectedSublocalities.length > 0) {
-          const matchesSublocality = selectedSublocalities.some(sublocalityKey => {
-            const [filterCity, filterSublocality] = sublocalityKey.split(':');
-            return jobCity === filterCity && jobSublocality === filterSublocality;
-          });
-          
-          if (matchesSublocality) {
-            // Job matches a selected sublocality, include it
-          } else {
-            const citiesWithSelectedSublocalities = new Set(
-              selectedSublocalities.map(s => s.split(':')[0])
-            );
-            
-            const cityExplicitlySelected = selectedCities && selectedCities.some(city => 
-              city === jobCity && !citiesWithSelectedSublocalities.has(city)
-            );
-            
-            if (!cityExplicitlySelected) {
-              return false;
-            }
-          }
-        } else if (selectedCities && selectedCities.length > 0) {
-          if (!jobCity || !selectedCities.includes(jobCity)) {
-            return false;
-          }
-        }
-      }
-
-      // Filter by provinces
-      if (selectedProvinces && selectedProvinces.length > 0) {
-        const jobCity = extractCity(job.location);
-        const jobProvince = jobCity ? getProvinceForCity(jobCity) : null;
-        if (!jobProvince || !selectedProvinces.includes(jobProvince)) {
-          return false;
-        }
-      }
-      
-      // Filter by client types
-      if (selectedClientTypes && selectedClientTypes.length > 0) {
-        if (job.clientType && !selectedClientTypes.includes(job.clientType)) {
-          return false;
-        }
-      }
-
-      // Filter by urgency
-      if (selectedUrgency && selectedUrgency.length > 0) {
-        if ('urgency' in job && job.urgency && !selectedUrgency.includes(job.urgency)) {
-          return false;
-        }
-      }
-
-      // Filter by ending soon
-      if (endingSoon && 'postType' in job && job.postType === 'tender' && 'tenderInfo' in job && job.tenderInfo?.submissionDeadline) {
-        if (!isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline))) {
-          return false;
-        }
-      }
-      
-      // Filter by budget ranges
-      if (selectedBudgetRanges && selectedBudgetRanges.length > 0) {
-        const jobBudgetMin = ('budget_min' in job ? job.budget_min : undefined) as number | undefined;
-        const jobBudgetMax = ('budget_max' in job ? job.budget_max : undefined) as number | undefined;
-        
-        const hasBudgetMin = jobBudgetMin != null && jobBudgetMin !== undefined;
-        const hasBudgetMax = jobBudgetMax != null && jobBudgetMax !== undefined;
-        
-        if (hasBudgetMin || hasBudgetMax) {
-          const min = hasBudgetMin ? Number(jobBudgetMin) : (hasBudgetMax ? 0 : 0);
-          const max = hasBudgetMax ? Number(jobBudgetMax) : (hasBudgetMin ? Number(jobBudgetMin) : Infinity);
-
-          let matchesRange = false;
-          for (const range of selectedBudgetRanges) {
-            if (range === '<5000' && max < 5000) {
-              matchesRange = true;
-              break;
-            } else if (range === '5000-20000' && min <= 20000 && max >= 5000) {
-              matchesRange = true;
-              break;
-            } else if (range === '20000+' && min >= 20000) {
-              matchesRange = true;
-              break;
-            }
-          }
-          
-          if (!matchesRange) {
-            return false;
-          }
-        }
-      }
-
-      // Filter by budget min/max inputs
-      if (budgetMinNum !== undefined && budgetMinNum !== null) {
-        const jobBudgetMin = job.budget?.min ?? null;
-        const jobBudgetMax = job.budget?.max ?? null;
-        
-        if (jobBudgetMin !== null || jobBudgetMax !== null) {
-          const jobMaxBudget = jobBudgetMax ?? jobBudgetMin ?? 0;
-          if (jobMaxBudget < budgetMinNum) {
-            return false;
-          }
-        }
-      }
-
-      if (budgetMaxNum !== undefined && budgetMaxNum !== null) {
-        const jobBudgetMin = ('budget_min' in job ? job.budget_min : undefined) as number | null | undefined;
-        const jobBudgetMax = ('budget_max' in job ? job.budget_max : undefined) as number | null | undefined;
-        
-        if (jobBudgetMin !== null && jobBudgetMin !== undefined || jobBudgetMax !== null && jobBudgetMax !== undefined) {
-          const jobMinBudget = (jobBudgetMin ?? jobBudgetMax ?? 0) as number;
-          if (jobMinBudget > budgetMaxNum) {
-            return false;
-          }
-        }
-      }
-      
-      // Filter by search query
-      if (searchQuery && searchQuery.trim().length > 0) {
-        const searchTerm = searchQuery.toLowerCase().trim();
-        const jobTitle = (job.title || '').toLowerCase();
-        
-        if (!jobTitle.includes(searchTerm)) {
-          return false;
-        }
-      }
-
-      // Filter by date added
-      if (selectedDateAdded && selectedDateAdded.length > 0) {
-        const jobCreatedAt = ('created_at' in job ? job.created_at : undefined) as string | undefined;
-        if (jobCreatedAt) {
-          const jobDate = new Date(jobCreatedAt);
-          
-          if (!isNaN(jobDate.getTime())) {
-            const now = new Date();
-            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            todayStart.setHours(0, 0, 0, 0);
-            
-            const jobDateStart = new Date(jobDate.getFullYear(), jobDate.getMonth(), jobDate.getDate());
-            jobDateStart.setHours(0, 0, 0, 0);
-            
-            let matchesDateFilter = false;
-            for (const dateFilter of selectedDateAdded) {
-              let filterStartDate: Date;
-              
-              switch (dateFilter) {
-                case 'today':
-                  filterStartDate = new Date(todayStart);
-                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
-                  break;
-                case 'last-week':
-                  filterStartDate = new Date(todayStart);
-                  filterStartDate.setTime(filterStartDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
-                  break;
-                case 'last-month':
-                  filterStartDate = new Date(todayStart);
-                  filterStartDate.setTime(filterStartDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
-                  break;
-                case 'last-3-months':
-                  filterStartDate = new Date(todayStart);
-                  filterStartDate.setTime(filterStartDate.getTime() - 90 * 24 * 60 * 60 * 1000);
-                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
-                  break;
-                case 'last-6-months':
-                  filterStartDate = new Date(todayStart);
-                  filterStartDate.setTime(filterStartDate.getTime() - 180 * 24 * 60 * 60 * 1000);
-                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
-                  break;
-                case 'last-year':
-                  filterStartDate = new Date(todayStart);
-                  filterStartDate.setTime(filterStartDate.getTime() - 365 * 24 * 60 * 60 * 1000);
-                  if (jobDateStart >= filterStartDate) matchesDateFilter = true;
-                  break;
-              }
-              
-              if (matchesDateFilter) break;
-            }
-            
-            if (!matchesDateFilter) {
-              return false;
-            }
-          }
-        }
-      }
-      
-      return true;
-    }).length;
-  }, [jobs, selectedPostTypes, selectedCategories, selectedSubcategories, selectedContractTypes, selectedCities, selectedSublocalities, selectedProvinces, selectedClientTypes, selectedUrgency, selectedBudgetRanges, budgetMin, budgetMax, searchQuery, endingSoon, selectedDateAdded]);
-
-  // Emit filter changes to parent
-  useEffect(() => {
-    if (onFilterChange) {
-      const budgetMinNum = budgetMin && budgetMin.trim() ? parseFloat(budgetMin) : undefined;
-      const budgetMaxNum = budgetMax && budgetMax.trim() ? parseFloat(budgetMax) : undefined;
-      
-      const newFilterState: FilterState = {
-        categories: selectedCategories,
-        subcategories: selectedSubcategories,
-        contractTypes: selectedContractTypes,
-        locations: [], // Keep for backward compatibility, but use cities/provinces
-        cities: selectedCities,
-        sublocalities: selectedSublocalities,
-        provinces: selectedProvinces,
-        budgetRanges: selectedBudgetRanges,
-        budgetMin: budgetMinNum !== undefined && !isNaN(budgetMinNum) ? budgetMinNum : undefined,
-        budgetMax: budgetMaxNum !== undefined && !isNaN(budgetMaxNum) ? budgetMaxNum : undefined,
-        clientTypes: selectedClientTypes,
-        postTypes: selectedPostTypes,
-        urgency: selectedUrgency,
-        searchQuery,
-        endingSoon: endingSoon,
-        dateAdded: selectedDateAdded
-      };
-
-      const filtersChanged = previousFilterStateRef.current === null || JSON.stringify(previousFilterStateRef.current) !== JSON.stringify(newFilterState);
-      // Check if new filter state matches initialFilters (to avoid unnecessary updates on mount)
-      const matchesInitialFilters = initialFilters && JSON.stringify({
-        ...initialFilters,
-        locations: [] // Normalize locations field
-      }) === JSON.stringify({
-        ...newFilterState,
-        locations: []
-      });
-
-      // Skip emitting if filters haven't actually changed
-      // Also skip on initial mount if the state matches initialFilters exactly (prevents unnecessary updates when component mounts)
-      if (filtersChanged && !(isInitialMountRef.current && matchesInitialFilters)) {
-        isUpdatingFromSelfRef.current = true;
-        previousFilterStateRef.current = newFilterState;
-        isInitialMountRef.current = false;
-        onFilterChange(newFilterState);
-      } else {
-        // Still update the ref to track state, but don't emit
-        if (isInitialMountRef.current) {
-          previousFilterStateRef.current = newFilterState;
-          isInitialMountRef.current = false;
-        }
-      }
-    }
-  }, [selectedCategories, selectedSubcategories, selectedContractTypes, selectedCities, selectedSublocalities, selectedProvinces, selectedClientTypes, selectedPostTypes, selectedUrgency, selectedBudgetRanges, budgetMin, budgetMax, searchQuery, endingSoon, selectedDateAdded, onFilterChange, isMapView, initialFilters]);
-
-  // Scroll detection for showing scroll indicator
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    const checkScrollPosition = () => {
-      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
-      const isScrollable = scrollHeight > clientHeight;
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
-      
-      setShowScrollIndicator(isScrollable && !isAtBottom);
-    };
-
-    // Check initial state
-    checkScrollPosition();
-
-    // Add scroll listener
-    scrollContainer.addEventListener('scroll', checkScrollPosition);
-    
-    // Check on resize
-    window.addEventListener('resize', checkScrollPosition);
-
-    return () => {
-      scrollContainer.removeEventListener('scroll', checkScrollPosition);
-      window.removeEventListener('resize', checkScrollPosition);
-    };
-  }, [expandedFilterSections]); // Re-check when sections expand/collapse
-
-  const toggleFilterSection = (sectionName: string) => {
-    // Don't allow closing search section
-    if (sectionName === 'search') return;
-    
-    setExpandedFilterSections(prev => 
-      prev.includes(sectionName) 
-        ? prev.filter(name => name !== sectionName)
-        : [...prev, sectionName]
+  const toggleSection = (name: string) => {
+    setExpandedFilterSections((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
     );
   };
 
-  // Handle city selection - update provinces when cities change
-  const handleCityChange = (city: string, checked: boolean) => {
-    if (checked) {
-      setSelectedCities(prev => [...prev, city]);
-    } else {
-      setSelectedCities(prev => prev.filter(c => c !== city));
-      // Remove sublocalities for this city when city is deselected
-      setSelectedSublocalities(prev => prev.filter(s => !s.startsWith(`${city}:`)));
-      // Remove provinces that are no longer relevant
-      const removedCityProvince = getProvinceForCity(city);
-      if (removedCityProvince) {
-        const remainingCities = selectedCities.filter(c => c !== city);
-        const remainingProvinces = getProvincesFromCities(remainingCities);
-        setSelectedProvinces(prev => prev.filter(p => remainingProvinces.includes(p)));
-      }
-    }
+  const toggleCategoryExpand = (id: string) => {
+    setExpandedCategoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  // Handle sublocality selection
-  const handleSublocalityChange = (city: string, sublocality: string, checked: boolean) => {
-    const sublocalityKey = `${city}:${sublocality}`;
-    if (checked) {
-      setSelectedSublocalities(prev => [...prev, sublocalityKey]);
-      // Ensure city is also selected
-      if (!selectedCities.includes(city)) {
-        setSelectedCities(prev => [...prev, city]);
-      }
-    } else {
-      setSelectedSublocalities(prev => prev.filter(s => s !== sublocalityKey));
-    }
+  const handleDistrictChange = (district: string, checked: boolean) => {
+    const key = `${WARSAW_CITY}:${district}`;
+    patch({
+      sublocalities: checked
+        ? [...local.sublocalities, key]
+        : local.sublocalities.filter((s) => s !== key),
+    });
   };
 
-  const clearAllFilters = () => {
-    setSelectedCategories([]);
-    setSelectedSubcategories([]);
-    setSelectedContractTypes([]);
-    setSelectedCities([]);
-    setSelectedSublocalities([]);
-    setSelectedProvinces([]);
-    setSelectedClientTypes([]);
-    setSelectedPostTypes(['job', 'tender']); // Domyślnie pokazuj wszystkie typy
-    setSelectedUrgency([]);
-    setSelectedBudgetRanges([]);
-    setBudgetMin('');
-    setBudgetMax('');
-    setSearchQuery('');
-    setEndingSoon(false);
-    setSelectedDateAdded([]);
-  };
-
-  // Get location filters separately
-  const getLocationFilters = () => {
-    const locationFilters: Array<{ label: string; value: string; onRemove: () => void }> = [];
-
-    // Cities (only if no sublocalities are selected for that city)
-    selectedCities.forEach(city => {
-      const citySublocalities = selectedSublocalities.filter(s => s.startsWith(`${city}:`));
-      // Only show city badge if no sublocalities are selected for this city
-      if (citySublocalities.length === 0) {
-        locationFilters.push({
-          label: city,
-          value: `city-${city}`,
-          onRemove: () => {
-            handleCityChange(city, false);
-          }
-        });
-      }
+  const toggleDeadline = (value: DeadlineFilterKey, checked: boolean) => {
+    patch({
+      deadline: checked
+        ? [...local.deadline, value]
+        : local.deadline.filter((d) => d !== value),
     });
-
-    // Sublocalities
-    selectedSublocalities.forEach(sublocalityKey => {
-      const [city, sublocality] = sublocalityKey.split(':');
-      locationFilters.push({
-        label: `${city} - ${sublocality}`,
-        value: `sublocality-${sublocalityKey}`,
-        onRemove: () => {
-          handleSublocalityChange(city, sublocality, false);
-        }
-      });
-    });
-
-    // Provinces
-    selectedProvinces.forEach(province => {
-      locationFilters.push({
-        label: province,
-        value: `province-${province}`,
-        onRemove: () => {
-          setSelectedProvinces(prev => prev.filter(p => p !== province));
-        }
-      });
-    });
-
-    return locationFilters;
-  };
-
-  // Get all applied filters (excluding location filters)
-  const getAppliedFilters = () => {
-    const applied: Array<{ label: string; value: string; onRemove: () => void }> = [];
-
-    // Post types - always show when selected
-    selectedPostTypes.forEach(type => {
-      applied.push({
-        label: type === 'job' ? 'Zgłoszenia' : 'Przetargi',
-        value: `postType-${type}`,
-        onRemove: () => {
-          setSelectedPostTypes(prev => {
-            const newPostTypes = prev.filter(t => t !== type);
-            // Ensure at least one postType is selected
-            return newPostTypes.length > 0 ? newPostTypes : (type === 'job' ? ['tender'] : ['job']);
-          });
-        }
-      });
-    });
-
-    // Categories
-    selectedCategories.forEach(category => {
-      applied.push({
-        label: category,
-        value: category,
-        onRemove: () => {
-          setSelectedCategories(prev => prev.filter(c => c !== category));
-        }
-      });
-    });
-
-    // Client types
-    selectedClientTypes.forEach(clientType => {
-      applied.push({
-        label: clientType,
-        value: clientType,
-        onRemove: () => {
-          setSelectedClientTypes(prev => prev.filter(t => t !== clientType));
-        }
-      });
-    });
-
-    // Contract types
-    selectedContractTypes.forEach(type => {
-      applied.push({
-        label: type,
-        value: type,
-        onRemove: () => {
-          setSelectedContractTypes(prev => prev.filter(t => t !== type));
-        }
-      });
-    });
-
-    // Budget ranges
-    selectedBudgetRanges.forEach(range => {
-      const rangeLabels: Record<string, string> = {
-        '<5000': 'Mniej niż 5000 PLN',
-        '5000-20000': '5000 - 20000 PLN',
-        '20000+': '20000+ PLN'
-      };
-      applied.push({
-        label: rangeLabels[range] || range,
-        value: `budget-${range}`,
-        onRemove: () => {
-          setSelectedBudgetRanges(prev => prev.filter(r => r !== range));
-        }
-      });
-    });
-
-    // Budget min/max
-    if (budgetMin) {
-      applied.push({
-        label: `Budżet min: ${budgetMin} PLN`,
-        value: 'budget-min',
-        onRemove: () => {
-          setBudgetMin('');
-        }
-      });
-    }
-
-    if (budgetMax) {
-      applied.push({
-        label: `Budżet max: ${budgetMax} PLN`,
-        value: 'budget-max',
-        onRemove: () => {
-          setBudgetMax('');
-        }
-      });
-    }
-
-    // Search query
-    if (searchQuery.trim()) {
-      applied.push({
-        label: `Szukaj: "${searchQuery}"`,
-        value: 'search',
-        onRemove: () => {
-          setSearchQuery('');
-        }
-      });
-    }
-
-    // Urgency
-    selectedUrgency.forEach(urgency => {
-      const urgencyLabels: Record<string, string> = {
-        'low': 'Niski priorytet',
-        'medium': 'Średni priorytet',
-        'high': 'Wysoki priorytet'
-      };
-      applied.push({
-        label: urgencyLabels[urgency] || urgency,
-        value: `urgency-${urgency}`,
-        onRemove: () => {
-          setSelectedUrgency(prev => prev.filter(u => u !== urgency));
-        }
-      });
-    });
-
-    // Ending soon filter
-    if (endingSoon) {
-      applied.push({
-        label: 'Kończące się wkrótce',
-        value: 'ending-soon',
-        onRemove: () => {
-          setEndingSoon(false);
-        }
-      });
-    }
-
-    // Date added filters
-    selectedDateAdded.forEach(dateFilter => {
-      const dateLabels: Record<string, string> = {
-        'today': 'Dzisiaj',
-        'last-week': 'Ostatni tydzień',
-        'last-month': 'Ostatni miesiąc',
-        'last-3-months': 'Ostatnie 3 miesiące',
-        'last-6-months': 'Ostatnie 6 miesięcy',
-        'last-year': 'Ostatni rok'
-      };
-      applied.push({
-        label: dateLabels[dateFilter] || dateFilter,
-        value: `date-${dateFilter}`,
-        onRemove: () => {
-          setSelectedDateAdded(prev => prev.filter(d => d !== dateFilter));
-        }
-      });
-    });
-
-    return applied;
   };
 
   return (
-    <div 
+    <div
       className="w-full lg:w-80 overflow-hidden h-full"
       style={{ backgroundColor: '#ffffff' }}
     >
       <div className="flex flex-col h-full relative">
-        {/* Fixed Header */}
         <div className={`flex-shrink-0 px-6 ${isMapView ? 'pt-6' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
@@ -826,9 +226,8 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
             </div>
           </div>
 
-            {/* Current Location Display */}
-            {primaryLocation && primaryLocation !== 'Polska' && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          {primaryLocation && primaryLocation !== 'Polska' && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex flex-col gap-2 text-sm">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-blue-600" />
@@ -847,234 +246,101 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                       <Edit3 className="h-3 w-3 mr-1" />
                       Zmień
                     </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
+        </div>
 
-              {/* Applied Filters */}
-              {(getLocationFilters().length > 0 || getAppliedFilters().length > 0 || (primaryLocation && primaryLocation !== 'Polska')) && (
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-xs font-semibold text-gray-700">Aktywne filtry</Label>
-                    <div className="text-xs cursor-pointer flex items-center text-red-400 hover:text-gray-900 h-auto py-0 px-2" onClick={clearAllFilters}>
-                      <X className="h-3 w-3 mr-1" />
-                      Wyczyść wszystko
-                    </div>
-                  </div>
-                  
-                  {/* Location Filters - Separate line at top with icon */}
-                  {(getLocationFilters().length > 0 || (primaryLocation && primaryLocation !== 'Polska')) && (
-                    <div className="mb-2 flex flex-wrap gap-1 items-center">
-                      {/* Current Location Badge - Informational, always shown when available */}
-                      {primaryLocation && primaryLocation !== 'Polska' && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs px-2 py-1 bg-gray-50 border border-gray-200 text-gray-700"
-                        >
-                          <div className="flex items-center">
-                            <MapPin className="w-3 h-3 text-gray-600 mr-1" />
-                            <span className="font-medium">Aktualna lokalizacja:</span>
-                            <span className="ml-1">{primaryLocation}</span>
-                          </div>
-                        </Badge>
-                      )}
-                      
-                      {/* Selected Location Filters */}
-                      {getLocationFilters().map((filter) => (
-                        <Badge
-                        key={filter.value}
-                        variant="secondary"
-                        className="text-xs px-2 py-1 bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer"
-                        onClick={filter.onRemove}
-                        >
-                          <div className="flex items-center">
-                            <MapPin className="w-3 h-3 text-gray-600 mr-1" />
-                            {filter.label}
-                          </div>
-                          <X className="h-3 w-3 ml-1" />
-                        </Badge>
-                        
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Other Filters */}
-                  {getAppliedFilters().length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {getAppliedFilters().map((filter) => (
-                        <Badge
-                          key={filter.value}
-                          variant="secondary"
-                          className="text-xs px-2 py-1 bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer"
-                          onClick={filter.onRemove}
-                        >
-                          {filter.label}
-                          <X className="h-3 w-3 ml-1" />
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-          </div>
-
-          {/* Scrollable Filters Content */}
-          <div 
-            ref={scrollContainerRef}
-            className={`flex-1 overflow-y-auto px-6 ${isMapView ? 'pb-4' : 'pb-6'} max-h-[calc(100vh-20rem)] relative`}
+        <div
+          ref={scrollContainerRef}
+          className={`flex-1 overflow-y-auto px-6 ${isMapView ? 'pb-4' : 'pb-6'} max-h-[calc(100vh-20rem)]`}
+        >
+          {/* Categories — always expanded at first level; subs on chevron */}
+          <Collapsible
+            open={expandedFilterSections.includes('categories')}
+            onOpenChange={() => toggleSection('categories')}
+            className="mb-4"
           >
-
-            {/* Post Type Filter */}
-            <Collapsible
-              open={expandedFilterSections.includes('post-type')}
-              onOpenChange={() => toggleFilterSection('post-type')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Typ Ogłoszenia
-                </Label>
-                {expandedFilterSections.includes('post-type') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id="job"
-                      checked={selectedPostTypes.includes('job')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedPostTypes(prev => [...prev, 'job']);
-                        } else {
-                          setSelectedPostTypes(prev => {
-                            const newTypes = prev.filter(t => t !== 'job');
-                            // Ensure at least one postType is selected
-                            return newTypes.length > 0 ? newTypes : ['tender'];
-                          });
-                        }
-                      }}
-                    />
-                    <Label htmlFor="job" className="text-sm cursor-pointer flex items-center space-x-2">
-                      <Wrench className="w-4 h-4 text-primary" />
-                      <span className="text-foreground">Zgłoszenia</span>
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id="tender"
-                      checked={selectedPostTypes.includes('tender')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedPostTypes(prev => [...prev, 'tender']);
-                        } else {
-                          setSelectedPostTypes(prev => {
-                            const newTypes = prev.filter(t => t !== 'tender');
-                            // Ensure at least one postType is selected
-                            return newTypes.length > 0 ? newTypes : ['job'];
-                          });
-                        }
-                      }}
-                    />
-                    <Label htmlFor="tender" className="text-sm cursor-pointer flex items-center space-x-2">
-                      <Gavel className="w-4 h-4 text-orange-600" />
-                      <span className="text-foreground">Przetargi</span>
-                    </Label>
-                  </div>
-
-                  {/* Ending Soon Filter - Only show when tenders are selected */}
-                  {selectedPostTypes.includes('tender') && (
-                    <>
-                      <div className="h-px bg-gray-200 my-2" />
-                      <div className="flex items-center space-x-2">
-                        <CustomCheckbox 
-                          id="ending-soon"
-                          checked={endingSoon}
-                          onCheckedChange={setEndingSoon}
-                        />
-                        <Label htmlFor="ending-soon" className="text-sm cursor-pointer flex items-center space-x-2">
-                          <Clock className="w-4 h-4 text-orange-600" />
-                          <span className="text-foreground">Kończące się wkrótce (&lt;7 dni)</span>
-                        </Label>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Categories */}
-            <Collapsible
-              open={expandedFilterSections.includes('categories')}
-              onOpenChange={() => toggleFilterSection('categories')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Kategorie
-                </Label>
-                {expandedFilterSections.includes('categories') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-3">
+            <SectionTrigger title="Kategorie" open={expandedFilterSections.includes('categories')} />
+            <CollapsibleContent className="mt-3 pl-2">
+              <div className="space-y-3">
                 {categoriesFromDb.length > 0 ? (
-                  categoriesFromDb.map(category => {
-                    const isCategorySelected = selectedCategories.includes(category.name);
+                  categoriesFromDb.map((category) => {
+                    const isSelected = local.categories.includes(category.name);
+                    const isExpanded = expandedCategoryIds.has(category.id);
                     const count = categoryCounts[category.name] || 0;
-                    
+
                     return (
                       <div key={category.id} className="space-y-1">
-                        {/* Main Category */}
                         <div className="flex items-center space-x-2">
-                          <CustomCheckbox 
+                          <CustomCheckbox
                             id={`category-${category.id}`}
-                            checked={isCategorySelected}
+                            checked={isSelected}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedCategories(prev => [...prev, category.name]);
+                                patch({
+                                  categories: [...local.categories, category.name],
+                                });
                               } else {
-                                setSelectedCategories(prev => prev.filter(c => c !== category.name));
-                                // Clear subcategories when main category is deselected
-                                setSelectedSubcategories(prev => {
-                                  const subcategoryNames = category.subcategories.map(sub => sub.name);
-                                  return prev.filter(sub => !subcategoryNames.includes(sub));
+                                const subNames = category.subcategories.map((s) => s.name);
+                                patch({
+                                  categories: local.categories.filter((c) => c !== category.name),
+                                  subcategories: local.subcategories.filter(
+                                    (s) => !subNames.includes(s)
+                                  ),
                                 });
                               }
                             }}
                           />
-                          <Label htmlFor={`category-${category.id}`} className="text-sm cursor-pointer text-gray-900 font-light">
+                          <Label
+                            htmlFor={`category-${category.id}`}
+                            className="text-sm cursor-pointer text-gray-900 font-light flex-1"
+                          >
                             {category.name} {count > 0 && `(${count})`}
                           </Label>
+                          {category.subcategories.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleCategoryExpand(category.id)}
+                              className="p-1 hover:bg-gray-100 rounded"
+                              aria-label={isExpanded ? 'Zwiń' : 'Rozwiń'}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4 text-gray-600" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-gray-600" />
+                              )}
+                            </button>
+                          )}
                         </div>
-                        
-                        {/* Subcategories - shown when main category is selected */}
-                        {isCategorySelected && category.subcategories.length > 0 && (
+                        {isExpanded && category.subcategories.length > 0 && (
                           <div className="ml-6 space-y-1 pl-1 border-l-2 border-gray-200">
-                            {category.subcategories.map(subcategory => {
-                              const subCount = subcategoryCounts[subcategory.name] || 0;
+                            {category.subcategories.map((sub) => {
+                              const subCount = subcategoryCounts[sub.name] || 0;
                               return (
-                                <div key={subcategory.id} className="flex items-center space-x-2">
-                                  <CustomCheckbox 
-                                    id={`subcategory-${subcategory.id}`}
-                                    checked={selectedSubcategories.includes(subcategory.name)}
+                                <div
+                                  key={sub.id}
+                                  className="flex items-center space-x-2"
+                                >
+                                  <CustomCheckbox
+                                    id={`sub-${sub.id}`}
+                                    checked={local.subcategories.includes(sub.name)}
                                     onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedSubcategories(prev => [...prev, subcategory.name]);
-                                      } else {
-                                        setSelectedSubcategories(prev => prev.filter(s => s !== subcategory.name));
-                                      }
+                                      patch({
+                                        subcategories: checked
+                                          ? [...local.subcategories, sub.name]
+                                          : local.subcategories.filter((s) => s !== sub.name),
+                                      });
                                     }}
                                   />
-                                  <Label htmlFor={`subcategory-${subcategory.id}`} className="text-xs cursor-pointer text-gray-700 font-light">
-                                    {subcategory.name} <span className="text-gray-500">({subCount})</span>
+                                  <Label
+                                    htmlFor={`sub-${sub.id}`}
+                                    className="text-xs cursor-pointer text-gray-700 font-light"
+                                  >
+                                    {sub.name}{' '}
+                                    <span className="text-gray-500">({subCount})</span>
                                   </Label>
                                 </div>
                               );
@@ -1088,454 +354,134 @@ export default function JobFilters({ onFilterChange, primaryLocation, onLocation
                   <div className="text-xs text-gray-400 pl-2">Brak kategorii</div>
                 )}
               </div>
-              </CollapsibleContent>
-            </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
 
-            {/* Location - Two Level (City and Province) */}
-            <Collapsible
-              open={expandedFilterSections.includes('location')}
-              onOpenChange={() => toggleFilterSection('location')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Lokalizacja
-                </Label>
-                {expandedFilterSections.includes('location') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                {/* City Selection with Sublocalities */}
-                <div className="space-y-3 mb-4">
-                  <Label className="text-xs font-semibold text-gray-700 mb-2 block">Miasto</Label>
-                  {cities.length > 0 ? (
-                    cities.map(city => {
-                      const cityCount = jobs.filter(job => {
-                        const jobCity = extractCity(job.location);
-                        return jobCity === city;
-                      }).length;
-                      
-                      const sublocalities = getSublocalitiesForCity(city);
-                      const hasSublocalities = sublocalities.length > 0;
-                      
-                      const isCityExpanded = expandedCities.has(city);
-                      const isCitySelected = selectedCities.includes(city);
-                      const showSublocalities = hasSublocalities && (isCitySelected || isCityExpanded);
-                      
+          {/* Location — Warsaw only */}
+          <Collapsible
+            open={expandedFilterSections.includes('location')}
+            onOpenChange={() => toggleSection('location')}
+            className="mb-4"
+          >
+            <SectionTrigger title="Lokalizacja" open={expandedFilterSections.includes('location')} />
+            <CollapsibleContent className="mt-3 pl-2">
+              <input
+                type="text"
+                value={WARSAW_CITY}
+                disabled
+                className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-600 text-sm mb-3"
+                aria-label="Miasto"
+              />
+              <Label className="text-xs font-semibold text-gray-700 mb-2 block">
+                Dzielnica
+              </Label>
+              {warsawDistricts.length > 0 ? (
+                <div className="space-y-2">
+                  {warsawDistricts.map((district) => {
+                    const key = `${WARSAW_CITY}:${district}`;
+                    const count = jobs.filter((job) => {
                       return (
-                        <div key={city} className="space-y-1">
-                          {/* City checkbox with expand/collapse */}
-                          <div className="flex items-center space-x-2">
-                            <CustomCheckbox 
-                              id={`city-${city}`}
-                              checked={isCitySelected}
-                              onCheckedChange={(checked) => handleCityChange(city, checked)}
-                            />
-                            <Label htmlFor={`city-${city}`} className="text-sm cursor-pointer flex items-center text-gray-900 font-light flex-1">
-                              <MapPin className="w-3 h-3 mr-1 text-gray-600" />
-                              {city} ({cityCount})
-                            </Label>
-                            {hasSublocalities && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setExpandedCities(prev => {
-                                    const newSet = new Set(prev);
-                                    if (newSet.has(city)) {
-                                      newSet.delete(city);
-                                    } else {
-                                      newSet.add(city);
-                                    }
-                                    return newSet;
-                                  });
-                                }}
-                                className="ml-auto p-1 hover:bg-gray-100 rounded transition-colors"
-                                aria-label={isCityExpanded ? 'Zwiń' : 'Rozwiń'}
-                              >
-                                {isCityExpanded ? (
-                                  <ChevronUp className="w-4 h-4 text-gray-600" />
-                                ) : (
-                                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                                )}
-                              </button>
-                            )}
-                          </div>
-                          
-                          {/* Sublocalities nested under city - shown when city is selected or expanded */}
-                          {showSublocalities && (
-                            <div className="ml-6 space-y-1 pl-1 border-l-2 border-gray-200">
-                              {sublocalities.map(sublocality => {
-                                const sublocalityKey = `${city}:${sublocality}`;
-                                const sublocalityCount = jobs.filter(job => {
-                                  const jobCity = extractCity(job.location);
-                                  const jobSublocality = extractSublocality(job.location);
-                                  return jobCity === city && jobSublocality === sublocality;
-                                }).length;
-                                
-                                return (
-                                  <div key={sublocalityKey} className="flex items-center space-x-2">
-                                    <CustomCheckbox 
-                                      id={`sublocality-${sublocalityKey}`}
-                                      checked={selectedSublocalities.includes(sublocalityKey)}
-                                      onCheckedChange={(checked) => handleSublocalityChange(city, sublocality, checked)}
-                                    />
-                                    <Label htmlFor={`sublocality-${sublocalityKey}`} className="text-xs cursor-pointer flex items-center text-gray-700 font-light">
-                                      {sublocality} ({sublocalityCount})
-                                    </Label>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
+                        extractCity(job.location) === WARSAW_CITY &&
+                        extractSublocality(job.location) === district
                       );
-                    })
-                  ) : (
-                    <div className="text-xs text-gray-400 pl-2">Brak miast</div>
-                  )}
-                </div>
-
-                {/* Province Selection - Only shown when cities are selected */}
-                {selectedCities.length > 0 && availableProvinces.length > 0 && (
-                  <div className="space-y-2 border-t pt-3">
-                    <Label className="text-xs font-semibold text-gray-700 mb-2 block">Województwo</Label>
-                    {availableProvinces.map(province => (
-                      <div key={province} className="flex items-center space-x-2">
-                        <CustomCheckbox 
-                          id={`province-${province}`}
-                          checked={selectedProvinces.includes(province)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedProvinces(prev => [...prev, province]);
-                            } else {
-                              setSelectedProvinces(prev => prev.filter(p => p !== province));
-                            }
-                          }}
+                    }).length;
+                    return (
+                      <div key={district} className="flex items-center space-x-2">
+                        <CustomCheckbox
+                          id={`district-${district}`}
+                          checked={local.sublocalities.includes(key)}
+                          onCheckedChange={(checked) =>
+                            handleDistrictChange(district, checked)
+                          }
                         />
-                        <Label htmlFor={`province-${province}`} className="text-sm cursor-pointer text-gray-900 font-light">
-                          {province}
+                        <Label
+                          htmlFor={`district-${district}`}
+                          className="text-sm cursor-pointer text-gray-900 font-light"
+                        >
+                          {district} ({count})
                         </Label>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Client Type */}
-            <Collapsible
-              open={expandedFilterSections.includes('client-type')}
-              onOpenChange={() => toggleFilterSection('client-type')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Typ Klienta
-                </Label>
-                {expandedFilterSections.includes('client-type') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-2">
-                {['Wspólnota Mieszkaniowa', 'Spółdzielnia Mieszkaniowa'].map(clientType => {
-                  const count = clientTypeCounts[clientType] || 0;
-                  return (
-                    <div key={clientType} className="flex items-center space-x-2">
-                      <CustomCheckbox 
-                        id={clientType}
-                        checked={selectedClientTypes.includes(clientType)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedClientTypes(prev => [...prev, clientType]);
-                          } else {
-                            setSelectedClientTypes(prev => prev.filter(t => t !== clientType));
-                          }
-                        }}
-                      />
-                      <Label htmlFor={clientType} className="text-sm cursor-pointer text-gray-900 font-light">
-                        {clientType} ({count})
-                      </Label>
-                    </div>
-                  );
-                })}
-              </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Urgency Filter */}
-            <Collapsible
-              open={expandedFilterSections.includes('urgency')}
-              onOpenChange={() => toggleFilterSection('urgency')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Priorytet
-                </Label>
-                {expandedFilterSections.includes('urgency') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id="urgency-low"
-                      checked={selectedUrgency.includes('low')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedUrgency(prev => [...prev, 'low']);
-                        } else {
-                          setSelectedUrgency(prev => prev.filter(u => u !== 'low'));
-                        }
-                      }}
-                    />
-                    <Label htmlFor="urgency-low" className="text-sm cursor-pointer flex items-center space-x-2">
-                      <AlertCircle className="w-4 h-4 text-green-600" />
-                      <span className="text-foreground">Niski</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id="urgency-medium"
-                      checked={selectedUrgency.includes('medium')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedUrgency(prev => [...prev, 'medium']);
-                        } else {
-                          setSelectedUrgency(prev => prev.filter(u => u !== 'medium'));
-                        }
-                      }}
-                    />
-                    <Label htmlFor="urgency-medium" className="text-sm cursor-pointer flex items-center space-x-2">
-                      <AlertCircle className="w-4 h-4 text-blue-600" />
-                      <span className="text-foreground">Średni</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id="urgency-high"
-                      checked={selectedUrgency.includes('high')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedUrgency(prev => [...prev, 'high']);
-                        } else {
-                          setSelectedUrgency(prev => prev.filter(u => u !== 'high'));
-                        }
-                      }}
-                    />
-                    <Label htmlFor="urgency-high" className="text-sm cursor-pointer flex items-center space-x-2">
-                      <AlertCircle className="w-4 h-4 text-red-600" />
-                      <span className="text-foreground">Wysoki (Pilne)</span>
-                    </Label>
-                  </div>
+                    );
+                  })}
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+              ) : (
+                <div className="text-xs text-gray-400">Brak dzielnic w ogłoszeniach</div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
 
-            {/* Date Added Filter */}
-            <Collapsible
-              open={expandedFilterSections.includes('date-added')}
-              onOpenChange={() => toggleFilterSection('date-added')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Data dodania
-                </Label>
-                {expandedFilterSections.includes('date-added') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-2">
-                  {[
-                    { value: 'today', label: 'Dzisiaj' },
-                    { value: 'last-week', label: 'Ostatni tydzień' },
-                    { value: 'last-month', label: 'Ostatni miesiąc' },
-                    { value: 'last-3-months', label: 'Ostatnie 3 miesiące' },
-                    { value: 'last-6-months', label: 'Ostatnie 6 miesięcy' },
-                    { value: 'last-year', label: 'Ostatni rok' }
-                  ].map(({ value, label }) => (
-                    <div key={value} className="flex items-center space-x-2">
-                      <CustomCheckbox 
-                        id={`date-${value}`}
-                        checked={selectedDateAdded.includes(value)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedDateAdded(prev => [...prev, value]);
-                          } else {
-                            setSelectedDateAdded(prev => prev.filter(d => d !== value));
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`date-${value}`} className="text-sm cursor-pointer flex items-center space-x-2">
-                        <Calendar className="w-3 h-3 mr-1 text-gray-600" />
-                        <span className="text-foreground">{label}</span>
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Budget Range */}
-            <Collapsible
-              open={expandedFilterSections.includes('budget')}
-              onOpenChange={() => toggleFilterSection('budget')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Budżet
-                </Label>
-                {expandedFilterSections.includes('budget') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-3">
-                  {/* Budget Range Checkboxes */}
-                  <div className="space-y-2">
-                    {[
-                      { value: '<5000', label: 'Mniej niż 5000 PLN' },
-                      { value: '5000-20000', label: '5000 - 20000 PLN' },
-                      { value: '20000+', label: '20000+ PLN' }
-                    ].map(({ value, label }) => (
-                      <div key={value} className="flex items-center space-x-2">
-                        <CustomCheckbox 
-                          id={`budget-${value}`}
-                          checked={selectedBudgetRanges.includes(value)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedBudgetRanges(prev => [...prev, value]);
-                            } else {
-                              setSelectedBudgetRanges(prev => prev.filter(r => r !== value));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`budget-${value}`} className="text-sm cursor-pointer text-gray-900 font-light">
-                          {label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Budget Min/Max Inputs */}
-                  <div className="pt-2 border-t">
-                    <div className="flex gap-2">
-                      <div className="flex-1 flex flex-col space-y-1">
-                        <Label htmlFor="budget-min-input" className="text-xs text-gray-700">Budżet min (PLN)</Label>
-                        <input
-                          id="budget-min-input"
-                          type="number"
-                          value={budgetMin}
-                          onChange={(e) => setBudgetMin(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary text-sm"
-                          placeholder="0"
-                          min="0"
-                        />
-                      </div>
-                      <div className="flex-1 flex flex-col space-y-1">
-                        <Label htmlFor="budget-max-input" className="text-xs text-gray-700">Budżet max (PLN)</Label>
-                        <input
-                          id="budget-max-input"
-                          type="number"
-                          value={budgetMax}
-                          onChange={(e) => setBudgetMax(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary text-sm"
-                          placeholder="0"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Contract Type */}
-            <Collapsible
-              open={expandedFilterSections.includes('contract-type')}
-              onOpenChange={() => toggleFilterSection('contract-type')}
-              className="mb-4"
-            >
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <Label className="text-sm font-bold text-gray-900 cursor-pointer">
-                  Typ Umowy
-                </Label>
-                {expandedFilterSections.includes('contract-type') ? 
-                  <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                }
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 pl-2">
-                <div className="space-y-2">
-                {['Jednorazowe zgłoszenie', 'Stały zleceniodawca', 'Zgłoszenie okresowe', 'Serwis stały', 'Sezonowe zgłoszenie'].map(type => (
-                  <div key={type} className="flex items-center space-x-2">
-                    <CustomCheckbox 
-                      id={type}
-                      checked={selectedContractTypes.includes(type)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedContractTypes(prev => [...prev, type]);
-                        } else {
-                          setSelectedContractTypes(prev => prev.filter(t => t !== type));
-                        }
-                      }}
+          {/* Termin realizacji */}
+          <Collapsible
+            open={expandedFilterSections.includes('deadline')}
+            onOpenChange={() => toggleSection('deadline')}
+            className="mb-4"
+          >
+            <SectionTrigger
+              title="Termin realizacji"
+              open={expandedFilterSections.includes('deadline')}
+            />
+            <CollapsibleContent className="mt-3 pl-2">
+              <div className="space-y-2">
+                {DEADLINE_FILTER_OPTIONS.map(({ value, label }) => (
+                  <div key={value} className="flex items-center space-x-2">
+                    <CustomCheckbox
+                      id={`deadline-${value}`}
+                      checked={local.deadline.includes(value)}
+                      onCheckedChange={(checked) => toggleDeadline(value, checked)}
                     />
-                    <Label htmlFor={type} className="text-sm cursor-pointer flex items-center text-gray-900 font-light">
-                      <Clock className="w-3 h-3 mr-1 text-gray-600" />
-                      {type}
+                    <Label
+                      htmlFor={`deadline-${value}`}
+                      className="text-sm cursor-pointer flex items-center space-x-2"
+                    >
+                      <Calendar className="w-3 h-3 text-gray-600" />
+                      <span>{label}</span>
                     </Label>
                   </div>
                 ))}
               </div>
-              </CollapsibleContent>
-            </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
 
-            {/* Search Query - Always Open */}
-            <div className="mb-4">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="mt-2">
+          {/* Budget — range only */}
+          <Collapsible
+            open={expandedFilterSections.includes('budget')}
+            onOpenChange={() => toggleSection('budget')}
+            className="mb-4"
+          >
+            <SectionTrigger title="Budżet" open={expandedFilterSections.includes('budget')} />
+            <CollapsibleContent className="mt-3 pl-2">
+              <div className="flex gap-2">
+                <div className="flex-1 flex flex-col space-y-1">
+                  <Label htmlFor="budget-min-input" className="text-xs text-gray-700">
+                    Budżet min (PLN)
+                  </Label>
                   <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary"
-                    placeholder="Wpisz szukany termin"
+                    id="budget-min-input"
+                    type="number"
+                    value={budgetMinStr}
+                    onChange={(e) => setBudgetMinStr(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
+                    placeholder="0"
+                    min="0"
+                  />
+                </div>
+                <div className="flex-1 flex flex-col space-y-1">
+                  <Label htmlFor="budget-max-input" className="text-xs text-gray-700">
+                    Budżet max (PLN)
+                  </Label>
+                  <input
+                    id="budget-max-input"
+                    type="number"
+                    value={budgetMaxStr}
+                    onChange={(e) => setBudgetMaxStr(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
+                    placeholder="0"
+                    min="0"
                   />
                 </div>
               </div>
-            </div>
-
-          {/* Scroll Indicator */}
-          {showScrollIndicator && (
-              <div className="sticky bottom-2 z-10 flex justify-center -mb-2">
-                <div 
-                  className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full p-2 shadow-lg cursor-pointer hover:bg-white transition-colors"
-                  onClick={() => {
-                    const scrollContainer = scrollContainerRef.current;
-                    if (scrollContainer) {
-                      scrollContainer.scrollBy({
-                        top: scrollContainer.clientHeight * 0.8,
-                        behavior: 'smooth'
-                      });
-                    }
-                  }}
-                >
-                <ArrowDown className="w-4 h-4 text-gray-600 animate-pulse" />
-              </div>
-            </div>
-          )}
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
     </div>

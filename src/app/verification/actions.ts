@@ -218,7 +218,6 @@ export async function submitVerificationDocumentsAction(
     await syncInsuranceToContractorSettings(supabase, user.id, newPaths.insurance);
   }
 
-  revalidatePath('/verification');
   revalidatePath('/account');
   return { ok: true };
 }

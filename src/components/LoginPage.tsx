@@ -3,32 +3,28 @@
 import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { User, Mail, Lock, Loader2 } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, MapPin, MessageSquare, BadgeCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Card, CardContent } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { loginAction } from '../lib/auth/actions';
 import { useUserProfile } from '../contexts/AuthContext';
+import {
+  AuthFormPanel,
+  AuthPageLayout,
+  authFieldClassName,
+} from './auth/AuthPageLayout';
 
-interface LoginPageProps {
-  searchParams?: {
-    error?: string;
-    message?: string;
-    redirectTo?: string;
-  };
-}
-
-export function LoginPage({ searchParams }: LoginPageProps) {
+export function LoginPage() {
   const router = useRouter();
-  const searchParamsObj = useSearchParams();
+  const searchParams = useSearchParams();
   const { refreshSession } = useUserProfile();
   const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(searchParams?.error || null);
-  const [message, setMessage] = useState<string | null>(searchParams?.message || null);
-  
-  const redirectTo = searchParams?.redirectTo || searchParamsObj?.get('redirectTo') || '/';
+  const [error, setError] = useState<string | null>(searchParams?.get('error') ?? null);
+  const [message, setMessage] = useState<string | null>(searchParams?.get('message') ?? null);
+
+  const redirectTo = searchParams?.get('redirectTo') || '/';
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -36,20 +32,16 @@ export function LoginPage({ searchParams }: LoginPageProps) {
     setMessage(null);
 
     const formData = new FormData(e.currentTarget);
-    
+
     startTransition(async () => {
       const result = await loginAction(formData);
 
       if ('error' in result) {
         setError(result.error);
       } else {
-        // Login successful - refresh session in context immediately
         await refreshSession();
-        // Refresh router to update server state
         router.refresh();
-        // Use server-determined redirect target (role-aware); fall back to client value.
         const target = result.redirectTo || redirectTo;
-        // Small delay to ensure context updates, then navigate
         setTimeout(() => {
           router.push(target);
         }, 100);
@@ -58,117 +50,114 @@ export function LoginPage({ searchParams }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-16" data-testid="login-page">
-      <div className="container mx-auto px-4">
-        <div className="max-w-md mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2" data-testid="login-heading">
-              Zaloguj się
-            </h1>
-            <p className="text-slate-600">
-              Wprowadź swoje dane aby się zalogować
-            </p>
+    <AuthPageLayout
+      testId="login-page"
+      title="Zaloguj się"
+      subtitle="Wróć do zleceń i wiadomości na swoim koncie."
+      side={{
+        heading: 'Platforma dla zarządców i wykonawców',
+        body: 'Przeglądaj zlecenia na mapie, składaj oferty i zarządzaj współpracą w jednym miejscu.',
+        features: [
+          {
+            icon: MapPin,
+            title: 'Zlecenia i przetargi w Warszawie',
+            description: 'Filtruj po dzielnicy, kategorii i budżecie na mapie.',
+          },
+          {
+            icon: MessageSquare,
+            title: 'Bezpieczna komunikacja',
+            description: 'Wiadomości i oferty w jednym panelu konta.',
+          },
+          {
+            icon: BadgeCheck,
+            title: 'Profil i weryfikacja wykonawców',
+            description: 'Dokumenty i uprawnienia — przejrzysty status weryfikacji.',
+          },
+        ],
+      }}
+      footer={
+        <>
+          Nie masz konta?{' '}
+          <Link href="/register" className="font-medium text-primary hover:underline">
+            Zarejestruj się
+          </Link>
+        </>
+      }
+    >
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {message && (
+        <Alert className="mb-4 border-emerald-500/30 bg-emerald-500/5">
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      )}
+
+      <AuthFormPanel>
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="email">Adres email</Label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="twoj@email.pl"
+                className={`pl-10 ${authFieldClassName}`}
+                required
+                disabled={isPending}
+                autoComplete="email"
+              />
+            </div>
           </div>
 
-          {/* Alerts */}
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          {message && (
-            <Alert className="mb-6">
-              <AlertDescription>{message}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Login Form Card */}
-          <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-6">
-              <form className="space-y-6" onSubmit={handleSubmit}>
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-900">
-                    Adres email *
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="twoj@email.pl"
-                      className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                      required
-                      disabled={isPending}
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-900">
-                    Hasło *
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="••••••••"
-                      className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-slate-600"
-                      required
-                      disabled={isPending}
-                    />
-                  </div>
-                </div>
-
-                <input type="hidden" name="redirectTo" value={redirectTo} />
-
-                <Button 
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  type="submit"
-                  disabled={isPending}
-                >
-                  {isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Logowanie...
-                    </>
-                  ) : (
-                    <>
-                  <User className="mr-2 h-5 w-5" />
-                  Zaloguj się
-                    </>
-                  )}
-                </Button>
-              </form>
-
-              <div className="mt-6 text-center">
-                <Link 
-                  href="/forgot-password" 
-                  className="text-sm text-slate-500 hover:text-slate-700 hover:underline transition-colors"
-                >
-                  Zapomniałeś hasła?
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Register Link */}
-          <div className="mt-6 text-center">
-            <span className="text-slate-600">Nie masz konta? </span>
-            <Link 
-              href="/register" 
-              className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
-            >
-              Zarejestruj się
-            </Link>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="password">Hasło</Label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-muted-foreground hover:text-primary hover:underline"
+              >
+                Zapomniałeś hasła?
+              </Link>
+            </div>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                className={`pl-10 ${authFieldClassName}`}
+                required
+                disabled={isPending}
+                autoComplete="current-password"
+              />
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+
+          <input type="hidden" name="redirectTo" value={redirectTo} />
+
+          <Button type="submit" className="h-11 w-full" disabled={isPending}>
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Logowanie...
+              </>
+            ) : (
+              <>
+                Zaloguj się
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </form>
+      </AuthFormPanel>
+    </AuthPageLayout>
   );
 }
 

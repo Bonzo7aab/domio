@@ -166,12 +166,13 @@ export const sitemapEntries: SitemapEntry[] = [
   },
   {
     category: "Pomoc",
-    label: "Weryfikacja",
-    path: "/verification",
+    label: "Dokończ weryfikację",
+    path: "/account?tab=documents",
     icon: Shield,
-    description: "Zweryfikuj swoje konto",
-    keywords: ["weryfikacja", "verification", "verify", "potwierdź"],
-    requiresAuth: true
+    description: "Prześlij dokumenty w zakładce Dokumenty na koncie",
+    keywords: ["weryfikacja", "verification", "verify", "potwierdź", "dokończ", "dokumenty"],
+    requiresAuth: true,
+    userTypes: ['contractor'],
   },
   {
     category: "Pomoc",

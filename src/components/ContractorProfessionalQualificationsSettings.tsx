@@ -19,6 +19,8 @@ import { Label } from './ui/label';
 
 interface ContractorProfessionalQualificationsSettingsProps {
   userId: string;
+  /** When `section`, renders as a row inside the documents upload shell. */
+  variant?: 'card' | 'section';
 }
 
 const SCAN_ACCEPT =
@@ -28,6 +30,7 @@ const SAVED_TOAST = 'Dane uprawnień zawodowych zostały zapisane';
 
 export function ContractorProfessionalQualificationsSettings({
   userId,
+  variant = 'card',
 }: ContractorProfessionalQualificationsSettingsProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
@@ -141,12 +144,126 @@ export function ContractorProfessionalQualificationsSettings({
   };
 
   if (isLoading) {
+    const loadingBody = (
+      <p className="text-sm text-muted-foreground">Ładowanie danych uprawnień zawodowych...</p>
+    );
+    if (variant === 'section') {
+      return <section className="px-4 py-5 sm:px-6">{loadingBody}</section>;
+    }
     return (
       <Card>
-        <CardContent className="py-6 text-sm text-muted-foreground">
-          Ładowanie danych uprawnień zawodowych...
-        </CardContent>
+        <CardContent className="py-6">{loadingBody}</CardContent>
       </Card>
+    );
+  }
+
+  const fields = (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-dashed border-border/80 bg-muted/10 p-3 sm:p-4">
+        <Label htmlFor="pq-valid-until" className="text-xs font-medium">
+          Data ważności dokumentu
+        </Label>
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Calendar className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="pq-valid-until"
+              type="date"
+              className="bg-background pl-9"
+              value={validUntil}
+              onChange={event => setValidUntil(event.target.value)}
+            />
+          </div>
+          <Button onClick={handleSaveDate} disabled={isSaving} size="sm" className="shrink-0">
+            Zapisz datę
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-dashed border-border/80 bg-muted/10 p-3 sm:p-4">
+        <Label htmlFor="pq-scan-file" className="text-xs font-medium">
+          Skan uprawnień (certyfikat, licencja)
+        </Label>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {getOcPolicyAllowedFormatsLabel()} · maks. 10 MB
+        </p>
+        <div className="mt-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            {scanPath ? (
+              <p className="truncate text-sm font-medium" title={scanPath}>
+                {scanPath.split('/').pop()}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Brak dodanego skanu</p>
+            )}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {scanPath ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={isSaving}
+                aria-label="Usuń skan"
+                onClick={() => void handleRemoveScan()}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            ) : null}
+            <Button variant="outline" size="sm" disabled={isSaving} className="h-9 shrink-0" asChild>
+              <label htmlFor="pq-scan-file" className="cursor-pointer">
+                <FileUp className="mr-2 h-4 w-4" />
+                {scanPath ? 'Zamień' : 'Dodaj skan'}
+              </label>
+            </Button>
+            {scanPath && previewSignedUrl ? (
+              <Button variant="outline" size="sm" className="h-9 shrink-0" asChild>
+                <a href={previewSignedUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Otwórz
+                </a>
+              </Button>
+            ) : null}
+            <input
+              id="pq-scan-file"
+              type="file"
+              className="hidden"
+              accept={SCAN_ACCEPT}
+              onChange={handleUpload}
+            />
+          </div>
+        </div>
+        {scanPath && !previewSignedUrl ? (
+          <p className="mt-2 text-xs text-destructive">
+            Nie udało się przygotować linku do pliku. Zapisz plik ponownie.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (variant === 'section') {
+    return (
+      <section id="professional-qualifications" className="scroll-mt-24 px-4 py-5 sm:px-6">
+        <div className="mb-4 flex gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground">
+            <GraduationCap className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold">Uprawnienia zawodowe</h3>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Opcjonalny
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Certyfikat, licencja lub inny dokument potwierdzający kwalifikacje.
+            </p>
+          </div>
+        </div>
+        {fields}
+      </section>
     );
   }
 
@@ -158,88 +275,7 @@ export function ContractorProfessionalQualificationsSettings({
           Uprawnienia Zawodowe
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="pq-valid-until">Data ważności dokumentu</Label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Calendar className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="pq-valid-until"
-                type="date"
-                className="pl-9"
-                value={validUntil}
-                onChange={(event) => setValidUntil(event.target.value)}
-              />
-            </div>
-            <Button onClick={handleSaveDate} disabled={isSaving}>
-              Zapisz
-            </Button>
-          </div>
-        </div>
-
-        <div className="min-w-0 space-y-2">
-          <Label htmlFor="pq-scan-file">Skan uprawnień (certyfikat, licencja)</Label>
-          <p className="text-xs text-muted-foreground">
-            Dozwolone formaty: {getOcPolicyAllowedFormatsLabel()} · maks. 10 MB
-          </p>
-          <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 shadow-sm sm:flex-row sm:items-center sm:gap-0 sm:px-3 sm:py-2.5">
-            <div className="min-w-0 flex-1 sm:border-r sm:border-border/70 sm:pr-4">
-              {scanPath ? (
-                <p className="truncate text-left text-sm leading-snug" title={scanPath}>
-                  <span className="text-muted-foreground">Plik zapisany: </span>
-                  <span className="font-medium text-foreground">{scanPath.split('/').pop()}</span>
-                </p>
-              ) : (
-                <p className="text-left text-sm leading-snug text-muted-foreground">Brak dodanego skanu</p>
-              )}
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pl-4">
-              {scanPath ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  disabled={isSaving}
-                  aria-label="Usuń skan"
-                  onClick={() => void handleRemoveScan()}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              ) : null}
-              <Button variant="outline" size="sm" disabled={isSaving} className="h-9 shrink-0" asChild>
-                <label htmlFor="pq-scan-file" className="cursor-pointer">
-                  <FileUp className="mr-2 h-4 w-4" />
-                  {scanPath ? 'Zamień' : 'Dodaj skan'}
-                </label>
-              </Button>
-              {scanPath && previewSignedUrl ? (
-                <Button variant="outline" size="sm" className="h-9 shrink-0" asChild>
-                  <a href={previewSignedUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Otwórz w nowej karcie
-                  </a>
-                </Button>
-              ) : null}
-              <input
-                id="pq-scan-file"
-                type="file"
-                className="hidden"
-                accept={SCAN_ACCEPT}
-                onChange={handleUpload}
-              />
-            </div>
-          </div>
-
-          {scanPath && !previewSignedUrl ? (
-            <p className="text-xs text-destructive">
-              Nie udało się przygotować linku do pliku. Sprawdź uprawnienia do magazynu plików lub zapisz plik
-              ponownie.
-            </p>
-          ) : null}
-        </div>
-      </CardContent>
+      <CardContent>{fields}</CardContent>
     </Card>
   );
 }

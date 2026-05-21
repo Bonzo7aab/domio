@@ -12,7 +12,7 @@ import { extractCity, extractSublocality } from '../utils/locationMapping';
 import type { Job } from '../types/job';
 import { MapLegend } from './MapLegend';
 import JobFilters, { FilterState } from './JobFilters';
-import { isTenderEndingSoon } from '../utils/tenderHelpers';
+import { jobMatchesFilters } from '../lib/filters/filter-logic';
 
 interface EnhancedMapViewProps {
   isExpanded?: boolean;
@@ -311,50 +311,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
     // If filters haven't changed and we have cached result, we could return early
     // But since filteredJobs might have changed, we still need to filter
     
-    const result = filteredJobs.filter(job => {
-      // Use optimized filter functions
-      if (!filterByPostType(job, filters.postTypes)) return false;
-      if (!filterByCategory(job, filters.categories)) return false;
-      if (filters.subcategories && filters.subcategories.length > 0 && !filters.subcategories.includes(job.subcategory)) {
-        return false;
-      }
-      if (filters.contractTypes && filters.contractTypes.length > 0 && !filters.contractTypes.includes(job.type)) {
-        return false;
-      }
-      if (!filterByLocation(job, filters.cities, filters.sublocalities)) return false;
-      
-      // Legacy location filter support
-      if (filters.locations && filters.locations.length > 0) {
-        const jobLocationString = typeof job.location === 'string' ? job.location : job.location?.city || '';
-        if (!filters.locations.includes(jobLocationString)) {
-          return false;
-        }
-      }
-      
-      if (filters.clientTypes && filters.clientTypes.length > 0 && !filters.clientTypes.includes(job.clientType)) {
-        return false;
-      }
-      if (filters.urgency && filters.urgency.length > 0 && !filters.urgency.includes(job.urgency)) {
-        return false;
-      }
-      if (filters.endingSoon && job.postType === 'tender' && job.tenderInfo?.submissionDeadline) {
-        if (!isTenderEndingSoon(new Date(job.tenderInfo.submissionDeadline))) {
-          return false;
-        }
-      }
-      if (!filterByBudget(job, filters.budgetRanges, filters.budgetMin, filters.budgetMax)) {
-        return false;
-      }
-      if (filters.searchQuery && filters.searchQuery.trim()) {
-        const query = filters.searchQuery.toLowerCase();
-        const jobTitle = (job.title || '').toLowerCase();
-        if (!jobTitle.includes(query)) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
+    const result = filteredJobs.filter((job) => jobMatchesFilters(job, filters));
     
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps

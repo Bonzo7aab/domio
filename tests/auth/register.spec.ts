@@ -85,20 +85,24 @@ test.describe('Registration Page', () => {
     await page.fill('input[name="password"]', password);
     await page.fill('input[name="confirmPassword"]', password);
     await page.locator('form').getByRole('checkbox', { name: /akceptuję regulamin/i }).check();
-    await page.locator('form').getByText('Roboty Budowlane i Remonty').click();
 
     await page.click('button[type="submit"]');
 
-    // Wait for redirect to verification (auto-login) or login (email confirm)
+    // Wait for verification choice step (auto-login), legacy documents tab, or login (email confirm)
     await page.waitForURL(
       (url) =>
-        url.pathname.includes('/verification') ||
+        url.pathname.includes('/register/verification-choice') ||
+        (url.pathname.includes('/account') && url.search.includes('tab=documents')) ||
         url.pathname.includes('/login'),
       { timeout: 15000 }
     );
 
-    if (page.url().includes('/verification')) {
-      expect(page.url()).toContain('/verification');
+    if (page.url().includes('/register/verification-choice')) {
+      await expect(page.getByTestId('register-verification-choice')).toBeVisible();
+      await expect(page.getByText('Prześlij dokumenty teraz')).toBeVisible();
+      await expect(page.getByText('Zrobię to później')).toBeVisible();
+    } else if (page.url().includes('/account')) {
+      expect(page.url()).toMatch(/tab=documents/);
     }
 
     // Cleanup: delete the created user
@@ -180,7 +184,6 @@ test.describe('Registration Page', () => {
     await page.fill('input[name="phone"]', '+48123456789');
     await page.fill('input[name="nip"]', '1234567890');
     await page.fill('input[name="companyName"]', 'Test Co');
-    await page.locator('form').getByText('Roboty Budowlane i Remonty').click();
     await page.fill('input[name="password"]', '12345');
     await page.fill('input[name="confirmPassword"]', '12345');
     await page.locator('form').getByRole('checkbox', { name: /akceptuję regulamin/i }).check();
@@ -216,7 +219,6 @@ test.describe('Registration Page', () => {
     await page.fill('input[name="phone"]', '+48123456789');
     await page.fill('input[name="nip"]', '1234567890');
     await page.fill('input[name="companyName"]', 'Test Co');
-    await page.locator('form').getByText('Roboty Budowlane i Remonty').click();
     await page.fill('input[name="password"]', 'Password123!');
     await page.fill('input[name="confirmPassword"]', 'DifferentPassword123!');
     await page.locator('form').getByRole('checkbox', { name: /akceptuję regulamin/i }).check();

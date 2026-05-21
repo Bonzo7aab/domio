@@ -31,6 +31,8 @@ import { formatBudget, budgetFromDatabase, type Budget } from '../types/budget';
 import { type Job, type TenderInfo } from '../types/job';
 import { ManagerJobStatusSelect } from './manager-dashboard/ManagerJobStatusSelect';
 import { canManagerEditJobFields, getJobWorkflowStatusLabel } from '../lib/job-workflow-status';
+import { VerificationRequiredApplyDialog } from './VerificationRequiredApplyDialog';
+import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
 
 interface JobPageProps {
   jobId: string;
@@ -441,6 +443,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [showCompanyRequiredDialog, setShowCompanyRequiredDialog] = useState(false);
+  const [verificationApplyDialogOpen, setVerificationApplyDialogOpen] = useState(false);
   const [applicationForm, setApplicationForm] = useState<JobApplicationFormFields>({
     proposedPrice: '',
     vatRate: '23',
@@ -732,9 +735,14 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       toast.error('Musisz się zalogować aby złożyć ofertę');
       return;
     }
-    
+
     if (user?.userType !== 'contractor') {
       toast.error('Tylko wykonawcy mogą składać oferty');
+      return;
+    }
+
+    if (needsVerificationAttention(user)) {
+      setVerificationApplyDialogOpen(true);
       return;
     }
 
@@ -1608,6 +1616,11 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         applicationForm={applicationForm}
         setApplicationForm={(form) => setApplicationForm(form)}
         postType={job.postType}
+      />
+
+      <VerificationRequiredApplyDialog
+        open={verificationApplyDialogOpen}
+        onOpenChange={setVerificationApplyDialogOpen}
       />
 
       {/* Company Required Dialog */}

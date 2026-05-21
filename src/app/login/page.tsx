@@ -49,9 +49,5 @@ function LoginContent() {
     return <LoadingState label="Przekierowywanie..." />;
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <LoginPage />
-    </div>
-  );
+  return <LoginPage />;
 }

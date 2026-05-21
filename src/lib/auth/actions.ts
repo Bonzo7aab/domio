@@ -92,8 +92,7 @@ async function loginActionImpl(
     ) {
       const forbiddenForContractor =
         isContractor &&
-        (requestedRedirect.startsWith('/account') ||
-          requestedRedirect.startsWith('/manager-dashboard') ||
+        (requestedRedirect.startsWith('/manager-dashboard') ||
           requestedRedirect.startsWith('/admin'))
       const forbiddenForManager =
         !isContractor &&
@@ -138,8 +137,6 @@ async function registerActionImpl(
   const street = (formData.get('street') as string)?.trim()
   const city = (formData.get('city') as string)?.trim() || undefined
   const district = (formData.get('district') as string)?.trim() || undefined
-  const categories = formData.getAll('categories') as string[]
-
   if (!acceptTerms || acceptTerms === '0') {
     redirect(`/register?error=${encodeURIComponent('Musisz zaakceptować regulamin i politykę prywatności')}`)
   }
@@ -160,10 +157,6 @@ async function registerActionImpl(
     if (!organizationType || !street || !district) {
       redirect(`/register?error=${encodeURIComponent('Uzupełnij typ organizacji, adres (ulica, dzielnica)')}`)
     }
-  }
-
-  if (userType === 'contractor' && (!categories || categories.length === 0)) {
-    redirect(`/register?error=${encodeURIComponent('Wybierz co najmniej jedną kategorię')}`)
   }
 
   if (password.length < 6) {
@@ -246,9 +239,6 @@ async function registerActionImpl(
     phone: phone || null,
     is_verified: false,
     verification_level: 'none' as const,
-    ...(userType === 'contractor' && {
-      metadata: { primary_category_slugs: categories },
-    }),
   }
 
   const { data: companyRow, error: companyError } = await admin
@@ -291,7 +281,7 @@ async function registerActionImpl(
   if (authData.session) {
     const redirectTo =
       userType === 'contractor'
-        ? `/verification?message=${successMessage}`
+        ? `/register/verification-choice?message=${successMessage}`
         : `/account?message=${successMessage}`
     return { success: true, redirectTo }
   }
