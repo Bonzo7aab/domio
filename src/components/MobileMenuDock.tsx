@@ -197,7 +197,7 @@ export function MobileMenuDock() {
 
   const compactDockItems: FloatingDockItem[] = [
     {
-      title: isMapExpanded ? 'Ukryj mapę' : 'Pokaż mapę',
+      title: isMapExpanded ? 'Wróć do listy' : 'Pokaż mapę',
       icon: <Map className="size-6" />,
       onClick: () => setIsMapExpanded(!isMapExpanded),
     },
@@ -235,21 +235,18 @@ export function MobileMenuDock() {
 
         {/* Filters Drawer - always rendered */}
         <Drawer open={filtersDrawerOpen} onOpenChange={setFiltersDrawerOpen}>
-          <DrawerContent className="max-h-[85vh]">
+          <DrawerContent className="flex max-h-[85vh] flex-col overflow-hidden">
             <DrawerHeader className="sr-only">
               <DrawerTitle>Filtry</DrawerTitle>
             </DrawerHeader>
-            <div className="overflow-y-auto flex-1">
-              <div className="w-full">
-                <JobFilters
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <JobFilters
                   onFilterChange={setFilters}
                   initialFilters={filters}
                   primaryLocation={primaryLocation}
                   onLocationChange={onLocationChangeRequest}
                   jobs={loadedJobs}
-                  isMapView={isMapExpanded}
                 />
-              </div>
             </div>
           </DrawerContent>
         </Drawer>

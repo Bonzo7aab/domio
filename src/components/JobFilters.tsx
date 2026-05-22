@@ -18,12 +18,28 @@ import type { CategoryWithSubcategories } from '../lib/database/categories';
 import type { FilterState, DeadlineFilterKey } from '../lib/filters/filter-state';
 import { defaultFilters, WARSAW_CITY } from '../lib/filters/filter-state';
 import { extractCity, extractSublocality } from '../utils/locationMapping';
-import { jobMatchesFilters, getWarsawDistrictsFromJobs } from '../lib/filters/filter-logic';
+import {
+  getDeadlineFilterCounts,
+  getWarsawDistrictsForFilters,
+} from '../lib/filters/filter-logic';
 import { DEADLINE_FILTER_OPTIONS } from '../lib/filters/deadline-labels';
+import { cn } from './ui/utils';
 
 export type { FilterState } from '../lib/filters/filter-state';
 
 const EXPANDED_SECTIONS = ['categories', 'location', 'deadline', 'budget'] as const;
+
+function filterOptionLabelClass(count: number, isSelected: boolean, size: 'sm' | 'xs' = 'sm'): string {
+  return cn(
+    'cursor-pointer font-light',
+    size === 'xs' ? 'text-xs' : 'text-sm',
+    isSelected ? 'text-gray-900' : count === 0 ? 'text-gray-400' : 'text-gray-800',
+  );
+}
+
+function filterCountClass(count: number, isSelected: boolean): string {
+  return cn(isSelected || count > 0 ? 'text-gray-500' : 'text-gray-300');
+}
 
 interface JobFiltersProps {
   onFilterChange?: (filters: FilterState) => void;
@@ -31,7 +47,6 @@ interface JobFiltersProps {
   onLocationChange?: () => void;
   jobs?: Job[];
   initialFilters?: FilterState;
-  isMapView?: boolean;
 }
 
 const CustomCheckbox: React.FC<{
@@ -85,7 +100,6 @@ export default function JobFilters({
   onLocationChange,
   jobs = [],
   initialFilters,
-  isMapView = false,
 }: JobFiltersProps) {
   const [expandedFilterSections, setExpandedFilterSections] = useState<string[]>([
     ...EXPANDED_SECTIONS,
@@ -145,12 +159,24 @@ export default function JobFilters({
     return counts;
   }, [jobs]);
 
-  const warsawDistricts = useMemo(() => getWarsawDistrictsFromJobs(jobs), [jobs]);
+  const warsawDistricts = useMemo(() => getWarsawDistrictsForFilters(), []);
 
-  const filteredJobsCount = useMemo(
-    () => jobs.filter((job) => jobMatchesFilters(job, local)).length,
-    [jobs, local]
-  );
+  const districtCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const district of warsawDistricts) {
+      counts[district] = 0;
+    }
+    jobs.forEach((job) => {
+      if (extractCity(job.location) !== WARSAW_CITY) return;
+      const sub = extractSublocality(job.location);
+      if (sub && sub in counts) {
+        counts[sub] += 1;
+      }
+    });
+    return counts;
+  }, [jobs, warsawDistricts]);
+
+  const deadlineCounts = useMemo(() => getDeadlineFilterCounts(jobs), [jobs]);
 
   useEffect(() => {
     const budgetMin =
@@ -211,19 +237,13 @@ export default function JobFilters({
 
   return (
     <div
-      className="w-full lg:w-80 overflow-hidden h-full"
-      style={{ backgroundColor: '#ffffff' }}
+      className="flex h-full min-h-0 w-full max-h-full flex-col overflow-hidden bg-white lg:w-80"
     >
-      <div className="flex flex-col h-full relative">
-        <div className={`flex-shrink-0 px-6 ${isMapView ? 'pt-6' : ''}`}>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="flex-shrink-0 px-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <h3 className="text-lg font-bold text-gray-900">Filtry</h3>
-              {isMapView && (
-                <span className="text-sm font-normal text-gray-600">
-                  ({filteredJobsCount})
-                </span>
-              )}
             </div>
           </div>
 
@@ -256,7 +276,7 @@ export default function JobFilters({
 
         <div
           ref={scrollContainerRef}
-          className={`flex-1 overflow-y-auto px-6 ${isMapView ? 'pb-4' : 'pb-6'} max-h-[calc(100vh-20rem)]`}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6"
         >
           <div className="mb-4 flex items-center space-x-2">
             <CustomCheckbox
@@ -314,9 +334,10 @@ export default function JobFilters({
                           />
                           <Label
                             htmlFor={`category-${category.id}`}
-                            className="text-sm cursor-pointer text-gray-900 font-light flex-1"
+                            className={cn('flex-1', filterOptionLabelClass(count, isSelected))}
                           >
-                            {category.name} {count > 0 && `(${count})`}
+                            {category.name}{' '}
+                            <span className={filterCountClass(count, isSelected)}>({count})</span>
                           </Label>
                           {category.subcategories.length > 0 && (
                             <button
@@ -337,6 +358,7 @@ export default function JobFilters({
                           <div className="ml-6 space-y-1 pl-1 border-l-2 border-gray-200">
                             {category.subcategories.map((sub) => {
                               const subCount = subcategoryCounts[sub.name] || 0;
+                              const subSelected = local.subcategories.includes(sub.name);
                               return (
                                 <div
                                   key={sub.id}
@@ -344,7 +366,7 @@ export default function JobFilters({
                                 >
                                   <CustomCheckbox
                                     id={`sub-${sub.id}`}
-                                    checked={local.subcategories.includes(sub.name)}
+                                    checked={subSelected}
                                     onCheckedChange={(checked) => {
                                       patch({
                                         subcategories: checked
@@ -355,10 +377,12 @@ export default function JobFilters({
                                   />
                                   <Label
                                     htmlFor={`sub-${sub.id}`}
-                                    className="text-xs cursor-pointer text-gray-700 font-light"
+                                    className={filterOptionLabelClass(subCount, subSelected, 'xs')}
                                   >
                                     {sub.name}{' '}
-                                    <span className="text-gray-500">({subCount})</span>
+                                    <span className={filterCountClass(subCount, subSelected)}>
+                                      ({subCount})
+                                    </span>
                                   </Label>
                                 </div>
                               );
@@ -393,38 +417,33 @@ export default function JobFilters({
               <Label className="text-xs font-semibold text-gray-700 mb-2 block">
                 Dzielnica
               </Label>
-              {warsawDistricts.length > 0 ? (
-                <div className="space-y-2">
+              <div className="space-y-2">
                   {warsawDistricts.map((district) => {
                     const key = `${WARSAW_CITY}:${district}`;
-                    const count = jobs.filter((job) => {
-                      return (
-                        extractCity(job.location) === WARSAW_CITY &&
-                        extractSublocality(job.location) === district
-                      );
-                    }).length;
+                    const count = districtCounts[district] ?? 0;
+                    const districtSelected = local.sublocalities.includes(key);
                     return (
                       <div key={district} className="flex items-center space-x-2">
                         <CustomCheckbox
                           id={`district-${district}`}
-                          checked={local.sublocalities.includes(key)}
+                          checked={districtSelected}
                           onCheckedChange={(checked) =>
                             handleDistrictChange(district, checked)
                           }
                         />
                         <Label
                           htmlFor={`district-${district}`}
-                          className="text-sm cursor-pointer text-gray-900 font-light"
+                          className={filterOptionLabelClass(count, districtSelected)}
                         >
-                          {district} ({count})
+                          {district}{' '}
+                          <span className={filterCountClass(count, districtSelected)}>
+                            ({count})
+                          </span>
                         </Label>
                       </div>
                     );
                   })}
                 </div>
-              ) : (
-                <div className="text-xs text-gray-400">Brak dzielnic w ogłoszeniach</div>
-              )}
             </CollapsibleContent>
           </Collapsible>
 
@@ -440,22 +459,41 @@ export default function JobFilters({
             />
             <CollapsibleContent className="mt-3 pl-2">
               <div className="space-y-2">
-                {DEADLINE_FILTER_OPTIONS.map(({ value, label }) => (
-                  <div key={value} className="flex items-center space-x-2">
-                    <CustomCheckbox
-                      id={`deadline-${value}`}
-                      checked={local.deadline.includes(value)}
-                      onCheckedChange={(checked) => toggleDeadline(value, checked)}
-                    />
-                    <Label
-                      htmlFor={`deadline-${value}`}
-                      className="text-sm cursor-pointer flex items-center space-x-2"
-                    >
-                      <Calendar className="w-3 h-3 text-gray-600" />
-                      <span>{label}</span>
-                    </Label>
-                  </div>
-                ))}
+                {DEADLINE_FILTER_OPTIONS.map(({ value, label }) => {
+                  const count = deadlineCounts[value] ?? 0;
+                  const deadlineSelected = local.deadline.includes(value);
+                  return (
+                    <div key={value} className="flex items-center space-x-2">
+                      <CustomCheckbox
+                        id={`deadline-${value}`}
+                        checked={deadlineSelected}
+                        onCheckedChange={(checked) => toggleDeadline(value, checked)}
+                      />
+                      <Label
+                        htmlFor={`deadline-${value}`}
+                        className={cn(
+                          'flex items-center gap-2',
+                          filterOptionLabelClass(count, deadlineSelected),
+                        )}
+                      >
+                        <Calendar
+                          className={cn(
+                            'w-3 h-3 shrink-0',
+                            count === 0 && !deadlineSelected
+                              ? 'text-gray-300'
+                              : 'text-gray-600',
+                          )}
+                        />
+                        <span>
+                          {label}{' '}
+                          <span className={filterCountClass(count, deadlineSelected)}>
+                            ({count})
+                          </span>
+                        </span>
+                      </Label>
+                    </div>
+                  );
+                })}
               </div>
             </CollapsibleContent>
           </Collapsible>

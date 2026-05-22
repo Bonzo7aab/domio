@@ -268,7 +268,7 @@ export default function JobList({
             <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-1.5">
               <Map className="w-4 h-4 text-muted-foreground shrink-0" />
               <Label htmlFor="map-toggle" className="text-sm cursor-pointer whitespace-nowrap">
-                Zobacz mapę
+                {isMapVisible ? 'Wróć do listy' : 'Zobacz mapę'}
               </Label>
               <Switch
                 id="map-toggle"

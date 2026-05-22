@@ -9,7 +9,6 @@ import {
   type JobApplicationFormFields,
   type JobApplicationSubmitPayload,
 } from '../components/JobApplicationModal';
-import { MapPlaceholder } from '../components/MapPlaceholder';
 import CategoryIconBar from '../components/CategoryIconBar';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -606,70 +605,72 @@ function HomePageContent() {
         />
       )}
       
-      {/* Full Screen Map - Rendered outside container when expanded for full width */}
       {isMapExpanded && (
-        <EnhancedMapView 
-          jobs={jobs}
-          allJobs={loadedJobs}
-          isExpanded={isMapExpanded}
-          onToggleExpand={() => setIsMapExpanded(!isMapExpanded)}
-          selectedJobId={selectedJobId}
-          onJobSelect={handleJobSelect}
-          hoveredJobId={hoveredJobId}
-          onJobHover={setHoveredJobId}
-          userLocation={userLocation}
-          onLocationChange={setUserLocation}
-          onCityNameChange={handleCityNameChange}
-          searchRadius={searchRadius}
-          onRadiusChange={setSearchRadius}
-          filters={filters}
-          onFiltersChange={setFilters}
-          showCitySelector={showCitySelector}
-          onCitySelectorClose={handleCitySelectorClose}
-          onBoundsChanged={handleMapBoundsChange}
-        />
+        <div className="flex w-full min-h-[calc(100vh-4rem)] md:min-h-[calc(100vh-4rem)]">
+          <div className="hidden lg:flex h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] min-h-0 flex-col lg:w-80 xl:w-96 flex-shrink-0 overflow-hidden lg:sticky lg:top-20 lg:self-start border-r border-border bg-white">
+            <JobFilters
+              onFilterChange={setFilters}
+              initialFilters={filters}
+              primaryLocation={primaryLocation}
+              onLocationChange={handleLocationChangeRequest}
+              jobs={loadedJobs}
+            />
+          </div>
+          <div className="flex-1 min-w-0 relative min-h-0">
+            <EnhancedMapView
+              jobs={jobs}
+              allJobs={loadedJobs}
+              isExpanded
+              fillParent
+              onToggleExpand={() => setIsMapExpanded(false)}
+              selectedJobId={selectedJobId}
+              onJobSelect={handleJobSelect}
+              hoveredJobId={hoveredJobId}
+              onJobHover={setHoveredJobId}
+              userLocation={userLocation}
+              onLocationChange={setUserLocation}
+              onCityNameChange={handleCityNameChange}
+              searchRadius={searchRadius}
+              onRadiusChange={setSearchRadius}
+              filters={filters}
+              onFiltersChange={setFilters}
+              showCitySelector={showCitySelector}
+              onCitySelectorClose={handleCitySelectorClose}
+              onBoundsChanged={handleMapBoundsChange}
+            />
+          </div>
+        </div>
       )}
-      
-      {/* Main Layout - Hidden when map is expanded, wrapped in max-w-7xl container */}
+
       {!isMapExpanded && (
         <div className="w-full">
-          {/* Category Icon Bar - Level 1 Navigation */}
           <CategoryIconBar jobs={loadedJobs} />
-          
+
           <div className="max-w-7xl mx-auto sm:px-4 md:px-6 lg:px-8">
             <div className="flex flex-col lg:flex-row min-h-0 lg:min-h-[calc(100vh-12rem)]">
-            {/* Filters Sidebar - Visible only on laptop and above */}
-            <div className="hidden lg:flex flex-col lg:w-80 xl:w-96 flex-shrink-0">
-              {/* Map Placeholder */}
-              <div className="mb-4">
-                <MapPlaceholder 
-                  onToggleExpand={() => setIsMapExpanded(!isMapExpanded)}
+              <div className="hidden lg:flex h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] min-h-0 flex-col lg:w-80 xl:w-96 flex-shrink-0 overflow-hidden lg:sticky lg:top-20 lg:self-start">
+                <JobFilters
+                  onFilterChange={setFilters}
+                  initialFilters={filters}
+                  primaryLocation={primaryLocation}
+                  onLocationChange={handleLocationChangeRequest}
+                  jobs={loadedJobs}
                 />
               </div>
-              {/* Filters */}
-              <JobFilters 
-                onFilterChange={setFilters}
-                initialFilters={filters}
-                primaryLocation={primaryLocation}
-                onLocationChange={handleLocationChangeRequest}
-                jobs={loadedJobs}
-              />
+
+              <div className="flex-1 min-w-0 lg:ml-6">
+                <JobList
+                  jobs={loadedJobs}
+                  filters={filters}
+                  onFilterChange={setFilters}
+                  onJobSelect={handleJobSelect}
+                  onToggleMap={handleToggleMap}
+                  isMapVisible={isMapExpanded}
+                  isLoadingJobs={isLoadingJobs}
+                  onApplyClick={handleApplyClick}
+                />
+              </div>
             </div>
-            
-            {/* Main Content - JobList */}
-            <div className="flex-1 min-w-0 lg:ml-6">
-              <JobList 
-                jobs={loadedJobs}
-                filters={filters}
-                onFilterChange={setFilters}
-                onJobSelect={handleJobSelect}
-                onToggleMap={handleToggleMap}
-                isMapVisible={isMapExpanded}
-                isLoadingJobs={isLoadingJobs}
-                onApplyClick={handleApplyClick}
-              />
-            </div>
-          </div>
           </div>
         </div>
       )}

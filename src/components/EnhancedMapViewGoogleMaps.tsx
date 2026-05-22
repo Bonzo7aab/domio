@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { X, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Crosshair, Maximize2, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -11,11 +11,15 @@ import { getCurrentLocation, calculateDistance } from '../lib/google-maps/geocod
 import { extractCity, extractSublocality } from '../utils/locationMapping';
 import type { Job } from '../types/job';
 import { MapLegend } from './MapLegend';
-import JobFilters, { FilterState } from './JobFilters';
+import type { FilterState } from './JobFilters';
 import { jobMatchesFilters } from '../lib/filters/filter-logic';
 
 interface EnhancedMapViewProps {
   isExpanded?: boolean;
+  /** When true, map fills the parent column instead of fixed fullscreen. */
+  fillContainer?: boolean;
+  /** When true with isExpanded, map fills parent next to page sidebar filters (no overlay filters). */
+  fillParent?: boolean;
   onToggleExpand?: () => void;
   jobs?: Job[]; // Jobs for map markers (can be bounds-filtered)
   allJobs?: Job[]; // All jobs for filters (should not be bounds-filtered)
@@ -51,6 +55,8 @@ const cityCoordinates = {
 
 export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   isExpanded = false,
+  fillContainer = false,
+  fillParent = false,
   onToggleExpand,
   jobs = [], // Jobs for map markers (can be bounds-filtered)
   allJobs, // All jobs for filters (should not be bounds-filtered, falls back to jobs if not provided)
@@ -69,15 +75,11 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   onCitySelectorClose,
   onBoundsChanged
 }) => {
-  // Use allJobs for filters, fall back to jobs if allJobs not provided
-  // This ensures filters always work on the full dataset, not bounds-filtered results
-  const jobsForFilters = allJobs !== undefined && allJobs.length > 0 ? allJobs : jobs;
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showCitySelector, setShowCitySelector] = useState(false);
   const [showJobClusters] = useState(true); // Always show all jobs
   const [mapCenter, setMapCenter] = useState({ lat: 52.1394, lng: 21.0458 }); // Ursynów, Warsaw
   const [mapZoom, setMapZoom] = useState(13); // District-level view
-  const [_showMapFilters] = useState(true);
   const [_showMapLegend] = useState(true);
   const [selectedCityName, setSelectedCityName] = useState<string | null>(null);
 
@@ -353,10 +355,16 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
     onJobSelect?.(markerId);
   };
 
+  const containerClass = isExpanded
+    ? fillParent
+      ? 'absolute inset-0 w-full h-full min-h-0'
+      : 'fixed top-0 left-0 right-0 bottom-0 z-50 w-full h-[calc(100vh-4rem-5rem)] md:h-[calc(100vh-4rem)]'
+    : fillContainer
+      ? 'w-full h-full min-h-0 flex-1'
+      : 'w-[450px] h-[450px]';
+
   return (
-    <div className={`relative transition-all duration-300 flex-shrink-0 ${
-      isExpanded ? 'fixed top-0 left-0 right-0 bottom-0 z-50 w-full h-[calc(100vh-4rem-5rem)] md:h-[calc(100vh-4rem)]' : 'w-[450px] h-[450px]'
-    }`}>
+    <div className={`relative transition-all duration-300 flex-shrink-0 ${containerClass}`}>
       {/* Map Container */}
       <div className={`relative w-full h-full overflow-hidden bg-muted ${
         isExpanded ? 'rounded-none border-none' : 'rounded-lg border border-border'
@@ -373,39 +381,50 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
           isSmallMap={!isExpanded}
         />
 
-        {/* Expand/Collapse Button */}
-        {onToggleExpand && (
-          <div className={`absolute z-[1001] ${isExpanded ? 'top-4 right-4' : 'top-4 right-4'} hidden md:block`}>
+        {/* Back to list — prominent when fullscreen map */}
+        {onToggleExpand && isExpanded && (
+          <div className="absolute z-[1001] top-4 right-4">
             <Button
-              variant="outline"
-              size={isExpanded ? "default" : "icon"}
+              variant="default"
+              size="lg"
               onClick={onToggleExpand}
-              className={`bg-white shadow-lg ${isExpanded ? 'h-10 px-4' : 'w-10 h-10'}`}
-              title={isExpanded ? 'Zmniejsz mapę' : 'Powiększ mapę'}
+              className="h-11 px-5 font-semibold shadow-xl bg-primary text-primary-foreground hover:bg-primary/90 border-2 border-primary-foreground/20"
+              aria-label="Wróć do listy ogłoszeń"
             >
-              {isExpanded ? (
-                <>
-                  <Minimize2 className="w-4 h-4 mr-2" />
-                  Zmniejsz mapę
-                </>
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
+              <ArrowLeft className="w-5 h-5 mr-2 shrink-0" />
+              Wróć do listy
             </Button>
           </div>
         )}
 
-        {/* Map Filters - Only visible when expanded and on desktop */}
-        {/* Note: Use allJobs (not bounds-filtered) for filters to show accurate counts */}
-        {isExpanded && _showMapFilters && onFiltersChange && (
-          <div className="absolute top-28 left-4 z-[1001] w-80 hidden md:block">
-            <JobFilters 
-              onFilterChange={onFiltersChange}
-              initialFilters={filters}
-              primaryLocation={selectedCityName || undefined}
-              isMapView={true}
-              jobs={jobsForFilters}
-            />
+        {/* Expand (compact map only) */}
+        {onToggleExpand && !isExpanded && !fillContainer && (
+          <div className="absolute z-[1001] top-4 right-4 hidden md:block">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onToggleExpand}
+              className="w-10 h-10 bg-white shadow-lg"
+              title="Powiększ mapę"
+              aria-label="Powiększ mapę"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+
+        {onToggleExpand && !isExpanded && fillContainer && (
+          <div className="absolute z-[1001] top-4 right-4">
+            <Button
+              variant="default"
+              size="lg"
+              onClick={onToggleExpand}
+              className="h-11 px-5 font-semibold shadow-xl bg-primary text-primary-foreground hover:bg-primary/90"
+              aria-label="Wróć do listy ogłoszeń"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2 shrink-0" />
+              Wróć do listy
+            </Button>
           </div>
         )}
 
@@ -416,9 +435,9 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
           </div>
         )}
         
-        {/* Map Legend - Mobile version (top right, collapsed by default) */}
+        {/* Map Legend - Mobile version (below back button) */}
         {isExpanded && _showMapLegend && (
-          <div className="absolute top-4 right-4 z-[1000] md:hidden">
+          <div className="absolute top-16 right-4 z-[1000] md:hidden">
             <MapLegend initialExpanded={false} />
           </div>
         )}

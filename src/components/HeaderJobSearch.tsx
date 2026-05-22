@@ -4,8 +4,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Search, MapPin } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFilterContext } from '../contexts/FilterContext';
-import { useJobsContext } from '../contexts/JobsContext';
-import { getWarsawDistrictsFromJobs } from '../lib/filters/filter-logic';
+import { getWarsawDistrictsForFilters } from '../lib/filters/filter-logic';
 import { WARSAW_CITY, type FilterState } from '../lib/filters/filter-state';
 import { getFiltersUrl } from '../utils/filterUrlSync';
 import {
@@ -21,7 +20,6 @@ const ALL_DISTRICTS = '__all__';
 
 export function HeaderJobSearch({ className }: { className?: string }) {
   const { filters, setFilters } = useFilterContext();
-  const { loadedJobs } = useJobsContext();
   const pathname = usePathname();
   const router = useRouter();
   const [searchDraft, setSearchDraft] = useState(filters.searchQuery ?? '');
@@ -33,10 +31,7 @@ export function HeaderJobSearch({ className }: { className?: string }) {
     setSearchDraft(next);
   }
 
-  const districts = useMemo(
-    () => getWarsawDistrictsFromJobs(loadedJobs ?? []),
-    [loadedJobs]
-  );
+  const districts = useMemo(() => getWarsawDistrictsForFilters(), []);
 
   const selectedDistrict = useMemo(() => {
     const warsaw = filters.sublocalities.find((s) => s.startsWith(`${WARSAW_CITY}:`));

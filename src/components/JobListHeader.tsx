@@ -156,7 +156,7 @@ export const JobListHeader: React.FC<JobListHeaderProps> = ({
             className={`px-3 ${isMapVisible ? 'bg-blue-800 hover:bg-blue-900 text-white' : 'border-gray-200 text-gray-900 hover:bg-gray-50'}`}
           >
             <Map className="w-4 h-4 mr-2" />
-            {isMapVisible ? 'Ukryj mapę' : 'Pokaż mapę'}
+            {isMapVisible ? 'Wróć do listy' : 'Pokaż mapę'}
           </Button>
 
           {/* More Options */}

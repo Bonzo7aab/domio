@@ -312,7 +312,7 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
       return;
     }
     if (buildings.length > 0 && !buildingId) {
-      toast.error("Wybierz nieruchomość");
+      toast.error("Wybierz nazwę nieruchomości");
       return;
     }
     if (budgetMode === "amount") {
@@ -562,7 +562,7 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
               </div>
 
               <div>
-                <Label>Nieruchomość *</Label>
+                <Label>Nazwa nieruchomości *</Label>
                 {buildings.length === 0 ? (
                   <p className="text-sm text-muted-foreground mt-1">
                     Brak zapisanych nieruchomości. Do czasu dodania używany będzie adres siedziby firmy z profilu.
@@ -570,7 +570,7 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
                 ) : (
                   <Select value={buildingId} onValueChange={setBuildingId}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Wybierz nieruchomość" />
+                      <SelectValue placeholder="np. Wspólnota Przykładowa 1" />
                     </SelectTrigger>
                     <SelectContent>
                       {groupedBuildingOptions.map((group) => (

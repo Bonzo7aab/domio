@@ -1,4 +1,5 @@
 import type { Job } from '../../types/job';
+import { WARSAW_DISTRICTS } from '../config/warsawDistricts';
 import { extractCity, extractSublocality } from '../../utils/locationMapping';
 import type { DeadlineFilterKey, FilterState } from './filter-state';
 import { WARSAW_CITY } from './filter-state';
@@ -39,7 +40,7 @@ function startOfDay(d: Date): Date {
   return x;
 }
 
-function matchesDeadlineFilter(deadline: Date, filter: DeadlineFilterKey): boolean {
+export function matchesDeadlineFilter(deadline: Date, filter: DeadlineFilterKey): boolean {
   const now = new Date();
   const today = startOfDay(now);
   const deadlineDay = startOfDay(deadline);
@@ -154,6 +155,37 @@ export function jobMatchesFilters(job: Job, filters: FilterState): boolean {
   return true;
 }
 
+/** All official Warsaw districts for filter UI (including those with zero listings). */
+export function getWarsawDistrictsForFilters(): string[] {
+  return [...WARSAW_DISTRICTS];
+}
+
+export function getDeadlineFilterCounts(jobs: Job[]): Record<DeadlineFilterKey, number> {
+  const counts = {} as Record<DeadlineFilterKey, number>;
+  const keys: DeadlineFilterKey[] = [
+    'today',
+    'within-week',
+    'within-month',
+    'within-3-months',
+    'within-6-months',
+    'within-year',
+  ];
+  for (const key of keys) {
+    counts[key] = 0;
+  }
+  for (const job of jobs) {
+    const deadline = getJobDeadline(job);
+    if (!deadline) continue;
+    for (const key of keys) {
+      if (matchesDeadlineFilter(deadline, key)) {
+        counts[key] += 1;
+      }
+    }
+  }
+  return counts;
+}
+
+/** @deprecated Prefer getWarsawDistrictsForFilters — kept for job-derived district sets. */
 export function getWarsawDistrictsFromJobs(jobs: Job[]): string[] {
   const districts = new Set<string>();
   jobs.forEach((job) => {

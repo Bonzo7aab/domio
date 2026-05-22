@@ -37,6 +37,8 @@ import { AuthPromptPopover, AUTH_PROMPT_FAVORITES, AUTH_PROMPT_MESSAGES } from '
 import { Avatar, AvatarFallback } from './ui/avatar';
 import type { AuthUser } from '../types/auth';
 import { useNavigationWithLoading } from '../hooks/useNavigationWithLoading';
+import { usePathname } from 'next/navigation';
+import { useLayoutContext } from './ConditionalFooter';
 import {
   needsVerificationAttention,
   verificationMenuLabel,
@@ -48,7 +50,9 @@ interface HeaderProps {
 }
 
 export function Header({ initialUser }: HeaderProps) {
-  const router = useNavigationWithLoading()
+  const router = useNavigationWithLoading();
+  const pathname = usePathname();
+  const { setIsMapExpanded } = useLayoutContext();
   const { user: contextUser, session, isAuthenticated: contextIsAuthenticated, logout, isLoading } = useUserProfile();
   const [isMounted, setIsMounted] = useState(false);
 
@@ -178,8 +182,11 @@ export function Header({ initialUser }: HeaderProps) {
   )
 
   const handleHomeClick = () => {
-    router.push('/')
-  }
+    setIsMapExpanded(false);
+    if (pathname !== '/') {
+      router.push('/');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-slate-200" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>

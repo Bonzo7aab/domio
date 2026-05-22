@@ -4,11 +4,9 @@ function normalizePropertyPart(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-/** Stable key for grouping buildings that represent the same property. */
-export function getPropertyGroupKey(
-  building: Pick<Building, 'name' | 'street_address'>,
-): string {
-  return `${normalizePropertyPart(building.name)}|${normalizePropertyPart(building.street_address)}`;
+/** Stable key for grouping buildings shown in job/tender property selects (by name only). */
+export function getPropertyGroupKey(building: Pick<Building, 'name'>): string {
+  return normalizePropertyPart(building.name);
 }
 
 export interface GroupedBuildingOption {
@@ -92,9 +90,5 @@ export function filterBuildings(
 }
 
 export function formatGroupedBuildingLabel(group: GroupedBuildingOption): string {
-  const location = `${group.street_address}, ${group.city}`;
-  if (group.count > 1) {
-    return `${group.name} — ${location} (${group.count})`;
-  }
-  return `${group.name} — ${location}`;
+  return group.name;
 }
