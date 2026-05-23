@@ -61,6 +61,13 @@ MIGRATIONS=(
     "38_allow_contractors_cancel_bids_applications.sql"
     "39_service_pricing.sql"
     "40_update_application_counts.sql"
+    # Auth/admin follow-ups (avoid 51_* because it hard-codes a specific admin email)
+    "49_contractor_account_settings_and_offer_feedback.sql"
+    "50_admin_panel_kan8.sql"
+    "52_user_read_own_verification_decisions.sql"
+    "53_verification_document_reviews.sql"
+    "58_platform_registration_settings.sql"
+    "60_harden_system_write_policies.sql"
 )
 
 # Check if psql is available

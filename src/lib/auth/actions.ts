@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getRegistrationSettingsForRegister } from '../database/platform-settings'
 import { registrationClosedMessage } from '../registration-settings-shared'
+import { sanitizeRedirectPath } from './redirectPath'
 
 export interface LoginData {
   email: string
@@ -48,7 +49,7 @@ async function loginActionImpl(
 
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  const requestedRedirect = (formData.get('redirectTo') as string | null)?.trim() || ''
+  const requestedRedirect = sanitizeRedirectPath(formData.get('redirectTo') as string | null, '')
 
   if (!email || !password) {
     return { error: 'Email i hasło są wymagane' }
@@ -85,11 +86,7 @@ async function loginActionImpl(
     if (isAdmin) {
       // Admins always land on /admin regardless of `redirectTo`.
       redirectTo = '/admin'
-    } else if (
-      requestedRedirect &&
-      requestedRedirect.startsWith('/') &&
-      !requestedRedirect.startsWith('//')
-    ) {
+    } else if (requestedRedirect) {
       const forbiddenForContractor =
         isContractor &&
         (requestedRedirect.startsWith('/manager-dashboard') ||

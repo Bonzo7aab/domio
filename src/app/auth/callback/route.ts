@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '../../../types/database'
+import { sanitizeRedirectPath } from '../../../lib/auth/redirectPath'
 
 /**
  * Exchanges Supabase PKCE `code` from the recovery / magic-link redirect, sets session cookies, then redirects to `next`.
@@ -9,10 +10,7 @@ import type { Database } from '../../../types/database'
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
-  let next = url.searchParams.get('next') ?? '/'
-  if (!next.startsWith('/')) {
-    next = '/'
-  }
+  const next = sanitizeRedirectPath(url.searchParams.get('next'), '/')
 
   const cookieStore = await cookies()
 

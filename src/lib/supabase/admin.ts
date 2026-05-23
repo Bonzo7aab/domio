@@ -8,14 +8,9 @@ import type { Database } from '../../types/database'
  * Resolution order (see Supabase → Settings → API Keys):
  * 1. `SUPABASE_SECRET_KEY` — new secret key (`sb_secret_...`, recommended)
  * 2. `SUPABASE_SERVICE_ROLE_KEY` — legacy JWT `service_role` key (still supported)
- * 3. `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` — deprecated fallback only
  */
 function resolveElevatedSupabaseKey(): string | undefined {
-  return (
-    process.env.SUPABASE_SECRET_KEY ??
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-  )
+  return process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
 }
 
 export function createAdminClient() {
