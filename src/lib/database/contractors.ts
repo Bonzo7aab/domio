@@ -1695,55 +1695,19 @@ export async function createContractorReview(
     tenderId?: string;
   }
 ): Promise<{ data: Record<string, unknown> | null; error: Error | null }> {
-  try {
-    // Validate rating
-    if (reviewData.rating < 1 || reviewData.rating > 5) {
-      return { data: null, error: new Error('Rating must be between 1 and 5') };
-    }
-
-    // Check if reviewer already reviewed this contractor
-    const { data: existingReview } = await supabase
-      .from('company_reviews')
-      .select('id')
-      .eq('company_id', contractorId)
-      .eq('reviewer_id', reviewerId)
-      .maybeSingle();
-
-    if (existingReview) {
-      return { data: null, error: new Error('You have already reviewed this contractor') };
-    }
-
-    // Insert review
-    const { data, error } = await supabase
-      .from('company_reviews')
-      .insert({
-        company_id: contractorId,
-        reviewer_id: reviewerId,
-        rating: reviewData.rating,
-        title: reviewData.title || null,
-        comment: reviewData.comment || null,
-        categories: reviewData.categories || null,
-        job_id: reviewData.jobId || null,
-        tender_id: reviewData.tenderId || null,
-        is_public: true,
-        is_verified: false
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating review:', error);
-      return { data: null, error: new Error('Failed to create review') };
-    }
-
-    return { data, error: null };
-  } catch (error) {
-    console.error('Error in createContractorReview:', error);
-    return { 
-      data: null, 
-      error: error instanceof Error ? error : new Error('Unknown error occurred') 
-    };
+  const { createCompanyReview } = await import('./reviews');
+  const result = await createCompanyReview(supabase, contractorId, reviewerId, {
+    rating: reviewData.rating,
+    title: reviewData.title,
+    comment: reviewData.comment ?? '',
+    categories: reviewData.categories,
+    jobId: reviewData.jobId,
+    tenderId: reviewData.tenderId,
+  });
+  if (result.error || !result.data) {
+    return { data: null, error: result.error };
   }
+  return { data: { id: result.data.id }, error: null };
 }
 
 /**

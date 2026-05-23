@@ -80,6 +80,9 @@ export function ManagerRatingsOcenaContent({
                   </div>
                   {w.title && <p className="text-sm font-medium">{w.title}</p>}
                   {w.comment && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{w.comment}</p>}
+                  {w.imageUrls && w.imageUrls.length > 0 && (
+                    <p className="text-xs text-muted-foreground">{w.imageUrls.length} zdjęć w opinii</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {new Date(w.createdAt).toLocaleDateString('pl-PL')}
                   </p>

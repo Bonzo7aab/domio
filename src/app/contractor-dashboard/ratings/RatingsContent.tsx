@@ -30,12 +30,23 @@ interface Review {
   helpfulCount: number;
 }
 
+interface WrittenReview {
+  id: string;
+  rating: number;
+  title: string;
+  comment: string;
+  createdAt: string;
+  counterpartyName: string;
+  jobId: string | null;
+}
+
 interface RatingsContentProps {
   ratingSummary: RatingSummary | null;
   reviews: Review[];
+  writtenReviews: WrittenReview[];
 }
 
-export function RatingsContent({ ratingSummary, reviews }: RatingsContentProps) {
+export function RatingsContent({ ratingSummary, reviews, writtenReviews }: RatingsContentProps) {
   return (
     <div className="space-y-6">
       {/* Rating Summary */}
@@ -118,14 +129,32 @@ export function RatingsContent({ ratingSummary, reviews }: RatingsContentProps) 
           <TabsTrigger value="received">Otrzymane</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="issued">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">
-                W tej sekcji pojawią się oceny wystawione przez Ciebie po zakończonych realizacjach.
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="issued" className="space-y-4">
+          {writtenReviews.length > 0 ? (
+            writtenReviews.map((w) => (
+              <Card key={w.id}>
+                <CardContent className="pt-6 space-y-1">
+                  <div className="flex justify-between gap-2">
+                    <span className="font-medium">{w.counterpartyName}</span>
+                    <span className="text-amber-600 font-semibold">★ {w.rating}</span>
+                  </div>
+                  {w.title && <p className="text-sm font-medium">{w.title}</p>}
+                  {w.comment && (
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{w.comment}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(w.createdAt).toLocaleDateString('pl-PL')}
+                  </p>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center text-muted-foreground">
+                Brak wystawionych ocen zgłoszeń. Oceń zgłoszenie po ukończeniu projektu w sekcji Projekty.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="received" className="space-y-4">

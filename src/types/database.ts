@@ -612,6 +612,7 @@ export interface Database {
           title: string | null
           comment: string | null
           categories: Json | null
+          image_urls: string[]
           is_public: boolean
           is_verified: boolean
           created_at: string
@@ -627,6 +628,7 @@ export interface Database {
           title?: string | null
           comment?: string | null
           categories?: Json | null
+          image_urls?: string[]
           is_public?: boolean
           is_verified?: boolean
           created_at?: string
@@ -642,6 +644,7 @@ export interface Database {
           title?: string | null
           comment?: string | null
           categories?: Json | null
+          image_urls?: string[]
           is_public?: boolean
           is_verified?: boolean
           created_at?: string

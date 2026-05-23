@@ -7,10 +7,16 @@ import { createClient } from '../../lib/supabase/client';
 import { fetchJobById, fetchTenderById } from '../../lib/database/jobs';
 import type { JobWithCompany, TenderWithCompany } from '../../lib/database/jobs';
 import { getSubmissionStatusLabel, type ManagerSubmissionKind } from '../../lib/database/manager-submissions';
+import {
+  fetchAcceptedContractorForJob,
+  type AcceptedContractorForJob,
+} from '../../lib/database/reviews';
 import { budgetFromDatabase, formatBudget } from '../../types/budget';
 import { ManagerJobStatusSelect } from './ManagerJobStatusSelect';
+import { ServiceReviewPanel } from '../reviews/ServiceReviewPanel';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -40,11 +46,15 @@ export function ManagerSubmissionPodgladDialog({
   const [loading, setLoading] = useState(false);
   const [job, setJob] = useState<JobWithCompany | null>(null);
   const [tender, setTender] = useState<TenderWithCompany | null>(null);
+  const [acceptedContractor, setAcceptedContractor] = useState<AcceptedContractorForJob | null>(null);
+  const [activeTab, setActiveTab] = useState('details');
 
   useEffect(() => {
     if (!open || !target) {
       setJob(null);
       setTender(null);
+      setAcceptedContractor(null);
+      setActiveTab('details');
       return;
     }
 
@@ -52,6 +62,8 @@ export function ManagerSubmissionPodgladDialog({
     setLoading(true);
     setJob(null);
     setTender(null);
+    setAcceptedContractor(null);
+    setActiveTab('details');
 
     const run = async (): Promise<void> => {
       const supabase = createClient();
@@ -64,6 +76,10 @@ export function ManagerSubmissionPodgladDialog({
             setJob(null);
           } else {
             setJob(data);
+            if (data.status === 'completed') {
+              const contractor = await fetchAcceptedContractorForJob(supabase, target.id);
+              if (!cancelled) setAcceptedContractor(contractor);
+            }
           }
         } else {
           const { data, error } = await fetchTenderById(supabase, target.id);
@@ -105,7 +121,15 @@ export function ManagerSubmissionPodgladDialog({
             Ładowanie…
           </div>
         ) : job ? (
-          <div className="space-y-4 text-sm">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="text-sm">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="details">Szczegóły</TabsTrigger>
+              <TabsTrigger value="rate-service" disabled={job.status !== 'completed' || !acceptedContractor}>
+                Oceń Usługę
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details" className="space-y-4 mt-0">
             <div>
               <h2 className="text-2xl font-bold pr-8">{job.title}</h2>
               <div className="flex flex-wrap items-center gap-3 mt-2">
@@ -116,6 +140,13 @@ export function ManagerSubmissionPodgladDialog({
                   onUpdated={(next) => {
                     setJob((prev) => (prev ? { ...prev, status: next } : prev));
                     onJobStatusUpdated?.(next);
+                    if (next === 'completed') {
+                      void (async () => {
+                        const supabase = createClient();
+                        const contractor = await fetchAcceptedContractorForJob(supabase, job.id);
+                        setAcceptedContractor(contractor);
+                      })();
+                    }
                   }}
                 />
                 <span className="text-muted-foreground">{job.category?.name || 'Inne'}</span>
@@ -213,7 +244,26 @@ export function ManagerSubmissionPodgladDialog({
                 Zamknij
               </Button>
             </div>
-          </div>
+            </TabsContent>
+
+            <TabsContent value="rate-service" className="mt-0">
+              {job.status !== 'completed' ? (
+                <p className="text-muted-foreground py-4">
+                  Ocena usługi będzie dostępna po oznaczeniu zgłoszenia jako ukończone.
+                </p>
+              ) : !acceptedContractor ? (
+                <p className="text-muted-foreground py-4">
+                  Brak zaakceptowanego wykonawcy — nie można wystawić oceny usługi.
+                </p>
+              ) : (
+                <ServiceReviewPanel
+                  jobId={job.id}
+                  contractorCompanyId={acceptedContractor.companyId}
+                  contractorName={acceptedContractor.companyName}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
         ) : tender ? (
           <div className="space-y-4 text-sm">
             <div>

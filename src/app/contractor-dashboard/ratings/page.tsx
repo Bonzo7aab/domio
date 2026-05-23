@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { fetchContractorRatingSummary, fetchContractorReviews } from '../../../lib/database/contractors';
+import { fetchReviewsWrittenByUser } from '../../../lib/database/reviews';
 import { Card, CardContent } from '../../../components/ui/card';
 import { RatingsContent } from './RatingsContent';
 
@@ -15,14 +16,16 @@ async function getRatingsData(userId: string) {
   }
 
   // Fetch all data in parallel
-  const [ratingSummary, reviews] = await Promise.all([
+  const [ratingSummary, reviews, writtenReviews] = await Promise.all([
     fetchContractorRatingSummary(company.id),
     fetchContractorReviews(company.id, 20),
+    fetchReviewsWrittenByUser(supabase, userId),
   ]);
 
   return {
     ratingSummary,
     reviews: reviews || [],
+    writtenReviews,
   };
 }
 
@@ -62,9 +65,10 @@ async function RatingsDataFetcher() {
   }
 
   return (
-    <RatingsContent 
+    <RatingsContent
       ratingSummary={ratingsData.ratingSummary}
       reviews={ratingsData.reviews}
+      writtenReviews={ratingsData.writtenReviews}
     />
   );
 }

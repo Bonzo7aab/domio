@@ -15,6 +15,7 @@ import { budgetFromDatabase, formatBudget } from "../../../../../types/budget";
 interface SelectedJobData {
   title: string;
   budget: string;
+  status: string;
 }
 
 export default function JobApplicationsPage() {
@@ -69,6 +70,7 @@ export default function JobApplicationsPage() {
           setJobData({
             title: job.title,
             budget,
+            status: job.status,
           });
         }
 
@@ -195,6 +197,7 @@ export default function JobApplicationsPage() {
           jobId={jobId}
           jobTitle={jobData?.title || "Zgłoszenie"}
           jobBudget={jobData?.budget}
+          jobStatus={jobData?.status}
           applications={applications}
           onStatusChange={handleStatusChange}
           onStartConversation={handleStartConversation}

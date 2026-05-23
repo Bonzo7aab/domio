@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Application as JobApplication } from '../types';
-import ContractorReviewForm from './ContractorReviewForm';
+import { ServiceReviewDialog } from './reviews/ServiceReviewDialog';
 
 // JobApplication type now imported from centralized types folder
 
@@ -33,15 +33,18 @@ interface JobApplicationsListProps {
   jobId: string;
   jobTitle: string;
   jobBudget?: string;
+  /** When `completed`, manager can rate accepted contractor service. */
+  jobStatus?: string;
   applications: JobApplication[];
   onStatusChange: (applicationId: string, status: string, notes?: string) => void;
   onStartConversation: (contractorId: string, applicationId: string) => void;
 }
 
 export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
-  jobId: _jobId,
+  jobId,
   jobTitle,
   jobBudget,
+  jobStatus,
   applications,
   onStatusChange,
   onStartConversation
@@ -51,10 +54,11 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
   const [reviewNotes, setReviewNotes] = useState('');
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [selectedContractorForReview, setSelectedContractorForReview] = useState<{
-    id: string;
+    companyId: string;
     name: string;
-    jobId: string;
   } | null>(null);
+
+  const canRateService = jobStatus === 'completed';
 
   // Filtrowanie aplikacji według statusu
   const filteredApplications = applications.filter(app => {
@@ -392,21 +396,25 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                           </>
                         )}
                         
-                        {application.status === 'accepted' && (
+                        {application.status === 'accepted' && canRateService && application.contractorCompanyId && (
                           <Button
                             variant="outline"
                             onClick={() => {
                               setSelectedContractorForReview({
-                                id: application.contractorId,
-                                name: application.contractorName,
-                                jobId: application.jobId
+                                companyId: application.contractorCompanyId!,
+                                name: application.contractorCompany || application.contractorName,
                               });
                               setShowReviewForm(true);
                             }}
                           >
                             <Star className="h-4 w-4 mr-2" />
-                            Oceń wykonawcę
+                            Oceń Usługę
                           </Button>
+                        )}
+                        {application.status === 'accepted' && !canRateService && (
+                          <span className="text-xs text-muted-foreground self-center">
+                            Ocena usługi po ukończeniu zgłoszenia
+                          </span>
                         )}
                       </div>
                     </div>
@@ -464,20 +472,16 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
         </div>
       )}
 
-      {/* Review Form Modal */}
-      {showReviewForm && selectedContractorForReview && (
-        <ContractorReviewForm
-          contractorId={selectedContractorForReview.id}
+      {selectedContractorForReview && (
+        <ServiceReviewDialog
+          open={showReviewForm}
+          onOpenChange={(open) => {
+            setShowReviewForm(open);
+            if (!open) setSelectedContractorForReview(null);
+          }}
+          jobId={jobId}
+          contractorCompanyId={selectedContractorForReview.companyId}
           contractorName={selectedContractorForReview.name}
-          jobId={selectedContractorForReview.jobId}
-          onClose={() => {
-            setShowReviewForm(false);
-            setSelectedContractorForReview(null);
-          }}
-          onSuccess={() => {
-            // Optionally refresh data or show success message
-            toast.success('Opinia została dodana pomyślnie');
-          }}
         />
       )}
     </div>

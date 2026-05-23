@@ -1,6 +1,7 @@
 "use client";
 
 import { Briefcase, Calendar, Clock, DollarSign, Edit, Euro, FolderKanban, MapPin, Plus, Star, Trash2 } from 'lucide-react';
+import { SubmissionReviewDialog } from '../../../components/reviews/SubmissionReviewDialog';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
@@ -44,6 +45,7 @@ export function ProjectsContent({ platformProjects: initialPlatformProjects, por
   const [showPortfolioForm, setShowPortfolioForm] = useState(false);
   const [editingProject, setEditingProject] = useState<PortfolioProject | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [reviewProject, setReviewProject] = useState<PlatformProject | null>(null);
 
   const handleAddPortfolioProject = () => {
     setEditingProject(null);
@@ -169,13 +171,25 @@ export function ProjectsContent({ platformProjects: initialPlatformProjects, por
                             }
                           </p>
                         )}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => router.push(`/jobs/${project.jobId}`)}
-                        >
-                          Zobacz szczegóły
-                        </Button>
+                        <div className="flex flex-col gap-2">
+                          {project.clientCompanyId ? (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setReviewProject(project)}
+                            >
+                              <Star className="w-4 h-4 mr-1" />
+                              Oceń Zgłoszenie
+                            </Button>
+                          ) : null}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/jobs/${project.jobId}`)}
+                          >
+                            Zobacz szczegóły
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -328,6 +342,17 @@ export function ProjectsContent({ platformProjects: initialPlatformProjects, por
           />
         </DialogContent>
       </Dialog>
+
+      {reviewProject?.clientCompanyId ? (
+        <SubmissionReviewDialog
+          open={!!reviewProject}
+          onOpenChange={(open) => !open && setReviewProject(null)}
+          jobId={reviewProject.jobId}
+          managerCompanyId={reviewProject.clientCompanyId}
+          managerCompanyName={reviewProject.clientCompany}
+          submissionTitle={reviewProject.title}
+        />
+      ) : null}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deletingProjectId} onOpenChange={(open) => !open && setDeletingProjectId(null)}>
