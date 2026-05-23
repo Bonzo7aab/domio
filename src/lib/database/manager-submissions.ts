@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import { getJobWorkflowStatusLabel } from '../job-workflow-status';
+import { getTenderWorkflowStatusLabel } from '../tender-workflow-status';
 
 export type ManagerSubmissionKind = 'job' | 'tender';
 
@@ -16,6 +17,8 @@ export interface ManagerSubmission {
   createdAt: string;
   /** Jobs only: editable when draft/active and no offers (see updateManagerJob). */
   canEdit: boolean;
+  /** Job/tender has an accepted offer (Wybrana Oferta). */
+  hasSelectedOffer: boolean;
 }
 
 function jobStatusLabel(status: string): string {
@@ -23,15 +26,7 @@ function jobStatusLabel(status: string): string {
 }
 
 function tenderStatusLabel(status: string): string {
-  const map: Record<string, string> = {
-    draft: 'Szkic',
-    active: 'Aktywne',
-    paused: 'Wstrzymane',
-    evaluation: 'Wybór ofert',
-    awarded: 'W realizacji',
-    cancelled: 'Anulowane',
-  };
-  return map[status] || status;
+  return getTenderWorkflowStatusLabel(status);
 }
 
 export function getSubmissionStatusLabel(kind: ManagerSubmissionKind, status: string): string {
@@ -69,6 +64,8 @@ export async function fetchManagerSubmissions(
   const tenderOfferCounts: Record<string, { total: number; newCount: number }> = {};
   const jobLastOfferAt: Record<string, string> = {};
   const tenderLastOfferAt: Record<string, string> = {};
+  const jobHasSelectedOffer: Record<string, boolean> = {};
+  const tenderHasSelectedOffer: Record<string, boolean> = {};
 
   if (jobIds.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,6 +78,9 @@ export async function fetchManagerSubmissions(
       const jid = row.job_id as string;
       if (!jobOfferCounts[jid]) jobOfferCounts[jid] = { total: 0, newCount: 0 };
       jobOfferCounts[jid].total += 1;
+      if (row.status === 'accepted') {
+        jobHasSelectedOffer[jid] = true;
+      }
       if (row.status === 'submitted') {
         jobOfferCounts[jid].newCount += 1;
       }
@@ -105,6 +105,9 @@ export async function fetchManagerSubmissions(
       const tid = row.tender_id as string;
       if (!tenderOfferCounts[tid]) tenderOfferCounts[tid] = { total: 0, newCount: 0 };
       tenderOfferCounts[tid].total += 1;
+      if (row.status === 'accepted') {
+        tenderHasSelectedOffer[tid] = true;
+      }
       if (row.status === 'submitted') {
         tenderOfferCounts[tid].newCount += 1;
       }
@@ -132,6 +135,7 @@ export async function fetchManagerSubmissions(
         j.status === 'active' ||
         j.status === 'collecting_offers') &&
       (jobOfferCounts[j.id]?.total ?? 0) === 0,
+    hasSelectedOffer: jobHasSelectedOffer[j.id] ?? false,
   }));
 
   const tenders: ManagerSubmission[] = tenderRows.map((t) => ({
@@ -144,6 +148,7 @@ export async function fetchManagerSubmissions(
     lastOfferAt: tenderLastOfferAt[t.id] ?? null,
     createdAt: t.created_at,
     canEdit: false,
+    hasSelectedOffer: tenderHasSelectedOffer[t.id] ?? false,
   }));
 
   return [...jobs, ...tenders].sort(

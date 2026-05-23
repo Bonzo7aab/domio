@@ -4,7 +4,11 @@ import type { Application } from '../../types/application';
 import type { Budget, BudgetInput } from '../../types/budget';
 import { budgetFromDatabase, budgetToDatabase, formatBudget } from '../../types/budget';
 import { fetchAllCategoriesWithSubcategories } from './categories';
-import { JOB_WORKFLOW_STATUSES } from '../job-workflow-status';
+import { JOB_WORKFLOW_STATUSES, isJobWorkflowStatusRegression } from '../job-workflow-status';
+import {
+  TENDER_WORKFLOW_STATUSES,
+  isTenderWorkflowStatusRegression,
+} from '../tender-workflow-status';
 
 /** Job statuses visible on the public map/listing (accepting or reviewing offers). */
 export const PUBLIC_LISTING_JOB_STATUSES = [
@@ -463,6 +467,28 @@ export async function updateManagerJobWorkflowStatus(
       return { error: new Error('Zgłoszenie nie należy do tej firmy') as PostgrestError };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: acceptedApp } = await (supabase as any)
+      .from('job_applications')
+      .select('id')
+      .eq('job_id', jobId)
+      .eq('status', 'accepted')
+      .maybeSingle();
+
+    const hasSelectedOffer = Boolean(acceptedApp);
+
+    if (
+      isJobWorkflowStatusRegression(String(existing.status), params.status, hasSelectedOffer)
+    ) {
+      return {
+        error: new Error(
+          hasSelectedOffer
+            ? 'Po wyborze oferty nie można cofnąć statusu zgłoszenia'
+            : 'Nie można cofnąć statusu zgłoszenia',
+        ) as PostgrestError,
+      };
+    }
+
     const updatePayload: Record<string, unknown> = {
       status: params.status,
       updated_at: new Date().toISOString(),
@@ -482,6 +508,83 @@ export async function updateManagerJobWorkflowStatus(
     return { error: updateError };
   } catch (err) {
     console.error('Error in updateManagerJobWorkflowStatus:', err);
+    return { error: err as PostgrestError };
+  }
+}
+
+export async function updateManagerTenderWorkflowStatus(
+  supabase: SupabaseClient<Database>,
+  params: {
+    tenderId: string;
+    managerId: string;
+    companyId: string;
+    status: string;
+  },
+): Promise<{ error: PostgrestError | null }> {
+  const allowed = new Set<string>([...TENDER_WORKFLOW_STATUSES, 'draft', 'paused', 'cancelled']);
+
+  if (!allowed.has(params.status)) {
+    return {
+      error: new Error('Nieprawidłowy status przetargu') as PostgrestError,
+    };
+  }
+
+  try {
+    const tenderId = params.tenderId.trim();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing, error: fetchErr } = await (supabase as any)
+      .from('tenders')
+      .select('id, manager_id, company_id, status')
+      .eq('id', tenderId)
+      .maybeSingle();
+
+    if (fetchErr || !existing) {
+      return { error: fetchErr || (new Error('Nie znaleziono przetargu') as PostgrestError) };
+    }
+
+    if (existing.manager_id !== params.managerId) {
+      return { error: new Error('Brak uprawnień') as PostgrestError };
+    }
+
+    if (existing.company_id !== params.companyId) {
+      return { error: new Error('Przetarg nie należy do tej firmy') as PostgrestError };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: acceptedBid } = await (supabase as any)
+      .from('tender_bids')
+      .select('id')
+      .eq('tender_id', tenderId)
+      .eq('status', 'accepted')
+      .maybeSingle();
+
+    const hasSelectedOffer = Boolean(acceptedBid);
+
+    if (
+      isTenderWorkflowStatusRegression(String(existing.status), params.status, hasSelectedOffer)
+    ) {
+      return {
+        error: new Error(
+          hasSelectedOffer
+            ? 'Po wyborze oferty nie można cofnąć statusu przetargu'
+            : 'Nie można cofnąć statusu przetargu',
+        ) as PostgrestError,
+      };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase as any)
+      .from('tenders')
+      .update({
+        status: params.status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', tenderId)
+      .eq('manager_id', params.managerId);
+
+    return { error: updateError };
+  } catch (err) {
+    console.error('Error in updateManagerTenderWorkflowStatus:', err);
     return { error: err as PostgrestError };
   }
 }

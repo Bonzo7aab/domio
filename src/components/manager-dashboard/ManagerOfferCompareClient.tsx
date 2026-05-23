@@ -24,6 +24,20 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import {
+  acceptJobOfferAction,
+  acceptTenderOfferAction,
+} from '../../app/manager-dashboard/zgloszenia/actions';
+import {
   Table,
   TableBody,
   TableCell,
@@ -154,6 +168,8 @@ export function ManagerOfferCompareClient({
   const [detailBid, setDetailBid] = useState<TenderBidLike | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [contactProfile, setContactProfile] = useState<ContractorProfile | null>(null);
+  const [confirmSelectOpen, setConfirmSelectOpen] = useState(false);
+  const [selectingOffer, setSelectingOffer] = useState(false);
 
   const [sort, setSort] = useState<CompareSortState>({ key: 'net', dir: 'asc' });
 
@@ -343,6 +359,50 @@ export function ManagerOfferCompareClient({
   const openDetailFromBid = (bid: TenderBidLike): void => {
     setDetailBid(bid);
     setDetailApp(null);
+  };
+
+  const openConfirmSelect = (): void => {
+    setConfirmSelectOpen(true);
+  };
+
+  const submissionRedirectUrl = (): string => {
+    const typ = kind === 'tender' ? 'przetarg' : 'zgłoszenie';
+    return `/manager-dashboard/zgloszenia?podglad=${submissionId}&typ=${encodeURIComponent(typ)}&tab=selected-offer`;
+  };
+
+  const handleConfirmSelectOffer = async (): Promise<void> => {
+    if (selectingOffer) return;
+    setSelectingOffer(true);
+
+    try {
+      if (kind === 'job' && detailApp) {
+        const result = await acceptJobOfferAction(submissionId, detailApp.id);
+        if (!result.success) {
+          toast.error(result.error || 'Nie udało się wybrać oferty');
+          return;
+        }
+      } else if (kind === 'tender' && detailBid) {
+        const result = await acceptTenderOfferAction(submissionId, detailBid.id);
+        if (!result.success) {
+          toast.error(result.error || 'Nie udało się wybrać oferty');
+          return;
+        }
+      } else {
+        toast.error('Brak wybranej oferty');
+        return;
+      }
+
+      setConfirmSelectOpen(false);
+      setDetailApp(null);
+      setDetailBid(null);
+      toast.success('Oferta została wybrana');
+      router.refresh();
+      router.push(submissionRedirectUrl());
+    } catch {
+      toast.error('Wystąpił błąd podczas wyboru oferty');
+    } finally {
+      setSelectingOffer(false);
+    }
   };
 
   const detailProfile = useMemo(() => {
@@ -636,10 +696,7 @@ export function ManagerOfferCompareClient({
               )}
 
               <div className="flex flex-col gap-2 sm:flex-row pt-2">
-                <Button
-                  className="flex-1"
-                  onClick={() => toast.success('Akceptacja oferty — podłączenie do procesu w kolejnej iteracji.')}
-                >
+                <Button className="flex-1" onClick={openConfirmSelect}>
                   Wybierz tę ofertę
                 </Button>
                 <Button
@@ -656,6 +713,24 @@ export function ManagerOfferCompareClient({
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmSelectOpen} onOpenChange={setConfirmSelectOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Czy na pewno chcesz wybrać tę ofertę?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Po potwierdzeniu pozostałe oferty zostaną odrzucone, a Ty zobaczysz pełne dane
+              kontaktowe wykonawcy na stronie zgłoszenia.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={selectingOffer}>Anuluj</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleConfirmSelectOffer()} disabled={selectingOffer}>
+              {selectingOffer ? 'Zapisywanie…' : 'Potwierdzam wybór'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={contactOpen} onOpenChange={setContactOpen}>
         <DialogContent>

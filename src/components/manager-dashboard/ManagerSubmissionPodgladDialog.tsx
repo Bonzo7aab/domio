@@ -11,6 +11,11 @@ import {
   fetchAcceptedContractorForJob,
   type AcceptedContractorForJob,
 } from '../../lib/database/reviews';
+import {
+  fetchAcceptedJobApplication,
+  fetchAcceptedTenderBid,
+} from '../../lib/database/offer-selection';
+import { SelectedOfferPanel } from './SelectedOfferPanel';
 import { budgetFromDatabase, formatBudget } from '../../types/budget';
 import { ManagerJobStatusSelect } from './ManagerJobStatusSelect';
 import { ServiceReviewPanel } from '../reviews/ServiceReviewPanel';
@@ -35,6 +40,8 @@ interface ManagerSubmissionPodgladDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onJobStatusUpdated?: (status: string) => void;
+  /** Open this tab when the dialog mounts (e.g. after selecting an offer). */
+  initialTab?: 'details' | 'selected-offer' | 'rate-service';
 }
 
 export function ManagerSubmissionPodgladDialog({
@@ -42,11 +49,13 @@ export function ManagerSubmissionPodgladDialog({
   open,
   onOpenChange,
   onJobStatusUpdated,
+  initialTab = 'details',
 }: ManagerSubmissionPodgladDialogProps): ReactElement {
   const [loading, setLoading] = useState(false);
   const [job, setJob] = useState<JobWithCompany | null>(null);
   const [tender, setTender] = useState<TenderWithCompany | null>(null);
   const [acceptedContractor, setAcceptedContractor] = useState<AcceptedContractorForJob | null>(null);
+  const [hasSelectedOffer, setHasSelectedOffer] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
 
   useEffect(() => {
@@ -54,6 +63,7 @@ export function ManagerSubmissionPodgladDialog({
       setJob(null);
       setTender(null);
       setAcceptedContractor(null);
+      setHasSelectedOffer(false);
       setActiveTab('details');
       return;
     }
@@ -63,7 +73,8 @@ export function ManagerSubmissionPodgladDialog({
     setJob(null);
     setTender(null);
     setAcceptedContractor(null);
-    setActiveTab('details');
+    setHasSelectedOffer(false);
+    setActiveTab(initialTab === 'selected-offer' ? 'selected-offer' : initialTab === 'rate-service' ? 'rate-service' : 'details');
 
     const run = async (): Promise<void> => {
       const supabase = createClient();
@@ -76,9 +87,13 @@ export function ManagerSubmissionPodgladDialog({
             setJob(null);
           } else {
             setJob(data);
-            if (data.status === 'completed') {
-              const contractor = await fetchAcceptedContractorForJob(supabase, target.id);
-              if (!cancelled) setAcceptedContractor(contractor);
+            const acceptedApp = await fetchAcceptedJobApplication(supabase, target.id);
+            if (!cancelled) {
+              setHasSelectedOffer(acceptedApp !== null);
+              if (data.status === 'completed' || acceptedApp !== null) {
+                const contractor = await fetchAcceptedContractorForJob(supabase, target.id);
+                if (!cancelled) setAcceptedContractor(contractor);
+              }
             }
           }
         } else {
@@ -89,6 +104,8 @@ export function ManagerSubmissionPodgladDialog({
             setTender(null);
           } else {
             setTender(data);
+            const acceptedBid = await fetchAcceptedTenderBid(supabase, target.id);
+            if (!cancelled) setHasSelectedOffer(acceptedBid !== null);
           }
         }
       } catch {
@@ -102,7 +119,7 @@ export function ManagerSubmissionPodgladDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, target]);
+  }, [open, target, initialTab]);
 
   const title =
     target?.kind === 'job' ? 'Szczegóły zgłoszenia' : 'Szczegóły przetargu';
@@ -122,8 +139,15 @@ export function ManagerSubmissionPodgladDialog({
           </div>
         ) : job ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="text-sm">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsList
+              className={`grid w-full mb-4 ${
+                hasSelectedOffer ? 'grid-cols-3' : 'grid-cols-2'
+              }`}
+            >
               <TabsTrigger value="details">Szczegóły</TabsTrigger>
+              {hasSelectedOffer ? (
+                <TabsTrigger value="selected-offer">Wybrana Oferta</TabsTrigger>
+              ) : null}
               <TabsTrigger value="rate-service" disabled={job.status !== 'completed' || !acceptedContractor}>
                 Oceń Usługę
               </TabsTrigger>
@@ -136,6 +160,7 @@ export function ManagerSubmissionPodgladDialog({
                 <ManagerJobStatusSelect
                   jobId={job.id}
                   status={job.status}
+                  hasSelectedOffer={hasSelectedOffer}
                   className="w-[220px]"
                   onUpdated={(next) => {
                     setJob((prev) => (prev ? { ...prev, status: next } : prev));
@@ -246,6 +271,14 @@ export function ManagerSubmissionPodgladDialog({
             </div>
             </TabsContent>
 
+            <TabsContent value="selected-offer" className="mt-0">
+              {hasSelectedOffer && target ? (
+                <SelectedOfferPanel submissionId={target.id} kind="job" />
+              ) : (
+                <p className="text-muted-foreground py-4">Brak wybranej oferty.</p>
+              )}
+            </TabsContent>
+
             <TabsContent value="rate-service" className="mt-0">
               {job.status !== 'completed' ? (
                 <p className="text-muted-foreground py-4">
@@ -265,7 +298,19 @@ export function ManagerSubmissionPodgladDialog({
             </TabsContent>
           </Tabs>
         ) : tender ? (
-          <div className="space-y-4 text-sm">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="text-sm">
+            <TabsList
+              className={`grid w-full mb-4 ${
+                hasSelectedOffer ? 'grid-cols-2' : 'grid-cols-1'
+              }`}
+            >
+              <TabsTrigger value="details">Szczegóły</TabsTrigger>
+              {hasSelectedOffer ? (
+                <TabsTrigger value="selected-offer">Wybrana Oferta</TabsTrigger>
+              ) : null}
+            </TabsList>
+
+            <TabsContent value="details" className="space-y-4 mt-0 text-sm">
             <div>
               <h2 className="text-2xl font-bold pr-8">{tender.title}</h2>
               <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -344,7 +389,14 @@ export function ManagerSubmissionPodgladDialog({
                 Zamknij
               </Button>
             </div>
-          </div>
+            </TabsContent>
+
+            {hasSelectedOffer && target ? (
+              <TabsContent value="selected-offer" className="mt-0">
+                <SelectedOfferPanel submissionId={target.id} kind="tender" />
+              </TabsContent>
+            ) : null}
+          </Tabs>
         ) : (
           <p className="text-center text-muted-foreground py-6">Brak danych do wyświetlenia.</p>
         )}

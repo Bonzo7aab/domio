@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
@@ -10,7 +10,8 @@ import {
 } from '../../lib/database/manager-submissions';
 import { getJobWorkflowStatusSortIndex } from '../../lib/job-workflow-status';
 import { ManagerSubmissionPodgladDialog } from './ManagerSubmissionPodgladDialog';
-import { ManagerJobStatusSelect } from './ManagerJobStatusSelect';
+import { ManagerWorkflowAdvanceButton } from './ManagerWorkflowAdvanceButton';
+import { cn } from '../ui/utils';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
@@ -72,6 +73,7 @@ export function ManagerMojeZgloszeniaContent({
   submissions: initialSubmissions,
 }: ManagerMojeZgloszeniaContentProps): React.ReactElement {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [submissions, setSubmissions] = useState(initialSubmissions);
 
   useEffect(() => {
@@ -80,8 +82,31 @@ export function ManagerMojeZgloszeniaContent({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [podgladRow, setPodgladRow] = useState<ManagerSubmission | null>(null);
+  const [podgladInitialTab, setPodgladInitialTab] = useState<
+    'details' | 'selected-offer' | 'rate-service'
+  >('details');
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  useEffect(() => {
+    const podgladId = searchParams.get('podglad');
+    if (!podgladId) return;
+
+    const typ = searchParams.get('typ');
+    const kind: ManagerSubmission['kind'] =
+      typ === 'przetarg' || typ === 'tender' ? 'tender' : 'job';
+    const row = submissions.find((s) => s.id === podgladId && s.kind === kind);
+    if (!row) return;
+
+    const tabParam = searchParams.get('tab');
+    const tab: 'details' | 'selected-offer' | 'rate-service' =
+      tabParam === 'selected-offer' || tabParam === 'rate-service' ? tabParam : 'details';
+
+    setPodgladRow(row);
+    setPodgladInitialTab(tab);
+
+    router.replace('/manager-dashboard/zgloszenia', { scroll: false });
+  }, [searchParams, submissions, router]);
 
   const statusOptions = useMemo(() => {
     const codes = Array.from(new Set(submissions.map((r) => r.status)));
@@ -150,11 +175,26 @@ export function ManagerMojeZgloszeniaContent({
     return `/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=${typ}`;
   };
 
-  const handleStatusUpdated = (rowId: string, kind: ManagerSubmission['kind'], next: string): void => {
+  const handleStatusUpdated = (
+    rowId: string,
+    kind: ManagerSubmission['kind'],
+    next: string,
+    patch?: Partial<ManagerSubmission>,
+  ): void => {
     setSubmissions((prev) =>
-      prev.map((r) => (r.id === rowId && r.kind === kind ? { ...r, status: next } : r)),
+      prev.map((r) =>
+        r.id === rowId && r.kind === kind ? { ...r, status: next, ...patch } : r,
+      ),
     );
     router.refresh();
+  };
+
+  const openSzczegoly = (
+    row: ManagerSubmission,
+    tab: 'details' | 'selected-offer' = row.hasSelectedOffer ? 'selected-offer' : 'details',
+  ): void => {
+    setPodgladInitialTab(tab);
+    setPodgladRow(row);
   };
 
   return (
@@ -249,19 +289,28 @@ export function ManagerMojeZgloszeniaContent({
                       row.newOffersCount > 0
                         ? `${row.offersCount} (${row.newOffersCount} ${row.newOffersCount === 1 ? 'nowa' : 'nowe'})`
                         : String(row.offersCount);
+                    const isPickedRow = row.hasSelectedOffer;
+                    const isActiveRow =
+                      podgladRow?.id === row.id && podgladRow?.kind === row.kind;
                     return (
-                      <TableRow key={`${row.kind}-${row.id}`}>
-                        <TableCell className="font-medium max-w-[240px]">{row.title}</TableCell>
-                        <TableCell>
-                          {row.kind === 'job' ? (
-                            <ManagerJobStatusSelect
-                              jobId={row.id}
-                              status={row.status}
-                              onUpdated={(next) => handleStatusUpdated(row.id, row.kind, next)}
-                            />
-                          ) : (
-                            <span className="text-sm">{statusLabel}</span>
+                      <TableRow
+                        key={`${row.kind}-${row.id}`}
+                        className={cn(
+                          isPickedRow &&
+                            'bg-primary/5 border-l-4 border-l-primary hover:bg-primary/10',
+                          isActiveRow && !isPickedRow && 'bg-muted/50',
+                        )}
+                      >
+                        <TableCell
+                          className={cn(
+                            'font-medium max-w-[240px]',
+                            isPickedRow && 'text-primary',
                           )}
+                        >
+                          {row.title}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {statusLabel}
                         </TableCell>
                         <TableCell>{offersLabel}</TableCell>
                         <TableCell className="text-muted-foreground whitespace-nowrap">
@@ -284,9 +333,19 @@ export function ManagerMojeZgloszeniaContent({
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex flex-wrap justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setPodgladRow(row)}>
-                              Podgląd
+                            <Button
+                              variant={isPickedRow ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => openSzczegoly(row)}
+                            >
+                              Szczegóły
                             </Button>
+                            <ManagerWorkflowAdvanceButton
+                              row={row}
+                              onStatusUpdated={(next) =>
+                                handleStatusUpdated(row.id, row.kind, next)
+                              }
+                            />
                             {row.kind === 'job' && row.canEdit && (
                               <Button variant="secondary" size="sm" asChild>
                                 <Link href={`/manager-dashboard/zgloszenia/edytuj/${row.id}`}>
@@ -294,13 +353,16 @@ export function ManagerMojeZgloszeniaContent({
                                 </Link>
                               </Button>
                             )}
-                            <Button
-                              size="sm"
-                              disabled={row.offersCount === 0}
-                              onClick={() => router.push(compareHref(row))}
-                            >
-                              Porównaj oferty
-                            </Button>
+                            {!row.hasSelectedOffer && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={row.offersCount === 0}
+                                onClick={() => router.push(compareHref(row))}
+                              >
+                                Porównaj oferty
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -316,8 +378,12 @@ export function ManagerMojeZgloszeniaContent({
       <ManagerSubmissionPodgladDialog
         target={podgladRow ? { id: podgladRow.id, kind: podgladRow.kind } : null}
         open={podgladRow !== null}
+        initialTab={podgladInitialTab}
         onOpenChange={(open) => {
-          if (!open) setPodgladRow(null);
+          if (!open) {
+            setPodgladRow(null);
+            setPodgladInitialTab('details');
+          }
         }}
         onJobStatusUpdated={(next) => {
           if (podgladRow?.kind === 'job') {

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { fetchManagerSubmissions } from '../../../lib/database/manager-submissions';
@@ -42,7 +43,15 @@ export default async function ZgloszeniaPage(): Promise<ReactElement> {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <ManagerMojeZgloszeniaContent submissions={submissions} />
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            Ładowanie zgłoszeń…
+          </div>
+        }
+      >
+        <ManagerMojeZgloszeniaContent submissions={submissions} />
+      </Suspense>
     </div>
   );
 }

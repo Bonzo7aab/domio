@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { updateJobWorkflowStatusAction } from '../../app/manager-dashboard/zgloszenia/actions';
 import {
   getJobWorkflowStatusLabel,
-  getManagerSelectableWorkflowStatuses,
+  getManagerAllowedJobStatuses,
   normalizeJobStatus,
 } from '../../lib/job-workflow-status';
 import {
@@ -19,6 +19,7 @@ import {
 interface ManagerJobStatusSelectProps {
   jobId: string;
   status: string;
+  hasSelectedOffer?: boolean;
   onUpdated?: (status: string) => void;
   className?: string;
 }
@@ -26,12 +27,13 @@ interface ManagerJobStatusSelectProps {
 export function ManagerJobStatusSelect({
   jobId,
   status,
+  hasSelectedOffer = false,
   onUpdated,
   className,
 }: ManagerJobStatusSelectProps): ReactElement {
   const [isPending, startTransition] = useTransition();
   const normalized = normalizeJobStatus(status);
-  const workflowOptions = getManagerSelectableWorkflowStatuses();
+  const workflowOptions = getManagerAllowedJobStatuses(status, hasSelectedOffer);
   const options =
     status === 'draft'
       ? (['draft', ...workflowOptions] as const)
