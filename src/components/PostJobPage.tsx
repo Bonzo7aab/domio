@@ -11,6 +11,7 @@ import { Badge } from "./ui/badge";
 import { ArrowLeft, Upload, FileText, X, File, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useUserProfile } from "../contexts/AuthContext";
+import { needsVerificationAttention } from "../lib/verification/needs-verification-attention";
 import { createClient } from "../lib/supabase/client";
 import { createJob, fetchJobById, updateManagerJob } from "../lib/database/jobs";
 import { fetchUserPrimaryCompany } from "../lib/database/companies";
@@ -322,6 +323,13 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
         toast.error("Podaj prawidłową kwotę netto lub wybierz „Potrzebna wycena”");
         return;
       }
+    }
+
+    if (needsVerificationAttention(user)) {
+      toast.error(
+        "Twoje konto oczekuje na weryfikację. Dodawanie zgłoszeń będzie możliwe po akceptacji przez administratora.",
+      );
+      return;
     }
 
     setIsSubmitting(true);

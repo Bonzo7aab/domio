@@ -1618,7 +1618,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   <span className="font-semibold">{job.visits_count || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Aplikacje</span>
+                  <span className="text-sm text-muted-foreground">Oferty</span>
                   <span className="font-semibold">{job.applications || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">

@@ -11,6 +11,7 @@ import { CompanyManagementForm } from './CompanyManagementForm';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { ContractorDocumentsTab } from './ContractorDocumentsTab';
 import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
+import { verificationStatusLabel, verificationStatusBadgeClass } from '../lib/verification/status';
 import type {
   DocumentReviewMap,
   VerificationDocumentEntry,
@@ -32,10 +33,9 @@ export function UserAccountPageClient({
   verificationDocuments = [],
   documentReviews,
 }: UserAccountPageClientProps) {
-  const { user, isLoading, session } = useUserProfile();
+  const { user, isLoading } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const hasCheckedAuth = React.useRef(false);
   const [isMounted, setIsMounted] = React.useState(false);
   
   // Priority 1 & 5: Controlled tabs with URL persistence
@@ -142,38 +142,6 @@ export function UserAccountPageClient({
     return () => window.cancelAnimationFrame(handle);
   }, [activeTab, isMounted]);
 
-  // Wait for auth check to complete before redirecting
-  React.useEffect(() => {
-    // Mark that we've checked auth once we have a definitive answer
-    if (!isLoading) {
-      hasCheckedAuth.current = true;
-    }
-  }, [isLoading]);
-
-  // Redirect to login only after we've confirmed no user and no session
-  // This is a fallback in case middleware doesn't catch it (e.g., in test environment)
-  React.useEffect(() => {
-    // Don't redirect if still loading or if we haven't checked auth yet
-    if (isLoading || !hasCheckedAuth.current) {
-      return;
-    }
-
-    // If we have a session but no user, it means user profile is being loaded
-    // Don't redirect in this case - wait for user to load
-    if (session && !user) {
-      return;
-    }
-
-    // Only redirect if we're sure there's no user and no session
-    if (!user && !session) {
-      // Preserve redirectTo parameter from current URL (set by middleware) or use current pathname
-      const currentUrl = new URL(window.location.href);
-      const redirectTo = currentUrl.searchParams.get('redirectTo') || window.location.pathname;
-      const loginUrl = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
-      router.push(loginUrl);
-    }
-  }, [user, session, isLoading, router]);
-
   // Prevent hydration mismatch by not rendering loading state during SSR
   if (!isMounted || isLoading) {
     return (
@@ -188,7 +156,15 @@ export function UserAccountPageClient({
 
 
   if (!user) {
-    return null; // Will redirect to login
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <p className="text-sm text-muted-foreground">
+            Nie udało się wczytać profilu. Odśwież stronę lub skontaktuj się z administratorem.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const showDocumentsTabAttention = needsVerificationAttention(user);
@@ -219,38 +195,30 @@ export function UserAccountPageClient({
                       {user.userType === 'manager' ? 'Zarządca' : 'Wykonawca'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {user.userType !== 'manager' && (
-                      <>
-                        {verificationStatus.state === 'approved' && (
-                          <ShieldCheck className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-success" />
+                  {user.userType === 'contractor' && (
+                    <div className="flex items-center gap-1">
+                      {verificationStatus.state === 'approved' && (
+                        <ShieldCheck className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-success" />
+                      )}
+                      {verificationStatus.state === 'pending' && (
+                        <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-amber-600" />
+                      )}
+                      {verificationStatus.state === 'rejected' && (
+                        <ShieldX className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
+                      )}
+                      {verificationStatus.state === 'unsubmitted' && (
+                        <VerificationAttentionIcon className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                      )}
+                      <span
+                        className={cn(
+                          'font-medium rounded-full border px-2 py-0.5 text-xs',
+                          verificationStatusBadgeClass(verificationStatus.state),
                         )}
-                        {verificationStatus.state === 'pending' && (
-                          <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-blue-600" />
-                        )}
-                        {verificationStatus.state === 'rejected' && (
-                          <ShieldX className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
-                        )}
-                        {verificationStatus.state === 'unsubmitted' && (
-                          <VerificationAttentionIcon className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
-                        )}
-                        <span
-                          className={cn(
-                            'font-medium',
-                            verificationStatus.state === 'approved' && 'text-success',
-                            verificationStatus.state === 'pending' && 'text-blue-600',
-                            verificationStatus.state === 'rejected' && 'text-destructive',
-                            verificationStatus.state === 'unsubmitted' && 'text-destructive',
-                          )}
-                        >
-                          {verificationStatus.state === 'approved' && 'Zweryfikowany'}
-                          {verificationStatus.state === 'pending' && 'Oczekuje na weryfikację'}
-                          {verificationStatus.state === 'rejected' && 'Weryfikacja odrzucona'}
-                          {verificationStatus.state === 'unsubmitted' && 'Niezweryfikowany'}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                      >
+                        {verificationStatusLabel(verificationStatus.state)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

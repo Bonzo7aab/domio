@@ -8,24 +8,20 @@ import {
   clearVerificationDocumentReviewAction,
 } from '../../app/admin/actions';
 import type { DocumentReview } from '../../lib/database/admin-verification';
+import type { DocumentRejectionReasonId } from '../../lib/verification/status';
 import { Button } from '../ui/button';
-import { Textarea } from '../ui/textarea';
+import {
+  DocumentRejectReasonFields,
+  buildDocumentRejectReason,
+} from './DocumentRejectReasonFields';
 
 interface DocumentReviewControlsProps {
   subjectUserId: string;
   documentKey: string;
-  /** Current review for this document (if any). Drives button states and the stale hint. */
   review: DocumentReview | null;
-  /** Whether the document has been re-uploaded since the review was made. */
   isStale: boolean;
 }
 
-/**
- * Per-document approve / reject controls embedded in the admin documents list.
- * Local UI only manages the rejection-reason editor; persisted state lives on
- * `user_profiles.verification_document_reviews` and re-renders via
- * `router.refresh()` after each action.
- */
 export function DocumentReviewControls({
   subjectUserId,
   documentKey,
@@ -34,10 +30,16 @@ export function DocumentReviewControls({
 }: DocumentReviewControlsProps) {
   const [pending, startTransition] = React.useTransition();
   const [showRejectForm, setShowRejectForm] = React.useState(false);
-  const [reason, setReason] = React.useState(review?.status === 'rejected' ? review.reason ?? '' : '');
+  const [reasonId, setReasonId] = React.useState<DocumentRejectionReasonId | ''>('');
+  const [customReason, setCustomReason] = React.useState('');
 
   const isApproved = review?.status === 'approved' && !isStale;
   const isRejected = review?.status === 'rejected' && !isStale;
+
+  const composedReason = React.useMemo(
+    () => buildDocumentRejectReason(reasonId, customReason),
+    [reasonId, customReason]
+  );
 
   const submitApprove = () => {
     startTransition(async () => {
@@ -52,9 +54,8 @@ export function DocumentReviewControls({
   };
 
   const submitReject = () => {
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      toast.error('Podaj powód odrzucenia dokumentu.');
+    if (!composedReason?.trim()) {
+      toast.error('Wybierz powód odrzucenia dokumentu.');
       return;
     }
     startTransition(async () => {
@@ -62,7 +63,7 @@ export function DocumentReviewControls({
         subjectUserId,
         documentKey,
         'rejected',
-        trimmed
+        composedReason
       );
       if (!result.ok) {
         toast.error(result.error ?? 'Nie udało się odrzucić dokumentu.');
@@ -70,6 +71,8 @@ export function DocumentReviewControls({
       }
       toast.success('Dokument odrzucony.');
       setShowRejectForm(false);
+      setReasonId('');
+      setCustomReason('');
     });
   };
 
@@ -82,8 +85,17 @@ export function DocumentReviewControls({
       }
       toast.success('Ocena wyczyszczona.');
       setShowRejectForm(false);
-      setReason('');
+      setReasonId('');
+      setCustomReason('');
     });
+  };
+
+  const openRejectForm = () => {
+    setShowRejectForm(true);
+    if (review?.status === 'rejected' && review.reason) {
+      setCustomReason(review.reason);
+      setReasonId('other');
+    }
   };
 
   return (
@@ -117,12 +129,12 @@ export function DocumentReviewControls({
           disabled={pending}
           onClick={() => {
             if (isRejected) {
-              setShowRejectForm(true);
-              setReason(review?.reason ?? '');
+              openRejectForm();
             } else {
-              setShowRejectForm(prev => !prev);
-              if (review?.status === 'rejected') {
-                setReason(review.reason ?? '');
+              setShowRejectForm((prev) => !prev);
+              if (!showRejectForm) {
+                setReasonId('');
+                setCustomReason('');
               }
             }
           }}
@@ -147,13 +159,12 @@ export function DocumentReviewControls({
       </div>
 
       {showRejectForm && (
-        <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-          <label className="text-xs font-medium text-destructive">Powód odrzucenia dokumentu</label>
-          <Textarea
-            value={reason}
-            onChange={e => setReason(e.target.value)}
-            placeholder="Np. Plik jest nieczytelny / Polisa wygasła / Brak pieczątki"
-            rows={3}
+        <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+          <DocumentRejectReasonFields
+            reasonId={reasonId}
+            customReason={customReason}
+            onReasonIdChange={setReasonId}
+            onCustomReasonChange={setCustomReason}
             disabled={pending}
           />
           <div className="flex gap-2">
@@ -162,7 +173,7 @@ export function DocumentReviewControls({
               size="sm"
               variant="destructive"
               onClick={submitReject}
-              disabled={pending || !reason.trim()}
+              disabled={pending || !composedReason?.trim()}
             >
               Zapisz odrzucenie
             </Button>
@@ -172,7 +183,8 @@ export function DocumentReviewControls({
               variant="ghost"
               onClick={() => {
                 setShowRejectForm(false);
-                setReason(review?.status === 'rejected' ? review.reason ?? '' : '');
+                setReasonId('');
+                setCustomReason('');
               }}
               disabled={pending}
             >

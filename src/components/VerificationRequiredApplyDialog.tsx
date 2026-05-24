@@ -39,10 +39,13 @@ export function VerificationRequiredApplyDialog({
           <AlertDialogDescription asChild>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Aby składać oferty na zlecenia, prześlij wymagane dokumenty: wypis z KRS/CEIDG oraz
-                polisę OC (z datą ważności).
+                Twoje konto oczekuje na weryfikację przez administratora. Składanie ofert jest
+                tymczasowo zablokowane.
               </p>
-              <p>Po weryfikacji przez administratora będziesz mógł składać oferty na platformie.</p>
+              <p>
+                Uzupełnij dokumenty (wypis z KRS/CEIDG, polisa OC), jeśli jeszcze tego nie zrobiłeś —
+                przyspieszy to proces weryfikacji.
+              </p>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>

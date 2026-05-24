@@ -137,12 +137,17 @@ export async function submitVerificationDocumentsAction(
 
   const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
-    .select('user_type, verification_document_paths')
+    .select('user_type, verification_document_paths, is_verified')
     .eq('id', user.id)
     .single();
 
   if (profileError || !profile) {
     return { ok: false, error: 'Nie udało się wczytać profilu.' };
+  }
+
+  if (profile.is_verified) {
+    const { invalidateUserVerification } = await import('../../lib/verification/invalidate-verification');
+    await invalidateUserVerification(supabase, user.id);
   }
 
   const userType = profile.user_type;

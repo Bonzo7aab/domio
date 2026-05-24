@@ -167,7 +167,53 @@ export async function upsertUserCompany(
     if (existingRelation?.company_id) {
       // Update existing company
       companyId = existingRelation.company_id;
-      
+
+      const { data: existingCompany } = await supabase
+        .from('companies')
+        .select('name, nip, regon, krs, address, city, postal_code, phone, email')
+        .eq('id', companyId)
+        .maybeSingle();
+
+      const verificationSensitiveKeys = [
+        'name',
+        'nip',
+        'regon',
+        'krs',
+        'address',
+        'city',
+        'postal_code',
+        'phone',
+        'email',
+      ] as const;
+
+      const normalize = (value: string | null | undefined) => (value ?? '').trim();
+      const verificationDataChanged =
+        !!existingCompany &&
+        verificationSensitiveKeys.some(key => {
+          const nextValue =
+            key === 'name'
+              ? companyData.name
+              : key === 'nip'
+                ? companyData.nip
+                : key === 'regon'
+                  ? companyData.regon
+                  : key === 'krs'
+                    ? companyData.krs
+                    : key === 'address'
+                      ? companyData.address
+                      : key === 'city'
+                        ? companyData.city
+                        : key === 'postal_code'
+                          ? companyData.postal_code
+                          : key === 'phone'
+                            ? companyData.phone
+                            : companyData.email;
+          return (
+            normalize(existingCompany[key as keyof typeof existingCompany] as string | null) !==
+            normalize(nextValue ?? null)
+          );
+        });
+
       const updateData = {
         name: companyData.name,
         type: companyData.type,
@@ -217,6 +263,12 @@ export async function upsertUserCompany(
       }
 
       console.log('[upsertUserCompany] Company updated successfully:', updatedCompany.id);
+
+      if (verificationDataChanged) {
+        const { invalidateUserVerification } = await import('../verification/invalidate-verification');
+        await invalidateUserVerification(supabase, userId);
+      }
+
       return { data: updatedCompany as CompanyData, error: null };
     } else {
       // Create new company

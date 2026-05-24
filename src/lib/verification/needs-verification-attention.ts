@@ -1,6 +1,6 @@
 import type { AuthUser } from '../../types/auth';
 
-/** Contractor who has not been approved by admin yet. */
+/** Contractor who has not been approved by admin yet (header / account UI). */
 export function needsVerificationAttention(user: AuthUser | null | undefined): boolean {
   return user?.userType === 'contractor' && user.isVerified !== true;
 }

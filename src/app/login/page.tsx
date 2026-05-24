@@ -26,26 +26,23 @@ export default function Login() {
 }
 
 function LoginContent() {
-  const { user, isLoading } = useUserProfile();
+  const { isAuthenticated, isLoading } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo') || '/';
 
-  // Redirect to homepage if already logged in
-  // Note: Middleware also handles this, but client-side redirect ensures tests pass
+  // Redirect when session exists (middleware also handles full-page requests).
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!isLoading && isAuthenticated) {
       router.replace(redirectTo);
     }
-  }, [user, isLoading, router, redirectTo]);
+  }, [isAuthenticated, isLoading, router, redirectTo]);
 
-  // Show loading while checking auth
   if (isLoading) {
     return <LoadingState label="Sprawdzanie..." />;
   }
 
-  // Don't render login page if user is authenticated (will redirect via useEffect or middleware)
-  if (user) {
+  if (isAuthenticated) {
     return <LoadingState label="Przekierowywanie..." />;
   }
 

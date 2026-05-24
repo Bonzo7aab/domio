@@ -1,12 +1,11 @@
 'use client'
 
 import * as Sentry from '@sentry/nextjs'
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js'
 import { createClient } from '../lib/supabase/client'
 import type { AuthUser } from '../types/auth'
 
-// Typ dla naszego kontekstu
 type AuthContextType = {
   session: Session | null
   supabase: SupabaseClient
@@ -17,21 +16,19 @@ type AuthContextType = {
   isLoading: boolean
 }
 
-// Tworzymy kontekst
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Komponent dostawcy
 export default function AuthProvider({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [isLoading, setIsLoading] = useState(true) // Start as loading until we check session
+  const [isLoading, setIsLoading] = useState(true)
+  const initialSessionHandled = useRef(false)
 
-  // Fetch user profile from the database
   const fetchUserProfile = useCallback(async (authUser: User): Promise<AuthUser | null> => {
     try {
       const { data: profile, error: profileError } = await supabase
@@ -52,7 +49,7 @@ export default function AuthProvider({
         lastName: profile.last_name,
         userType: profile.user_type,
         phone: profile.phone || undefined,
-        company: undefined, // Company field not available in user_profiles table
+        company: undefined,
         isVerified: profile.is_verified,
         verificationSubmittedAt: profile.verification_submitted_at ?? null,
         profileCompleted: profile.profile_completed,
@@ -66,40 +63,53 @@ export default function AuthProvider({
     }
   }, [supabase])
 
-  // Refresh session and user profile
+  const loadProfileForSession = useCallback(
+    async (nextSession: Session | null) => {
+      if (!nextSession?.user) {
+        setUser(null)
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      const userProfile = await fetchUserProfile(nextSession.user)
+      setUser(userProfile)
+      setIsLoading(false)
+    },
+    [fetchUserProfile]
+  )
+
   const refreshSession = useCallback(async () => {
     try {
-      const { data } = await supabase.auth.getSession()
-      setSession(data.session)
-      
-      if (data.session?.user) {
-        setIsLoading(true)
-        const userProfile = await fetchUserProfile(data.session.user)
-        setUser(userProfile)
-        setIsLoading(false)
-      } else {
+      const { data, error } = await supabase.auth.getUser()
+      if (error) {
+        setSession(null)
         setUser(null)
+        setIsLoading(false)
+        return
       }
+
+      const { data: sessionData } = await supabase.auth.getSession()
+      setSession(sessionData.session)
+      await loadProfileForSession(sessionData.session)
     } catch (error) {
       console.error('Error refreshing session:', error)
       setIsLoading(false)
     }
-  }, [supabase, fetchUserProfile])
+  }, [supabase, loadProfileForSession])
 
-  // Logout function
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await supabase.auth.signOut()
       Sentry.setUser(null)
       setSession(null)
       setUser(null)
+      setIsLoading(false)
     } catch (error) {
       console.error('Error during logout:', error)
     }
-  }
+  }, [supabase])
 
-  // Computed isAuthenticated value
-  // User is authenticated if they have a session, even if profile is still loading
   const isAuthenticated = !!session
 
   useEffect(() => {
@@ -113,86 +123,67 @@ export default function AuthProvider({
   useEffect(() => {
     let mounted = true
 
-    // Get initial session on mount
-    const initializeSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession()
-        if (!mounted) return
-        
-        setSession(data.session)
-        
-        if (data.session?.user) {
-          setIsLoading(true)
-          const userProfile = await fetchUserProfile(data.session.user)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!mounted) return
+
+      if (event === 'SIGNED_OUT') {
+        setSession(null)
+        setUser(null)
+        setIsLoading(false)
+        return
+      }
+
+      if (
+        event === 'INITIAL_SESSION' ||
+        event === 'SIGNED_IN' ||
+        event === 'TOKEN_REFRESHED' ||
+        event === 'USER_UPDATED'
+      ) {
+        setSession(nextSession)
+
+        if (event === 'INITIAL_SESSION') {
+          initialSessionHandled.current = true
+        }
+
+        // Defer Supabase calls out of the auth callback (Supabase recommendation).
+        setTimeout(() => {
           if (!mounted) return
-          setUser(userProfile)
-          setIsLoading(false)
-        } else {
-          setUser(null)
-          setIsLoading(false)
-        }
-      } catch (error) {
-        console.error('Error initializing session:', error)
-        if (mounted) {
-          setIsLoading(false)
-        }
+          void loadProfileForSession(nextSession)
+        }, 0)
       }
-    }
+    })
 
-    initializeSession()
-
-    // Listen to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state change:', event, session?.user?.id)
-        
-        if (!mounted) return
-        
-        if (event === 'SIGNED_OUT') {
-          setSession(null)
-          setUser(null)
-          setIsLoading(false)
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || session) {
-          // Handle SIGNED_IN, TOKEN_REFRESHED, or any session update
-          setSession(session)
-          
-          if (session?.user) {
-          // Fetch user profile immediately (not in setTimeout) so it loads faster
-          setIsLoading(true)
-          fetchUserProfile(session.user).then((userProfile) => {
-            if (!mounted) return
-            setUser(userProfile)
-            console.log('User profile loaded:', userProfile?.firstName)
-            setIsLoading(false)
-          }).catch((error) => {
-            console.error('Error fetching user profile:', error)
-            if (mounted) {
-              setUser(null)
-              setIsLoading(false)
-            }
-          })
-          } else {
-            setUser(null)
-            setIsLoading(false)
-          }
-        }
-      }
-    )
+    // Fallback if INITIAL_SESSION never fires (should be rare).
+    const fallbackTimer = window.setTimeout(() => {
+      if (!mounted || initialSessionHandled.current) return
+      void refreshSession()
+    }, 2500)
 
     return () => {
       mounted = false
+      window.clearTimeout(fallbackTimer)
       subscription.unsubscribe()
     }
-  }, [supabase, fetchUserProfile, refreshSession])
+  }, [supabase, loadProfileForSession, refreshSession])
 
-  return (
-    <AuthContext.Provider value={{ session, supabase, user, logout, refreshSession, isAuthenticated, isLoading }}>
-      <>{children}</>
-    </AuthContext.Provider>
+  const contextValue = useMemo(
+    () => ({
+      session,
+      supabase,
+      user,
+      logout,
+      refreshSession,
+      isAuthenticated,
+      isLoading,
+    }),
+    [session, supabase, user, logout, refreshSession, isAuthenticated, isLoading]
   )
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
 
-// Hook do łatwego używania kontekstu w innych komponentach
 export const useUserProfile = () => {
   const context = useContext(AuthContext)
   if (context === undefined) {

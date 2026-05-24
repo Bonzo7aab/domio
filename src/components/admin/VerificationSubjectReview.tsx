@@ -14,8 +14,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
-import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
+import {
+  VerificationRejectReasonFields,
+  buildRejectReasonFromFields,
+} from './VerificationRejectReasonFields';
+import type { VerificationRejectionReasonId } from '../../lib/verification/status';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
 import {
@@ -150,26 +154,20 @@ export function VerificationSubjectReview({
 
   const hasDocs = total > 0;
   const allReviewed = hasDocs && unreviewed === 0;
-  const canApprove = allReviewed && rejected === 0;
-  const canReject = allReviewed; // explicit final reject is OK as long as everything was reviewed
+  const isManager = userType === 'manager';
+  const canApprove =
+    (isManager && !hasDocs) || (allReviewed && rejected === 0);
+  const canReject = !hasDocs || allReviewed;
 
-  const prefilledReason = React.useMemo(() => buildPrefilledRejectReason(snapshots), [snapshots]);
-  const [rejectReason, setRejectReason] = React.useState(prefilledReason);
+  const documentPrefill = React.useMemo(() => buildPrefilledRejectReason(snapshots), [snapshots]);
+  const [rejectReasonId, setRejectReasonId] = React.useState<VerificationRejectionReasonId | ''>('');
+  const [rejectCustomReason, setRejectCustomReason] = React.useState('');
   const [busy, setBusy] = React.useState(false);
 
-  // Keep the textarea in sync with the latest per-doc rejection prefill, but
-  // only when the admin hasn't typed anything custom. Custom = textarea differs
-  // from the previously rendered prefill.
-  const lastPrefillRef = React.useRef(prefilledReason);
-  React.useEffect(() => {
-    setRejectReason(prev => {
-      if (prev === lastPrefillRef.current) {
-        return prefilledReason;
-      }
-      return prev;
-    });
-    lastPrefillRef.current = prefilledReason;
-  }, [prefilledReason]);
+  const composedRejectReason = React.useMemo(
+    () => buildRejectReasonFromFields(rejectReasonId, rejectCustomReason, documentPrefill),
+    [rejectReasonId, rejectCustomReason, documentPrefill]
+  );
 
   const openOc = async (mode: 'view' | 'download') => {
     setBusy(true);
@@ -216,13 +214,13 @@ export function VerificationSubjectReview({
       toast.error('Najpierw oceń wszystkie dokumenty.');
       return;
     }
-    if (!rejectReason.trim()) {
-      toast.error('Podaj powód odrzucenia weryfikacji.');
+    if (!composedRejectReason?.trim()) {
+      toast.error('Wybierz powód odrzucenia weryfikacji.');
       return;
     }
     setBusy(true);
     try {
-      const res = await rejectVerificationSubjectAction(subjectUserId, rejectReason);
+      const res = await rejectVerificationSubjectAction(subjectUserId, composedRejectReason);
       if (!res.ok) {
         toast.error(res.error ?? 'Błąd odrzucenia');
         return;
@@ -511,24 +509,27 @@ export function VerificationSubjectReview({
                 : 'border bg-background'
             }`}
           >
-            <Label htmlFor="rejectReason" className="font-medium">
-              Odrzuć weryfikację
-            </Label>
+            <Label className="font-medium">Odrzuć weryfikację</Label>
             <p className="text-xs text-muted-foreground">
-              Powód zostanie wysłany w powiadomieniu i e-mailu. Jeśli odrzuciłaś/eś poszczególne
-              dokumenty, ich powody są wstępnie wpisane poniżej — możesz je dopracować.
+              Wybierz powód z listy — trafi do powiadomienia i e-maila użytkownika.
+              {documentPrefill.trim() ? ' Uwagi z oceny dokumentów zostaną dołączone automatycznie.' : ''}
             </p>
-            <Textarea
-              id="rejectReason"
-              value={rejectReason}
-              onChange={e => setRejectReason(e.target.value)}
-              placeholder="Powód odrzucenia widoczny dla użytkownika…"
-              rows={4}
+            <VerificationRejectReasonFields
+              reasonId={rejectReasonId}
+              customReason={rejectCustomReason}
+              onReasonIdChange={setRejectReasonId}
+              onCustomReasonChange={setRejectCustomReason}
+              disabled={busy}
             />
+            {documentPrefill.trim() ? (
+              <p className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                {documentPrefill}
+              </p>
+            ) : null}
             <Button
               type="button"
               variant="destructive"
-              disabled={busy || !canReject || rejectReason.trim().length === 0}
+              disabled={busy || !canReject || !composedRejectReason?.trim()}
               onClick={handleReject}
               title={
                 !hasDocs

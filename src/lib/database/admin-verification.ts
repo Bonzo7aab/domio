@@ -1,38 +1,131 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 
-export interface PendingVerificationRow {
+export interface VerificationQueueRowBase {
   userId: string;
   firstName: string;
   lastName: string;
   userType: string;
-  verificationSubmittedAt: string;
   companyId: string | null;
   companyName: string | null;
   companyType: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  documentsSubmitted: number;
+  documentsExpected: number;
 }
 
-export interface RejectedVerificationRow {
-  userId: string;
-  firstName: string;
-  lastName: string;
-  userType: string;
-  companyId: string | null;
-  companyName: string | null;
-  companyType: string | null;
+export interface PendingVerificationRow extends VerificationQueueRowBase {
+  verificationSubmittedAt: string | null;
+}
+
+export interface RejectedVerificationRow extends VerificationQueueRowBase {
   decidedAt: string;
   reason: string | null;
 }
 
-export interface ApprovedVerificationRow {
-  userId: string;
-  firstName: string;
-  lastName: string;
-  userType: string;
-  companyId: string | null;
-  companyName: string | null;
-  companyType: string | null;
+export interface ApprovedVerificationRow extends VerificationQueueRowBase {
   decidedAt: string;
+}
+
+const CONTRACTOR_DOC_KEYS = [
+  'company_registration',
+  'insurance',
+  'certifications',
+  'references',
+] as const;
+
+const MANAGER_DOC_KEYS = [
+  'company_registration',
+  'insurance',
+  'management_license',
+  'management_contracts',
+] as const;
+
+export function expectedDocumentCount(userType: string): number {
+  return userType === 'contractor' ? CONTRACTOR_DOC_KEYS.length : MANAGER_DOC_KEYS.length;
+}
+
+export function countSubmittedDocuments(
+  userType: string,
+  paths: Record<string, string> | null | undefined
+): number {
+  const keys = userType === 'contractor' ? CONTRACTOR_DOC_KEYS : MANAGER_DOC_KEYS;
+  let count = 0;
+  for (const key of keys) {
+    const path = paths?.[key];
+    if (path && typeof path === 'string' && path.trim().length > 0) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+export function resolveUpdatedAt(
+  profileUpdatedAt: string | null | undefined,
+  verificationSubmittedAt: string | null | undefined,
+  paths: Record<string, string> | null | undefined
+): string | null {
+  const timestamps: number[] = [];
+  if (profileUpdatedAt) {
+    const ms = Date.parse(profileUpdatedAt);
+    if (Number.isFinite(ms)) timestamps.push(ms);
+  }
+  if (verificationSubmittedAt) {
+    const ms = Date.parse(verificationSubmittedAt);
+    if (Number.isFinite(ms)) timestamps.push(ms);
+  }
+  for (const path of Object.values(paths ?? {})) {
+    const filename = path.split('/').pop() ?? '';
+    const uploadedAt = parseUploadedAtFromFilename(filename);
+    if (uploadedAt) {
+      const ms = Date.parse(uploadedAt);
+      if (Number.isFinite(ms)) timestamps.push(ms);
+    }
+  }
+  if (timestamps.length === 0) return null;
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
+interface ProfileQueueSource {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  user_type: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  verification_submitted_at?: string | null;
+  verification_document_paths?: Record<string, string> | null;
+  user_companies?: Array<{
+    is_primary?: boolean;
+    companies?: { id?: string; name?: string; type?: string };
+  }>;
+}
+
+function buildQueueRowBase(profile: ProfileQueueSource): Omit<VerificationQueueRowBase, never> {
+  const userType = profile.user_type ?? '';
+  const paths = profile.verification_document_paths ?? null;
+  const ucs = profile.user_companies ?? [];
+  const primary = ucs.find((uc) => uc.is_primary) ?? ucs[0];
+  const company = primary?.companies;
+
+  return {
+    userId: profile.id,
+    firstName: profile.first_name ?? '',
+    lastName: profile.last_name ?? '',
+    userType,
+    companyId: company?.id ?? null,
+    companyName: company?.name ?? null,
+    companyType: company?.type ?? null,
+    createdAt: profile.created_at ?? null,
+    updatedAt: resolveUpdatedAt(
+      profile.updated_at,
+      profile.verification_submitted_at,
+      paths
+    ),
+    documentsSubmitted: countSubmittedDocuments(userType, paths),
+    documentsExpected: expectedDocumentCount(userType),
+  };
 }
 
 export interface VerificationDocumentEntry {
@@ -213,13 +306,17 @@ export async function fetchLatestDecisionAtForUser(
 }
 
 /**
- * Users who submitted verification docs and are not yet verified on profile / primary company.
+ * All contractors/managers awaiting verification (OPD-45), including accounts that
+ * have not uploaded documents yet. Excludes users whose latest decision is rejected
+ * until they resubmit.
  */
 export async function fetchPendingVerificationQueue(
   supabase: SupabaseClient<Database>
 ): Promise<PendingVerificationRow[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
+
+  const latest = await fetchLatestDecisions(supabase);
 
   const { data: profiles, error } = await sb
     .from('user_profiles')
@@ -229,8 +326,11 @@ export async function fetchPendingVerificationQueue(
       first_name,
       last_name,
       user_type,
+      platform_role,
       verification_submitted_at,
       verification_document_paths,
+      created_at,
+      updated_at,
       is_verified,
       user_companies (
         is_primary,
@@ -238,15 +338,14 @@ export async function fetchPendingVerificationQueue(
         companies (
           id,
           name,
-          type,
-          is_verified
+          type
         )
       )
     `
     )
-    .not('verification_submitted_at', 'is', null)
+    .in('user_type', ['contractor', 'manager'])
     .eq('is_verified', false)
-    .order('verification_submitted_at', { ascending: true });
+    .order('created_at', { ascending: true });
 
   if (error) {
     logSupabaseError('fetchPendingVerificationQueue', error);
@@ -256,27 +355,32 @@ export async function fetchPendingVerificationQueue(
   const rows: PendingVerificationRow[] = [];
 
   for (const p of profiles ?? []) {
-    const ucs = (p.user_companies ?? []) as Array<{
-      is_primary?: boolean;
-      companies?: { id?: string; name?: string; type?: string; is_verified?: boolean };
-    }>;
-    const primary = ucs.find((uc) => uc.is_primary) ?? ucs[0];
-    const company = primary?.companies;
-    if (company?.is_verified) {
+    if (p.platform_role === 'platform_admin') {
       continue;
     }
 
+    const userId = p.id as string;
+    const submittedAt = (p.verification_submitted_at as string | null) ?? null;
+    const decision = latest.get(userId);
+    if (decision?.decision === 'rejected' && !submittedAt) {
+      continue;
+    }
+
+    const base = buildQueueRowBase(p as ProfileQueueSource);
     rows.push({
-      userId: p.id as string,
-      firstName: (p.first_name as string) ?? '',
-      lastName: (p.last_name as string) ?? '',
-      userType: (p.user_type as string) ?? '',
-      verificationSubmittedAt: p.verification_submitted_at as string,
-      companyId: company?.id ?? null,
-      companyName: company?.name ?? null,
-      companyType: company?.type ?? null,
+      ...base,
+      verificationSubmittedAt: submittedAt,
     });
   }
+
+  rows.sort((a, b) => {
+    const aSubmitted = a.verificationSubmittedAt ? Date.parse(a.verificationSubmittedAt) : 0;
+    const bSubmitted = b.verificationSubmittedAt ? Date.parse(b.verificationSubmittedAt) : 0;
+    if (aSubmitted && bSubmitted) return aSubmitted - bSubmitted;
+    if (aSubmitted) return -1;
+    if (bSubmitted) return 1;
+    return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'pl');
+  });
 
   return rows;
 }
@@ -316,16 +420,9 @@ async function fetchLatestDecisions(
   return latest;
 }
 
-interface ProfileWithCompany {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  user_type: string | null;
+interface ProfileWithCompany extends ProfileQueueSource {
   is_verified: boolean | null;
-  user_companies?: Array<{
-    is_primary?: boolean;
-    companies?: { id?: string; name?: string; type?: string };
-  }>;
+  platform_role?: string;
 }
 
 async function fetchProfilesByIds(
@@ -340,6 +437,7 @@ async function fetchProfilesByIds(
     .select(
       `
       id, first_name, last_name, user_type, is_verified,
+      created_at, updated_at, verification_submitted_at, verification_document_paths,
       user_companies ( is_primary, companies ( id, name, type ) )
     `
     )
@@ -380,15 +478,8 @@ export async function fetchRejectedVerificationQueue(
     if (!profile) continue;
     if (profile.is_verified) continue;
     const decision = latest.get(uid)!;
-    const company = pickCompany(profile);
     rows.push({
-      userId: profile.id,
-      firstName: profile.first_name ?? '',
-      lastName: profile.last_name ?? '',
-      userType: profile.user_type ?? '',
-      companyId: company?.id ?? null,
-      companyName: company?.name ?? null,
-      companyType: company?.type ?? null,
+      ...buildQueueRowBase(profile),
       decidedAt: decision.created_at,
       reason: decision.reason ?? null,
     });
@@ -401,33 +492,49 @@ export async function fetchRejectedVerificationQueue(
 export async function fetchApprovedVerificationQueue(
   supabase: SupabaseClient<Database>
 ): Promise<ApprovedVerificationRow[]> {
-  const latest = await fetchLatestDecisions(supabase);
-  const approvedIds: string[] = [];
-  for (const [uid, dec] of latest.entries()) {
-    if (dec.decision === 'approved') approvedIds.push(uid);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any;
+
+  const { data: profiles, error } = await sb
+    .from('user_profiles')
+    .select(
+      `
+      id,
+      first_name,
+      last_name,
+      user_type,
+      platform_role,
+      is_verified,
+      created_at,
+      updated_at,
+      verification_submitted_at,
+      verification_document_paths,
+      user_companies ( is_primary, companies ( id, name, type ) )
+    `
+    )
+    .in('user_type', ['contractor', 'manager'])
+    .eq('is_verified', true)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    logSupabaseError('fetchApprovedVerificationQueue', error);
+    return [];
   }
 
-  const profiles = await fetchProfilesByIds(supabase, approvedIds);
-
+  const latest = await fetchLatestDecisions(supabase);
   const rows: ApprovedVerificationRow[] = [];
-  for (const uid of approvedIds) {
-    const profile = profiles.get(uid);
-    if (!profile) continue;
-    const decision = latest.get(uid)!;
-    const company = pickCompany(profile);
+
+  for (const p of (profiles ?? []) as ProfileWithCompany[]) {
+    if ((p as ProfileWithCompany & { platform_role?: string }).platform_role === 'platform_admin') {
+      continue;
+    }
+    const decision = latest.get(p.id);
     rows.push({
-      userId: profile.id,
-      firstName: profile.first_name ?? '',
-      lastName: profile.last_name ?? '',
-      userType: profile.user_type ?? '',
-      companyId: company?.id ?? null,
-      companyName: company?.name ?? null,
-      companyType: company?.type ?? null,
-      decidedAt: decision.created_at,
+      ...buildQueueRowBase(p),
+      decidedAt: decision?.created_at ?? p.updated_at ?? '',
     });
   }
 
-  rows.sort((a, b) => b.decidedAt.localeCompare(a.decidedAt));
   return rows;
 }
 

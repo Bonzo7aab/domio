@@ -515,7 +515,7 @@ export const EnhancedMapView: React.FC<EnhancedMapViewProps> = ({
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-1">{cluster.jobs[0].company}</p>
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">{cluster.jobs[0].applications} aplikacji</span>
+                            <span className="text-muted-foreground">{cluster.jobs[0].applications} ofert</span>
                             <span className="font-medium text-success">{cluster.jobs[0].salary}</span>
                           </div>
                         </div>

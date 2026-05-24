@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../../lib/supabase/server';
-import { getUserVerificationStatus } from '../../lib/database/verification';
+import { getUserVerificationStatus } from '../../lib/database/verification-queries';
 import {
   fetchVerificationDocumentReviews,
   getVerificationDocumentSignedUrls,
@@ -29,14 +29,7 @@ export default async function Account() {
   const isContractor = profileRow?.user_type === 'contractor';
   const isManager = profileRow?.user_type === 'manager';
 
-  const verificationStatus = isManager
-    ? {
-        state: 'approved' as const,
-        submittedAt: null,
-        decidedAt: null,
-        reason: null,
-      }
-    : await getUserVerificationStatus(user.id, supabase);
+  const verificationStatus = await getUserVerificationStatus(user.id, supabase);
 
   let existingDocuments: VerificationDocumentEntry[] = [];
   let documentReviews: Awaited<ReturnType<typeof fetchVerificationDocumentReviews>> = {};

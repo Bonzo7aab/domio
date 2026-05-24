@@ -2155,6 +2155,15 @@ export async function createJob(
   }
 ): Promise<{ data: JobWithCompany | null; error: PostgrestError | null }> {
   try {
+    const { canUserUsePlatformFeatures } = await import('../verification/can-use-platform');
+    const access = await canUserUsePlatformFeatures(supabase, jobData.managerId);
+    if (!access.allowed) {
+      return {
+        data: null,
+        error: new Error(access.message ?? 'Konto nie jest zweryfikowane.') as PostgrestError,
+      };
+    }
+
     const resolved = await resolveJobFormCategoryIds(supabase, jobData.category, jobData.subcategory);
     if (resolved.error || !resolved.categoryId) {
       return { data: null, error: resolved.error };
@@ -2428,6 +2437,15 @@ export async function createJobApplication(
   applicationData: CreateJobApplicationInput
 ): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
   try {
+    const { canUserUsePlatformFeatures } = await import('../verification/can-use-platform');
+    const access = await canUserUsePlatformFeatures(supabase, contractorId);
+    if (!access.allowed) {
+      return {
+        data: null,
+        error: new Error(access.message ?? 'Konto wykonawcy nie jest zweryfikowane.') as PostgrestError,
+      };
+    }
+
     // Fetch contractor's primary company
     const { fetchUserPrimaryCompany } = await import('./companies');
     const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, contractorId);
@@ -2740,6 +2758,15 @@ export async function createTenderBid(
   }
 ): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
   try {
+    const { canUserUsePlatformFeatures } = await import('../verification/can-use-platform');
+    const access = await canUserUsePlatformFeatures(supabase, contractorId);
+    if (!access.allowed) {
+      return {
+        data: null,
+        error: new Error(access.message ?? 'Konto wykonawcy nie jest zweryfikowane.') as PostgrestError,
+      };
+    }
+
     // Fetch contractor's primary company
     const { fetchUserPrimaryCompany } = await import('./companies');
     const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, contractorId);
