@@ -1,4 +1,10 @@
 import { createClient } from '../supabase/client';
+import type {
+  ContractorServiceAreaSettings,
+  ContractorVatStatus,
+} from '../contractor/constants';
+import { DEFAULT_SERVICE_AREA } from '../contractor/constants';
+import { normalizeIbanInput } from '../contractor/iban';
 
 const CONTRACTOR_POLICY_BUCKET = 'verification-documents';
 
@@ -36,8 +42,18 @@ export interface ContractorRadarSettings {
 export interface ContractorAccountSettings {
   ocValidUntil: string | null;
   ocPolicyScanPath: string | null;
+  ocGuaranteeAmount: number | null;
   professionalQualificationsValidUntil: string | null;
   professionalQualificationsScanPath: string | null;
+  professionalQualificationTypes: string[];
+  bankAccountIban: string | null;
+  vatStatus: ContractorVatStatus | null;
+  serviceArea: ContractorServiceAreaSettings;
+  zusCertificatePath: string | null;
+  zusCertificateIssuedAt: string | null;
+  taxCertificatePath: string | null;
+  taxCertificateIssuedAt: string | null;
+  referenceDocumentPaths: string[];
   notificationChannels: ContractorNotificationChannels;
   radar: ContractorRadarSettings;
   updatedAt: string | null;
@@ -85,13 +101,65 @@ const normalizeAreas = (value: unknown): string[] => {
   return filtered.length > 0 ? filtered : DEFAULT_RADAR.areas;
 };
 
+const normalizeStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string').map(s => s.trim()).filter(Boolean);
+};
+
+const normalizeServiceArea = (value: unknown): ContractorServiceAreaSettings => {
+  if (typeof value !== 'object' || value === null) {
+    return DEFAULT_SERVICE_AREA;
+  }
+  const raw = value as Record<string, unknown>;
+  const voivodeship =
+    typeof raw.voivodeship === 'string' && raw.voivodeship.trim()
+      ? (raw.voivodeship as ContractorServiceAreaSettings['voivodeship'])
+      : DEFAULT_SERVICE_AREA.voivodeship;
+  const scope =
+    raw.scope === 'whole_voivodeship' || raw.scope === 'selected_cities'
+      ? raw.scope
+      : DEFAULT_SERVICE_AREA.scope;
+  const cities = normalizeStringArray(raw.cities);
+  const districts = normalizeStringArray(raw.districts);
+  return {
+    voivodeship,
+    scope,
+    cities: cities.length > 0 ? cities : DEFAULT_SERVICE_AREA.cities,
+    districts: districts.length > 0 ? districts : DEFAULT_SERVICE_AREA.districts,
+  };
+};
+
+const normalizeVatStatus = (value: unknown): ContractorVatStatus | null => {
+  if (value === 'active_vat' || value === 'vat_exempt') return value;
+  return null;
+};
+
+const normalizeGuaranteeAmount = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace(/\s/g, '').replace(',', '.'));
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return null;
+};
+
 const normalizeSettings = (row: Record<string, unknown> | null): ContractorAccountSettings => {
   if (!row) {
     return {
       ocValidUntil: null,
       ocPolicyScanPath: null,
+      ocGuaranteeAmount: null,
       professionalQualificationsValidUntil: null,
       professionalQualificationsScanPath: null,
+      professionalQualificationTypes: [],
+      bankAccountIban: null,
+      vatStatus: null,
+      serviceArea: DEFAULT_SERVICE_AREA,
+      zusCertificatePath: null,
+      zusCertificateIssuedAt: null,
+      taxCertificatePath: null,
+      taxCertificateIssuedAt: null,
+      referenceDocumentPaths: [],
       notificationChannels: DEFAULT_CHANNELS,
       radar: DEFAULT_RADAR,
       updatedAt: null,
@@ -111,6 +179,7 @@ const normalizeSettings = (row: Record<string, unknown> | null): ContractorAccou
   return {
     ocValidUntil: typeof row.oc_valid_until === 'string' ? row.oc_valid_until : null,
     ocPolicyScanPath: typeof row.oc_policy_scan_path === 'string' ? row.oc_policy_scan_path : null,
+    ocGuaranteeAmount: normalizeGuaranteeAmount(row.oc_guarantee_amount),
     professionalQualificationsValidUntil:
       typeof row.professional_qualifications_valid_until === 'string'
         ? row.professional_qualifications_valid_until
@@ -119,6 +188,18 @@ const normalizeSettings = (row: Record<string, unknown> | null): ContractorAccou
       typeof row.professional_qualifications_scan_path === 'string'
         ? row.professional_qualifications_scan_path
         : null,
+    professionalQualificationTypes: normalizeStringArray(row.professional_qualification_types),
+    bankAccountIban:
+      typeof row.bank_account_iban === 'string' ? normalizeIbanInput(row.bank_account_iban) || null : null,
+    vatStatus: normalizeVatStatus(row.vat_status),
+    serviceArea: normalizeServiceArea(row.service_area_settings),
+    zusCertificatePath: typeof row.zus_certificate_path === 'string' ? row.zus_certificate_path : null,
+    zusCertificateIssuedAt:
+      typeof row.zus_certificate_issued_at === 'string' ? row.zus_certificate_issued_at : null,
+    taxCertificatePath: typeof row.tax_certificate_path === 'string' ? row.tax_certificate_path : null,
+    taxCertificateIssuedAt:
+      typeof row.tax_certificate_issued_at === 'string' ? row.tax_certificate_issued_at : null,
+    referenceDocumentPaths: normalizeStringArray(row.reference_document_paths),
     notificationChannels: {
       email: normalizeBoolean(notificationChannelsRaw.email, DEFAULT_CHANNELS.email),
       app: normalizeBoolean(notificationChannelsRaw.app, DEFAULT_CHANNELS.app),
@@ -232,11 +313,43 @@ export async function upsertContractorAccountSettings(
   if (payload.ocPolicyScanPath !== undefined) {
     patch.oc_policy_scan_path = payload.ocPolicyScanPath;
   }
+  if (payload.ocGuaranteeAmount !== undefined) {
+    patch.oc_guarantee_amount = payload.ocGuaranteeAmount;
+  }
   if (payload.professionalQualificationsValidUntil !== undefined) {
     patch.professional_qualifications_valid_until = payload.professionalQualificationsValidUntil;
   }
   if (payload.professionalQualificationsScanPath !== undefined) {
     patch.professional_qualifications_scan_path = payload.professionalQualificationsScanPath;
+  }
+  if (payload.professionalQualificationTypes !== undefined) {
+    patch.professional_qualification_types = payload.professionalQualificationTypes;
+  }
+  if (payload.bankAccountIban !== undefined) {
+    patch.bank_account_iban = payload.bankAccountIban
+      ? normalizeIbanInput(payload.bankAccountIban)
+      : null;
+  }
+  if (payload.vatStatus !== undefined) {
+    patch.vat_status = payload.vatStatus;
+  }
+  if (payload.serviceArea !== undefined) {
+    patch.service_area_settings = payload.serviceArea;
+  }
+  if (payload.zusCertificatePath !== undefined) {
+    patch.zus_certificate_path = payload.zusCertificatePath;
+  }
+  if (payload.zusCertificateIssuedAt !== undefined) {
+    patch.zus_certificate_issued_at = payload.zusCertificateIssuedAt;
+  }
+  if (payload.taxCertificatePath !== undefined) {
+    patch.tax_certificate_path = payload.taxCertificatePath;
+  }
+  if (payload.taxCertificateIssuedAt !== undefined) {
+    patch.tax_certificate_issued_at = payload.taxCertificateIssuedAt;
+  }
+  if (payload.referenceDocumentPaths !== undefined) {
+    patch.reference_document_paths = payload.referenceDocumentPaths;
   }
   if (payload.notificationChannels !== undefined) {
     patch.notification_channels = payload.notificationChannels;
@@ -391,6 +504,14 @@ export async function uploadProfessionalQualificationsScan(
   userId: string,
   file: File
 ): Promise<{ path: string }> {
+  return uploadVerificationScan(userId, file, 'professional-qualifications');
+}
+
+async function uploadVerificationScan(
+  userId: string,
+  file: File,
+  folder: string
+): Promise<{ path: string }> {
   validateVerificationScanFile(file);
 
   const supabase = createClient();
@@ -402,7 +523,7 @@ export async function uploadProfessionalQualificationsScan(
     ? extension
     : 'pdf';
 
-  const filePath = `${userId}/verification/professional-qualifications/${Date.now()}-${Math.random()
+  const filePath = `${userId}/verification/${folder}/${Date.now()}-${Math.random()
     .toString(36)
     .slice(2)}.${safeExt}`;
 
@@ -415,6 +536,18 @@ export async function uploadProfessionalQualificationsScan(
   }
 
   return { path: filePath };
+}
+
+export async function uploadZusCertificateScan(userId: string, file: File): Promise<{ path: string }> {
+  return uploadVerificationScan(userId, file, 'zus-certificate');
+}
+
+export async function uploadTaxCertificateScan(userId: string, file: File): Promise<{ path: string }> {
+  return uploadVerificationScan(userId, file, 'tax-certificate');
+}
+
+export async function uploadReferenceDocumentScan(userId: string, file: File): Promise<{ path: string }> {
+  return uploadVerificationScan(userId, file, 'references');
 }
 
 /** Best-effort removal of objects from the verification-documents bucket (ignores missing files). */

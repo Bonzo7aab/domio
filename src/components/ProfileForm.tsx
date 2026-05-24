@@ -11,6 +11,8 @@ import { updateUserAction } from '../lib/auth/actions';
 import { createClient } from '../lib/supabase/client';
 import { fetchUserPrimaryCompany, upsertUserCompany, type CompanyData } from '../lib/database/companies';
 import type { AuthUser } from '../types/auth';
+import { ContractorFinanceSettings } from './ContractorFinanceSettings';
+import { ContractorServiceAreaSettings } from './ContractorServiceAreaSettings';
 
 interface ProfileFormProps {
   user: AuthUser;
@@ -34,6 +36,8 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
   const [companySnapshot, setCompanySnapshot] = useState<CompanyData | null>(null);
   const [businessCompanyName, setBusinessCompanyName] = useState('');
   const [businessNip, setBusinessNip] = useState('');
+  const [businessRegon, setBusinessRegon] = useState('');
+  const [businessKrs, setBusinessKrs] = useState('');
 
   const [profileData, setProfileData] = useState({
     firstName: user.firstName || '',
@@ -59,11 +63,15 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
         setCompanySnapshot(null);
         setBusinessCompanyName('');
         setBusinessNip('');
+        setBusinessRegon('');
+        setBusinessKrs('');
         return;
       }
       setCompanySnapshot(data);
       setBusinessCompanyName(data.name || '');
       setBusinessNip((data.nip || '').trim());
+      setBusinessRegon((data.regon || '').trim());
+      setBusinessKrs((data.krs || '').trim());
     } finally {
       setIsLoadingBusiness(false);
     }
@@ -74,6 +82,8 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
       setCompanySnapshot(null);
       setBusinessCompanyName('');
       setBusinessNip('');
+      setBusinessRegon('');
+      setBusinessKrs('');
       setIsEditingBusiness(false);
       return;
     }
@@ -144,6 +154,8 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
     setSuccess('');
     const trimmedName = businessCompanyName.trim();
     const trimmedNip = businessNip.trim();
+    const trimmedRegon = businessRegon.trim();
+    const trimmedKrs = businessKrs.trim();
     if (!trimmedName || !trimmedNip) {
       setError('Nazwa firmy i NIP są wymagane');
       return;
@@ -169,8 +181,8 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
             address: snap.address || '',
             city: snap.city || '',
             postal_code: snap.postal_code || '',
-            regon: snap.regon || '',
-            krs: snap.krs || '',
+            regon: trimmedRegon,
+            krs: trimmedKrs,
             website: snap.website || '',
             founded_year: snap.founded_year ?? undefined,
             employee_count: snap.employee_count || '',
@@ -181,6 +193,8 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
             name: trimmedName,
             type: 'contractor',
             nip: trimmedNip,
+            regon: trimmedRegon || undefined,
+            krs: trimmedKrs || undefined,
             phone: user.phone?.trim() || undefined,
             email: user.email?.trim() || undefined,
           };
@@ -197,6 +211,8 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
       setCompanySnapshot(saved);
       setBusinessCompanyName(saved.name || '');
       setBusinessNip((saved.nip || '').trim());
+      setBusinessRegon((saved.regon || '').trim());
+      setBusinessKrs((saved.krs || '').trim());
       setSuccess('Dane biznesowe zostały zaktualizowane');
       setIsEditingBusiness(false);
       setTimeout(() => setSuccess(''), 3000);
@@ -212,9 +228,13 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
     if (companySnapshot) {
       setBusinessCompanyName(companySnapshot.name || '');
       setBusinessNip((companySnapshot.nip || '').trim());
+      setBusinessRegon((companySnapshot.regon || '').trim());
+      setBusinessKrs((companySnapshot.krs || '').trim());
     } else {
       setBusinessCompanyName('');
       setBusinessNip('');
+      setBusinessRegon('');
+      setBusinessKrs('');
     }
     setIsEditingBusiness(false);
     setError('');
@@ -375,9 +395,39 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
                 <p className="text-sm py-2 px-3 bg-muted rounded-md">{businessNip || '—'}</p>
               )}
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="businessRegon">REGON</Label>
+              {isEditingBusiness ? (
+                <Input
+                  id="businessRegon"
+                  value={businessRegon}
+                  onChange={(e) => setBusinessRegon(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              ) : (
+                <p className="text-sm py-2 px-3 bg-muted rounded-md">{businessRegon || '—'}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="businessKrs">KRS</Label>
+              {isEditingBusiness ? (
+                <Input
+                  id="businessKrs"
+                  value={businessKrs}
+                  onChange={(e) => setBusinessKrs(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              ) : (
+                <p className="text-sm py-2 px-3 bg-muted rounded-md">{businessKrs || '—'}</p>
+              )}
+            </div>
           </div>
         </div>
       ) : null}
+
+      {isContractorBusinessBlock ? <ContractorFinanceSettings userId={user.id} /> : null}
 
       {/* Contact Information Section */}
       <div className="border rounded-lg p-4 bg-card">
@@ -468,6 +518,8 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
           </div>
         </div>
       </div>
+
+      {isContractorBusinessBlock ? <ContractorServiceAreaSettings userId={user.id} /> : null}
 
     </div>
   );

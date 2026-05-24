@@ -49,6 +49,8 @@ import type {
   VerificationDocumentEntry,
 } from '../lib/database/admin-verification';
 import { ContractorProfessionalQualificationsSettings } from './ContractorProfessionalQualificationsSettings';
+import { ContractorOfficialCertificatesSettings } from './ContractorOfficialCertificatesSettings';
+import { ContractorProfessionalQualificationsChecklist } from './ContractorProfessionalQualificationsChecklist';
 
 interface VerificationPageProps {
   initialStatus: VerificationStatus;
@@ -440,9 +442,12 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   // payload.
   const [ocValidUntil, setOcValidUntil] = useState<string>('');
   const [initialOcValidUntil, setInitialOcValidUntil] = useState<string>('');
+  const [ocGuaranteeAmount, setOcGuaranteeAmount] = useState('');
+  const [initialOcGuaranteeAmount, setInitialOcGuaranteeAmount] = useState('');
   const [isSavingOcDate, setIsSavingOcDate] = useState(false);
 
   const isContractor = user?.userType === 'contractor';
+  const useContractorDocumentSections = embedded && isContractor;
   const status = initialStatus.state;
   const showUploadForm = status !== 'approved';
 
@@ -472,6 +477,10 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
           const dateValue = settings.ocValidUntil ?? '';
           setOcValidUntil(dateValue);
           setInitialOcValidUntil(dateValue);
+          const guarantee =
+            settings.ocGuaranteeAmount != null ? String(settings.ocGuaranteeAmount) : '';
+          setOcGuaranteeAmount(guarantee);
+          setInitialOcGuaranteeAmount(guarantee);
         }
       } catch {
         if (!cancelled) {
@@ -493,23 +502,33 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     }
     try {
       setIsSavingOcDate(true);
+      const parsedGuarantee = ocGuaranteeAmount.trim()
+        ? Number(ocGuaranteeAmount.replace(/\s/g, '').replace(',', '.'))
+        : null;
       const saved = await upsertContractorAccountSettings(user.id, {
         ocValidUntil: ocValidUntil ? ocValidUntil : null,
+        ocGuaranteeAmount:
+          parsedGuarantee != null && Number.isFinite(parsedGuarantee) ? parsedGuarantee : null,
       });
       const newDate = saved.ocValidUntil ?? '';
       setOcValidUntil(newDate);
       setInitialOcValidUntil(newDate);
-      toast.success('Data ważności OC zapisana');
+      const guarantee =
+        saved.ocGuaranteeAmount != null ? String(saved.ocGuaranteeAmount) : '';
+      setOcGuaranteeAmount(guarantee);
+      setInitialOcGuaranteeAmount(guarantee);
+      toast.success('Dane polisy OC zapisane');
       router.refresh();
     } catch (error) {
       console.error('Error saving OC valid until from verification page:', error);
-      toast.error('Nie udało się zapisać daty ważności OC');
+      toast.error('Nie udało się zapisać danych polisy OC');
     } finally {
       setIsSavingOcDate(false);
     }
   };
 
-  const ocDateDirty = ocValidUntil !== initialOcValidUntil;
+  const ocDateDirty =
+    ocValidUntil !== initialOcValidUntil || ocGuaranteeAmount !== initialOcGuaranteeAmount;
 
   const contractorDocuments = [
     {
@@ -566,6 +585,9 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   ];
 
   const documents = isContractor ? contractorDocuments : managerDocuments;
+  const visibleDocuments = useContractorDocumentSections
+    ? documents.filter(doc => doc.type !== 'company_registration')
+    : documents;
 
   const handleFileChange = (documentType: string, file: File | null) => {
     setUploads(prev => ({
@@ -634,7 +656,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 
     try {
       const fd = new FormData();
-      for (const doc of documents) {
+      for (const doc of visibleDocuments) {
         const file = uploads[doc.type]?.file;
         if (file) {
           fd.append(doc.type, file);
@@ -658,13 +680,13 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 
   // A required doc is "covered" if there's a new file OR a previously uploaded
   // file. Contractor OC is also covered by an OC scan stored in account settings.
-  const requiredDocumentsUploaded = documents
+  const requiredDocumentsUploaded = visibleDocuments
     .filter(doc => doc.required)
     .every(doc =>
       isRequiredDocComplete(doc, existingByKey, uploads, isContractor, hasOcPolicyInAccount),
     );
 
-  const requiredDocs = documents.filter(doc => doc.required);
+  const requiredDocs = visibleDocuments.filter(doc => doc.required);
   const requiredCompleteCount = requiredDocs.filter(doc =>
     isRequiredDocComplete(doc, existingByKey, uploads, isContractor, hasOcPolicyInAccount),
   ).length;
@@ -673,7 +695,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       ? Math.round((requiredCompleteCount / requiredDocs.length) * 100)
       : 100;
 
-  const newUploadsCount = documents.reduce(
+  const newUploadsCount = visibleDocuments.reduce(
     (count, doc) => count + (uploads[doc.type]?.file ? 1 : 0),
     0
   );
@@ -828,7 +850,14 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
               })()}
 
               <div className="divide-y">
-                {documents.map(doc => {
+                {useContractorDocumentSections && (
+                  <div className="bg-muted/40 px-4 py-3 sm:px-6">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Sekcja A — Polisa OC firmy
+                    </p>
+                  </div>
+                )}
+                {visibleDocuments.map(doc => {
                   const existing = existingByKey[doc.type];
                   const newFile = uploads[doc.type]?.file ?? null;
                   const willReplace = Boolean(existing && newFile);
@@ -918,7 +947,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                         )}
 
                         {doc.type === 'insurance' && isContractor && (
-                          <div className="rounded-lg border border-dashed border-border/80 bg-muted/15 p-3 sm:p-4">
+                          <div className="rounded-lg border border-dashed border-border/80 bg-muted/15 p-3 sm:p-4 space-y-4">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                               <div className="min-w-0 flex-1 space-y-1.5">
                                 <Label
@@ -926,16 +955,29 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                                   className="flex items-center gap-1.5 text-xs font-medium"
                                 >
                                   <Calendar className="h-3.5 w-3.5 text-primary" />
-                                  Data ważności polisy OC
+                                  Ważność polisy do
                                 </Label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Współdzielone z ustawieniami konta wykonawcy.
-                                </p>
                                 <Input
                                   id="oc-valid-until-verification"
                                   type="date"
                                   value={ocValidUntil}
                                   onChange={e => setOcValidUntil(e.target.value)}
+                                  disabled={isSavingOcDate}
+                                  className="max-w-xs bg-background"
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1 space-y-1.5">
+                                <Label htmlFor="oc-guarantee-amount" className="text-xs font-medium">
+                                  Suma gwarancyjna polisy (zł)
+                                </Label>
+                                <Input
+                                  id="oc-guarantee-amount"
+                                  type="number"
+                                  min={0}
+                                  inputMode="numeric"
+                                  placeholder="np. 200000"
+                                  value={ocGuaranteeAmount}
+                                  onChange={e => setOcGuaranteeAmount(e.target.value)}
                                   disabled={isSavingOcDate}
                                   className="max-w-xs bg-background"
                                 />
@@ -948,7 +990,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                                 onClick={handleSaveOcValidUntil}
                                 className="shrink-0"
                               >
-                                {isSavingOcDate ? 'Zapisywanie...' : 'Zapisz datę'}
+                                {isSavingOcDate ? 'Zapisywanie...' : 'Zapisz dane OC'}
                               </Button>
                             </div>
                           </div>
@@ -1040,6 +1082,37 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                         )}
                       </div>
                     </section>
+                    {doc.type === 'insurance' && useContractorDocumentSections && userId && (
+                      <>
+                        <div className="bg-muted/40 px-4 py-3 sm:px-6 border-t">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Sekcja B — Zaświadczenia urzędowe (ZUS i US)
+                          </p>
+                        </div>
+                        <section className="px-4 py-5 sm:px-6">
+                          <ContractorOfficialCertificatesSettings userId={userId} />
+                        </section>
+                      </>
+                    )}
+                    {doc.type === 'certifications' && useContractorDocumentSections && userId && (
+                      <div className="bg-muted/40 px-4 py-3 sm:px-6 border-t">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Sekcja C — Uprawnienia zawodowe i certyfikaty
+                        </p>
+                      </div>
+                    )}
+                    {doc.type === 'certifications' && useContractorDocumentSections && userId && (
+                      <section className="px-4 py-5 sm:px-6 border-t">
+                        <ContractorProfessionalQualificationsChecklist userId={userId} />
+                      </section>
+                    )}
+                    {doc.type === 'references' && useContractorDocumentSections && (
+                      <div className="bg-muted/40 px-4 py-3 sm:px-6 border-t">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Sekcja D — Referencje i portfolio
+                        </p>
+                      </div>
+                    )}
                     {doc.type === 'references' && userId && isContractor && (
                       <ContractorProfessionalQualificationsSettings
                         userId={userId}
@@ -1069,6 +1142,9 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                 <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 sm:p-4">
                   <p className="text-xs font-semibold text-amber-900">Przed wysłaniem</p>
                   <ul className="mt-2 space-y-1 text-xs text-amber-900/90">
+                    {useContractorDocumentSections && (
+                      <li>· Dokumenty urzędowe (ZUS, US) nie starsze niż 3 miesiące</li>
+                    )}
                     <li>· Dokumenty aktualne (nie starsze niż 6 miesięcy) i czytelne</li>
                     <li>· Do dokumentów obcojęzycznych dołącz tłumaczenie</li>
                     <li className="font-medium">

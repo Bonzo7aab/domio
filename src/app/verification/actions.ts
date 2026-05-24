@@ -192,7 +192,36 @@ export async function submitVerificationDocumentsAction(
 
   const hasCompanyReg = Boolean(merged.company_registration);
 
-  if (!hasCompanyReg) {
+  if (!hasCompanyReg && userType === 'contractor') {
+    // user_companies is not in generated Database types
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: companyRelation } = await (supabase as any)
+      .from('user_companies')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .eq('is_primary', true)
+      .maybeSingle();
+
+    if (companyRelation?.company_id) {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('krs, regon')
+        .eq('id', companyRelation.company_id)
+        .maybeSingle();
+
+      const hasKrsOrRegon = Boolean(
+        (company?.krs && String(company.krs).trim()) ||
+          (company?.regon && String(company.regon).trim()),
+      );
+      if (hasKrsOrRegon) {
+        // KRS/REGON w profilu zastępują wymóg wypisu KRS/CEIDG (OPD-56)
+      } else {
+        return { ok: false, error: 'Wymagany dokument: wypis z KRS / CEIDG lub uzupełnienie KRS/REGON w danych firmy.' };
+      }
+    } else {
+      return { ok: false, error: 'Wymagany dokument: wypis z KRS / CEIDG lub uzupełnienie KRS/REGON w danych firmy.' };
+    }
+  } else if (!hasCompanyReg) {
     return { ok: false, error: 'Wymagany dokument: wypis z KRS / CEIDG.' };
   }
   if (!hasInsuranceDoc) {
