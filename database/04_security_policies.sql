@@ -408,7 +408,11 @@ CREATE POLICY "Users can update their own notifications" ON notifications
 
 -- System can insert notifications for any user
 CREATE POLICY "System can insert notifications" ON notifications
-    FOR INSERT WITH CHECK (true);
+    FOR INSERT WITH CHECK (
+        auth.role() = 'service_role' OR
+        is_admin() OR
+        user_id = auth.uid()
+    );
 
 -- =============================================
 -- NOTIFICATION PREFERENCES POLICIES
@@ -436,7 +440,11 @@ CREATE POLICY "Users can view their own activity logs" ON activity_logs
 
 -- System can insert activity logs for any user
 CREATE POLICY "System can insert activity logs" ON activity_logs
-    FOR INSERT WITH CHECK (true);
+    FOR INSERT WITH CHECK (
+        auth.role() = 'service_role' OR
+        is_admin() OR
+        user_id = auth.uid()
+    );
 
 -- =============================================
 -- QUESTIONS POLICIES
@@ -648,7 +656,9 @@ CREATE POLICY "Users can view their storage quotas" ON storage_quotas
 
 -- System can insert/update storage quotas
 CREATE POLICY "System can manage storage quotas" ON storage_quotas
-    FOR ALL WITH CHECK (true);
+    FOR ALL
+    USING (auth.role() = 'service_role' OR is_admin())
+    WITH CHECK (auth.role() = 'service_role' OR is_admin());
 
 -- =============================================
 -- COMPANY STORAGE QUOTAS POLICIES
@@ -666,7 +676,9 @@ CREATE POLICY "Users can view company storage quotas" ON company_storage_quotas
 
 -- System can insert/update company storage quotas
 CREATE POLICY "System can manage company storage quotas" ON company_storage_quotas
-    FOR ALL WITH CHECK (true);
+    FOR ALL
+    USING (auth.role() = 'service_role' OR is_admin())
+    WITH CHECK (auth.role() = 'service_role' OR is_admin());
 
 -- =============================================
 -- PORTFOLIO PROJECTS POLICIES
@@ -798,7 +810,9 @@ CREATE POLICY "Certificate templates are publicly readable" ON certificate_templ
 
 -- System can manage file processing queue
 CREATE POLICY "System can manage file processing queue" ON file_processing_queue
-    FOR ALL WITH CHECK (true);
+    FOR ALL
+    USING (auth.role() = 'service_role' OR is_admin())
+    WITH CHECK (auth.role() = 'service_role' OR is_admin());
 
 -- =============================================
 -- HELPER FUNCTIONS FOR POLICIES

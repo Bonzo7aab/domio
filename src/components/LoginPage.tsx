@@ -10,6 +10,7 @@ import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
 import { loginAction } from '../lib/auth/actions';
 import { useUserProfile } from '../contexts/AuthContext';
+import { sanitizeRedirectPath } from '../lib/auth/redirectPath';
 import {
   AuthFormPanel,
   AuthPageLayout,
@@ -24,7 +25,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(searchParams?.get('error') ?? null);
   const [message, setMessage] = useState<string | null>(searchParams?.get('message') ?? null);
 
-  const redirectTo = searchParams?.get('redirectTo') || '/';
+  const redirectTo = sanitizeRedirectPath(searchParams?.get('redirectTo'), '/');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

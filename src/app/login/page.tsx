@@ -5,6 +5,7 @@ import React from 'react';
 import { LoginPage } from '../../components/LoginPage';
 import { useUserProfile } from '../../contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { sanitizeRedirectPath } from '../../lib/auth/redirectPath';
 
 function LoadingState({ label }: { label: string }) {
   return (
@@ -29,7 +30,7 @@ function LoginContent() {
   const { isAuthenticated, isLoading } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams?.get('redirectTo') || '/';
+  const redirectTo = sanitizeRedirectPath(searchParams?.get('redirectTo'), '/');
 
   // Redirect when session exists (middleware also handles full-page requests).
   useEffect(() => {

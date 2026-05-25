@@ -192,6 +192,30 @@ test.describe('Login Page', () => {
     }
   });
 
+  test('should ignore unsafe redirectTo values after login', async ({ page }) => {
+    const email = `test-login-unsafe-redirect-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
+    const password = 'TestPassword123!';
+
+    await createTestUser(email, password, 'contractor');
+    testData.userEmails.push(email);
+
+    try {
+      // Protocol-relative URL must never be used as redirect target.
+      await page.goto(`${ROUTES.login}?redirectTo=${encodeURIComponent('//evil.example/phish')}`);
+      await page.fill('input[name="email"]', email);
+      await page.fill('input[name="password"]', password);
+      await page.click('button[type="submit"]');
+
+      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+
+      const currentUrl = new URL(page.url());
+      expect(currentUrl.hostname).not.toBe('evil.example');
+      expect(currentUrl.pathname).not.toContain('/login');
+    } finally {
+      await deleteTestUser(email);
+    }
+  });
+
   test('should navigate to forgot password page', async ({ page }) => {
     await page.goto(ROUTES.login);
     

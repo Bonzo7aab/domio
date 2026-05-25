@@ -51,6 +51,20 @@ Execute these SQL files **in order** in your Supabase SQL Editor:
    - Adds DELETE policy for company owners
    - **Must run this to enable company creation in account settings**
 
+### Auth & Platform Security Updates
+
+For current auth/admin flows, also apply these later migrations:
+
+- **49_contractor_account_settings_and_offer_feedback.sql**
+- **50_admin_panel_kan8.sql**
+- **52_user_read_own_verification_decisions.sql**
+- **53_verification_document_reviews.sql**
+- **58_platform_registration_settings.sql**
+- **60_harden_system_write_policies.sql** 🔒
+
+> Note: `51_grant_platform_admin_by_email.sql` is environment-specific (hard-coded email)
+> and should be run manually only when intentionally granting admin access.
+
 ## Quick Start
 
 ### Option 1: Supabase Dashboard
