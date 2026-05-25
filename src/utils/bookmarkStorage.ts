@@ -23,10 +23,17 @@ export interface BookmarkedJob {
 
 const BOOKMARKS_KEY = 'urbi-bookmarked-jobs';
 
+function canUseLocalStorage(): boolean {
+  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+}
+
 export const getBookmarkedJobs = (): BookmarkedJob[] => {
+  if (!canUseLocalStorage()) {
+    return [];
+  }
   try {
     const bookmarks = localStorage.getItem(BOOKMARKS_KEY);
-    return bookmarks ? JSON.parse(bookmarks) : [];
+    return bookmarks ? (JSON.parse(bookmarks) as BookmarkedJob[]) : [];
   } catch (error) {
     console.error('Error loading bookmarked jobs:', error);
     return [];
@@ -62,7 +69,9 @@ export const addBookmark = async (
     // Add new bookmark at the beginning
     const updatedBookmarks = [newBookmark, ...filteredBookmarks];
     
-    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));
+    if (canUseLocalStorage()) {
+      localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));
+    }
 
     if (bookmarksCountBaseline !== undefined) {
       incrementBookmarkCountOverride(job.id, bookmarksCountBaseline);
@@ -93,7 +102,9 @@ export const removeBookmark = async (
     // Always update localStorage for offline/unauthenticated users
     const bookmarks = getBookmarkedJobs();
     const updatedBookmarks = bookmarks.filter(bookmark => bookmark.id !== jobId);
-    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));
+    if (canUseLocalStorage()) {
+      localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));
+    }
 
     decrementBookmarkCountOverride(jobId, bookmarksCountBaseline);
 
@@ -114,6 +125,9 @@ export const isJobBookmarked = (jobId: string): boolean => {
 };
 
 export const clearAllBookmarks = (): void => {
+  if (!canUseLocalStorage()) {
+    return;
+  }
   try {
     localStorage.removeItem(BOOKMARKS_KEY);
     console.log('✅ All bookmarks cleared');

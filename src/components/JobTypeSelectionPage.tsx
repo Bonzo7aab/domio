@@ -132,8 +132,8 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                 <Gavel className="w-8 h-8 text-purple-600" />
               </div>
-              <CardTitle className="text-2xl">Przetarg</CardTitle>
-              <p className="text-gray-600">Formalny proces konkurencji dla dużych projektów</p>
+              <CardTitle className="text-2xl">Konkurs ofert</CardTitle>
+              <p className="text-gray-600">Formalny proces konkurencji dla większych realizacji</p>
             </CardHeader>
             <CardContent className="space-y-6">
               
@@ -178,7 +178,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               <div className="bg-purple-50 p-4 rounded-lg">
                 <h4 className="font-medium text-purple-600 mb-2">Proces:</h4>
                 <div className="text-sm text-gray-700 space-y-1">
-                  <div>1. Tworzysz przetarg z kryteriami</div>
+                  <div>1. Tworzysz konkurs z kryteriami</div>
                   <div>2. Wykonawcy składają oferty</div>
                   <div>3. System ocenia według punktów</div>
                   <div>4. Wybierasz zwycięzcę transparentnie</div>
@@ -194,7 +194,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                     </p>
                   </div>
                   <Button onClick={onSelectTender} className="w-full" size="lg" variant="outline">
-                    Zaloguj się i utwórz przetarg
+                    Zaloguj się i utwórz konkurs
                   </Button>
                 </div>
               ) : userType !== 'manager' ? (
@@ -223,11 +223,11 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
                 </div>
               ) : hasCompany === false ? (
                 <Button disabled className="w-full" size="lg" variant="outline">
-                  Utwórz przetarg
+                  Utwórz konkurs
                 </Button>
               ) : (
                 <Button onClick={onSelectTender} className="w-full" size="lg" variant="outline">
-                  Utwórz przetarg
+                  Utwórz konkurs
                 </Button>
               )}
             </CardContent>

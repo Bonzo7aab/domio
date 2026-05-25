@@ -3,7 +3,7 @@ import type { Database } from '../../types/database';
 import type { Application } from '../../types/application';
 import type { Budget, BudgetInput } from '../../types/budget';
 import { budgetFromDatabase, budgetToDatabase, formatBudget } from '../../types/budget';
-import { fetchAllCategoriesWithSubcategories } from './categories';
+import { fetchAllCategories, fetchAllCategoriesWithSubcategories } from './categories';
 import { JOB_WORKFLOW_STATUSES, isJobWorkflowStatusRegression } from '../job-workflow-status';
 import {
   TENDER_WORKFLOW_STATUSES,
@@ -36,6 +36,117 @@ export interface JobFilters {
 export interface JobLocation {
   city: string;
   sublocality_level_1?: string;
+}
+
+/** Shared shape for createTender / updateTender (legacy wizard + OPD-53 contest). */
+export interface TenderUpsertData {
+  title: string;
+  description: string;
+  category: string;
+  subcategory?: string;
+  location: JobLocation | string;
+  estimatedValue: string;
+  currency: string;
+  submissionDeadline: Date;
+  evaluationDeadline?: Date | null;
+  requirements: string[];
+  evaluationCriteria: Array<Record<string, unknown>>;
+  documents?: Array<Record<string, unknown>>;
+  isPublic: boolean;
+  allowQuestions: boolean;
+  questionsDeadline?: Date;
+  minimumExperience: number;
+  requiredCertificates: string[];
+  insuranceRequired: string;
+  advancePayment: boolean;
+  performanceBond: boolean;
+  status?: 'draft' | 'active';
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  projectDuration?: string;
+  buildingId?: string | null;
+  subcategoryId?: string | null;
+  completionDate?: Date | null;
+  siteVisitType?: string;
+  siteVisitNotes?: string | null;
+  formalRequirements?: Record<string, unknown> | null;
+  selectionCriteria?: Record<string, unknown> | null;
+  warrantyPeriod?: string | null;
+  guaranteePeriod?: string | null;
+  depositRequired?: boolean;
+  depositInstructions?: string | null;
+  paymentTerms?: Record<string, unknown> | null;
+  wadium?: number | null;
+}
+
+function tenderLocationJsonb(location: JobLocation | string): JobLocation {
+  if (typeof location === 'string') {
+    return { city: location };
+  }
+  return location;
+}
+
+function tenderDocumentsJson(
+  documents?: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> | null {
+  if (!documents?.length) return null;
+  return documents.map((doc) => ({
+    id: doc.id,
+    name: doc.name,
+    type: doc.type,
+    url: doc.url,
+    path: doc.path,
+  }));
+}
+
+function tenderDbRowFromUpsert(
+  tenderData: TenderUpsertData,
+  categoryId: string,
+  subcategoryId: string | null,
+): Record<string, unknown> {
+  const locationJsonb = tenderLocationJsonb(tenderData.location);
+  const completionDate =
+    tenderData.completionDate instanceof Date
+      ? tenderData.completionDate.toISOString().split('T')[0]
+      : tenderData.completionDate ?? null;
+
+  return {
+    title: tenderData.title,
+    description: tenderData.description,
+    category_id: categoryId,
+    subcategory_id: subcategoryId ?? tenderData.subcategoryId ?? null,
+    building_id: tenderData.buildingId ?? null,
+    location: locationJsonb,
+    address: tenderData.address ?? null,
+    latitude: tenderData.latitude ?? null,
+    longitude: tenderData.longitude ?? null,
+    estimated_value: parseFloat(tenderData.estimatedValue),
+    currency: tenderData.currency,
+    status: tenderData.status || 'draft',
+    submission_deadline: tenderData.submissionDeadline.toISOString(),
+    evaluation_deadline: tenderData.evaluationDeadline
+      ? tenderData.evaluationDeadline.toISOString()
+      : null,
+    completion_date: completionDate,
+    project_duration: tenderData.projectDuration || null,
+    is_public: tenderData.isPublic,
+    allow_questions: tenderData.allowQuestions ?? true,
+    requirements: tenderData.requirements,
+    evaluation_criteria: tenderData.evaluationCriteria,
+    documents: tenderDocumentsJson(tenderData.documents),
+    site_visit_type: tenderData.siteVisitType ?? null,
+    site_visit_notes: tenderData.siteVisitNotes ?? null,
+    formal_requirements: tenderData.formalRequirements ?? null,
+    selection_criteria: tenderData.selectionCriteria ?? null,
+    warranty_period: tenderData.warrantyPeriod ?? null,
+    guarantee_period: tenderData.guaranteePeriod ?? null,
+    deposit_required: tenderData.depositRequired ?? false,
+    deposit_instructions: tenderData.depositInstructions ?? null,
+    payment_terms: tenderData.paymentTerms ?? null,
+    wadium: tenderData.wadium ?? null,
+    published_at: tenderData.status === 'active' ? new Date().toISOString() : null,
+  };
 }
 
 /**
@@ -98,6 +209,47 @@ export interface JobWithCompany {
     name: string;
     slug: string;
   } | null;
+}
+
+/**
+ * Resolve category for tender upsert. Drafts without a chosen category use the first
+ * active main category so the row can be saved and completed later.
+ */
+export async function resolveTenderCategoryIds(
+  supabase: SupabaseClient<Database>,
+  categoryName: string,
+  subcategoryName?: string | null,
+  status?: 'draft' | 'active',
+): Promise<
+  | { categoryId: string; subcategoryId: string | null; error: null }
+  | { categoryId: null; subcategoryId: null; error: PostgrestError }
+> {
+  if (categoryName.trim()) {
+    const resolved = await resolveJobFormCategoryIds(supabase, categoryName, subcategoryName);
+    if (resolved.error || !resolved.categoryId) {
+      return resolved;
+    }
+    return resolved;
+  }
+
+  if (status !== 'draft') {
+    return {
+      categoryId: null,
+      subcategoryId: null,
+      error: new Error('Wybierz kategorię') as PostgrestError,
+    };
+  }
+
+  const { data: categories, error: categoriesError } = await fetchAllCategories(supabase);
+  if (categoriesError || !categories?.length) {
+    return {
+      categoryId: null,
+      subcategoryId: null,
+      error: new Error('Brak kategorii w systemie') as PostgrestError,
+    };
+  }
+
+  return { categoryId: categories[0].id, subcategoryId: null, error: null };
 }
 
 /**
@@ -642,9 +794,22 @@ export interface TenderWithCompany {
   is_public: boolean;
   requirements: string[] | null;
   evaluation_criteria: Record<string, unknown> | null;
+  documents?: Array<Record<string, unknown>> | null;
   phases: Record<string, unknown> | null;
   current_phase: string | null;
   wadium: number | null;
+  building_id?: string | null;
+  completion_date?: string | null;
+  site_visit_type?: string | null;
+  site_visit_notes?: string | null;
+  formal_requirements?: Record<string, unknown> | null;
+  selection_criteria?: Record<string, unknown> | null;
+  warranty_period?: string | null;
+  guarantee_period?: string | null;
+  deposit_required?: boolean | null;
+  deposit_instructions?: string | null;
+  payment_terms?: Record<string, unknown> | null;
+  allow_questions?: boolean | null;
   bids_count: number;
   views_count: number;
   created_at: string;
@@ -656,6 +821,10 @@ export interface TenderWithCompany {
     is_verified: boolean;
   } | null;
   category: {
+    name: string;
+    slug: string;
+  } | null;
+  subcategory?: {
     name: string;
     slug: string;
   } | null;
@@ -1396,6 +1565,10 @@ export async function fetchTenderById(
         category:job_categories!tenders_category_id_fkey (
           name,
           slug
+        ),
+        subcategory:job_categories!tenders_subcategory_id_fkey (
+          name,
+          slug
         )
       `)
       .eq('id', id)
@@ -1680,200 +1853,32 @@ function getTimeAgo(date: string): string {
  */
 export async function createTender(
   supabase: SupabaseClient<Database>,
-  tenderData: {
-    title: string;
-    description: string;
-    category: string; // Category name, will be converted to category_id
-    location: JobLocation | string; // Can be object or string for backward compatibility
-    estimatedValue: string;
-    currency: string;
-    submissionDeadline: Date;
-    evaluationDeadline: Date;
-    requirements: string[];
-    evaluationCriteria: Array<Record<string, unknown>>;
-    documents?: Array<Record<string, unknown>>;
-    isPublic: boolean;
-    allowQuestions: boolean;
-    questionsDeadline?: Date;
-    minimumExperience: number;
-    requiredCertificates: string[];
-    insuranceRequired: string;
-    advancePayment: boolean;
-    performanceBond: boolean;
-    status?: 'draft' | 'active';
-    managerId: string; // User profile ID
-    companyId: string; // Company ID
-    address?: string;
-    latitude?: number;
-    longitude?: number;
-    projectDuration?: string;
-  }
+  tenderData: TenderUpsertData & {
+    managerId: string;
+    companyId: string;
+  },
 ): Promise<{ data: TenderWithCompany | null; error: PostgrestError | null }> {
   try {
-    // Map form category names to database category names
-    const categoryMapping: Record<string, string> = {
-      'Utrzymanie Czystości i Zieleni': 'Usługi Sprzątające',
-      'Roboty Remontowo-Budowlane': 'Remonty i Budownictwo',
-      'Instalacje i systemy': 'Instalacje Techniczne',
-      'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
-      'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
-      'Inne': 'Zarządzanie Nieruchomościami',
+    const resolved = await resolveTenderCategoryIds(
+      supabase,
+      tenderData.category,
+      tenderData.subcategory,
+      tenderData.status,
+    );
+    if (resolved.error || !resolved.categoryId) {
+      return { data: null, error: resolved.error };
+    }
+
+    const insertRow = {
+      ...tenderDbRowFromUpsert(tenderData, resolved.categoryId, resolved.subcategoryId),
+      manager_id: tenderData.managerId,
+      company_id: tenderData.companyId,
     };
 
-    // List of predefined categories from the form
-    const predefinedCategories = [
-      'Utrzymanie Czystości i Zieleni',
-      'Roboty Remontowo-Budowlane',
-      'Instalacje i systemy',
-      'Utrzymanie techniczne i konserwacja',
-      'Specjalistyczne usługi',
-      'Inne'
-    ];
-
-    // Check if this is a custom category (not in predefined list)
-    const isCustomCategory = !predefinedCategories.includes(tenderData.category);
-    
-    let categoryData: { id: string; name: string; slug: string } | null = null;
-    let categoryError: PostgrestError | null = null;
-
-    // For custom categories, try to find/create category with the exact custom name first
-    // For predefined categories, use the mapped name
-    if (isCustomCategory) {
-      // First, try exact match with the custom category name (case-insensitive)
-      const { data: customMatch, error: customError } = await (supabase as unknown as SupabaseClient<Database>)
-        .from('job_categories')
-        .select('id, name, slug')
-        .ilike('name', tenderData.category)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (!customError && customMatch) {
-        categoryData = customMatch;
-        categoryError = null;
-      } else {
-        // If custom category doesn't exist, try partial match
-        const { data: partialCustomMatch, error: partialCustomError } = await supabase
-          .from('job_categories')
-          .select('id, name, slug')
-          .ilike('name', `%${tenderData.category}%`)
-          .eq('is_active', true)
-          .limit(1)
-          .maybeSingle();
-
-        if (!partialCustomError && partialCustomMatch) {
-          categoryData = partialCustomMatch;
-          categoryError = null;
-        }
-      }
-    }
-
-    // If custom category search failed or it's a predefined category, use mapped name
-    if (categoryError || !categoryData) {
-      const searchCategoryName = categoryMapping[tenderData.category] || 
-        (isCustomCategory ? 'Zarządzanie Nieruchomościami' : tenderData.category);
-
-      // Try exact match with mapped name
-      const { data: mappedMatch, error: mappedError } = await supabase
-        .from('job_categories')
-        .select('id, name, slug')
-        .ilike('name', searchCategoryName)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (!mappedError && mappedMatch) {
-        categoryData = mappedMatch;
-        categoryError = null;
-      } else {
-        // If exact match fails, try partial match
-        const { data: partialMatch, error: partialError } = await supabase
-          .from('job_categories')
-          .select('id, name, slug')
-          .ilike('name', `%${searchCategoryName}%`)
-          .eq('is_active', true)
-          .limit(1)
-          .maybeSingle();
-
-        if (!partialError && partialMatch) {
-          categoryData = partialMatch;
-          categoryError = null;
-        }
-      }
-    }
-
-    if (categoryError || !categoryData) {
-      console.error('Error finding category:', {
-        error: categoryError,
-        searchedCategory: tenderData.category,
-        isCustomCategory,
-      });
-      
-      // Try to get all available categories for debugging
-      const { data: allCategories } = await supabase
-        .from('job_categories')
-        .select('name, slug')
-        .eq('is_active', true)
-        .limit(20);
-      
-      console.error('Available categories:', allCategories);
-      
-      return { 
-        data: null, 
-        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) as PostgrestError
-      };
-    }
-
-    const categoryId = categoryData.id;
-    // Note: For custom categories, if a category with the exact custom name exists in the database,
-    // it will be used and the name is preserved. If it doesn't exist, we fall back to a mapped category.
-    // The category name stored in the database will be what we found/used.
-
-    // Prepare documents JSONB
-    const documentsJson = tenderData.documents ? tenderData.documents.map(doc => ({
-      id: doc.id,
-      name: doc.name,
-      type: doc.type,
-      // Note: File objects can't be stored directly, they need to be uploaded first
-      // For now, we'll store metadata only
-    })) : null;
-
-    // Prepare location as JSONB object (same format as jobs)
-    let locationJsonb: { city: string; sublocality_level_1?: string };
-    if (typeof tenderData.location === 'string') {
-      // If location is a string, convert to object format
-      locationJsonb = {
-        city: tenderData.location
-      };
-    } else {
-      // If location is already an object, use it directly
-      locationJsonb = tenderData.location;
-    }
-
-    // Insert tender
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: insertedTender, error: insertError } = await (supabase as any)
-        .from('tenders')
-      .insert({
-        title: tenderData.title,
-        description: tenderData.description,
-        category_id: categoryId,
-        manager_id: tenderData.managerId,
-        company_id: tenderData.companyId,
-        location: locationJsonb,
-        address: tenderData.address || null,
-        latitude: tenderData.latitude || null,
-        longitude: tenderData.longitude || null,
-        estimated_value: parseFloat(tenderData.estimatedValue),
-        currency: tenderData.currency,
-        status: tenderData.status || 'draft',
-        submission_deadline: tenderData.submissionDeadline.toISOString(),
-        evaluation_deadline: tenderData.evaluationDeadline.toISOString(),
-        project_duration: tenderData.projectDuration || null,
-        is_public: tenderData.isPublic,
-        requirements: tenderData.requirements,
-        evaluation_criteria: tenderData.evaluationCriteria,
-        documents: documentsJson,
-        published_at: tenderData.status === 'active' ? new Date().toISOString() : null,
-      })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: insertedTender, error: insertError } = await (supabase as any)
+      .from('tenders')
+      .insert(insertRow)
       .select(`
         *,
         company:companies!tenders_company_id_fkey (
@@ -1890,24 +1895,16 @@ export async function createTender(
       .single();
 
     if (insertError) {
-      console.error('Error creating tender:', {
-        error: insertError,
-        errorMessage: insertError?.message,
-        errorDetails: insertError?.details,
-        errorHint: insertError?.hint,
-        errorCode: insertError?.code,
-        tenderData: {
-          title: tenderData.title,
-          category: tenderData.category,
-          categoryId: categoryId,
-          location: tenderData.location,
-        }
-      });
-      return { 
-        data: null, 
-        error: (insertError instanceof Error 
-          ? insertError 
-          : new Error(String((insertError as unknown as { message?: string; details?: string; hint?: string })?.message || (insertError as unknown as { message?: string; details?: string; hint?: string })?.details || (insertError as unknown as { message?: string; details?: string; hint?: string })?.hint || 'Unknown database error'))) as PostgrestError
+      console.error('Error creating tender:', insertError);
+      return {
+        data: null,
+        error: (insertError instanceof Error
+          ? insertError
+          : new Error(
+              String(
+                (insertError as { message?: string })?.message || 'Unknown database error',
+              ),
+            )) as PostgrestError,
       };
     }
 
@@ -1925,35 +1922,9 @@ export async function createTender(
 export async function updateTender(
   supabase: SupabaseClient<Database>,
   tenderId: string,
-  tenderData: {
-    title: string;
-    description: string;
-    category: string; // Category name, will be converted to category_id
-    location: string;
-    estimatedValue: string;
-    currency: string;
-    submissionDeadline: Date;
-    evaluationDeadline: Date;
-    requirements: string[];
-    evaluationCriteria: Array<Record<string, unknown>>;
-    documents?: Array<Record<string, unknown>>;
-    isPublic: boolean;
-    allowQuestions: boolean;
-    questionsDeadline?: Date;
-    minimumExperience: number;
-    requiredCertificates: string[];
-    insuranceRequired: string;
-    advancePayment: boolean;
-    performanceBond: boolean;
-    status?: 'draft' | 'active';
-    address?: string;
-    latitude?: number;
-    longitude?: number;
-    projectDuration?: string;
-  }
+  tenderData: TenderUpsertData,
 ): Promise<{ data: TenderWithCompany | null; error: PostgrestError | null }> {
   try {
-    // First, verify the tender exists and is in draft status
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingTender, error: fetchError } = await (supabase as any)
       .from('tenders')
@@ -1962,129 +1933,38 @@ export async function updateTender(
       .single();
 
     if (fetchError || !existingTender) {
-      return { 
-        data: null, 
-        error: new Error('Przetarg nie został znaleziony') as PostgrestError 
+      return {
+        data: null,
+        error: new Error('Konkurs nie został znaleziony') as PostgrestError,
       };
     }
 
     if ((existingTender as unknown as { status?: string })?.status !== 'draft') {
-      return { 
-        data: null, 
-        error: new Error('Tylko przetargi w statusie szkicu mogą być edytowane') as PostgrestError 
+      return {
+        data: null,
+        error: new Error('Tylko konkursy w statusie szkicu mogą być edytowane') as PostgrestError,
       };
     }
 
-    // Map form category names to database category names
-    const categoryMapping: Record<string, string> = {
-      'Utrzymanie Czystości i Zieleni': 'Usługi Sprzątające',
-      'Roboty Remontowo-Budowlane': 'Remonty i Budownictwo',
-      'Instalacje i systemy': 'Instalacje Techniczne',
-      'Utrzymanie techniczne i konserwacja': 'Zarządzanie Nieruchomościami',
-      'Specjalistyczne usługi': 'Zarządzanie Nieruchomościami',
+    const resolved = await resolveTenderCategoryIds(
+      supabase,
+      tenderData.category,
+      tenderData.subcategory,
+      tenderData.status,
+    );
+    if (resolved.error || !resolved.categoryId) {
+      return { data: null, error: resolved.error };
+    }
+
+    const updateRow = {
+      ...tenderDbRowFromUpsert(tenderData, resolved.categoryId, resolved.subcategoryId),
+      updated_at: new Date().toISOString(),
     };
 
-    // Use mapped category name if available, otherwise use original
-    const searchCategoryName = categoryMapping[tenderData.category] || tenderData.category;
-
-    // First, try exact match (case-insensitive)
-    let { data: categoryData, error: categoryError } = await supabase
-      .from('job_categories')
-      .select('id, name')
-      .ilike('name', searchCategoryName)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    // If exact match fails, try partial match
-    if (categoryError || !categoryData) {
-      const { data: partialMatch, error: partialError } = await supabase
-        .from('job_categories')
-        .select('id, name')
-        .ilike('name', `%${searchCategoryName}%`)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-
-      if (!partialError && partialMatch) {
-        categoryData = partialMatch;
-        categoryError = null;
-      }
-    }
-
-    // If still no match, try searching with the original category name
-    if (categoryError || !categoryData) {
-      const { data: originalMatch, error: originalError } = await supabase
-        .from('job_categories')
-        .select('id, name')
-        .ilike('name', `%${tenderData.category}%`)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-
-      if (!originalError && originalMatch) {
-        categoryData = originalMatch;
-        categoryError = null;
-      }
-    }
-
-    if (categoryError || !categoryData) {
-      console.error('Error finding category:', {
-        error: categoryError,
-        searchedCategory: tenderData.category,
-        mappedCategory: searchCategoryName,
-      });
-      
-      // Try to get all available categories for debugging
-      const { data: allCategories } = await supabase
-        .from('job_categories')
-        .select('name, slug')
-        .eq('is_active', true)
-        .limit(20);
-      
-      console.error('Available categories:', allCategories);
-      
-      return { 
-        data: null, 
-        error: new Error(`Category "${tenderData.category}" not found. Available categories: ${allCategories?.map((c: { name: string }) => c.name).join(', ') || 'none'}`) as PostgrestError
-      };
-    }
-
-    const categoryId = categoryData.id;
-
-    // Prepare documents JSONB
-    const documentsJson = tenderData.documents ? tenderData.documents.map(doc => ({
-      id: doc.id,
-      name: doc.name,
-      type: doc.type,
-      // Note: File objects can't be stored directly, they need to be uploaded first
-      // For now, we'll store metadata only
-    })) : null;
-
-    // Update tender
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: updatedTender, error: updateError } = await (supabase as any)
       .from('tenders')
-      .update({
-        title: tenderData.title,
-        description: tenderData.description,
-        category_id: categoryId,
-        location: tenderData.location,
-        address: tenderData.address || null,
-        latitude: tenderData.latitude || null,
-        longitude: tenderData.longitude || null,
-        estimated_value: parseFloat(tenderData.estimatedValue),
-        currency: tenderData.currency,
-        status: tenderData.status || 'draft',
-        submission_deadline: tenderData.submissionDeadline.toISOString(),
-        evaluation_deadline: tenderData.evaluationDeadline.toISOString(),
-        project_duration: tenderData.projectDuration || null,
-        is_public: tenderData.isPublic,
-        requirements: tenderData.requirements,
-        evaluation_criteria: tenderData.evaluationCriteria,
-        documents: documentsJson,
-        published_at: tenderData.status === 'active' ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateRow)
       .eq('id', tenderId)
       .select(`
         *,

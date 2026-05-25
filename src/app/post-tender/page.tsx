@@ -19,5 +19,7 @@ export default function PostTenderPage() {
     return null;
   }
 
-  return <TenderCreationPage onBack={() => router.push('/manager-dashboard/tenders')} />;
+  return (
+    <TenderCreationPage onBack={() => router.push('/manager-dashboard/zgloszenia')} />
+  );
 }

@@ -105,8 +105,8 @@ export function Header({ initialUser }: HeaderProps) {
   }
 
   // Navigation handlers
-  const handleAddJobClick = () => {
-    router.push('/post-job')
+  const handleCreateContestClick = () => {
+    router.push('/post-tender')
   }
 
   const handleAdminPanelClick = () => {
@@ -219,10 +219,10 @@ export function Header({ initialUser }: HeaderProps) {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={handleAddJobClick}
+                    onClick={handleCreateContestClick}
                     className="shrink-0 bg-blue-800 hover:bg-blue-900"
                   >
-                    Dodaj Zgłoszenie
+                    Utwórz konkurs
                   </Button>
                 )
               )}
@@ -619,8 +619,8 @@ export function Header({ initialUser }: HeaderProps) {
             ) : (
               <>
                 <div className="md:hidden flex items-center space-x-2">
-                  <Button variant="default" size="sm" onClick={handleAddJobClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
-                    Dodaj Zgłoszenie
+                  <Button variant="default" size="sm" onClick={handleCreateContestClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
+                    Utwórz konkurs
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

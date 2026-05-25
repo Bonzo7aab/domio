@@ -67,17 +67,6 @@ export const sitemapEntries: SitemapEntry[] = [
     requiresAuth: true,
     userTypes: ['contractor']
   },
-  {
-    category: "Dla Wykonawców",
-    label: "Dodaj Zgłoszenie",
-    path: "/job-type-selection",
-    icon: Plus,
-    description: "Utwórz nowe zgłoszenie",
-    keywords: ["dodaj", "zgłoszenie", "praca", "job", "post", "nowe"],
-    requiresAuth: true,
-    userTypes: ['manager']
-  },
-
   // Dla Zarządców
   {
     category: "Dla Zarządców",
@@ -91,11 +80,11 @@ export const sitemapEntries: SitemapEntry[] = [
   },
   {
     category: "Dla Zarządców",
-    label: "Utwórz Przetarg",
-    path: "/tender-creation",
-    icon: FileText,
-    description: "Utwórz nowy przetarg",
-    keywords: ["przetarg", "tender", "utwórz", "nowy", "oferty"],
+    label: "Utwórz konkurs",
+    path: "/post-tender",
+    icon: Plus,
+    description: "Utwórz nowy konkurs ofert",
+    keywords: ["konkurs", "tender", "utwórz", "nowy", "oferty", "zgłoszenie"],
     requiresAuth: true,
     userTypes: ['manager']
   },

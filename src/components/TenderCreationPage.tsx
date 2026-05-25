@@ -1,172 +1,253 @@
-import React, { useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from './ui/button';
-import { TenderCreationFormInline } from './TenderCreationFormInline';
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { TenderContestForm } from './tender-creation/TenderContestForm';
+import { TenderContestPageHeader } from './tender-creation/TenderContestPageHeader';
 import { useUserProfile } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase/client';
-import { createTender } from '../lib/database/jobs';
+import { createTender, fetchTenderById, updateTender } from '../lib/database/jobs';
+import type { TenderWithCompany } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
+import { uploadTenderDocuments } from '../lib/storage/tender-documents';
+import {
+  buildCreateTenderPayload,
+  contestPayloadToUpsertData,
+  mapTenderRowToContestForm,
+  parseExistingTenderDocuments,
+} from '../lib/tender-contest/build-tender-payload';
+import type { TenderContestDocumentMeta, TenderContestFormData } from '../types/tender-contest';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
 interface TenderCreationPageProps {
   onBack: () => void;
+  backLabel?: string;
+  tenderId?: string;
 }
 
-interface NewTender {
-  title: string;
-  description: string;
-  category: string;
-  location: string;
-  estimatedValue: string;
-  currency: string;
-  submissionDeadline: Date;
-  evaluationDeadline: Date;
-  requirements: string[];
-  evaluationCriteria: EvaluationCriterion[];
-  documents: TenderDocument[];
-  isPublic: boolean;
-  allowQuestions: boolean;
-  questionsDeadline?: Date;
-  minimumExperience: number;
-  requiredCertificates: string[];
-  insuranceRequired: string;
-  advancePayment: boolean;
-  performanceBond: boolean;
-  status?: 'draft' | 'active';
-}
-
-interface EvaluationCriterion {
-  id: string;
-  name: string;
-  description: string;
-  weight: number;
-  type: 'price' | 'quality' | 'time' | 'experience';
-}
-
-interface TenderDocument {
-  id: string;
-  name: string;
-  type: 'specification' | 'requirements' | 'drawings' | 'other';
-  file: File;
-}
-
-export default function TenderCreationPage({ onBack }: TenderCreationPageProps) {
+export default function TenderCreationPage({
+  onBack,
+  backLabel,
+  tenderId,
+}: TenderCreationPageProps): React.ReactElement {
   const { user, session, isLoading } = useUserProfile();
   const router = useRouter();
-  
-  // Redirect to login if not authenticated (fallback in case middleware doesn't catch it)
-  useEffect(() => {
-    if (!isLoading && !user && !session) {
-      const currentUrl = new URL(window.location.href);
-      const redirectTo = currentUrl.searchParams.get('redirectTo') || window.location.pathname;
-      const loginUrl = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
-      router.push(loginUrl);
-    }
-  }, [user, session, isLoading, router]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingTender, setIsLoadingTender] = useState(Boolean(tenderId));
+  const [initialTender, setInitialTender] = useState<TenderWithCompany | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const handleTenderSubmit = async (tender: NewTender) => {
-    if (!user?.id) {
-      toast.error('Musisz być zalogowany, aby utworzyć przetarg');
+  const isEditMode = Boolean(tenderId);
+
+  useEffect(() => {
+    const loginPath = isEditMode
+      ? `/login?redirectTo=${encodeURIComponent(`/post-tender/${tenderId}`)}`
+      : `/login?redirectTo=${encodeURIComponent('/post-tender')}`;
+    if (!isLoading && !user && !session) {
+      router.push(loginPath);
+    }
+  }, [user, session, isLoading, router, isEditMode, tenderId]);
+
+  useEffect(() => {
+    if (!tenderId || !user?.id) {
+      setIsLoadingTender(false);
       return;
     }
 
+    const load = async (): Promise<void> => {
+      setIsLoadingTender(true);
+      setLoadError(null);
+      try {
+        const supabase = createClient();
+        const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+          supabase,
+          user.id,
+        );
+        if (companyError || !company) {
+          setLoadError('Nie znaleziono firmy.');
+          return;
+        }
+
+        const { data: tender, error } = await fetchTenderById(supabase, tenderId);
+        if (error || !tender) {
+          setLoadError('Nie znaleziono konkursu.');
+          return;
+        }
+
+        if (tender.company?.id !== company.id) {
+          setLoadError('Brak dostępu do tego konkursu.');
+          return;
+        }
+
+        if (tender.status !== 'draft') {
+          setLoadError('Tylko szkic konkursu można uzupełniać w tym widoku.');
+          return;
+        }
+
+        setInitialTender(tender);
+      } catch {
+        setLoadError('Nie udało się wczytać konkursu.');
+      } finally {
+        setIsLoadingTender(false);
+      }
+    };
+
+    void load();
+  }, [tenderId, user?.id]);
+
+  const initialForm = useMemo(() => {
+    if (!initialTender) return undefined;
+    const row = initialTender as unknown as Record<string, unknown>;
+    return mapTenderRowToContestForm(
+      row,
+      initialTender.category?.name,
+      initialTender.subcategory?.name,
+    );
+  }, [initialTender]);
+
+  const existingDocuments = useMemo(
+    () => parseExistingTenderDocuments(initialTender?.documents),
+    [initialTender],
+  );
+
+  const handleSubmit = async (
+    form: TenderContestFormData,
+    newFiles: File[],
+    keptDocuments: TenderContestDocumentMeta[],
+    status: 'draft' | 'active',
+  ): Promise<void> => {
+    if (!user?.id) {
+      toast.error('Musisz być zalogowany, aby zapisać konkurs');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       const supabase = createClient();
-      
-      // Get user's primary company
       const { data: company, error: companyError } = await fetchUserPrimaryCompany(supabase, user.id);
-      
+
       if (companyError || !company) {
-        toast.error('Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.');
-        console.error('Error fetching company:', companyError);
+        toast.error('Nie znaleziono firmy. Uzupełnij dane firmy w profilu.');
         return;
       }
 
-      // Save tender to database
-      const { error: saveError } = await createTender(supabase, {
-        ...(tender as {
-          title: string;
-          description: string;
-          category: string;
-          location: string;
-          estimatedValue: string;
-          currency: string;
-          submissionDeadline: Date;
-          evaluationDeadline: Date;
-          requirements: string[];
-          evaluationCriteria: Array<{ id: string; name: string; description: string; weight: number; type: 'price' | 'quality' | 'time' | 'experience' | 'other' }>;
-          documents: Array<{ id: string; name: string; type: 'specification' | 'requirements' | 'drawings' | 'other'; file: File }>;
-          isPublic: boolean;
-          allowQuestions: boolean;
-          questionsDeadline?: Date;
-          minimumExperience: number;
-          requiredCertificates: string[];
-          insuranceRequired: string;
-          advancePayment: boolean;
-          performanceBond: boolean;
-          status?: 'draft' | 'active';
-          address?: string;
-          latitude?: number;
-          longitude?: number;
-          projectDuration?: string;
-        }),
-        managerId: user.id,
-        companyId: company.id,
-      });
+      const { data: uploaded, errors: uploadErrors } = await uploadTenderDocuments(
+        supabase,
+        newFiles,
+        user.id,
+        'draft',
+      );
 
-      if (saveError) {
-        toast.error('Nie udało się zapisać przetargu: ' + (saveError.message || 'Nieznany błąd'));
-        console.error('Error saving tender:', saveError);
+      if (uploadErrors.length > 0) {
+        toast.error('Część plików nie została wgrana');
+      }
+
+      const allDocs = [...keptDocuments, ...uploaded];
+
+      const { payload, error: buildError } = await buildCreateTenderPayload(
+        supabase,
+        form,
+        allDocs,
+        user.id,
+        company.id,
+        company.city,
+        company.address,
+        status,
+      );
+
+      if (buildError || !payload) {
+        toast.error(buildError?.message ?? 'Nie udało się przygotować danych konkursu');
         return;
       }
 
-      toast.success(tender.status === 'draft' ? 'Przetarg zapisany jako szkic' : 'Przetarg został opublikowany');
-      
-      // Redirect to manager dashboard tenders tab to see the new tender
-      router.push('/manager-dashboard/tenders');
+      if (isEditMode && tenderId) {
+        const { error: saveError } = await updateTender(
+          supabase,
+          tenderId,
+          contestPayloadToUpsertData(payload),
+        );
+
+        if (saveError) {
+          toast.error(
+            'Nie udało się zapisać konkursu: ' + (saveError.message || 'Nieznany błąd'),
+          );
+          return;
+        }
+      } else {
+        const { error: saveError } = await createTender(supabase, payload);
+
+        if (saveError) {
+          toast.error(
+            'Nie udało się zapisać konkursu: ' + (saveError.message || 'Nieznany błąd'),
+          );
+          return;
+        }
+      }
+
+      toast.success(
+        status === 'draft'
+          ? isEditMode
+            ? 'Szkic konkursu został zapisany'
+            : 'Konkurs zapisany jako szkic'
+          : 'Konkurs został opublikowany',
+      );
+      router.push('/manager-dashboard/zgloszenia?typ=przetarg');
     } catch (error) {
-      toast.error('Wystąpił błąd podczas zapisywania przetargu');
-      console.error('Error in handleTenderSubmit:', error);
+      console.error('Error saving contest:', error);
+      toast.error('Wystąpił błąd podczas zapisywania konkursu');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleFormClose = () => {
-    onBack();
-  };
-
-  // Don't render if not authenticated (will redirect)
   if (!isLoading && !user && !session) {
-    return null;
+    return <></>;
+  }
+
+  if (isLoadingTender) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Ładowanie konkursu…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <div className="max-w-4xl mx-auto px-4 py-12 text-center space-y-4">
+          <p className="text-muted-foreground">{loadError}</p>
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Wróć do listy
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={onBack}
-              className="hidden md:flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Powrót do wyboru typu ogłoszenia
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Opublikuj nowy przetarg</h1>
-              <p className="text-gray-600">Znajdź najlepszych wykonawców dla większych realizacji</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-muted/30">
+      <TenderContestPageHeader
+        onBack={onBack}
+        backLabel={backLabel}
+        title={isEditMode ? 'Kontynuuj konkurs ofert' : undefined}
+        subtitle={
+          isEditMode
+            ? 'Uzupełnij brakujące pola i zapisz szkic lub opublikuj konkurs.'
+            : undefined
+        }
+      />
 
-      {/* Form Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <TenderCreationFormInline
-          onClose={handleFormClose}
-          onSubmit={handleTenderSubmit}
+      <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
+        <TenderContestForm
+          onSubmit={handleSubmit}
+          isSubmitting={isSubmitting}
+          initialForm={initialForm}
+          existingDocuments={existingDocuments}
         />
       </div>
     </div>

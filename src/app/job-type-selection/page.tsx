@@ -27,7 +27,7 @@ export default function JobTypeSelection() {
     if (user.userType !== 'manager') return;
     if (hasCompany === false) return;
     if (isCheckingCompany || hasCompany === null) return;
-    router.replace('/post-job');
+    router.replace('/post-tender');
   }, [user, isLoading, hasCompany, isCheckingCompany, router]);
 
   // Check if user has a company (only for managers)

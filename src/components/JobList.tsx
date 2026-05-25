@@ -44,24 +44,22 @@ export default function JobList({
 }: JobListProps) {
   const { primaryLocation } = useFilterContext();
   const [sortBy, setSortBy] = useState('newest');
-  const [bookmarkedJobs, setBookmarkedJobs] = useState<string[]>(() => {
-    try {
-      return getBookmarkedJobs().map((b) => b.id);
-    } catch {
-      return [];
-    }
-  });
-  const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>(
-    () => readBookmarkCountOverrides(),
-  );
-  const [viewCountUpdates, setViewCountUpdates] = useState<Record<string, number>>(() => {
-    try {
-      const stored = sessionStorage.getItem('view-count-updates');
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [bookmarkedJobs, setBookmarkedJobs] = useState<string[]>([]);
+  const [bookmarkCountUpdates, setBookmarkCountUpdates] = useState<Record<string, number>>({});
+  const [viewCountUpdates, setViewCountUpdates] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setBookmarkedJobs(getBookmarkedJobs().map((b) => b.id));
+      setBookmarkCountUpdates(readBookmarkCountOverrides());
+      try {
+        const stored = sessionStorage.getItem('view-count-updates');
+        setViewCountUpdates(stored ? JSON.parse(stored) : {});
+      } catch {
+        setViewCountUpdates({});
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const syncBookmarkCounts = () => {
@@ -80,13 +78,14 @@ export default function JobList({
       try {
         const bookmarks = getBookmarkedJobs();
         setBookmarkedJobs(bookmarks.map((b) => b.id));
+        setBookmarkCountUpdates(readBookmarkCountOverrides());
       } catch (error) {
         console.error('Error loading bookmarks:', error);
       }
     };
-    const handleFocus = () => loadBookmarks();
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    loadBookmarks();
+    window.addEventListener('focus', loadBookmarks);
+    return () => window.removeEventListener('focus', loadBookmarks);
   }, []);
 
   const effectiveBookmarkCounts = useMemo(() => {

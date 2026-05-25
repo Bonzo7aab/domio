@@ -2,7 +2,14 @@ const BOOKMARK_COUNT_UPDATES_KEY = 'bookmark-count-updates';
 
 export const BOOKMARK_COUNT_CHANGED_EVENT = 'domio:bookmark-count-changed';
 
+function canUseSessionStorage(): boolean {
+  return typeof window !== 'undefined' && typeof sessionStorage !== 'undefined';
+}
+
 export function readBookmarkCountOverrides(): Record<string, number> {
+  if (!canUseSessionStorage()) {
+    return {};
+  }
   try {
     const stored = sessionStorage.getItem(BOOKMARK_COUNT_UPDATES_KEY);
     return stored ? (JSON.parse(stored) as Record<string, number>) : {};
@@ -12,6 +19,9 @@ export function readBookmarkCountOverrides(): Record<string, number> {
 }
 
 export function writeBookmarkCountOverrides(overrides: Record<string, number>): void {
+  if (!canUseSessionStorage()) {
+    return;
+  }
   try {
     sessionStorage.setItem(BOOKMARK_COUNT_UPDATES_KEY, JSON.stringify(overrides));
     window.dispatchEvent(new CustomEvent(BOOKMARK_COUNT_CHANGED_EVENT));

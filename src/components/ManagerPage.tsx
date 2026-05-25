@@ -1010,11 +1010,8 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
               </div>
             </div>
             <div className="flex flex-wrap gap-2 md:gap-3 w-full md:w-auto">
-              <Button variant="outline" onClick={handleTenderCreate} className="flex-1 md:flex-initial">
-                Utwórz przetarg
-              </Button>
-              <Button onClick={onPostJob} className="flex-1 md:flex-initial">
-                Opublikuj zgłoszenie
+              <Button onClick={handleTenderCreate} className="flex-1 md:flex-initial">
+                Utwórz konkurs
               </Button>
             </div>
           </div>
@@ -1179,11 +1176,8 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
               <h2 className="text-xl md:text-2xl font-bold">Zarządzanie zgłoszeniami</h2>
               <div className="flex flex-wrap gap-2 md:gap-3">
-                <Button variant="outline" onClick={handleTenderCreate} className="flex-1 md:flex-initial">
-                  Utwórz przetarg
-                </Button>
-                <Button onClick={onPostJob} className="flex-1 md:flex-initial">
-                  Dodaj zgłoszenie
+                <Button onClick={handleTenderCreate} className="flex-1 md:flex-initial">
+                  Utwórz konkurs
                 </Button>
               </div>
             </div>

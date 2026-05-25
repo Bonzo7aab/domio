@@ -15,7 +15,7 @@ export interface ManagerSubmission {
   /** ISO timestamp of the most recently submitted offer, or null if none. */
   lastOfferAt: string | null;
   createdAt: string;
-  /** Jobs only: editable when draft/active and no offers (see updateManagerJob). */
+  /** Editable when draft (and no offers for jobs; tenders: draft only, see updateTender). */
   canEdit: boolean;
   /** Job/tender has an accepted offer (Wybrana Oferta). */
   hasSelectedOffer: boolean;
@@ -147,7 +147,8 @@ export async function fetchManagerSubmissions(
     newOffersCount: tenderOfferCounts[t.id]?.newCount ?? 0,
     lastOfferAt: tenderLastOfferAt[t.id] ?? null,
     createdAt: t.created_at,
-    canEdit: false,
+    canEdit:
+      t.status === 'draft' && (tenderOfferCounts[t.id]?.total ?? 0) === 0,
     hasSelectedOffer: tenderHasSelectedOffer[t.id] ?? false,
   }));
 

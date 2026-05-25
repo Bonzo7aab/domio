@@ -229,7 +229,7 @@ export function ManagerMojeZgloszeniaContent({
               </SelectContent>
             </Select>
             <Button asChild className="lg:ml-auto">
-              <Link href="/post-job">Dodaj zgłoszenie</Link>
+              <Link href="/post-tender">Utwórz konkurs</Link>
             </Button>
           </div>
 
@@ -350,6 +350,13 @@ export function ManagerMojeZgloszeniaContent({
                               <Button variant="secondary" size="sm" asChild>
                                 <Link href={`/manager-dashboard/zgloszenia/edytuj/${row.id}`}>
                                   Edytuj
+                                </Link>
+                              </Button>
+                            )}
+                            {row.kind === 'tender' && row.canEdit && (
+                              <Button variant="secondary" size="sm" asChild>
+                                <Link href={`/post-tender/${row.id}`}>
+                                  Kontynuuj konkurs
                                 </Link>
                               </Button>
                             )}
