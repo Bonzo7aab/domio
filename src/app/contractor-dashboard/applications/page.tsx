@@ -2,55 +2,60 @@ import { Suspense } from 'react';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { fetchContractorApplications } from '../../../lib/database/contractors';
+import { fetchContractorContestOffers } from '../../../lib/database/contractor-contest-offers';
 import { Card, CardContent } from '../../../components/ui/card';
-import { ApplicationsContent } from './ApplicationsContent';
+import { ApplicationsPageClient } from './ApplicationsPageClient';
 
 async function getApplicationsData(userId: string) {
   const supabase = await createClient();
-  
-  // Fetch company
+
   const { data: company } = await fetchUserPrimaryCompany(supabase, userId);
   if (!company) {
     return null;
   }
 
-  // Fetch applications data
-  const applicationsData = await fetchContractorApplications(supabase, userId);
+  const [applicationsData, contestOffers] = await Promise.all([
+    fetchContractorApplications(supabase, userId),
+    fetchContractorContestOffers(supabase, userId),
+  ]);
 
-  // Map status from database format to component format
+  const contestBidIds = new Set(contestOffers.map((o) => o.id));
+
   const statusMap: Record<string, 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'cancelled'> = {
-    'pending': 'submitted',
-    'submitted': 'submitted',
-    'under_review': 'under_review',
-    'shortlisted': 'under_review',
-    'reviewing': 'under_review',
-    'accepted': 'accepted',
-    'rejected': 'rejected',
-    'cancelled': 'cancelled'
+    pending: 'submitted',
+    submitted: 'submitted',
+    under_review: 'under_review',
+    shortlisted: 'under_review',
+    reviewing: 'under_review',
+    accepted: 'accepted',
+    rejected: 'rejected',
+    cancelled: 'cancelled',
   };
 
-  // Transform ContractorApplication to MyApplication format
-  const transformedApplications = (applicationsData.applications || []).map(app => {
-    const proposedPrice = typeof app.proposedPrice === 'string' 
-      ? parseFloat(app.proposedPrice) || 0 
-      : app.proposedPrice || 0;
+  const transformedApplications = (applicationsData.applications || []).map((app) => {
+    const proposedPrice =
+      typeof app.proposedPrice === 'string'
+        ? parseFloat(app.proposedPrice) || 0
+        : app.proposedPrice || 0;
 
-    const transformedAttachments = (app.attachments || []).map((attachment: string | Record<string, unknown>, index: number) => {
-      if (typeof attachment === 'string') {
+    const transformedAttachments = (app.attachments || []).map(
+      (attachment: string | Record<string, unknown>, index: number) => {
+        if (typeof attachment === 'string') {
+          return {
+            id: `attachment-${index}`,
+            name: attachment.split('/').pop() || 'Załącznik',
+            type: 'file',
+            url: attachment,
+          };
+        }
         return {
-          id: `attachment-${index}`,
-          name: attachment.split('/').pop() || 'Załącznik',
-          type: 'file',
-          url: attachment
+          id: String(attachment.id || `attachment-${index}`),
+          name: String(attachment.name || attachment.filename || 'Załącznik'),
+          type: String(attachment.type || attachment.content_type || 'file'),
+          url: String(attachment.url || attachment.path || attachment.file_path || ''),
         };
-      }
-      return {
-        id: String(attachment.id || `attachment-${index}`),
-        name: String(attachment.name || attachment.filename || 'Załącznik'),
-        type: String(attachment.type || attachment.content_type || 'file'),
-        url: String(attachment.url || attachment.path || attachment.file_path || '')
-      };
-    });
+      },
+    );
 
     return {
       id: app.id,
@@ -59,7 +64,7 @@ async function getApplicationsData(userId: string) {
       jobCompany: app.companyName || 'Nieznana firma',
       jobLocation: app.jobLocation || 'Nieznana lokalizacja',
       jobCategory: app.jobCategory || 'Inne usługi',
-      proposedPrice: proposedPrice,
+      proposedPrice,
       proposedTimeline: app.estimatedCompletion || 'Nie określono',
       proposedTimelineDays: app.proposedTimelineDays ?? null,
       vatRate: app.vatRate,
@@ -81,62 +86,63 @@ async function getApplicationsData(userId: string) {
     };
   });
 
-  // Transform ContractorBid to MyApplication format
-  const transformedBids = (applicationsData.bids || []).map(bid => {
-    const proposedPrice = typeof bid.bidAmount === 'string' 
-      ? parseFloat(bid.bidAmount) || 0 
-      : parseFloat(String(bid.bidAmount)) || 0;
+  const transformedLegacyBids = (applicationsData.bids || [])
+    .filter((bid) => !contestBidIds.has(bid.id))
+    .map((bid) => {
+      const proposedPrice =
+        typeof bid.bidAmount === 'string'
+          ? parseFloat(bid.bidAmount) || 0
+          : parseFloat(String(bid.bidAmount)) || 0;
 
-    let proposedTimeline = 'Nie określono';
-    if (bid.proposedTimeline) {
-      const days = bid.proposedTimeline;
-      if (days < 7) {
-        proposedTimeline = `${days} ${days === 1 ? 'dzień' : 'dni'}`;
-      } else if (days < 30) {
-        const weeks = Math.round(days / 7);
-        proposedTimeline = `${weeks} ${weeks === 1 ? 'tydzień' : weeks < 5 ? 'tygodnie' : 'tygodni'}`;
-      } else {
-        const months = Math.round(days / 30);
-        proposedTimeline = `${months} ${months === 1 ? 'miesiąc' : months < 5 ? 'miesiące' : 'miesięcy'}`;
+      let proposedTimeline = 'Nie określono';
+      if (bid.proposedTimeline) {
+        const days = bid.proposedTimeline;
+        if (days < 7) {
+          proposedTimeline = `${days} ${days === 1 ? 'dzień' : 'dni'}`;
+        } else if (days < 30) {
+          const weeks = Math.round(days / 7);
+          proposedTimeline = `${weeks} ${weeks === 1 ? 'tydzień' : weeks < 5 ? 'tygodnie' : 'tygodni'}`;
+        } else {
+          const months = Math.round(days / 30);
+          proposedTimeline = `${months} ${months === 1 ? 'miesiąc' : months < 5 ? 'miesiące' : 'miesięcy'}`;
+        }
       }
-    }
 
-    return {
-      id: bid.id,
-      jobId: bid.tenderId,
-      jobTitle: bid.tenderTitle || 'Bez tytułu',
-      jobCompany: bid.companyName || 'Nieznana firma',
-      jobLocation: bid.location || 'Nieznana lokalizacja',
-      jobCategory: bid.category || 'Przetarg',
-      proposedPrice: proposedPrice,
-      proposedTimeline: proposedTimeline,
-      proposedTimelineDays: bid.proposedTimeline ?? null,
-      tenderValidUntil: bid.validUntil || undefined,
-      status: statusMap[bid.status] || 'submitted',
-      submittedAt: new Date(bid.submittedAt),
-      lastUpdated: bid.reviewedAt ? new Date(bid.reviewedAt) : new Date(bid.submittedAt),
-      coverLetter: bid.technicalProposal || '',
-      experience: '',
-      postedTime: bid.postedTime || undefined,
-      attachments: [],
-      certificates: [],
-      reviewNotes: bid.managerFeedbackMessage || undefined,
-      postType: 'tender' as const,
-    };
-  });
+      return {
+        id: bid.id,
+        jobId: bid.tenderId,
+        jobTitle: bid.tenderTitle || 'Bez tytułu',
+        jobCompany: bid.companyName || 'Nieznana firma',
+        jobLocation: bid.location || 'Nieznana lokalizacja',
+        jobCategory: bid.category || 'Przetarg',
+        proposedPrice,
+        proposedTimeline,
+        proposedTimelineDays: bid.proposedTimeline ?? null,
+        tenderValidUntil: bid.validUntil || undefined,
+        status: statusMap[bid.status] || 'submitted',
+        submittedAt: new Date(bid.submittedAt),
+        lastUpdated: bid.reviewedAt ? new Date(bid.reviewedAt) : new Date(bid.submittedAt),
+        coverLetter: bid.technicalProposal || '',
+        experience: '',
+        postedTime: bid.postedTime || undefined,
+        attachments: [],
+        certificates: [],
+        reviewNotes: bid.managerFeedbackMessage || undefined,
+        postType: 'tender' as const,
+      };
+    });
 
-  // Combine applications and bids, sorted by submission date
-  const allApplications = [...transformedApplications, ...transformedBids].sort((a, b) => 
-    b.submittedAt.getTime() - a.submittedAt.getTime()
+  const jobApplications = [...transformedApplications, ...transformedLegacyBids].sort(
+    (a, b) => b.submittedAt.getTime() - a.submittedAt.getTime(),
   );
 
   return {
-    applications: allApplications,
+    contestOffers,
+    jobApplications,
     companyId: company.id,
   };
 }
 
-// Loading fallback component
 function LoadingFallback({ message }: { message: string }) {
   return (
     <Card>
@@ -150,11 +156,12 @@ function LoadingFallback({ message }: { message: string }) {
   );
 }
 
-// Async data fetcher component
 async function ApplicationsDataFetcher() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     return null;
   }
@@ -165,23 +172,29 @@ async function ApplicationsDataFetcher() {
     return (
       <Card>
         <CardContent className="pt-6 text-center">
-          <p className="text-muted-foreground">Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.</p>
+          <p className="text-muted-foreground">
+            Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.
+          </p>
         </CardContent>
       </Card>
     );
   }
 
-  return <ApplicationsContent applications={applicationsData.applications} companyId={applicationsData.companyId} />;
+  return (
+    <ApplicationsPageClient
+      contestOffers={applicationsData.contestOffers}
+      jobApplications={applicationsData.jobApplications}
+      companyId={applicationsData.companyId}
+    />
+  );
 }
 
-// Page component - renders immediately
 export default function ApplicationsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <Suspense fallback={<LoadingFallback message="Ładowanie aplikacji..." />}>
+      <Suspense fallback={<LoadingFallback message="Ładowanie ofert..." />}>
         <ApplicationsDataFetcher />
       </Suspense>
     </div>
   );
 }
-

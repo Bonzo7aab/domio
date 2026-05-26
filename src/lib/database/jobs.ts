@@ -3049,7 +3049,21 @@ export async function cancelTenderBid(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bid, error: fetchError } = await (supabase as any)
       .from('tender_bids')
-      .select('id, company_id, status')
+      .select(
+        `
+        id,
+        company_id,
+        status,
+        tender_id,
+        tenders (
+          status,
+          submission_deadline,
+          building_id,
+          selection_criteria,
+          formal_requirements
+        )
+      `,
+      )
       .eq('id', bidId)
       .single();
 
@@ -3076,12 +3090,54 @@ export async function cancelTenderBid(
       };
     }
 
+    const bidStatus = (bid as unknown as { status?: string })?.status;
     // Check that status is not 'accepted' or 'rejected'
-    if ((bid as unknown as { status?: string })?.status === 'accepted' || (bid as unknown as { status?: string })?.status === 'rejected') {
+    if (bidStatus === 'accepted' || bidStatus === 'rejected') {
       return {
         data: null,
         error: new Error('Cannot cancel a bid that has already been accepted or rejected') as PostgrestError
       };
+    }
+
+    const tender = (bid as unknown as {
+      tenders?: {
+        status?: string;
+        submission_deadline?: string;
+        building_id?: string | null;
+        selection_criteria?: unknown;
+        formal_requirements?: unknown;
+      };
+    })?.tenders;
+
+    if (tender) {
+      const { isContestTender } = await import('../tender-contest/map-tender-contest-display');
+      const isContest = isContestTender({
+        building_id: tender.building_id ?? null,
+        selection_criteria: tender.selection_criteria as Record<string, unknown> | null,
+        formal_requirements: tender.formal_requirements as Record<string, unknown> | null,
+      });
+
+      if (isContest) {
+        if (tender.status !== 'active') {
+          return {
+            data: null,
+            error: new Error(
+              'Nie można wycofać oferty po zakończeniu zbierania ofert.',
+            ) as PostgrestError,
+          };
+        }
+        if (tender.submission_deadline) {
+          const deadline = new Date(tender.submission_deadline);
+          if (!Number.isNaN(deadline.getTime()) && deadline.getTime() <= Date.now()) {
+            return {
+              data: null,
+              error: new Error(
+                'Nie można wycofać oferty po upływie terminu składania ofert.',
+              ) as PostgrestError,
+            };
+          }
+        }
+      }
     }
 
     // Update status to 'cancelled'

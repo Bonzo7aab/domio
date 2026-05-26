@@ -246,10 +246,12 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                               <Eye className="mr-2 h-3.5 w-3.5" />
                               Zgłoszenie
                             </Button>
-                            {(application.status === 'accepted' ||
-                              application.status === 'submitted' ||
-                              application.status === 'under_review') && (
-                              <Button size="sm" variant="outline" onClick={() => onStartConversation && onStartConversation(application.id)}>
+                            {application.status === 'accepted' && onStartConversation && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onStartConversation(application.id)}
+                              >
                                 <MessageSquare className="mr-2 h-3.5 w-3.5" />
                                 Wiadomość
                               </Button>
