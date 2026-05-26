@@ -1,4 +1,11 @@
 import type { Budget } from './budget';
+import type {
+  FormalRequirements,
+  PaymentTerms,
+  SelectionCriteria,
+  SiteVisitType,
+  TenderContestDocumentMeta,
+} from './tender-contest';
 
 export interface Job {
   // Core identifiers
@@ -124,6 +131,30 @@ export interface Job {
   
   // Tender-specific info
   tenderInfo?: TenderInfo;
+
+  /** OPD-53 contest (konkurs) display fields — present when tender was created via contest form */
+  contestInfo?: ContestInfo;
+}
+
+export interface ContestInfo {
+  buildingName: string | null;
+  buildingAddress: string | null;
+  documents: TenderContestDocumentMeta[];
+  submissionDeadline: string;
+  completionDate: string | null;
+  siteVisitType: SiteVisitType;
+  siteVisitTypeLabel: string;
+  siteVisitNotes: string | null;
+  formalRequirements: FormalRequirements;
+  formalRequirementLines: string[];
+  selectionCriteria: SelectionCriteria;
+  warrantyPeriod: string | null;
+  guaranteePeriod: string | null;
+  depositRequired: boolean;
+  depositAmount: number | null;
+  depositInstructions: string | null;
+  paymentTerms: PaymentTerms;
+  paymentTermsLabel: string;
 }
 
 export interface TenderInfo {

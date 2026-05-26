@@ -828,6 +828,13 @@ export interface TenderWithCompany {
     name: string;
     slug: string;
   } | null;
+  building?: {
+    id: string;
+    name: string;
+    street_address: string | null;
+    city: string | null;
+  } | null;
+  address?: string | null;
 }
 
 /**
@@ -1569,6 +1576,12 @@ export async function fetchTenderById(
         subcategory:job_categories!tenders_subcategory_id_fkey (
           name,
           slug
+        ),
+        building:buildings!tenders_building_id_fkey (
+          id,
+          name,
+          street_address,
+          city
         )
       `)
       .eq('id', id)

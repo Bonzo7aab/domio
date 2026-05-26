@@ -24,6 +24,7 @@ interface SimilarJob {
   postedTime: string;
   postType: 'job' | 'tender';
   category: string;
+  type?: string;
 }
 
 const SimilarJobs: React.FC<SimilarJobsProps> = ({
@@ -51,7 +52,8 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
       },
       postedTime: job.postedTime,
       postType: job.postType || 'job' as 'job' | 'tender',
-      category: job.category
+      category: job.category,
+      type: 'type' in job && typeof job.type === 'string' ? job.type : undefined,
     }));
 
     // Filter similar jobs
@@ -92,7 +94,7 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
                 </h4>
                 {job.postType === 'tender' && (
                   <Badge variant="secondary" className="text-xs">
-                    Przetarg
+                    {job.type === 'Konkurs' ? 'Konkurs' : 'Przetarg'}
                   </Badge>
                 )}
               </div>

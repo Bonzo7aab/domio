@@ -33,6 +33,15 @@ import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { findConversationByJob } from '../lib/database/messaging';
 import { formatBudget, budgetFromDatabase, type Budget } from '../types/budget';
 import { type Job, type TenderInfo } from '../types/job';
+import {
+  isContestTender,
+  mapTenderRowToContestDisplay,
+} from '../lib/tender-contest/map-tender-contest-display';
+import { parseSelectionCriteria } from '../types/tender-contest';
+import {
+  CONTEST_TAB_ITEMS,
+  TenderContestDetailTabs,
+} from './tender-detail/TenderContestDetailTabs';
 import { ManagerJobStatusSelect } from './manager-dashboard/ManagerJobStatusSelect';
 import { canManagerEditJobFields, getJobWorkflowStatusLabel } from '../lib/job-workflow-status';
 import { VerificationRequiredApplyDialog } from './VerificationRequiredApplyDialog';
@@ -368,13 +377,39 @@ function normalizeJobData(
       phases = dbTender.phases as TenderInfo['phases'];
     }
 
+    const contest = isContestTender(dbTender);
+    const contestInfo = contest ? mapTenderRowToContestDisplay(dbTender) : undefined;
+
+    if (contest && contestInfo) {
+      const selection = parseSelectionCriteria(
+        dbTender.selection_criteria,
+        dbTender.evaluation_criteria,
+      );
+      evaluationCriteria = selection.items.map((item) => ({
+        name: item.name,
+        weight: item.weight,
+      }));
+    }
+
+    const wadiumDisplay =
+      contest && contestInfo?.depositRequired && contestInfo.depositAmount != null
+        ? `${contestInfo.depositAmount.toLocaleString('pl-PL')} ${dbTender.currency}`
+        : dbTender.wadium
+          ? `${dbTender.wadium} ${dbTender.currency}`
+          : 'Brak';
+
+    const buildingAddress =
+      contestInfo?.buildingAddress ??
+      dbTender.building?.street_address ??
+      (typeof dbTender.address === 'string' ? dbTender.address : undefined);
+
     return {
       id: dbTender.id,
       postType: 'tender',
       title: dbTender.title,
       company: dbTender.company?.name || 'Unknown',
       location: locationData,
-      type: 'Przetarg',
+      type: contest ? 'Konkurs' : 'Przetarg',
       description: dbTender.description,
       postedTime: dbTender.published_at ? getTimeAgo(dbTender.published_at) : getTimeAgo(dbTender.created_at),
       salary: formatBudget(budget),
@@ -387,7 +422,6 @@ function normalizeJobData(
         visits: dbTender.views_count || 0,
         bookmarks: 0,
       },
-      // Legacy metrics fields (for backward compatibility)
       applications: dbTender.bids_count || 0,
       visits_count: dbTender.views_count || 0,
       bookmarks_count: 0,
@@ -396,17 +430,17 @@ function normalizeJobData(
       urgency: 'medium',
       trust: {
         verified: dbTender.company?.is_verified || false,
-        isPremium: false, // Tenders don't have premium status
+        isPremium: false,
         hasInsurance: false,
         completedJobs: 0,
         certificates: [],
       },
-      // Legacy trust fields (for backward compatibility)
-      isPremium: false, // Tenders don't have premium status
+      isPremium: false,
       hasInsurance: false,
       completedJobs: 0,
       certificates: [],
       category: dbTender.category?.name || 'Inne',
+      subcategory: dbTender.subcategory?.name,
       deadline: dbTender.submission_deadline,
       projectDuration: dbTender.project_duration || undefined,
       contactPerson: undefined,
@@ -420,13 +454,15 @@ function normalizeJobData(
       images: [],
       lat: dbTender.latitude || undefined,
       lng: dbTender.longitude || undefined,
+      address: buildingAddress,
       status: dbTender.status as JobDisplayData['status'],
       published_at: dbTender.published_at,
+      contestInfo,
       tenderInfo: {
-        tenderType: 'Zamówienie publiczne',
+        tenderType: contest ? 'Konkurs ofert' : 'Zamówienie publiczne',
         phases,
         currentPhase: dbTender.current_phase || 'Składanie ofert',
-        wadium: dbTender.wadium ? `${dbTender.wadium} ${dbTender.currency}` : '0 PLN',
+        wadium: wadiumDisplay,
         evaluationCriteria,
         documentsRequired: dbTender.requirements || [],
         submissionDeadline: dbTender.submission_deadline,
@@ -715,6 +751,15 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     checkExistingConversation();
   }, [jobData, user?.id, user?.userType, supabase, managerId]);
 
+  useEffect(() => {
+    if (!jobData) return;
+    if (jobData.contestInfo) {
+      setActiveTab('contest-basic');
+    } else {
+      setActiveTab('overview');
+    }
+  }, [jobData?.id, jobData?.contestInfo]);
+
   // Early returns AFTER all hooks
   if (isLoadingJob) {
     return (
@@ -749,6 +794,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   }
 
   const job = jobData;
+  const isContestView = Boolean(job.contestInfo);
+  const tenderLabel = isContestView ? 'konkurs' : 'przetarg';
+  const tenderLocative = isContestView ? 'konkursie' : 'przetargu';
 
   const handleApplicationSubmit = async () => {
     if (!user) {
@@ -774,7 +822,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
     // For tenders, check if bid already exists
     if (job.postType === 'tender' && hasExistingBid) {
-      toast.error('Już złożyłeś ofertę na ten przetarg. Nie możesz złożyć więcej niż jednej oferty.');
+      toast.error(
+        `Już złożyłeś ofertę na ten ${tenderLabel}. Nie możesz złożyć więcej niż jednej oferty.`,
+      );
       return;
     }
 
@@ -821,7 +871,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           // Extract error message from various error object structures
           const errorMessage = error instanceof Error 
             ? error.message 
-            : (error as { message?: string; details?: string; hint?: string })?.message || (error as { message?: string; details?: string; hint?: string })?.details || (error as { message?: string; details?: string; hint?: string })?.hint || String(error) || 'Wystąpił błąd podczas składania oferty w przetargu';
+            : (error as { message?: string; details?: string; hint?: string })?.message || (error as { message?: string; details?: string; hint?: string })?.details || (error as { message?: string; details?: string; hint?: string })?.hint || String(error) || `Wystąpił błąd podczas składania oferty w ${tenderLocative}`;
           
           console.error('Error submitting tender bid:', {
             error,
@@ -844,7 +894,11 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         }
 
         console.log('Tender bid submitted successfully:', data);
-        toast.success('Oferta w przetargu została złożona pomyślnie!');
+        toast.success(
+          isContestView
+            ? 'Oferta w konkursie została złożona pomyślnie!'
+            : 'Oferta w przetargu została złożona pomyślnie!',
+        );
         // Update state to reflect that bid has been submitted
         setHasExistingBid(true);
       } else {
@@ -1006,6 +1060,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       Premium
                     </Badge>
                   )}
+                  {job.type === 'Konkurs' && (
+                    <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
+                      <Gavel className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
+                      Konkurs
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-gray-600 mb-1.5 sm:mb-2 md:mb-1 text-xs sm:text-sm md:text-base break-words">
                   {job.company}
@@ -1038,65 +1098,84 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       <nav className="border-b bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-1 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={cn(
-                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                activeTab === 'overview'
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              )}
-            >
-              Przegląd
-            </button>
-            <button
-              onClick={() => setActiveTab('requirements')}
-              className={cn(
-                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                activeTab === 'requirements'
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              )}
-            >
-              Wymagania
-            </button>
-            {job.postType === 'tender' && (
+            {job.contestInfo ? (
+              CONTEST_TAB_ITEMS.map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setActiveTab(tab.value)}
+                  className={cn(
+                    'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                    activeTab === tab.value
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300',
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))
+            ) : (
               <>
                 <button
-                  onClick={() => setActiveTab('procedure')}
+                  onClick={() => setActiveTab('overview')}
                   className={cn(
-                    "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                    activeTab === 'procedure'
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                    'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                    activeTab === 'overview'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300',
                   )}
                 >
-                  Procedura
+                  Przegląd
                 </button>
                 <button
-                  onClick={() => setActiveTab('documents')}
+                  onClick={() => setActiveTab('requirements')}
                   className={cn(
-                    "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                    activeTab === 'documents'
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                    'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                    activeTab === 'requirements'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300',
                   )}
                 >
-                  Dokumenty
+                  Wymagania
+                </button>
+                {job.postType === 'tender' && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('procedure')}
+                      className={cn(
+                        'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                        activeTab === 'procedure'
+                          ? 'border-primary text-primary'
+                          : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300',
+                      )}
+                    >
+                      Procedura
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('documents')}
+                      className={cn(
+                        'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                        activeTab === 'documents'
+                          ? 'border-primary text-primary'
+                          : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300',
+                      )}
+                    >
+                      Dokumenty
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setActiveTab('object')}
+                  className={cn(
+                    'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                    activeTab === 'object'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300',
+                  )}
+                >
+                  Obiekt
                 </button>
               </>
             )}
-            <button
-              onClick={() => setActiveTab('object')}
-              className={cn(
-                "px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0",
-                activeTab === 'object'
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              )}
-            >
-              Obiekt
-            </button>
           </div>
         </div>
       </nav>
@@ -1107,52 +1186,114 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           {/* Main Content */}
           <div className="lg:col-span-2 min-w-0 space-y-6">
 
-            {/* Key Tender Information - only for tenders */}
+            {/* Key tender / contest summary */}
             {job.postType === 'tender' && job.tenderInfo && (
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
                     <Gavel className="w-5 h-5" />
-                    Kluczowe informacje przetargu
+                    {job.contestInfo
+                      ? 'Kluczowe informacje konkursu'
+                      : 'Kluczowe informacje przetargu'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-6">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                    <div className="bg-background/80 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Termin składania</div>
-                      <div className="font-bold text-foreground text-sm">
-                        {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
+                  {job.contestInfo ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                      <div className="bg-background/80 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">
+                          Termin składania
+                        </div>
+                        <div className="font-bold text-foreground text-sm">
+                          {new Date(job.contestInfo.submissionDeadline).toLocaleString('pl-PL', {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })}
+                        </div>
+                      </div>
+                      {job.contestInfo.completionDate ? (
+                        <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                          <div className="text-xs text-muted-foreground font-medium mb-1">
+                            Termin wykonania
+                          </div>
+                          <div className="font-bold text-foreground text-sm">
+                            {new Date(job.contestInfo.completionDate).toLocaleDateString('pl-PL')}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
+                        <div className="font-bold text-foreground text-sm">{job.tenderInfo.wadium}</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">
+                          Złożone oferty
+                        </div>
+                        <div className="font-bold text-foreground text-sm">{job.applications}</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">
+                          Wizja lokalna
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {job.contestInfo.siteVisitTypeLabel}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
-                      <div className="font-bold text-foreground text-sm">{job.tenderInfo.wadium}</div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      <div className="bg-background/80 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">
+                          Termin składania
+                        </div>
+                        <div className="font-bold text-foreground text-sm">
+                          {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
+                        </div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
+                        <div className="font-bold text-foreground text-sm">{job.tenderInfo.wadium}</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Budżet</div>
+                        <div className="font-bold text-foreground text-sm">
+                          {formatBudget(job.budget)}
+                        </div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">
+                          Czas realizacji
+                        </div>
+                        <div className="font-bold text-foreground text-sm">
+                          {job.tenderInfo.projectDuration}
+                        </div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">
+                          Złożone oferty
+                        </div>
+                        <div className="font-bold text-foreground text-sm">{job.applications}</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
+                        <div className="text-xs text-muted-foreground font-medium mb-1">Status</div>
+                        <Badge variant="secondary" className="text-xs">
+                          {job.tenderInfo.currentPhase}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Budżet</div>
-                      <div className="font-bold text-foreground text-sm">{formatBudget(job.budget)}</div>
-                    </div>
-                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Czas realizacji</div>
-                      <div className="font-bold text-foreground text-sm">{job.tenderInfo.projectDuration}</div>
-                    </div>
-                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Złożone oferty</div>
-                      <div className="font-bold text-foreground text-sm">{job.applications}</div>
-                    </div>
-                    <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                      <div className="text-xs text-muted-foreground font-medium mb-1">Status</div>
-                      <Badge variant="secondary" className="text-xs">
-                        {job.tenderInfo.currentPhase}
-                      </Badge>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             )}
 
             {/* Job Details Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
+              {job.contestInfo ? (
+                <TenderContestDetailTabs
+                  job={job as JobDisplayData & { contestInfo: NonNullable<JobDisplayData['contestInfo']> }}
+                />
+              ) : null}
+
               {/* Overview Tab */}
               <TabsContent value="overview">
                 <Card>
@@ -1340,8 +1481,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 </Card>
               </TabsContent>
 
-              {/* Procedure Tab - Only for tenders */}
-              {job.postType === 'tender' && (
+              {/* Procedure Tab - Only for legacy tenders */}
+              {job.postType === 'tender' && !job.contestInfo && (
                 <TabsContent value="procedure">
                   <Card>
                     <CardContent className="p-6 space-y-6">
@@ -1374,8 +1515,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 </TabsContent>
               )}
 
-              {/* Documents Tab - Only for tenders */}
-              {job.postType === 'tender' && (
+              {/* Documents Tab - Only for legacy tenders */}
+              {job.postType === 'tender' && !job.contestInfo && (
                 <TabsContent value="documents">
                   <Card>
                     <CardContent className="p-6 space-y-6">
@@ -1532,7 +1673,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   </Button>
                   {hasExistingBid && job.postType === 'tender' && (
                     <p className="text-xs text-muted-foreground text-center">
-                      Już złożyłeś ofertę na ten przetarg
+                      Już złożyłeś ofertę na ten {tenderLabel}
                     </p>
                   )}
                   
