@@ -4,14 +4,15 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, ExternalLink, FileUp, GraduationCap, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { removeAccountVerificationDocumentAction } from '../app/verification/actions';
 import {
   getContractorAccountSettings,
   getOcPolicyAllowedFormatsLabel,
   getVerificationDocumentSignedUrl,
-  removeVerificationDocumentsFromBucket,
   upsertContractorAccountSettings,
   uploadProfessionalQualificationsScan,
 } from '../lib/database/contractor-account';
+import { DocumentRemovalAlertDialog } from './verification/DocumentRemovalAlertDialog';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -21,6 +22,8 @@ interface ContractorProfessionalQualificationsSettingsProps {
   userId: string;
   /** When `section`, renders as a row inside the documents upload shell. */
   variant?: 'card' | 'section';
+  /** Omit outer section heading when nested in documents tab section D. */
+  hideSectionChrome?: boolean;
 }
 
 const SCAN_ACCEPT =
@@ -31,6 +34,7 @@ const SAVED_TOAST = 'Dane uprawnień zawodowych zostały zapisane';
 export function ContractorProfessionalQualificationsSettings({
   userId,
   variant = 'card',
+  hideSectionChrome = false,
 }: ContractorProfessionalQualificationsSettingsProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
@@ -38,6 +42,7 @@ export function ContractorProfessionalQualificationsSettings({
   const [validUntil, setValidUntil] = React.useState('');
   const [scanPath, setScanPath] = React.useState<string | null>(null);
   const [previewSignedUrl, setPreviewSignedUrl] = React.useState<string | null>(null);
+  const [showRemoveDialog, setShowRemoveDialog] = React.useState(false);
 
   React.useEffect(() => {
     const load = async () => {
@@ -107,17 +112,24 @@ export function ContractorProfessionalQualificationsSettings({
     }
   };
 
-  const handleRemoveScan = async () => {
+  const handleConfirmRemoveScan = async () => {
     if (!scanPath) return;
-    if (!window.confirm('Czy na pewno chcesz usunąć skan uprawnień? Plik zostanie usunięty z magazynu.')) {
-      return;
-    }
     try {
       setIsSaving(true);
-      await removeVerificationDocumentsFromBucket([scanPath]);
-      await upsertContractorAccountSettings(userId, { professionalQualificationsScanPath: null });
+      const result = await removeAccountVerificationDocumentAction({
+        kind: 'professional_qualifications_scan',
+      });
+      if (!result.ok) {
+        toast.error(result.error ?? 'Nie udało się usunąć skanu uprawnień');
+        return;
+      }
       setScanPath(null);
-      toast.success('Skan uprawnień został usunięty');
+      setShowRemoveDialog(false);
+      toast.success(
+        result.verificationReset
+          ? 'Skan usunięty. Uzupełnij dokumenty i prześlij je ponownie do weryfikacji.'
+          : 'Skan uprawnień został usunięty',
+      );
       router.refresh();
     } catch (error) {
       console.error('Error removing qualification scan:', error);
@@ -206,7 +218,7 @@ export function ContractorProfessionalQualificationsSettings({
                 className="h-9 w-9 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 disabled={isSaving}
                 aria-label="Usuń skan"
-                onClick={() => void handleRemoveScan()}
+                onClick={() => setShowRemoveDialog(true)}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -243,6 +255,27 @@ export function ContractorProfessionalQualificationsSettings({
     </div>
   );
 
+  const removeDialog = (
+    <DocumentRemovalAlertDialog
+      open={showRemoveDialog}
+      onOpenChange={open => {
+        if (!open && !isSaving) setShowRemoveDialog(false);
+      }}
+      onConfirm={handleConfirmRemoveScan}
+      isPending={isSaving}
+      title="Usunąć skan uprawnień?"
+    />
+  );
+
+  if (variant === 'section' && hideSectionChrome) {
+    return (
+      <>
+        {fields}
+        {removeDialog}
+      </>
+    );
+  }
+
   if (variant === 'section') {
     return (
       <section id="professional-qualifications" className="scroll-mt-24 px-4 py-5 sm:px-6">
@@ -263,19 +296,23 @@ export function ContractorProfessionalQualificationsSettings({
           </div>
         </div>
         {fields}
+        {removeDialog}
       </section>
     );
   }
 
   return (
-    <Card className="scroll-mt-24">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <GraduationCap className="h-4 w-4" />
-          Uprawnienia Zawodowe
-        </CardTitle>
-      </CardHeader>
-      <CardContent>{fields}</CardContent>
-    </Card>
+    <>
+      <Card className="scroll-mt-24">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <GraduationCap className="h-4 w-4" />
+            Uprawnienia Zawodowe
+          </CardTitle>
+        </CardHeader>
+        <CardContent>{fields}</CardContent>
+      </Card>
+      {removeDialog}
+    </>
   );
 }

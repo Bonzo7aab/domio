@@ -255,3 +255,34 @@ export async function submitVerificationDocumentsAction(
   revalidatePath('/account');
   return { ok: true };
 }
+
+export async function removeAccountVerificationDocumentAction(
+  payload:
+    | { kind: 'verification'; documentKey: string }
+    | { kind: 'zus_certificate' }
+    | { kind: 'tax_certificate' }
+    | { kind: 'professional_qualifications_scan' }
+): Promise<{ ok: boolean; error?: string; verificationReset?: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { ok: false, error: 'Musisz być zalogowany.' };
+  }
+
+  const { removeAccountDocumentForUser } = await import(
+    '../../lib/verification/remove-account-document'
+  );
+
+  const result = await removeAccountDocumentForUser(supabase, user.id, payload);
+
+  if (result.ok) {
+    revalidatePath('/account');
+    revalidatePath('/verification');
+  }
+
+  return result;
+}

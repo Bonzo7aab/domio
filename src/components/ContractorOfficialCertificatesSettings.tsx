@@ -4,14 +4,15 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, FileUp, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { removeAccountVerificationDocumentAction } from '../app/verification/actions';
 import {
   getContractorAccountSettings,
   getVerificationDocumentSignedUrl,
-  removeVerificationDocumentsFromBucket,
   uploadTaxCertificateScan,
   uploadZusCertificateScan,
   upsertContractorAccountSettings,
 } from '../lib/database/contractor-account';
+import { DocumentRemovalAlertDialog } from './verification/DocumentRemovalAlertDialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -23,6 +24,7 @@ interface OfficialCertificateRowProps {
   onPathChange: (path: string | null) => void;
   onIssuedAtChange: (value: string) => void;
   onUpload: (file: File) => Promise<{ path: string }>;
+  onRequestRemove: () => void;
   inputId: string;
   dateId: string;
 }
@@ -34,6 +36,7 @@ function OfficialCertificateRow({
   onPathChange,
   onIssuedAtChange,
   onUpload,
+  onRequestRemove,
   inputId,
   dateId,
 }: OfficialCertificateRowProps) {
@@ -71,68 +74,55 @@ function OfficialCertificateRow({
     }
   };
 
-  const handleRemove = async () => {
-    if (!path) return;
-    try {
-      setIsSaving(true);
-      await removeVerificationDocumentsFromBucket([path]);
-      onPathChange(null);
-      toast.success(`${label}: plik usunięty`);
-    } catch (error) {
-      console.error(error);
-      toast.error(`Nie udało się usunąć pliku (${label})`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
-    <div className="rounded-lg border border-dashed border-border/80 bg-muted/10 p-4 space-y-3">
-      <p className="text-sm font-medium">{label}</p>
-      <OfficialCertificateDateField
-        dateId={dateId}
-        issuedAt={issuedAt}
-        onIssuedAtChange={onIssuedAtChange}
-      />
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs text-muted-foreground flex-1 min-w-0 truncate">
-          {path ? path.split('/').pop() : 'Brak pliku PDF'}
-        </p>
-        {path ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            disabled={isSaving}
-            onClick={() => void handleRemove()}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        ) : null}
-        <Button variant="outline" size="sm" disabled={isSaving} asChild>
-          <label htmlFor={inputId} className="cursor-pointer">
-            <FileUp className="h-4 w-4 mr-2" />
-            {path ? 'Zamień' : 'Dodaj PDF'}
-          </label>
-        </Button>
-        {path && previewUrl ? (
-          <Button variant="outline" size="sm" asChild>
-            <a href={previewUrl} target="_blank" rel="noreferrer">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Otwórz
-            </a>
-          </Button>
-        ) : null}
-        <input
-          id={inputId}
-          type="file"
-          className="hidden"
-          accept=".pdf,application/pdf"
-          onChange={handleFile}
+    <>
+      <h4 className="text-sm font-semibold text-foreground">{label}</h4>
+      <div className="mt-2 rounded-lg border border-dashed border-border/80 bg-muted/10 p-4 space-y-3">
+        <OfficialCertificateDateField
+          dateId={dateId}
+          issuedAt={issuedAt}
+          onIssuedAtChange={onIssuedAtChange}
         />
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground flex-1 min-w-0 truncate">
+            {path ? path.split('/').pop() : 'Brak pliku PDF'}
+          </p>
+          {path ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={isSaving}
+              onClick={onRequestRemove}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          ) : null}
+          <Button variant="outline" size="sm" disabled={isSaving} asChild>
+            <label htmlFor={inputId} className="cursor-pointer">
+              <FileUp className="h-4 w-4 mr-2" />
+              {path ? 'Zamień' : 'Dodaj PDF'}
+            </label>
+          </Button>
+          {path && previewUrl ? (
+            <Button variant="outline" size="sm" asChild>
+              <a href={previewUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Otwórz
+              </a>
+            </Button>
+          ) : null}
+          <input
+            id={inputId}
+            type="file"
+            className="hidden"
+            accept=".pdf,application/pdf"
+            onChange={handleFile}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -176,6 +166,7 @@ export function ContractorOfficialCertificatesSettings({ userId }: ContractorOff
   const [zusDate, setZusDate] = React.useState('');
   const [taxPath, setTaxPath] = React.useState<string | null>(null);
   const [taxDate, setTaxDate] = React.useState('');
+  const [pendingRemoval, setPendingRemoval] = React.useState<'zus' | 'tax' | null>(null);
 
   React.useEffect(() => {
     const load = async () => {
@@ -200,6 +191,39 @@ export function ContractorOfficialCertificatesSettings({ userId }: ContractorOff
     router.refresh();
   };
 
+  const handleConfirmRemove = async () => {
+    if (!pendingRemoval) return;
+    try {
+      setIsSaving(true);
+      const result = await removeAccountVerificationDocumentAction({
+        kind: pendingRemoval === 'zus' ? 'zus_certificate' : 'tax_certificate',
+      });
+      if (!result.ok) {
+        toast.error(result.error ?? 'Nie udało się usunąć pliku');
+        return;
+      }
+      if (pendingRemoval === 'zus') {
+        setZusPath(null);
+        setZusDate('');
+      } else {
+        setTaxPath(null);
+        setTaxDate('');
+      }
+      setPendingRemoval(null);
+      toast.success(
+        result.verificationReset
+          ? 'Dokument usunięty. Uzupełnij dokumenty i prześlij je ponownie do weryfikacji.'
+          : 'Plik został usunięty',
+      );
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error('Nie udało się usunąć pliku');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveDates = async () => {
     try {
       setIsSaving(true);
@@ -221,39 +245,55 @@ export function ContractorOfficialCertificatesSettings({ userId }: ContractorOff
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
-        Zarządcy wymagają dokumentów nie starszych niż 3 miesiące.
-      </p>
-      <OfficialCertificateRow
-        label="Zaświadczenie ZUS (niezaleganie)"
-        path={zusPath}
-        issuedAt={zusDate}
-        inputId="zus-cert-file"
-        dateId="zus-cert-date"
-        onPathChange={path => {
-          setZusPath(path);
-          void persist({ zusCertificatePath: path });
+    <>
+      <div className="space-y-8">
+        <OfficialCertificateRow
+          label="Zaświadczenie ZUS (niezaleganie)"
+          path={zusPath}
+          issuedAt={zusDate}
+          inputId="zus-cert-file"
+          dateId="zus-cert-date"
+          onPathChange={path => {
+            setZusPath(path);
+            void persist({ zusCertificatePath: path });
+          }}
+          onIssuedAtChange={setZusDate}
+          onUpload={file => uploadZusCertificateScan(userId, file)}
+          onRequestRemove={() => setPendingRemoval('zus')}
+        />
+        <OfficialCertificateRow
+          label="Zaświadczenie Skarbowe (US)"
+          path={taxPath}
+          issuedAt={taxDate}
+          inputId="tax-cert-file"
+          dateId="tax-cert-date"
+          onPathChange={path => {
+            setTaxPath(path);
+            void persist({ taxCertificatePath: path });
+          }}
+          onIssuedAtChange={setTaxDate}
+          onUpload={file => uploadTaxCertificateScan(userId, file)}
+          onRequestRemove={() => setPendingRemoval('tax')}
+        />
+        <Button type="button" size="sm" variant="outline" disabled={isSaving} onClick={handleSaveDates}>
+          Zapisz daty wystawienia
+        </Button>
+      </div>
+      <DocumentRemovalAlertDialog
+        open={pendingRemoval !== null}
+        onOpenChange={open => {
+          if (!open && !isSaving) setPendingRemoval(null);
         }}
-        onIssuedAtChange={setZusDate}
-        onUpload={file => uploadZusCertificateScan(userId, file)}
+        onConfirm={handleConfirmRemove}
+        isPending={isSaving}
+        title={
+          pendingRemoval === 'zus'
+            ? 'Usunąć zaświadczenie ZUS?'
+            : pendingRemoval === 'tax'
+              ? 'Usunąć zaświadczenie US?'
+              : 'Usunąć dokument?'
+        }
       />
-      <OfficialCertificateRow
-        label="Zaświadczenie Skarbowe (US)"
-        path={taxPath}
-        issuedAt={taxDate}
-        inputId="tax-cert-file"
-        dateId="tax-cert-date"
-        onPathChange={path => {
-          setTaxPath(path);
-          void persist({ taxCertificatePath: path });
-        }}
-        onIssuedAtChange={setTaxDate}
-        onUpload={file => uploadTaxCertificateScan(userId, file)}
-      />
-      <Button type="button" size="sm" variant="outline" disabled={isSaving} onClick={handleSaveDates}>
-        Zapisz daty wystawienia
-      </Button>
-    </div>
+    </>
   );
 }

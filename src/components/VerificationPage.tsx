@@ -18,6 +18,7 @@ import {
   Download,
   ExternalLink,
   RefreshCw,
+  Trash2,
   Building2,
   Award,
   Users,
@@ -37,7 +38,11 @@ import { useUserProfile } from '../contexts/AuthContext';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from './ui/dropzone';
 import type { FileRejection } from 'react-dropzone';
 import { toast } from 'sonner';
-import { submitVerificationDocumentsAction } from '../app/verification/actions';
+import {
+  removeAccountVerificationDocumentAction,
+  submitVerificationDocumentsAction,
+} from '../app/verification/actions';
+import { DocumentRemovalAlertDialog } from './verification/DocumentRemovalAlertDialog';
 import {
   getContractorAccountSettings,
   upsertContractorAccountSettings,
@@ -264,6 +269,48 @@ function VerificationStateBanner({ status, onAction }: StateBannerProps) {
   );
 }
 
+interface DocumentsSectionShellProps {
+  /** Short section marker, e.g. „Sekcja A”. */
+  eyebrow?: string;
+  /** Clear subject title for this block. */
+  heading: string;
+  description?: string;
+  id?: string;
+  children: React.ReactNode;
+}
+
+function DocumentsSectionShell({
+  eyebrow,
+  heading,
+  description,
+  id,
+  children,
+}: DocumentsSectionShellProps) {
+  return (
+    <section id={id} className="scroll-mt-24 border-t first:border-t-0">
+      <div className="border-b bg-muted/40 px-4 py-4 sm:px-6">
+        {eyebrow ? (
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h3
+          className={cn(
+            'text-base font-semibold tracking-tight text-foreground',
+            eyebrow ? 'mt-1' : '',
+          )}
+        >
+          {heading}
+        </h3>
+        {description ? (
+          <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+      <div className="px-4 py-5 sm:px-6">{children}</div>
+    </section>
+  );
+}
+
 interface ExistingDocChipProps {
   doc: VerificationDocumentEntry;
   review?: DocumentReview | null;
@@ -276,6 +323,10 @@ interface ExistingDocChipProps {
   onReplace?: () => void;
   /** True while the upload section for this doc is open. */
   isReplacing?: boolean;
+  onRemove?: () => void;
+  isRemoving?: boolean;
+  /** When set, shown above the file card (e.g. approved list). */
+  headingAboveFile?: string;
 }
 
 function ReviewBadge({ state }: { state: DocumentReviewState }) {
@@ -317,10 +368,16 @@ function ExistingDocChip({
   reviewState = 'pending',
   onReplace,
   isReplacing = false,
+  onRemove,
+  isRemoving = false,
+  headingAboveFile,
 }: ExistingDocChipProps) {
   const uploadedLabel = formatDateTime(doc.uploadedAt);
   return (
     <div className="space-y-2">
+      {headingAboveFile ? (
+        <p className="text-sm font-semibold text-foreground">{headingAboveFile}</p>
+      ) : null}
       <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background border">
@@ -328,7 +385,9 @@ function ExistingDocChip({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-foreground">Przesłany plik</span>
+              <span className="text-xs font-medium text-foreground">
+                {headingAboveFile ? 'Plik do weryfikacji' : 'Przesłany plik'}
+              </span>
               <ReviewBadge state={reviewState} />
             </div>
             <div className="truncate text-sm font-medium" title={doc.filename}>
@@ -344,11 +403,25 @@ function ExistingDocChip({
           </div>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
+          {onRemove && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isRemoving}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={onRemove}
+            >
+              <Trash2 className="mr-1 h-3.5 w-3.5" />
+              Usuń
+            </Button>
+          )}
           {onReplace && (
             <Button
               type="button"
               size="sm"
               variant={isReplacing ? 'ghost' : 'default'}
+              disabled={isRemoving}
               onClick={onReplace}
             >
               {isReplacing ? (
@@ -436,6 +509,8 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasOcPolicyInAccount, setHasOcPolicyInAccount] = useState(false);
   const [replaceMode, setReplaceMode] = useState<Record<string, boolean>>({});
+  const [pendingDocRemovalKey, setPendingDocRemovalKey] = useState<string | null>(null);
+  const [isRemovingDoc, setIsRemovingDoc] = useState(false);
   // OC validity date mirrored from /account?tab=contractor-data so the user
   // can complete the OC information in one place. Stored separately because
   // it lives in `contractor_account_settings`, not in the verification doc
@@ -636,6 +711,43 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     setReplaceMode(prev => ({ ...prev, [documentType]: !wasOn }));
   };
 
+  const handleConfirmRemoveStoredDocument = async () => {
+    if (!pendingDocRemovalKey) return;
+    const documentKey = pendingDocRemovalKey;
+    setIsRemovingDoc(true);
+    try {
+      const result = await removeAccountVerificationDocumentAction({
+        kind: 'verification',
+        documentKey,
+      });
+      if (!result.ok) {
+        toast.error(result.error ?? 'Nie udało się usunąć dokumentu');
+        return;
+      }
+      handleFileChange(documentKey, null);
+      setReplaceMode(prev => {
+        const next = { ...prev };
+        delete next[documentKey];
+        return next;
+      });
+      if (documentKey === 'insurance') {
+        setHasOcPolicyInAccount(false);
+      }
+      toast.success(
+        result.verificationReset
+          ? 'Dokument usunięty. Uzupełnij dokumenty i prześlij je ponownie do weryfikacji.'
+          : 'Dokument został usunięty',
+      );
+      setPendingDocRemovalKey(null);
+      router.refresh();
+    } catch (error) {
+      console.error('handleConfirmRemoveStoredDocument:', error);
+      toast.error('Nie udało się usunąć dokumentu');
+    } finally {
+      setIsRemovingDoc(false);
+    }
+  };
+
   const handleDescriptionChange = (documentType: string, description: string) => {
     setUploads(prev => ({
       ...prev,
@@ -719,7 +831,288 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
           ? 'Weryfikacja została odrzucona — możesz przesłać dokumenty ponownie'
           : 'Prześlij dokumenty aby zweryfikować swoje konto';
 
+  const renderContractorDocumentRow = (
+    doc: { type: string; name: string; description: string; required: boolean },
+    options?: { nestedInSectionShell?: boolean },
+  ) => {
+    const existing = existingByKey[doc.type];
+    const newFile = uploads[doc.type]?.file ?? null;
+    const willReplace = Boolean(existing && newFile);
+    const review = existing ? reviewByKey[existing.key] ?? null : null;
+    const reviewState = existing ? deriveDocumentReviewState(existing, review) : 'pending';
+    const isReplacing = !!replaceMode[doc.type];
+    const showUploadSection = !existing || isReplacing;
+    const DocIcon = getDocumentIcon(doc.type);
+    const isComplete = isRequiredDocComplete(
+      doc,
+      existingByKey,
+      uploads,
+      isContractor,
+      hasOcPolicyInAccount,
+    );
+
+    return (
+      <section
+        key={doc.type}
+        id={doc.type === 'insurance' && isContractor ? 'oc-policy' : undefined}
+        className={cn(
+          !options?.nestedInSectionShell && 'px-4 py-5 sm:px-6',
+          reviewState === 'rejected' && 'bg-destructive/[0.03]',
+          reviewState === 'approved' && existing && 'bg-emerald-500/[0.03]',
+        )}
+      >
+        {options?.nestedInSectionShell ? (
+          <div className="mb-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="text-base font-semibold tracking-tight text-foreground">{doc.name}</h4>
+              {doc.required ? (
+                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
+                  Wymagany
+                </span>
+              ) : (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Opcjonalny
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">{doc.description}</p>
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <div
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border',
+                  isComplete && doc.required
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                    : 'border-border bg-muted/50 text-muted-foreground',
+                )}
+              >
+                <DocIcon className="h-4 w-4" />
+              </div>
+              {existing ? (
+                <ReviewBadge state={reviewState} />
+              ) : doc.required && isComplete ? (
+                <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
+                  <Check className="h-3 w-3" />
+                  Gotowe
+                </Badge>
+              ) : null}
+              {willReplace && (
+                <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">
+                  <RefreshCw className="h-3 w-3" />
+                  Do zastąpienia
+                </Badge>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 gap-3">
+              <div
+                className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border',
+                  isComplete && doc.required
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                    : 'border-border bg-muted/50 text-muted-foreground',
+                )}
+              >
+                <DocIcon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold">{doc.name}</h3>
+                  {doc.required ? (
+                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
+                      Wymagany
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Opcjonalny
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">{doc.description}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+              {existing ? (
+                <ReviewBadge state={reviewState} />
+              ) : doc.required && isComplete ? (
+                <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
+                  <Check className="h-3 w-3" />
+                  Gotowe
+                </Badge>
+              ) : null}
+              {willReplace && (
+                <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">
+                  <RefreshCw className="h-3 w-3" />
+                  Do zastąpienia
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {existing && (
+            <ExistingDocChip
+              doc={existing}
+              review={review}
+              reviewState={reviewState}
+              onReplace={() => toggleReplace(doc.type)}
+              isReplacing={isReplacing}
+              onRemove={() => setPendingDocRemovalKey(doc.type)}
+              isRemoving={isRemovingDoc && pendingDocRemovalKey === doc.type}
+            />
+          )}
+
+          {doc.type === 'insurance' && isContractor && (
+            <>
+              {options?.nestedInSectionShell ? (
+                <h4 className="text-sm font-semibold text-foreground">
+                  Termin ważności polisy i suma gwarancyjna
+                </h4>
+              ) : null}
+              <div
+                className={cn(
+                  'rounded-lg border border-dashed border-border/80 bg-muted/15 p-3 sm:p-4 space-y-4',
+                  options?.nestedInSectionShell && 'mt-2',
+                )}
+              >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Label
+                    htmlFor="oc-valid-until-verification"
+                    className="flex items-center gap-1.5 text-xs font-medium"
+                  >
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                    Ważność polisy do
+                  </Label>
+                  <Input
+                    id="oc-valid-until-verification"
+                    type="date"
+                    value={ocValidUntil}
+                    onChange={e => setOcValidUntil(e.target.value)}
+                    disabled={isSavingOcDate}
+                    className="max-w-xs bg-background"
+                  />
+                </div>
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Label htmlFor="oc-guarantee-amount" className="text-xs font-medium">
+                    Suma gwarancyjna polisy (zł)
+                  </Label>
+                  <Input
+                    id="oc-guarantee-amount"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    placeholder="np. 200000"
+                    value={ocGuaranteeAmount}
+                    onChange={e => setOcGuaranteeAmount(e.target.value)}
+                    disabled={isSavingOcDate}
+                    className="max-w-xs bg-background"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={ocDateDirty ? 'default' : 'outline'}
+                  disabled={!ocDateDirty || isSavingOcDate}
+                  onClick={handleSaveOcValidUntil}
+                  className="shrink-0"
+                >
+                  {isSavingOcDate ? 'Zapisywanie...' : 'Zapisz dane OC'}
+                </Button>
+              </div>
+            </div>
+            </>
+          )}
+
+          {showUploadSection && (
+            <div className="rounded-lg border border-dashed border-border/80 bg-muted/10 p-3 sm:p-4 overflow-hidden">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+                <div className="flex min-w-0 flex-col gap-1.5 overflow-hidden">
+                  <Label className="text-xs font-medium text-foreground">{`Plik — ${doc.name}`}</Label>
+                  <Dropzone
+                    accept={{
+                      'application/pdf': ['.pdf'],
+                      'image/*': ['.jpg', '.jpeg', '.png'],
+                    }}
+                    maxFiles={1}
+                    maxSize={10 * 1024 * 1024}
+                    minSize={1024}
+                    onDrop={(acceptedFiles, fileRejections) =>
+                      handleFileDrop(doc.type, acceptedFiles, fileRejections)
+                    }
+                    disabled={isSubmitting}
+                    src={newFile ? [newFile] : []}
+                    className="!h-[5.5rem] !max-h-[5.5rem] !min-h-0 w-full !p-3 shrink-0"
+                  >
+                    <DropzoneEmptyState>
+                      <div className="flex flex-col items-center justify-center gap-1 py-1">
+                        <div className="flex size-6 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                          <Upload className="h-3.5 w-3.5" />
+                        </div>
+                        <p className="text-xs font-medium text-center">
+                          Przeciągnij lub kliknij, aby wybrać plik
+                        </p>
+                        <p className="text-[11px] text-muted-foreground text-center">
+                          PDF, JPG, PNG · max 10 MB
+                        </p>
+                      </div>
+                    </DropzoneEmptyState>
+                    <DropzoneContent>
+                      {newFile && (
+                        <div className="flex w-full flex-col items-center justify-center gap-0.5 py-1">
+                          <div className="flex items-center gap-1.5">
+                            <FileText className="h-4 w-4 text-primary" />
+                            <span className="max-w-[140px] truncate text-xs font-medium sm:max-w-[180px]">
+                              {newFile.name}
+                            </span>
+                            <Check className="h-3.5 w-3.5 text-success" />
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            {formatFileSize(newFile.size)} · kliknij, aby zmienić
+                          </p>
+                        </div>
+                      )}
+                    </DropzoneContent>
+                  </Dropzone>
+                  {newFile && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeFile(doc.type)}
+                      className="w-full"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Usuń wybrany plik
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <Label htmlFor={`desc-${doc.type}`} className="text-xs font-medium">
+                    Komentarz (opcjonalnie)
+                  </Label>
+                  <Textarea
+                    id={`desc-${doc.type}`}
+                    placeholder="Np. zakres uprawnień, numer polisy..."
+                    value={uploads[doc.type]?.description || ''}
+                    onChange={e => handleDescriptionChange(doc.type, e.target.value)}
+                    className="h-[5.5rem] min-h-[5.5rem] max-h-40 resize-y bg-background"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  };
+
   const content = (
+    <>
     <div className={embedded ? 'space-y-6' : 'max-w-4xl mx-auto px-4 py-8'}>
         <div className="space-y-6">
           {/* State banner — skip duplicate unsubmitted prompt in account tab */}
@@ -752,6 +1145,11 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                       doc={doc}
                       review={review}
                       reviewState={deriveDocumentReviewState(doc, review)}
+                      headingAboveFile={doc.label}
+                      onRemove={
+                        embedded ? () => setPendingDocRemovalKey(doc.key) : undefined
+                      }
+                      isRemoving={isRemovingDoc && pendingDocRemovalKey === doc.key}
                     />
                   );
                 })}
@@ -849,279 +1247,81 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                 );
               })()}
 
-              <div className="divide-y">
-                {useContractorDocumentSections && (
-                  <div className="bg-muted/40 px-4 py-3 sm:px-6">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Sekcja A — Polisa OC firmy
-                    </p>
-                  </div>
+              <div
+                className={cn(
+                  'divide-y',
+                  useContractorDocumentSections && 'overflow-hidden rounded-lg border',
                 )}
-                {visibleDocuments.map(doc => {
-                  const existing = existingByKey[doc.type];
-                  const newFile = uploads[doc.type]?.file ?? null;
-                  const willReplace = Boolean(existing && newFile);
-                  const review = existing ? reviewByKey[existing.key] ?? null : null;
-                  const reviewState = existing
-                    ? deriveDocumentReviewState(existing, review)
-                    : 'pending';
-                  const isReplacing = !!replaceMode[doc.type];
-                  // Show the upload section either when there is no existing
-                  // doc (initial submission) or when the user explicitly opted
-                  // into replacing the existing one via the "Zastąp" button.
-                  const showUploadSection = !existing || isReplacing;
-                  const DocIcon = getDocumentIcon(doc.type);
-                  const isComplete = isRequiredDocComplete(
-                    doc,
-                    existingByKey,
-                    uploads,
-                    isContractor,
-                    hasOcPolicyInAccount,
-                  );
-
-                  return (
-                    <React.Fragment key={doc.type}>
-                    <section
-                      id={doc.type === 'insurance' && isContractor ? 'oc-policy' : undefined}
-                      className={cn(
-                        'px-4 py-5 sm:px-6',
-                        reviewState === 'rejected' && 'bg-destructive/[0.03]',
-                        reviewState === 'approved' && existing && 'bg-emerald-500/[0.03]',
-                      )}
+              >
+                {useContractorDocumentSections && userId ? (
+                  <>
+                    <DocumentsSectionShell
+                      eyebrow="Sekcja A"
+                      heading="Polisa OC (odpowiedzialność cywilna)"
+                      id="oc-policy"
                     >
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex min-w-0 gap-3">
-                          <div
-                            className={cn(
-                              'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border',
-                              isComplete && doc.required
-                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                                : 'border-border bg-muted/50 text-muted-foreground',
-                            )}
-                          >
-                            <DocIcon className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-sm font-semibold">{doc.name}</h3>
-                              {doc.required ? (
-                                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
-                                  Wymagany
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                  Opcjonalny
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{doc.description}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-                          {existing ? (
-                            <ReviewBadge state={reviewState} />
-                          ) : doc.required && isComplete ? (
-                            <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
-                              <Check className="h-3 w-3" />
-                              Gotowe
-                            </Badge>
-                          ) : null}
-                          {willReplace && (
-                            <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">
-                              <RefreshCw className="h-3 w-3" />
-                              Do zastąpienia
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        {existing && (
-                          <ExistingDocChip
-                            doc={existing}
-                            review={review}
-                            reviewState={reviewState}
-                            onReplace={() => toggleReplace(doc.type)}
-                            isReplacing={isReplacing}
-                          />
+                      {visibleDocuments
+                        .filter(doc => doc.type === 'insurance')
+                        .map(doc =>
+                          renderContractorDocumentRow(doc, { nestedInSectionShell: true }),
                         )}
-
-                        {doc.type === 'insurance' && isContractor && (
-                          <div className="rounded-lg border border-dashed border-border/80 bg-muted/15 p-3 sm:p-4 space-y-4">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                              <div className="min-w-0 flex-1 space-y-1.5">
-                                <Label
-                                  htmlFor="oc-valid-until-verification"
-                                  className="flex items-center gap-1.5 text-xs font-medium"
-                                >
-                                  <Calendar className="h-3.5 w-3.5 text-primary" />
-                                  Ważność polisy do
-                                </Label>
-                                <Input
-                                  id="oc-valid-until-verification"
-                                  type="date"
-                                  value={ocValidUntil}
-                                  onChange={e => setOcValidUntil(e.target.value)}
-                                  disabled={isSavingOcDate}
-                                  className="max-w-xs bg-background"
-                                />
-                              </div>
-                              <div className="min-w-0 flex-1 space-y-1.5">
-                                <Label htmlFor="oc-guarantee-amount" className="text-xs font-medium">
-                                  Suma gwarancyjna polisy (zł)
-                                </Label>
-                                <Input
-                                  id="oc-guarantee-amount"
-                                  type="number"
-                                  min={0}
-                                  inputMode="numeric"
-                                  placeholder="np. 200000"
-                                  value={ocGuaranteeAmount}
-                                  onChange={e => setOcGuaranteeAmount(e.target.value)}
-                                  disabled={isSavingOcDate}
-                                  className="max-w-xs bg-background"
-                                />
-                              </div>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={ocDateDirty ? 'default' : 'outline'}
-                                disabled={!ocDateDirty || isSavingOcDate}
-                                onClick={handleSaveOcValidUntil}
-                                className="shrink-0"
-                              >
-                                {isSavingOcDate ? 'Zapisywanie...' : 'Zapisz dane OC'}
-                              </Button>
-                            </div>
-                          </div>
+                    </DocumentsSectionShell>
+                    <DocumentsSectionShell
+                      eyebrow="Sekcja B"
+                      heading="Zaświadczenia urzędowe: ZUS i US"
+                      description="Zarządcy wymagają dokumentów nie starszych niż 3 miesiące."
+                    >
+                      <ContractorOfficialCertificatesSettings userId={userId} />
+                    </DocumentsSectionShell>
+                    <DocumentsSectionShell
+                      eyebrow="Sekcja C"
+                      heading="Certyfikaty i zadeklarowane uprawnienia"
+                    >
+                      {visibleDocuments
+                        .filter(doc => doc.type === 'certifications')
+                        .map(doc =>
+                          renderContractorDocumentRow(doc, { nestedInSectionShell: true }),
                         )}
-
-                        {showUploadSection && (
-                          <div className="rounded-lg border border-dashed border-border/80 bg-muted/10 p-3 sm:p-4 overflow-hidden">
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
-                              <div className="flex min-w-0 flex-col gap-1.5 overflow-hidden">
-                                <Label className="text-xs font-medium text-foreground">
-                                  Plik dokumentu
-                                </Label>
-                                <Dropzone
-                                  accept={{
-                                    'application/pdf': ['.pdf'],
-                                    'image/*': ['.jpg', '.jpeg', '.png'],
-                                  }}
-                                  maxFiles={1}
-                                  maxSize={10 * 1024 * 1024}
-                                  minSize={1024}
-                                  onDrop={(acceptedFiles, fileRejections) =>
-                                    handleFileDrop(doc.type, acceptedFiles, fileRejections)
-                                  }
-                                  disabled={isSubmitting}
-                                  src={newFile ? [newFile] : []}
-                                  className="!h-[5.5rem] !max-h-[5.5rem] !min-h-0 w-full !p-3 shrink-0"
-                                >
-                                  <DropzoneEmptyState>
-                                    <div className="flex flex-col items-center justify-center gap-1 py-1">
-                                      <div className="flex size-6 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                                        <Upload className="h-3.5 w-3.5" />
-                                      </div>
-                                      <p className="text-xs font-medium text-center">
-                                        Przeciągnij lub kliknij, aby wybrać plik
-                                      </p>
-                                      <p className="text-[11px] text-muted-foreground text-center">
-                                        PDF, JPG, PNG · max 10 MB
-                                      </p>
-                                    </div>
-                                  </DropzoneEmptyState>
-                                  <DropzoneContent>
-                                    {newFile && (
-                                      <div className="flex w-full flex-col items-center justify-center gap-0.5 py-1">
-                                        <div className="flex items-center gap-1.5">
-                                          <FileText className="h-4 w-4 text-primary" />
-                                          <span className="max-w-[140px] truncate text-xs font-medium sm:max-w-[180px]">
-                                            {newFile.name}
-                                          </span>
-                                          <Check className="h-3.5 w-3.5 text-success" />
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground">
-                                          {formatFileSize(newFile.size)} · kliknij, aby zmienić
-                                        </p>
-                                      </div>
-                                    )}
-                                  </DropzoneContent>
-                                </Dropzone>
-                                {newFile && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeFile(doc.type)}
-                                    className="w-full"
-                                  >
-                                    <X className="h-4 w-4 mr-2" />
-                                    Usuń wybrany plik
-                                  </Button>
-                                )}
-                              </div>
-
-                              <div className="flex min-w-0 flex-col gap-1.5">
-                                <Label htmlFor={`desc-${doc.type}`} className="text-xs font-medium">
-                                  Komentarz (opcjonalnie)
-                                </Label>
-                                <Textarea
-                                  id={`desc-${doc.type}`}
-                                  placeholder="Np. zakres uprawnień, numer polisy..."
-                                  value={uploads[doc.type]?.description || ''}
-                                  onChange={e =>
-                                    handleDescriptionChange(doc.type, e.target.value)
-                                  }
-                                  className="h-[5.5rem] min-h-[5.5rem] max-h-40 resize-y bg-background"
-                                  rows={3}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </section>
-                    {doc.type === 'insurance' && useContractorDocumentSections && userId && (
-                      <>
-                        <div className="bg-muted/40 px-4 py-3 sm:px-6 border-t">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Sekcja B — Zaświadczenia urzędowe (ZUS i US)
+                      <div className="mt-8 space-y-3 border-t border-border pt-6">
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground">
+                            Typy uprawnień w profilu
+                          </h4>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Zaznacz kategorie zgodne z dokumentami i zapisz listę — ułatwia to
+                            weryfikację.
                           </p>
                         </div>
-                        <section className="px-4 py-5 sm:px-6">
-                          <ContractorOfficialCertificatesSettings userId={userId} />
-                        </section>
-                      </>
-                    )}
-                    {doc.type === 'certifications' && useContractorDocumentSections && userId && (
-                      <div className="bg-muted/40 px-4 py-3 sm:px-6 border-t">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Sekcja C — Uprawnienia zawodowe i certyfikaty
-                        </p>
-                      </div>
-                    )}
-                    {doc.type === 'certifications' && useContractorDocumentSections && userId && (
-                      <section className="px-4 py-5 sm:px-6 border-t">
                         <ContractorProfessionalQualificationsChecklist userId={userId} />
-                      </section>
-                    )}
-                    {doc.type === 'references' && useContractorDocumentSections && (
-                      <div className="bg-muted/40 px-4 py-3 sm:px-6 border-t">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Sekcja D — Referencje i portfolio
-                        </p>
                       </div>
-                    )}
-                    {doc.type === 'references' && userId && isContractor && (
-                      <ContractorProfessionalQualificationsSettings
-                        userId={userId}
-                        variant="section"
-                      />
-                    )}
-                    </React.Fragment>
-                  );
-                })}
+                    </DocumentsSectionShell>
+                    <DocumentsSectionShell eyebrow="Sekcja D" heading="Referencje i dodatkowy skan kwalifikacji">
+                      {visibleDocuments
+                        .filter(doc => doc.type === 'references')
+                        .map(doc =>
+                          renderContractorDocumentRow(doc, { nestedInSectionShell: true }),
+                        )}
+                      <div className="mt-8 space-y-3 border-t border-border pt-6">
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground">
+                            Skan certyfikatu lub licencji (opcjonalnie)
+                          </h4>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Osobny plik uzupełniający certyfikaty z części C — np. skan licencji
+                            branżowej.
+                          </p>
+                        </div>
+                        <ContractorProfessionalQualificationsSettings
+                          userId={userId}
+                          variant="section"
+                          hideSectionChrome
+                        />
+                      </div>
+                    </DocumentsSectionShell>
+                  </>
+                ) : (
+                  visibleDocuments.map(doc => renderContractorDocumentRow(doc))
+                )}
               </div>
 
               <div className="space-y-4 border-t bg-muted/20 px-4 py-5 sm:px-6">
@@ -1193,6 +1393,15 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
           )}
         </div>
     </div>
+      <DocumentRemovalAlertDialog
+        open={pendingDocRemovalKey !== null}
+        onOpenChange={open => {
+          if (!open && !isRemovingDoc) setPendingDocRemovalKey(null);
+        }}
+        onConfirm={handleConfirmRemoveStoredDocument}
+        isPending={isRemovingDoc}
+      />
+    </>
   );
 
   if (embedded) {
