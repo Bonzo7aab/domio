@@ -1,0 +1,116 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { createClient } from '../../../lib/supabase/server';
+import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
+import { acceptManagerTenderOffer } from '../../../lib/database/offer-selection';
+import { canCancelContest } from '../../../lib/tender-workflow-status';
+
+const KONKURSY_PATH = '/manager-dashboard/konkursy';
+
+function revalidateKonkursy(tenderId?: string): void {
+  revalidatePath(KONKURSY_PATH);
+  if (tenderId) {
+    revalidatePath(`${KONKURSY_PATH}/porownaj/${tenderId}`);
+  }
+}
+
+export async function acceptTenderOfferAction(
+  tenderId: string,
+  bidId: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenderId?.trim() || !bidId?.trim()) {
+    return { success: false, error: 'Nieprawidłowe dane' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: 'Wymagane logowanie' };
+  }
+
+  const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+    supabase,
+    user.id,
+  );
+
+  if (companyError || !company) {
+    return { success: false, error: 'Brak firmy zarządcy' };
+  }
+
+  const result = await acceptManagerTenderOffer(supabase, {
+    tenderId: tenderId.trim(),
+    bidId: bidId.trim(),
+    managerId: user.id,
+    companyId: company.id,
+  });
+
+  if (result.success) {
+    revalidateKonkursy(tenderId.trim());
+    revalidatePath('/manager-dashboard/zgloszenia');
+  }
+
+  return result;
+}
+
+export async function cancelContestAction(
+  tenderId: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenderId?.trim()) {
+    return { success: false, error: 'Nieprawidłowe dane' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: 'Wymagane logowanie' };
+  }
+
+  const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+    supabase,
+    user.id,
+  );
+
+  if (companyError || !company) {
+    return { success: false, error: 'Brak firmy zarządcy' };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: tender, error: fetchErr } = await (supabase as any)
+    .from('tenders')
+    .select('id, status, manager_id, company_id')
+    .eq('id', tenderId.trim())
+    .maybeSingle();
+
+  if (fetchErr || !tender) {
+    return { success: false, error: 'Nie znaleziono konkursu' };
+  }
+
+  if (tender.manager_id !== user.id || tender.company_id !== company.id) {
+    return { success: false, error: 'Brak uprawnień' };
+  }
+
+  if (!canCancelContest(tender.status)) {
+    return { success: false, error: 'Tego konkursu nie można już unieważnić' };
+  }
+
+  const now = new Date().toISOString();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: updateErr } = await (supabase as any)
+    .from('tenders')
+    .update({ status: 'cancelled', updated_at: now })
+    .eq('id', tenderId.trim());
+
+  if (updateErr) {
+    return { success: false, error: updateErr.message || 'Nie udało się unieważnić konkursu' };
+  }
+
+  revalidateKonkursy(tenderId.trim());
+  return { success: true };
+}

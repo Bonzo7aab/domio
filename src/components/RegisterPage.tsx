@@ -191,6 +191,11 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
       contentMaxWidth="lg"
       title="Zarejestruj się"
       subtitle="Kilka pól — i możesz korzystać z platformy."
+      trustNote={
+        selectedUserType === 'manager'
+          ? 'Dane chronione zgodnie z RODO.'
+          : 'Dane chronione zgodnie z RODO. Weryfikacja dokumentów dla wykonawców.'
+      }
       side={{
         heading:
           selectedUserType === 'contractor'

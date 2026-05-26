@@ -2771,14 +2771,20 @@ export async function createTenderBid(
 /**
  * Fetch tender bids for a specific tender
  */
+export interface FetchTenderBidsOptions {
+  /** Exclude draft bids (OPD-66 contest wizard). */
+  submittedOnly?: boolean;
+}
+
 export async function fetchTenderBidsByTenderId(
   supabase: SupabaseClient<Database>,
-  tenderId: string
+  tenderId: string,
+  options?: FetchTenderBidsOptions,
 ): Promise<{ data: Record<string, unknown>[] | null; error: PostgrestError | null }> {
   try {
     // Use type assertion since tender_bids may not be in generated types
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: bids, error } = await (supabase as any)
+    let query = (supabase as any)
       .from('tender_bids')
       .select(`
         id,
@@ -2794,6 +2800,7 @@ export async function fetchTenderBidsByTenderId(
         project_references,
         certificates,
         attachments,
+        offer_details,
         status,
         evaluation_score,
         evaluation_notes,
@@ -2812,8 +2819,13 @@ export async function fetchTenderBidsByTenderId(
         )
       `)
       .eq('tender_id', tenderId)
-      .neq('admin_moderation_status', 'suspended')
-      .order('submitted_at', { ascending: false });
+      .neq('admin_moderation_status', 'suspended');
+
+    if (options?.submittedOnly) {
+      query = query.neq('status', 'draft');
+    }
+
+    const { data: bids, error } = await query.order('submitted_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching tender bids:', error);
@@ -2829,7 +2841,24 @@ export async function fetchTenderBidsByTenderId(
         
         // Convert proposed_timeline (days) to number
         const proposedTimeline = Number(bid.proposed_timeline ?? 0);
-        
+        const offerDetails = bid.offer_details as Record<string, unknown> | null | undefined;
+        const netFromOffer =
+          typeof offerDetails?.netPrice === 'number'
+            ? offerDetails.netPrice
+            : bid.bid_amount || 0;
+        const vatFromOffer =
+          offerDetails?.vatRate === '8' || offerDetails?.vatRate === '23' || offerDetails?.vatRate === 'zw'
+            ? offerDetails.vatRate
+            : null;
+        const grossFromOffer =
+          typeof offerDetails?.grossPrice === 'number' ? offerDetails.grossPrice : null;
+        const warrantyMonths =
+          typeof offerDetails?.warrantyMonths === 'number' ? offerDetails.warrantyMonths : null;
+        const guaranteeMonths =
+          typeof offerDetails?.guaranteeMonths === 'number'
+            ? offerDetails.guaranteeMonths
+            : warrantyMonths;
+
         return {
           id: bid.id,
           contractorCompanyId: String((bid.company as Record<string, unknown>)?.id ?? ''),
@@ -2841,17 +2870,23 @@ export async function fetchTenderBidsByTenderId(
           contractorAvatar: String((bid.contractor as Record<string, unknown>)?.avatar_url ?? (bid.company as Record<string, unknown>)?.logo_url ?? ''),
           contractorRating: contractorProfile?.rating?.overall || 0,
           contractorCompletedJobs: contractorProfile?.experience?.completedProjects || 0,
-          totalPrice: bid.bid_amount || 0,
+          contractorReviewsCount: contractorProfile?.rating?.reviewsCount ?? 0,
+          totalPrice: netFromOffer,
+          netPrice: netFromOffer,
+          vatRate: vatFromOffer,
+          grossPrice: grossFromOffer,
           currency: 'PLN',
           proposedTimeline: proposedTimeline,
           proposedStartDate: bid.proposed_start_date ? new Date(String(bid.proposed_start_date)) : new Date(),
-          guaranteePeriod: 12, // Default, could be extracted from bid if available
+          guaranteePeriod: guaranteeMonths ?? 12,
+          warrantyMonths: warrantyMonths,
           description: String(bid.technical_proposal ?? ''),
           technicalProposal: String(bid.technical_proposal ?? ''),
+          offerDetails: offerDetails ?? null,
           attachments: (bid.attachments as Array<Record<string, unknown>>) || [],
           criteriaResponses: [], // Would need to be extracted from bid if stored separately
           submittedAt: new Date(String(bid.submitted_at ?? '')),
-          status: (bid.status as 'submitted' | 'under_review' | 'shortlisted' | 'rejected' | 'awarded') || 'submitted',
+          status: bid.status || 'submitted',
           evaluation: bid.evaluation_score || bid.evaluation_notes ? {
             criteriaScores: {},
             totalScore: bid.evaluation_score || 0,

@@ -1630,7 +1630,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       </Button>
                     )}
                     <Button asChild variant="outline" className="w-full">
-                      <Link href="/manager-dashboard/zgloszenia">Moje zgłoszenia</Link>
+                      <Link href="/manager-dashboard/konkursy">Konkursy</Link>
                     </Button>
                     {(job.applications ?? 0) > 0 && (
                       <Button asChild variant="secondary" className="w-full">

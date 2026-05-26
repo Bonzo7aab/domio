@@ -35,6 +35,8 @@ interface AuthPageLayoutProps {
   testId?: string;
   headingTestId?: string;
   contentMaxWidth?: 'md' | 'lg';
+  /** Footer trust line on the side panel. Omit contractor verification note for managers. */
+  trustNote?: string;
   side: {
     heading: string;
     body: string;
@@ -43,7 +45,13 @@ interface AuthPageLayoutProps {
   };
 }
 
-function AuthSidePanel({ side }: { side: AuthPageLayoutProps['side'] }) {
+function AuthSidePanel({
+  side,
+  trustNote = 'Dane chronione zgodnie z RODO. Weryfikacja dokumentów dla wykonawców.',
+}: {
+  side: AuthPageLayoutProps['side'];
+  trustNote?: string;
+}) {
   const highlights: AuthSideHighlight[] = side.highlights ?? [
     { icon: Map, label: 'Mapa zleceń' },
     { icon: Users, label: 'Dwie strony rynku' },
@@ -140,9 +148,7 @@ function AuthSidePanel({ side }: { side: AuthPageLayoutProps['side'] }) {
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/25">
               <Shield className="h-4 w-4 text-emerald-200" />
             </span>
-            <p className="text-xs leading-snug text-white/70">
-              Dane chronione zgodnie z RODO. Weryfikacja dokumentów dla wykonawców.
-            </p>
+            <p className="text-xs leading-snug text-white/70">{trustNote}</p>
           </div>
         </div>
       </div>
@@ -158,12 +164,13 @@ export function AuthPageLayout({
   testId,
   headingTestId,
   contentMaxWidth = 'md',
+  trustNote,
   side,
 }: AuthPageLayoutProps) {
   return (
     <div className="min-h-screen bg-background" data-testid={testId}>
       <div className="lg:grid lg:min-h-screen lg:grid-cols-2">
-        <AuthSidePanel side={side} />
+        <AuthSidePanel side={side} trustNote={trustNote} />
 
         <main className="flex min-h-screen flex-col justify-center px-4 py-10 sm:px-8 lg:min-h-0 lg:px-10 xl:px-14">
           <div

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
   FileText,
   Loader2,
   Upload,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -31,7 +32,12 @@ import { Progress } from '../ui/progress';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
 import type { ContestInfo } from '../../types/job';
-import type { ContestOfferFormData, ResolvedContractorDocument } from '../../types/contest-offer';
+import type {
+  ContestOfferAttachmentRef,
+  ContestOfferFormData,
+  FormalRequirementKey,
+  ResolvedContractorDocument,
+} from '../../types/contest-offer';
 import {
   computeGrossFromNet,
   createEmptyContestOfferForm,
@@ -46,6 +52,10 @@ import {
   upsertTenderBidDraft,
   validateContestOfferSubmit,
 } from '../../lib/database/contest-offers';
+import {
+  applyProfileDocumentsToForm,
+  buildFormalAttachmentFromProfile,
+} from '../../lib/contest-offer/build-profile-formal-attachment';
 import {
   loadContractorReferencesPrefill,
   resolveContractorDocuments,
@@ -97,6 +107,7 @@ export function ContestOfferSubmissionDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const profileDocsAppliedRef = useRef(false);
 
   const totalSteps = 4;
   const warrantyOptions = warrantyMonthsOptions(contestInfo.warrantyPeriod);
@@ -133,6 +144,10 @@ export function ContestOfferSubmissionDialog({
           const step = (draft.offer_details as { currentStep?: number }).currentStep;
           if (step && step >= 1 && step <= 4) setCurrentStep(step);
         }
+        hydrated.formalAttachments = applyProfileDocumentsToForm(
+          docs,
+          hydrated.formalAttachments,
+        ) as ContestOfferFormData['formalAttachments'];
         setForm(hydrated);
       } else {
         const empty = createEmptyContestOfferForm();
@@ -140,8 +155,13 @@ export function ContestOfferSubmissionDialog({
         if (contestInfo.paymentTerms.mode === 'standard_14') {
           empty.paymentTermsAccepted = true;
         }
+        empty.formalAttachments = applyProfileDocumentsToForm(
+          docs,
+          empty.formalAttachments,
+        ) as ContestOfferFormData['formalAttachments'];
         setForm(empty);
         setCurrentStep(1);
+        profileDocsAppliedRef.current = true;
       }
     } catch (e) {
       console.error(e);
@@ -154,6 +174,24 @@ export function ContestOfferSubmissionDialog({
   useEffect(() => {
     void loadInitial();
   }, [loadInitial]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      profileDocsAppliedRef.current = false;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (currentStep !== 3 || isLoading || profileDocsAppliedRef.current) return;
+    profileDocsAppliedRef.current = true;
+    setForm((prev) => ({
+      ...prev,
+      formalAttachments: applyProfileDocumentsToForm(
+        resolvedDocs,
+        prev.formalAttachments,
+      ) as ContestOfferFormData['formalAttachments'],
+    }));
+  }, [currentStep, isLoading, resolvedDocs]);
 
   const patchForm = (patch: Partial<ContestOfferFormData>) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -214,22 +252,46 @@ export function ContestOfferSubmissionDialog({
     }));
   };
 
-  const applyProfileDocument = (doc: ResolvedContractorDocument) => {
-    if (!doc.path) return;
-    patchForm({
-      formalAttachments: {
-        ...form.formalAttachments,
-        [doc.requirementKey]: {
-          id: `profile-${doc.requirementKey}`,
-          name: doc.fileName ?? doc.label,
-          path: doc.path,
-          url: doc.signedUrl ?? undefined,
-          type: 'document',
-          source: 'profile',
-          requirementKey: doc.requirementKey,
-        },
-      },
+  const removeFormalDocument = (key: FormalRequirementKey): void => {
+    setForm((prev) => {
+      const { [key]: _attachment, ...formalAttachments } = prev.formalAttachments;
+      const { [key]: _staged, ...stagedFiles } = prev.stagedFiles;
+      return { ...prev, formalAttachments, stagedFiles };
     });
+  };
+
+  const replaceFormalDocument = (key: FormalRequirementKey, file: File): void => {
+    setForm((prev) => {
+      const { [key]: _attachment, ...formalAttachments } = prev.formalAttachments;
+      return {
+        ...prev,
+        formalAttachments,
+        stagedFiles: { ...prev.stagedFiles, [key]: [file] },
+      };
+    });
+  };
+
+  const applyProfileDocument = (doc: ResolvedContractorDocument): void => {
+    const attachment = buildFormalAttachmentFromProfile(doc);
+    if (!attachment) return;
+    setForm((prev) => {
+      const { [doc.requirementKey]: _staged, ...stagedFiles } = prev.stagedFiles;
+      return {
+        ...prev,
+        formalAttachments: {
+          ...prev.formalAttachments,
+          [doc.requirementKey]: attachment,
+        },
+        stagedFiles,
+      };
+    });
+  };
+
+  const removeExtraAttachment = (id: string): void => {
+    setForm((prev) => ({
+      ...prev,
+      extraAttachments: prev.extraAttachments.filter((a) => a.id !== id),
+    }));
   };
 
   return (
@@ -377,16 +439,24 @@ export function ContestOfferSubmissionDialog({
 
               {currentStep === 3 && (
                 <div className="space-y-6">
-                  {resolvedDocs.map((doc) => (
-                    <FormalDocBlock
-                      key={doc.requirementKey}
-                      doc={doc}
-                      attached={form.formalAttachments[doc.requirementKey]}
-                      stagedName={form.stagedFiles[doc.requirementKey]?.[0]?.name}
-                      onUseProfile={() => applyProfileDocument(doc)}
-                      onUpload={(file) => stageFile(doc.requirementKey, file)}
-                    />
-                  ))}
+                  <p className="text-sm text-muted-foreground rounded-lg border bg-muted/40 p-3">
+                    Wymagane dokumenty są uzupełniane automatycznie z Twojego profilu, jeśli są
+                    dostępne. Możesz je usunąć, zastąpić innym plikiem lub wgrać brakujące
+                    dokumenty.
+                  </p>
+                  {resolvedDocs
+                    .filter((doc) => doc.requirementKey !== 'references')
+                    .map((doc) => (
+                      <FormalDocBlock
+                        key={doc.requirementKey}
+                        doc={doc}
+                        attached={form.formalAttachments[doc.requirementKey]}
+                        stagedName={form.stagedFiles[doc.requirementKey]?.[0]?.name}
+                        onUseProfile={() => applyProfileDocument(doc)}
+                        onUpload={(file) => replaceFormalDocument(doc.requirementKey, file)}
+                        onRemove={() => removeFormalDocument(doc.requirementKey)}
+                      />
+                    ))}
                   {contestInfo.formalRequirements.references && (
                     <div>
                       <Label htmlFor="referencesText">Referencje – wykaz zrealizowanych prac *</Label>
@@ -405,15 +475,45 @@ export function ContestOfferSubmissionDialog({
                       />
                     </div>
                   )}
-                  <div>
+                  <div className="space-y-3">
                     <Label>Inne załączniki</Label>
+                    {form.extraAttachments.length > 0 ? (
+                      <ul className="space-y-2">
+                        {form.extraAttachments.map((att) => (
+                          <li
+                            key={att.id}
+                            className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <FileText className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{att.name}</span>
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0 h-8 w-8"
+                              aria-label={`Usuń ${att.name}`}
+                              onClick={() => removeExtraAttachment(att.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {form.stagedFiles.other?.[0] ? (
+                      <p className="text-xs text-muted-foreground">
+                        Do wgrania przy zapisie: {form.stagedFiles.other[0].name}
+                      </p>
+                    ) : null}
                     <Input
                       type="file"
                       accept=".pdf,.doc,.docx,image/*"
-                      className="mt-1"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) stageFile('other', file);
+                        e.target.value = '';
                       }}
                     />
                   </div>
@@ -605,63 +705,127 @@ function FormalDocBlock({
   stagedName,
   onUseProfile,
   onUpload,
+  onRemove,
 }: {
   doc: ResolvedContractorDocument;
-  attached?: { name: string; source: string };
+  attached?: ContestOfferAttachmentRef;
   stagedName?: string;
   onUseProfile: () => void;
   onUpload: (file: File) => void;
+  onRemove: () => void;
 }): React.ReactElement {
+  const displayName = stagedName ?? attached?.name;
+  const isAttached = Boolean(displayName);
+  const fromProfile = attached?.source === 'profile' && !stagedName;
+  const pendingUpload = Boolean(stagedName);
+
   return (
-    <div className="rounded-lg border p-4 space-y-2">
+    <div className="rounded-lg border p-4 space-y-3">
       <div className="font-medium">{doc.label}</div>
-      {doc.missing ? (
-        <p className="text-sm text-muted-foreground flex items-center gap-2">
-          Brak dokumentu w Twoim profilu.{' '}
-          <Link
-            href={CONTRACTOR_VERIFICATION_DOCUMENTS_PATH}
-            className="text-primary inline-flex items-center gap-1 hover:underline"
-          >
-            Uzupełnij w profilu
-            <ExternalLink className="h-3 w-3" />
-          </Link>
-        </p>
+
+      {isAttached ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="space-y-1 text-sm min-w-0">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                <span className="font-medium truncate">{displayName}</span>
+              </div>
+              {fromProfile ? (
+                <p className="text-muted-foreground pl-6">
+                  Dokument został dodany z profilu.
+                </p>
+              ) : pendingUpload ? (
+                <p className="text-muted-foreground pl-6">
+                  Nowy plik zostanie dołączony po zapisaniu szkicu lub wysłaniu oferty.
+                </p>
+              ) : (
+                <p className="text-muted-foreground pl-6">Dokument dołączony do oferty.</p>
+              )}
+              {attached?.url && !stagedName ? (
+                <Link
+                  href={attached.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary text-xs pl-6 hover:underline inline-flex items-center gap-1"
+                >
+                  Podgląd pliku
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              ) : null}
+            </div>
+            <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+              Usuń
+            </Button>
+          </div>
+          <div>
+            <Label className="text-xs">Zmień plik</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                type="file"
+                accept=".pdf,.doc,.docx,image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onUpload(file);
+                  e.target.value = '';
+                }}
+              />
+              <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+            </div>
+          </div>
+        </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-          <span>Dokument w profilu:</span>
-          {doc.signedUrl ? (
-            <Link href={doc.signedUrl} target="_blank" className="text-primary hover:underline">
-              {doc.fileName}
-            </Link>
+        <div className="space-y-3">
+          {doc.missing ? (
+            <p className="text-sm text-muted-foreground">
+              Brak tego dokumentu w profilu.{' '}
+              <Link
+                href={CONTRACTOR_VERIFICATION_DOCUMENTS_PATH}
+                className="text-primary inline-flex items-center gap-1 hover:underline"
+              >
+                Uzupełnij w profilu
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </p>
           ) : (
-            <span>{doc.fileName}</span>
+            <div className="text-sm space-y-2">
+              <p className="text-muted-foreground">W profilu masz:</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {doc.signedUrl ? (
+                  <Link
+                    href={doc.signedUrl}
+                    target="_blank"
+                    className="text-primary hover:underline"
+                  >
+                    {doc.fileName}
+                  </Link>
+                ) : (
+                  <span>{doc.fileName}</span>
+                )}
+                {doc.hint ? <Badge variant="secondary">{doc.hint}</Badge> : null}
+                <Button type="button" size="sm" variant="outline" onClick={onUseProfile}>
+                  Użyj z profilu
+                </Button>
+              </div>
+            </div>
           )}
-          {doc.hint && <Badge variant="secondary">{doc.hint}</Badge>}
-          <Button type="button" size="sm" variant="outline" onClick={onUseProfile}>
-            Użyj z profilu
-          </Button>
+          <div>
+            <Label className="text-xs">Wgraj dokument do oferty</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                type="file"
+                accept=".pdf,.doc,.docx,image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onUpload(file);
+                  e.target.value = '';
+                }}
+              />
+              <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+            </div>
+          </div>
         </div>
       )}
-      <div>
-        <Label className="text-xs">Lub wgraj dokument do tej oferty</Label>
-        <div className="flex items-center gap-2 mt-1">
-          <Input
-            type="file"
-            accept=".pdf,.doc,.docx,image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onUpload(file);
-            }}
-          />
-          <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-        </div>
-        {(attached || stagedName) && (
-          <p className="text-xs text-muted-foreground mt-1">
-            Do oferty: {stagedName ?? attached?.name} ({attached?.source ?? 'nowy plik'})
-          </p>
-        )}
-      </div>
     </div>
   );
 }

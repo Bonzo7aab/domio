@@ -32,7 +32,7 @@ export default function PostTenderEditPage() {
   return (
     <TenderCreationPage
       tenderId={id}
-      onBack={() => router.push('/manager-dashboard/zgloszenia?typ=przetarg')}
+      onBack={() => router.push('/manager-dashboard/konkursy')}
     />
   );
 }

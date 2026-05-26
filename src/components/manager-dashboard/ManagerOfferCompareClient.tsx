@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowDown, ArrowLeft, ArrowUp, Phone, Mail } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Lock, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '../../lib/supabase/client';
 import {
@@ -37,6 +37,15 @@ import {
   acceptJobOfferAction,
   acceptTenderOfferAction,
 } from '../../app/manager-dashboard/zgloszenia/actions';
+import { acceptTenderOfferAction as acceptContestOfferAction } from '../../app/manager-dashboard/konkursy/actions';
+import type { ContestOfferDetails } from '../../types/contest-offer';
+import { computeGrossFromNet } from '../../types/contest-offer';
+import type { ContestOfferVatRate } from '../../types/contest-offer';
+import {
+  getContestWorkflowStatusLabel,
+  isContestCompareReadOnly,
+} from '../../lib/tender-workflow-status';
+import { formatCompareLockedTooltip } from '../../lib/contest-submission-deadline';
 import {
   Table,
   TableBody,
@@ -68,22 +77,69 @@ interface TenderBidLike {
   contractorCompanyId?: string;
   contractorCompany: string;
   contractorRating: number;
+  contractorReviewsCount?: number;
   contractorCompletedJobs: number;
   totalPrice: number;
+  netPrice?: number;
+  vatRate?: ContestOfferVatRate | null;
+  grossPrice?: number | null;
+  warrantyMonths?: number | null;
   proposedTimeline: number;
   proposedStartDate: Date;
   guaranteePeriod: number;
   technicalProposal: string;
+  offerDetails?: ContestOfferDetails | Record<string, unknown> | null;
   attachments: Array<Record<string, unknown>>;
+  status?: string;
 }
 
 function netFromBid(bid: TenderBidLike): number {
-  return bid.totalPrice;
+  return bid.netPrice ?? bid.totalPrice;
+}
+
+function vatLabelFromBid(bid: TenderBidLike): string {
+  if (bid.vatRate === 'zw') return 'ZW';
+  if (bid.vatRate === '8') return '8%';
+  if (bid.vatRate === '23') return '23%';
+  return '23%';
+}
+
+function bruttoFromBid(bid: TenderBidLike): number {
+  if (bid.grossPrice != null && !Number.isNaN(bid.grossPrice)) {
+    return bid.grossPrice;
+  }
+  const net = netFromBid(bid);
+  const rate = bid.vatRate ?? '23';
+  if (rate === 'zw') return net;
+  return computeGrossFromNet(net, rate);
+}
+
+function collectContestDocuments(bid: TenderBidLike): Array<{ name: string; url?: string }> {
+  const details = bid.offerDetails as ContestOfferDetails | null | undefined;
+  const docs: Array<{ name: string; url?: string }> = [];
+  if (details?.formalAttachments) {
+    for (const ref of Object.values(details.formalAttachments)) {
+      if (ref?.name) docs.push({ name: ref.name, url: ref.url });
+    }
+  }
+  if (details?.extraAttachments) {
+    for (const ref of details.extraAttachments) {
+      if (ref?.name) docs.push({ name: ref.name, url: ref.url });
+    }
+  }
+  if (docs.length === 0 && bid.attachments?.length) {
+    for (const raw of bid.attachments) {
+      const name = String((raw as { name?: string }).name ?? 'Plik');
+      docs.push({ name });
+    }
+  }
+  return docs;
 }
 
 interface ManagerOfferCompareClientProps {
   submissionId: string;
   kind: CompareKind;
+  contestMode?: boolean;
 }
 
 function formatMoney(amount: number): string {
@@ -157,9 +213,12 @@ function SortableTh({ label, sortKey, sort, onSort }: SortableThProps): React.Re
 export function ManagerOfferCompareClient({
   submissionId,
   kind,
+  contestMode = false,
 }: ManagerOfferCompareClientProps): React.ReactElement {
   const router = useRouter();
   const [title, setTitle] = useState<string>('');
+  const [tenderStatus, setTenderStatus] = useState<string | null>(null);
+  const [submissionDeadline, setSubmissionDeadline] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [jobApps, setJobApps] = useState<Application[]>([]);
   const [tenderBids, setTenderBids] = useState<TenderBidLike[]>([]);
@@ -235,7 +294,7 @@ export function ManagerOfferCompareClient({
           cmp = netA - netB;
           break;
         case 'brutto':
-          cmp = grossFromVat(netA, DEFAULT_VAT) - grossFromVat(netB, DEFAULT_VAT);
+          cmp = bruttoFromBid(a) - bruttoFromBid(b);
           break;
         case 'start':
           cmp =
@@ -303,15 +362,25 @@ export function ManagerOfferCompareClient({
         } else {
           const [{ data: tender, error: tErr }, { data: bids, error: bErr }] = await Promise.all([
             fetchTenderById(supabase, submissionId),
-            fetchTenderBidsByTenderId(supabase, submissionId),
+            fetchTenderBidsByTenderId(supabase, submissionId, {
+              submittedOnly: contestMode,
+            }),
           ]);
           if (cancelled) return;
           if (tErr || !tender) {
             toast.error('Nie udało się wczytać przetargu');
             setTitle('');
             setTenderBids([]);
+            setTenderStatus(null);
           } else {
             setTitle(tender.title);
+            setTenderStatus(tender.status);
+            setSubmissionDeadline(tender.submission_deadline ?? null);
+            if (contestMode && tender.status === 'active') {
+              toast.error('Porównanie ofert będzie dostępne po zakończeniu zbierania ofert');
+              router.replace('/manager-dashboard/konkursy');
+              return;
+            }
             const normalized = (bids || []) as unknown as TenderBidLike[];
             setTenderBids(normalized);
             await loadProfiles(normalized.map((b) => b.contractorCompanyId || ''));
@@ -329,9 +398,13 @@ export function ManagerOfferCompareClient({
     return () => {
       cancelled = true;
     };
-  }, [kind, submissionId, loadProfiles]);
+  }, [kind, submissionId, loadProfiles, contestMode, router]);
 
-  const backHref = '/manager-dashboard/zgloszenia';
+  const backHref = contestMode ? '/manager-dashboard/konkursy' : '/manager-dashboard/zgloszenia';
+  const compareReadOnly =
+    contestMode && tenderStatus != null && isContestCompareReadOnly(tenderStatus);
+  const canSelectWinner =
+    contestMode && tenderStatus === 'evaluation' && !compareReadOnly;
 
   const profileForCompany = (id: string | undefined): ContractorProfile | null => {
     if (!id) return null;
@@ -366,6 +439,9 @@ export function ManagerOfferCompareClient({
   };
 
   const submissionRedirectUrl = (): string => {
+    if (contestMode) {
+      return `/manager-dashboard/konkursy?podglad=${submissionId}&tab=selected-offer`;
+    }
     const typ = kind === 'tender' ? 'przetarg' : 'zgłoszenie';
     return `/manager-dashboard/zgloszenia?podglad=${submissionId}&typ=${encodeURIComponent(typ)}&tab=selected-offer`;
   };
@@ -382,7 +458,9 @@ export function ManagerOfferCompareClient({
           return;
         }
       } else if (kind === 'tender' && detailBid) {
-        const result = await acceptTenderOfferAction(submissionId, detailBid.id);
+        const result = contestMode
+          ? await acceptContestOfferAction(submissionId, detailBid.id)
+          : await acceptTenderOfferAction(submissionId, detailBid.id);
         if (!result.success) {
           toast.error(result.error || 'Nie udało się wybrać oferty');
           return;
@@ -424,13 +502,28 @@ export function ManagerOfferCompareClient({
     <div className="space-y-6 max-w-7xl mx-auto px-4 py-8">
       <Button variant="outline" onClick={() => router.push(backHref)} className="gap-2">
         <ArrowLeft className="h-4 w-4" />
-        Powrót do listy zgłoszeń
+        {contestMode ? 'Powrót do konkursów' : 'Powrót do listy zgłoszeń'}
       </Button>
 
       <div>
         <h1 className="text-2xl font-bold">Porównanie ofert</h1>
         <p className="text-muted-foreground mt-1">{title}</p>
+        {contestMode && tenderStatus ? (
+          <p className="text-sm mt-1">
+            Status: {getContestWorkflowStatusLabel(tenderStatus)}
+            {compareReadOnly ? ' — widok archiwalny' : ''}
+          </p>
+        ) : null}
       </div>
+
+      {contestMode && tenderStatus === 'active' ? (
+        <Card>
+          <CardContent className="pt-6 flex items-start gap-3 text-muted-foreground">
+            <Lock className="h-5 w-5 shrink-0 mt-0.5" aria-hidden />
+            <p>{formatCompareLockedTooltip(submissionDeadline)}</p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {kind === 'job' ? (
         <Card>
@@ -480,6 +573,106 @@ export function ManagerOfferCompareClient({
                           <Button size="sm" variant="outline" onClick={() => openDetailFromApp(app)}>
                             Szczegóły
                           </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : contestMode ? (
+        <Card>
+          <CardContent className="pt-6 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableTh label="Wykonawca" sortKey="contractor" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Cena netto" sortKey="net" sort={sort} onSort={toggleSort} />
+                  <TableHead>VAT</TableHead>
+                  <SortableTh label="Cena brutto" sortKey="brutto" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Gwarancja" sortKey="guarantee" sort={sort} onSort={toggleSort} />
+                  <TableHead>Dokumenty wykonawcy</TableHead>
+                  <TableHead className="text-right">Akcja</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tenderBids.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                      Brak złożonych ofert do porównania.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedTenderBids.map((bid) => {
+                    const net = netFromBid(bid);
+                    const brutto = bruttoFromBid(bid);
+                    const warranty =
+                      bid.warrantyMonths ?? bid.guaranteePeriod ?? null;
+                    const reviews = bid.contractorReviewsCount ?? 0;
+                    const docs = collectContestDocuments(bid);
+                    const isWinner = bid.status === 'accepted';
+                    return (
+                      <TableRow key={bid.id} className={isWinner ? 'bg-primary/5' : undefined}>
+                        <TableCell>
+                          <div className="font-medium">{bid.contractorCompany}</div>
+                          <div className="text-xs text-muted-foreground">
+                            ⭐ {bid.contractorRating.toFixed(1)}
+                            {reviews > 0 ? ` (${reviews} ${reviews === 1 ? 'ocena' : 'ocen'})` : ''}
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatMoney(net)}</TableCell>
+                        <TableCell>{vatLabelFromBid(bid)}</TableCell>
+                        <TableCell className="font-semibold">{formatMoney(brutto)}</TableCell>
+                        <TableCell>
+                          {warranty != null ? `${warranty} msc` : '—'}
+                        </TableCell>
+                        <TableCell className="text-sm max-w-[200px]">
+                          {docs.length === 0 ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <ul className="space-y-0.5">
+                              {docs.slice(0, 3).map((doc) => (
+                                <li key={doc.name}>
+                                  {doc.url ? (
+                                    <a
+                                      href={doc.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline"
+                                    >
+                                      {doc.name}
+                                    </a>
+                                  ) : (
+                                    doc.name
+                                  )}
+                                </li>
+                              ))}
+                              {docs.length > 3 ? (
+                                <li className="text-muted-foreground">+{docs.length - 3} więcej</li>
+                              ) : null}
+                            </ul>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button size="sm" variant="outline" onClick={() => openDetailFromBid(bid)}>
+                            Szczegóły
+                          </Button>
+                          {canSelectWinner && !isWinner ? (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setDetailBid(bid);
+                                openConfirmSelect();
+                              }}
+                            >
+                              Wybierz ofertę
+                            </Button>
+                          ) : null}
+                          {isWinner ? (
+                            <span className="text-xs font-medium text-primary">Wybrana</span>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     );
@@ -612,13 +805,13 @@ export function ManagerOfferCompareClient({
                       </div>
                       <div>
                         <span className="text-muted-foreground">VAT: </span>
-                        {DEFAULT_VAT}% (
-                        {formatMoney(grossFromVat(netFromBid(detailBid), DEFAULT_VAT) - netFromBid(detailBid))}
+                        {vatLabelFromBid(detailBid)} (
+                        {formatMoney(bruttoFromBid(detailBid) - netFromBid(detailBid))}
                         )
                       </div>
                       <div>
                         <span className="text-muted-foreground">Kwota brutto: </span>
-                        <strong>{formatMoney(grossFromVat(netFromBid(detailBid), DEFAULT_VAT))}</strong>
+                        <strong>{formatMoney(bruttoFromBid(detailBid))}</strong>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Termin rozpoczęcia: </span>
@@ -696,9 +889,11 @@ export function ManagerOfferCompareClient({
               )}
 
               <div className="flex flex-col gap-2 sm:flex-row pt-2">
+                {(kind === 'job' || !compareReadOnly) && (kind !== 'tender' || canSelectWinner || !contestMode) ? (
                 <Button className="flex-1" onClick={openConfirmSelect}>
                   Wybierz tę ofertę
                 </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   className="flex-1"

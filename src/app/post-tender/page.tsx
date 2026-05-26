@@ -20,6 +20,6 @@ export default function PostTenderPage() {
   }
 
   return (
-    <TenderCreationPage onBack={() => router.push('/manager-dashboard/zgloszenia')} />
+    <TenderCreationPage onBack={() => router.push('/manager-dashboard/konkursy')} />
   );
 }

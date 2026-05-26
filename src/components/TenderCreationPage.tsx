@@ -191,7 +191,7 @@ export default function TenderCreationPage({
             : 'Konkurs zapisany jako szkic'
           : 'Konkurs został opublikowany',
       );
-      router.push('/manager-dashboard/zgloszenia?typ=przetarg');
+      router.push('/manager-dashboard/konkursy');
     } catch (error) {
       console.error('Error saving contest:', error);
       toast.error('Wystąpił błąd podczas zapisywania konkursu');

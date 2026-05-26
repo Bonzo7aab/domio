@@ -13,7 +13,7 @@ interface TenderContestPageHeaderProps {
 
 export function TenderContestPageHeader({
   onBack,
-  backLabel = 'Moje zgłoszenia',
+  backLabel = 'Konkursy',
   title = 'Nowy konkurs ofert',
   subtitle = 'Uzupełnij zakres, terminy składania ofert i wymagania formalne. Zapisz jako szkic lub opublikuj od razu.',
 }: TenderContestPageHeaderProps): React.ReactElement {

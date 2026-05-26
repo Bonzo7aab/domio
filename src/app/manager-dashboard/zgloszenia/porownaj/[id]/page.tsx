@@ -1,24 +1,18 @@
-import { Suspense } from 'react';
-import { Card, CardContent } from '../../../../../components/ui/card';
-import { ManagerPorownajPageClient } from './ManagerPorownajPageClient';
+import { redirect } from 'next/navigation';
 
-function CompareFallback(): React.ReactElement {
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <Card>
-        <CardContent className="pt-6 flex items-center justify-center gap-2 text-muted-foreground">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          Ładowanie…
-        </CardContent>
-      </Card>
-    </div>
-  );
+interface LegacyPorownajPageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ typ?: string }>;
 }
 
-export default function PorownajOfertyPage(): React.ReactElement {
-  return (
-    <Suspense fallback={<CompareFallback />}>
-      <ManagerPorownajPageClient />
-    </Suspense>
-  );
+export default async function LegacyPorownajPage({
+  params,
+  searchParams,
+}: LegacyPorownajPageProps): Promise<never> {
+  const { id } = await params;
+  const { typ } = await searchParams;
+  if (typ === 'zgłoszenie') {
+    redirect(`/manager-dashboard/jobs/${id}/applications`);
+  }
+  redirect(`/manager-dashboard/konkursy/porownaj/${id}`);
 }

@@ -1,28 +1,42 @@
 /**
- * Manager przetarg workflow (aligned with job labels where applicable).
+ * Manager przetarg / konkurs workflow.
  */
 
 export const TENDER_WORKFLOW_STATUSES = ['active', 'evaluation', 'awarded'] as const;
 
 export type TenderWorkflowStatus = (typeof TENDER_WORKFLOW_STATUSES)[number];
 
+export const CONTEST_STATUS_FILTER_OPTIONS = [
+  { value: 'all', label: 'Wszystkie statusy' },
+  { value: 'draft', label: 'Szkic konkursu' },
+  { value: 'active', label: 'Zbieranie ofert' },
+  { value: 'evaluation', label: 'Wybór ofert' },
+  { value: 'awarded', label: 'Konkurs rozstrzygnięty' },
+  { value: 'cancelled', label: 'Konkurs unieważniony' },
+] as const;
+
 const WORKFLOW_LABELS: Record<TenderWorkflowStatus, string> = {
   active: 'Zbieranie ofert',
   evaluation: 'Wybór ofert',
-  awarded: 'W realizacji',
+  awarded: 'Konkurs rozstrzygnięty',
 };
 
 const EXTRA_LABELS: Record<string, string> = {
-  draft: 'Szkic',
+  draft: 'Szkic konkursu',
   paused: 'Wstrzymane',
-  cancelled: 'Anulowane',
+  cancelled: 'Konkurs unieważniony',
 };
 
-export function getTenderWorkflowStatusLabel(status: string): string {
+/** OPD-60 contest-specific labels (preferred in Konkursy UI). */
+export function getContestWorkflowStatusLabel(status: string): string {
   if (status in WORKFLOW_LABELS) {
     return WORKFLOW_LABELS[status as TenderWorkflowStatus];
   }
   return EXTRA_LABELS[status] || status;
+}
+
+export function getTenderWorkflowStatusLabel(status: string): string {
+  return getContestWorkflowStatusLabel(status);
 }
 
 export function getTenderWorkflowStatusIndex(status: string): number {
@@ -104,4 +118,17 @@ export function isTenderWorkflowStatusRegression(
     return toIdx < minIdx;
   }
   return false;
+}
+
+/** Manager may open compare only in evaluation (or read-only in awarded/cancelled). */
+export function canCompareContestOffers(status: string): boolean {
+  return status === 'evaluation' || status === 'awarded' || status === 'cancelled';
+}
+
+export function isContestCompareReadOnly(status: string): boolean {
+  return status === 'awarded' || status === 'cancelled';
+}
+
+export function canCancelContest(status: string): boolean {
+  return status === 'active' || status === 'evaluation';
 }

@@ -277,7 +277,24 @@ export async function acceptManagerTenderOffer(
     };
   }
 
+  await createOrderFromContestWinner({
+    tenderId,
+    bidId,
+    managerId: params.managerId,
+    companyId: params.companyId,
+  });
+
   return { success: true };
+}
+
+/** OPD-63: creates Zamówienie when manager selects contest winner. */
+async function createOrderFromContestWinner(_params: {
+  tenderId: string;
+  bidId: string;
+  managerId: string;
+  companyId: string;
+}): Promise<void> {
+  // Stub — full Zamówienia flow tracked in OPD-63.
 }
 
 /** Load accepted job application for manager "Wybrana Oferta" tab. */

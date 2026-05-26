@@ -206,7 +206,7 @@ async function registerActionImpl(
       first_name: firstName,
       last_name: lastName,
       phone: phone || null,
-      is_verified: false,
+      is_verified: userType === 'manager',
       profile_completed: false,
       onboarding_completed: false,
     })
@@ -234,8 +234,8 @@ async function registerActionImpl(
     country: 'PL',
     email: email,
     phone: phone || null,
-    is_verified: false,
-    verification_level: 'none' as const,
+    is_verified: userType === 'manager',
+    verification_level: userType === 'manager' ? ('verified' as const) : ('none' as const),
   }
 
   const { data: companyRow, error: companyError } = await admin

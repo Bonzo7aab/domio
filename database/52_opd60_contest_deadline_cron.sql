@@ -1,0 +1,2 @@
+-- OPD-60: Auto-advance contests from active → evaluation after submission deadline
+-- See supabase/migrations/20260526140000_opd60_contest_deadline_cron.sql

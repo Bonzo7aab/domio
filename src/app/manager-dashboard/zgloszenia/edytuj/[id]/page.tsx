@@ -37,7 +37,7 @@ export default function EdytujZgloszeniePage(): ReactElement {
     <PostJobPage
       jobId={id}
       onBack={() => {
-        router.push('/manager-dashboard/zgloszenia');
+        router.push('/manager-dashboard/konkursy');
       }}
     />
   );

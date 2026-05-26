@@ -58,6 +58,7 @@ export async function updateJobWorkflowStatusAction(
   }
 
   revalidatePath('/manager-dashboard/zgloszenia');
+  revalidatePath('/manager-dashboard/konkursy');
   revalidatePath(`/jobs/${jobId.trim()}`);
 
   return { success: true };
@@ -112,6 +113,7 @@ export async function updateTenderWorkflowStatusAction(
   }
 
   revalidatePath('/manager-dashboard/zgloszenia');
+  revalidatePath('/manager-dashboard/konkursy');
 
   return { success: true };
 }
@@ -193,7 +195,9 @@ export async function acceptTenderOfferAction(
 
   if (result.success) {
     revalidatePath('/manager-dashboard/zgloszenia');
+    revalidatePath('/manager-dashboard/konkursy');
     revalidatePath(`/manager-dashboard/zgloszenia/porownaj/${tenderId.trim()}`);
+    revalidatePath(`/manager-dashboard/konkursy/porownaj/${tenderId.trim()}`);
   }
 
   return result;

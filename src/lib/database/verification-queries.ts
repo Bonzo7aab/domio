@@ -32,7 +32,7 @@ export async function getUserVerificationStatus(
 
   const { data: profile, error: profileErr } = await sb
     .from('user_profiles')
-    .select('is_verified, verification_submitted_at')
+    .select('user_type, is_verified, verification_submitted_at')
     .eq('id', userId)
     .maybeSingle();
 
@@ -40,7 +40,16 @@ export async function getUserVerificationStatus(
     return EMPTY_STATUS;
   }
 
-  const typedProfile = profile as ProfileVerificationRow;
+  const typedProfile = profile as ProfileVerificationRow & { user_type?: string | null };
+  if (typedProfile.user_type === 'manager') {
+    return {
+      state: 'approved',
+      submittedAt: typedProfile.verification_submitted_at ?? null,
+      decidedAt: null,
+      reason: null,
+    };
+  }
+
   const isVerified = typedProfile.is_verified === true;
   const submittedAt = typedProfile.verification_submitted_at ?? null;
 

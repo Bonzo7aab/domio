@@ -101,7 +101,7 @@ export function Header({ initialUser }: HeaderProps) {
       : 'Wykonawca'
 
   const handleZgloszeniaClick = () => {
-    router.push('/manager-dashboard/zgloszenia')
+    router.push('/manager-dashboard/konkursy')
   }
 
   // Navigation handlers
@@ -409,7 +409,7 @@ export function Header({ initialUser }: HeaderProps) {
                               onClick={handleZgloszeniaClick}
                             >
                               <ClipboardList className="mr-2 h-4 w-4" />
-                              <span>Zgłoszenia</span>
+                              <span>Konkursy</span>
                             </Button>
                             <Button
                               variant="ghost"
@@ -561,7 +561,7 @@ export function Header({ initialUser }: HeaderProps) {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleZgloszeniaClick}>
                           <ClipboardList className="mr-2 h-4 w-4" />
-                          <span>Zgłoszenia</span>
+                          <span>Konkursy</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout}>
