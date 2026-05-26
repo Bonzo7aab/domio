@@ -2681,14 +2681,14 @@ export async function createTenderBid(
       };
     }
     
-    // Check if a non-cancelled bid already exists for this tender and company
+    // Block only submitted (non-draft, non-cancelled) bids — drafts allowed for contest flow
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingBids, error: checkError } = await (supabase as any)
       .from('tender_bids')
       .select('id, status')
       .eq('tender_id', tenderId)
       .eq('company_id', company.id)
-      .neq('status', 'cancelled')
+      .in('status', ['submitted', 'under_review', 'shortlisted', 'accepted', 'rejected'])
       .limit(1);
     
     if (checkError) {

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { requirePlatformAdmin } from '../../../../lib/admin/require-platform-admin';
 import { getUserVerificationStatus } from '../../../../lib/database/verification-queries';
 import { VerificationSubjectHeader } from '../../../../components/admin/VerificationSubjectHeader';
-import { createAdminClient } from '../../../../lib/supabase/admin';
+import { createAdminClientOrNull } from '../../../../lib/supabase/admin';
 import {
   countSubmittedDocuments,
   expectedDocumentCount,
@@ -62,21 +62,49 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
     .single();
 
   if (error || !profile) {
+    if (error) {
+      console.error('[admin/verification] user_profiles read failed', {
+        userId,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+    }
     notFound();
   }
 
   const notes = await fetchAdminNotesForUser(supabase, userId);
 
-  const adminClient = createAdminClient();
-  const { data: authUser } = await adminClient.auth.admin.getUserById(userId);
-  const email = authUser.user?.email ?? null;
+  const ucsEarly = (profile.user_companies ?? []) as Array<{
+    is_primary?: boolean;
+    companies?: { email?: string };
+  }>;
+  const primaryEarly = ucsEarly.find((uc) => uc.is_primary) ?? ucsEarly[0];
+  let email: string | null = primaryEarly?.companies?.email ?? null;
+
+  const elevatedClient = createAdminClientOrNull();
+  if (elevatedClient) {
+    try {
+      const { data: authUser, error: authError } = await elevatedClient.auth.admin.getUserById(userId);
+      if (authError) {
+        console.error('[admin/verification] auth.admin.getUserById failed', {
+          userId,
+          message: authError.message,
+        });
+      } else {
+        email = authUser.user?.email ?? email;
+      }
+    } catch (authErr) {
+      console.error('[admin/verification] auth.admin.getUserById threw', authErr);
+    }
+  }
 
   let ocValidUntil: string | null = null;
   let ocPolicyScanPath: string | null = null;
 
   if (profile.user_type === 'contractor') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: cas, error: casError } = await (adminClient as any)
+    const { data: cas, error: casError } = await sb
       .from('contractor_account_settings')
       .select('oc_valid_until, oc_policy_scan_path')
       .eq('user_id', userId)

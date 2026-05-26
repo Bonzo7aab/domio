@@ -1,4 +1,5 @@
 import { createClient } from '../supabase/client';
+import { isStorageObjectNotFound, normalizeStorageObjectPath } from '../storage/signed-url';
 import type {
   ContractorServiceAreaSettings,
   ContractorVatStatus,
@@ -567,12 +568,15 @@ export async function removeVerificationDocumentsFromBucket(paths: string[]): Pr
  */
 export async function getVerificationDocumentSignedUrl(path: string): Promise<string | null> {
   const supabase = createClient();
+  const objectPath = normalizeStorageObjectPath(path, CONTRACTOR_POLICY_BUCKET);
   const { data, error } = await supabase.storage
     .from(CONTRACTOR_POLICY_BUCKET)
-    .createSignedUrl(path, OC_POLICY_SIGNED_URL_TTL_SEC);
+    .createSignedUrl(objectPath, OC_POLICY_SIGNED_URL_TTL_SEC);
 
   if (error || !data?.signedUrl) {
-    console.error('getVerificationDocumentSignedUrl:', error);
+    if (error && !isStorageObjectNotFound(error)) {
+      console.warn('getVerificationDocumentSignedUrl:', (error as { message?: string }).message);
+    }
     return null;
   }
 

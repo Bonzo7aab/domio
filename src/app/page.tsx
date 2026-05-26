@@ -23,6 +23,13 @@ import { createJobApplication, createTenderBid } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { VerificationRequiredApplyDialog } from '../components/VerificationRequiredApplyDialog';
 import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
+import { ContestOfferSubmissionDialog } from '../components/contest-offer/ContestOfferSubmissionDialog';
+import { getTenderById } from '../lib/data';
+import {
+  isContestTender,
+  mapTenderRowToContestDisplay,
+} from '../lib/tender-contest/map-tender-contest-display';
+import type { ContestInfo } from '../types/job';
 
 // Dynamically import heavy components to reduce initial bundle size
 const EnhancedMapViewGoogleMaps = dynamic(
@@ -63,6 +70,12 @@ function HomePageContent() {
   const [searchRadius, setSearchRadius] = useState(25);
   // Keep map-related state for when map is expanded
   const [applicationModalOpen, setApplicationModalOpen] = useState(false);
+  const [contestOfferModalOpen, setContestOfferModalOpen] = useState(false);
+  const [contestOfferContext, setContestOfferContext] = useState<{
+    jobId: string;
+    job: Job;
+    contestInfo: ContestInfo;
+  } | null>(null);
   const [verificationApplyDialogOpen, setVerificationApplyDialogOpen] = useState(false);
   const [selectedApplicationJobId, setSelectedApplicationJobId] = useState<string | null>(null);
   const [selectedApplicationJob, setSelectedApplicationJob] = useState<Job | null>(null);
@@ -335,9 +348,28 @@ function HomePageContent() {
   }, [setLocationChangeHandler]);
 
   const openApplicationFlow = React.useCallback(
-    (jobId: string, jobData?: Job) => {
+    async (jobId: string, jobData?: Job) => {
+      const job = jobData ?? jobs.find((j) => j.id === jobId) ?? null;
+
+      if (job?.contestInfo) {
+        setContestOfferContext({ jobId, job, contestInfo: job.contestInfo });
+        setContestOfferModalOpen(true);
+        return;
+      }
+
+      if (job?.postType === 'tender') {
+        const { data: dbTender } = await getTenderById(jobId);
+        if (dbTender && isContestTender(dbTender)) {
+          const contestInfo = mapTenderRowToContestDisplay(dbTender);
+          const enriched = { ...job, contestInfo };
+          setContestOfferContext({ jobId, job: enriched, contestInfo });
+          setContestOfferModalOpen(true);
+          return;
+        }
+      }
+
       setSelectedApplicationJobId(jobId);
-      setSelectedApplicationJob(jobData ?? jobs.find(j => j.id === jobId) ?? null);
+      setSelectedApplicationJob(job);
       setApplicationModalOpen(true);
     },
     [jobs],
@@ -582,7 +614,32 @@ function HomePageContent() {
         onOpenChange={setVerificationApplyDialogOpen}
       />
 
-      {/* Job Application Modal */}
+      {contestOfferModalOpen && contestOfferContext && user?.id && (
+        <ContestOfferSubmissionDialog
+          isOpen={contestOfferModalOpen}
+          onClose={() => {
+            setContestOfferModalOpen(false);
+            setContestOfferContext(null);
+          }}
+          tenderId={contestOfferContext.jobId}
+          jobTitle={contestOfferContext.job.title}
+          description={contestOfferContext.job.description}
+          category={
+            typeof contestOfferContext.job.category === 'string'
+              ? contestOfferContext.job.category
+              : contestOfferContext.job.category?.name
+          }
+          subcategory={contestOfferContext.job.subcategory}
+          contestInfo={contestOfferContext.contestInfo}
+          contractorId={user.id}
+          onSubmitted={() => {
+            setContestOfferModalOpen(false);
+            setContestOfferContext(null);
+          }}
+        />
+      )}
+
+      {/* Job Application Modal (jobs and legacy tenders) */}
       {applicationModalOpen && selectedApplicationJobId && (
         <JobApplicationModal
           isOpen={applicationModalOpen}

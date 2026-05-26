@@ -3,7 +3,8 @@
  * This extends the existing notification system with push notifications
  */
 
-import { createAdminClient } from '../supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createAdminClientOrNull } from '../supabase/admin';
 import type { Database } from '../../types/database';
 import {
   sendPushNotificationIfEnabled,
@@ -22,6 +23,8 @@ export interface CreateNotificationOptions {
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   expiresAt?: Date;
   sendPush?: boolean; // Default: true, set to false to skip push notification
+  /** Authenticated admin session or service-role client. Prefer over elevated env when available. */
+  supabase?: SupabaseClient<Database>;
 }
 
 /**
@@ -35,8 +38,20 @@ export async function createNotificationWithPush(
   pushSent: boolean;
   error?: Error;
 }> {
-  const supabase = createAdminClient();
+  const supabase = options.supabase ?? createAdminClientOrNull();
   const sendPush = options.sendPush !== false; // Default to true
+
+  if (!supabase) {
+    const missingKeyError = new Error(
+      'Cannot create notification: pass `supabase` from an authenticated admin action, or set SUPABASE_SECRET_KEY / SUPABASE_SERVICE_ROLE_KEY for server-side inserts.',
+    );
+    console.warn('createNotificationWithPush:', missingKeyError.message);
+    return {
+      notificationId: null,
+      pushSent: false,
+      error: missingKeyError,
+    };
+  }
 
   try {
     // Create notification in database

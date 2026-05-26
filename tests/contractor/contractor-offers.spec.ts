@@ -4,6 +4,7 @@ import {
   createUniqueTestUsers,
   createTestJob,
   createTestTender,
+  createTestContestTender,
   cleanupTestData,
 } from '../helpers/offer-helpers';
 
@@ -963,6 +964,121 @@ test.describe('Contractor Making Offers', () => {
         await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
       } finally {
         // Cleanup is handled by afterEach hook, but also cleanup here as backup
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
+      }
+    });
+  });
+
+  test.describe('Contest offer wizard (OPD-66)', () => {
+    async function gotoJobPage(
+      page: import('@playwright/test').Page,
+      jobId: string,
+    ): Promise<void> {
+      await page.goto(`/jobs/${jobId}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.waitForLoadState('networkidle');
+    }
+
+    async function advanceContestWizardToFinancial(
+      page: import('@playwright/test').Page,
+    ): Promise<void> {
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText(/składasz ofertę w konkursie/i)).toBeVisible();
+      await dialog.getByRole('button', { name: 'Dalej' }).click();
+      const completion = new Date();
+      completion.setMonth(completion.getMonth() + 2);
+      await dialog.locator('#proposedCompletionDate').fill(completion.toISOString().slice(0, 10));
+      await dialog.getByRole('button', { name: 'Dalej' }).click();
+      await dialog.getByRole('button', { name: 'Dalej' }).click();
+    }
+
+    test('should open contest wizard and submit offer to sejf', async ({ page }) => {
+      try {
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
+
+        const contest = await createTestContestTender(manager.user.id, manager.company.id);
+        testData.tenderIds.push(contest.id);
+
+        await loginViaUI(page, contractor.email, contractor.password);
+        await gotoJobPage(page, contest.id);
+
+        await page.getByRole('button', { name: /złóż ofertę/i }).click();
+        await advanceContestWizardToFinancial(page);
+
+        const dialog = page.getByRole('dialog');
+        await dialog.locator('#netPrice').fill('12000');
+        const combos = dialog.getByRole('combobox');
+        await combos.nth(1).click();
+        await page.getByRole('option').first().click();
+        await combos.nth(2).click();
+        await page.getByRole('option').first().click();
+
+        await dialog.getByRole('button', { name: /wyślij ofertę do sejfu/i }).click();
+
+        await expect(
+          page.locator('[data-sonner-toast]').filter({ hasText: /oferta została wysłana do sejfu/i }).first(),
+        ).toBeVisible({ timeout: 20000 });
+      } finally {
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
+      }
+    });
+
+    test('should save draft and resume via Kontynuuj szkic', async ({ page }) => {
+      try {
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
+
+        const contest = await createTestContestTender(manager.user.id, manager.company.id, {
+          title: `Draft Contest ${Date.now()}`,
+        });
+        testData.tenderIds.push(contest.id);
+
+        await loginViaUI(page, contractor.email, contractor.password);
+        await gotoJobPage(page, contest.id);
+
+        await page.getByRole('button', { name: /złóż ofertę/i }).click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByText(/składasz ofertę w konkursie/i)).toBeVisible();
+        await dialog.getByRole('button', { name: 'Dalej' }).click();
+        const completion = new Date();
+        completion.setMonth(completion.getMonth() + 1);
+        await dialog.locator('#proposedCompletionDate').fill(completion.toISOString().slice(0, 10));
+        await dialog.getByRole('button', { name: /zapisz jako szkic/i }).click();
+        await expect(
+          page.locator('[data-sonner-toast]').filter({ hasText: /szkic oferty został zapisany/i }).first(),
+        ).toBeVisible({ timeout: 15000 });
+        await dialog.getByRole('button', { name: /close/i }).click().catch(() => undefined);
+        await page.keyboard.press('Escape');
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await page.getByRole('button', { name: /kontynuuj szkic oferty/i }).click();
+        await expect(dialog.getByText(/składasz ofertę w konkursie/i)).toBeVisible();
+        await expect(dialog.locator('#proposedCompletionDate')).toHaveValue(completion.toISOString().slice(0, 10));
+      } finally {
+        await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
+      }
+    });
+
+    test('legacy tender still uses JobApplicationModal', async ({ page }) => {
+      try {
+        const { contractor, manager } = await createUniqueTestUsers();
+        testData.userEmails.push(contractor.email, manager.email);
+        testData.companyIds.push(contractor.company.id, manager.company.id);
+
+        const legacyTender = await createTestTender(manager.user.id, manager.company.id, {
+          title: `Legacy Tender ${Date.now()}`,
+        });
+        testData.tenderIds.push(legacyTender.id);
+
+        await loginViaUI(page, contractor.email, contractor.password);
+        await gotoJobPage(page, legacyTender.id);
+
+        await page.getByRole('button', { name: /złóż ofertę/i }).click();
+        await expect(page.getByText(/złóż ofertę w przetargu/i)).toBeVisible();
+        await expect(page.getByText(/składasz ofertę w konkursie/i)).not.toBeVisible();
+      } finally {
         await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);
       }
     });

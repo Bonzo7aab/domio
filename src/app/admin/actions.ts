@@ -2,7 +2,7 @@
 
 import { instrumentServerAction } from '../../lib/sentry/instrument-server-action';
 import { revalidatePath } from 'next/cache';
-import { createAdminClient } from '../../lib/supabase/admin';
+import { createAdminClientOrNull } from '../../lib/supabase/admin';
 import { createClient } from '../../lib/supabase/server';
 import { requirePlatformAdmin } from '../../lib/admin/require-platform-admin';
 import { createNotificationWithPush } from '../../lib/database/notifications-server';
@@ -81,6 +81,7 @@ async function approveVerificationSubjectActionImpl(subjectUserId: string): Prom
   await logAdminAction(sb, actorId, 'verification_approve', 'user_profiles', subjectUserId, { company_id: companyId });
 
   await createNotificationWithPush({
+    supabase,
     userId: subjectUserId,
     type: 'verification_approved',
     title: 'Konto zweryfikowane',
@@ -158,6 +159,7 @@ async function rejectVerificationSubjectActionImpl(
   });
 
   await createNotificationWithPush({
+    supabase,
     userId: subjectUserId,
     type: 'verification_rejected',
     title: 'Weryfikacja odrzucona',
@@ -166,11 +168,17 @@ async function rejectVerificationSubjectActionImpl(
     sendPush: true,
   });
 
-  const admin = createAdminClient();
-  const { data: authUser } = await admin.auth.admin.getUserById(subjectUserId);
-  const email = authUser.user?.email;
-  if (email) {
-    await sendVerificationRejectionEmail({ toEmail: email, reason: trimmed });
+  const elevated = createAdminClientOrNull();
+  if (elevated) {
+    const { data: authUser } = await elevated.auth.admin.getUserById(subjectUserId);
+    const email = authUser.user?.email;
+    if (email) {
+      await sendVerificationRejectionEmail({ toEmail: email, reason: trimmed });
+    }
+  } else {
+    console.warn(
+      '[admin/verification] Skipping rejection email: SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY not set',
+    );
   }
 
   revalidatePath('/admin/verification');
@@ -273,6 +281,7 @@ async function suspendJobApplicationActionImpl(
   }
 
   await createNotificationWithPush({
+    supabase,
     userId: appRow.contractor_id as string,
     type: 'offer_admin_moderation',
     title: 'Oferta wymaga poprawy',
@@ -344,6 +353,7 @@ async function suspendTenderBidActionImpl(bidId: string, feedback: string): Prom
   }
 
   await createNotificationWithPush({
+    supabase,
     userId: bidRow.contractor_id as string,
     type: 'offer_admin_moderation',
     title: 'Oferta przetargowa wymaga poprawy',
@@ -576,6 +586,7 @@ async function pauseJobListingActionImpl(jobId: string, feedback: string): Promi
   }
 
   await createNotificationWithPush({
+    supabase,
     userId: job.manager_id as string,
     type: 'listing_admin_paused',
     title: 'Zgłoszenie zawieszone przez administratora',
@@ -634,6 +645,7 @@ async function pauseTenderListingActionImpl(
   }
 
   await createNotificationWithPush({
+    supabase,
     userId: tender.manager_id as string,
     type: 'listing_admin_paused',
     title: 'Przetarg zawieszony przez administratora',

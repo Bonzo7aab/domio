@@ -158,5 +158,7 @@ export async function updateSession(request: NextRequest) {
   //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
   // 3. Change the myNewResponse object instead of the supabaseResponse object
 
+  supabaseResponse.headers.set('x-pathname', pathname)
+
   return supabaseResponse
 }

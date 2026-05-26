@@ -13,6 +13,29 @@ function resolveElevatedSupabaseKey(): string | undefined {
   return process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
 }
 
+/** True when server env has a key that can bypass RLS (auth admin, etc.). */
+export function hasElevatedSupabaseKey(): boolean {
+  return Boolean(resolveElevatedSupabaseKey() && process.env.NEXT_PUBLIC_SUPABASE_URL)
+}
+
+/**
+ * Returns an elevated client when configured; otherwise `null` (no throw).
+ * Use for optional admin features (e.g. auth.users email) in local dev without service role.
+ */
+export function createAdminClientOrNull(): ReturnType<typeof createClient<Database>> | null {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const elevatedKey = resolveElevatedSupabaseKey()
+  if (!supabaseUrl || !elevatedKey) {
+    return null
+  }
+  return createClient<Database>(supabaseUrl, elevatedKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+
 export function createAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const elevatedKey = resolveElevatedSupabaseKey()

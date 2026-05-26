@@ -4,7 +4,7 @@
  */
 
 import webpush from 'web-push';
-import { createAdminClient } from '../supabase/admin';
+import { createAdminClientOrNull } from '../supabase/admin';
 import type { Database } from '../../types/database';
 
 type PushSubscription = Database['public']['Tables']['push_subscriptions']['Row'];
@@ -122,8 +122,11 @@ export async function sendPushNotificationToUser(
   failed: number;
   errors: Array<{ subscriptionId: string; error: Error }>;
 }> {
-  const supabase = createAdminClient();
-  
+  const supabase = createAdminClientOrNull();
+  if (!supabase) {
+    return { sent: 0, failed: 0, errors: [] };
+  }
+
   // Get all push subscriptions for the user
   const { data: subscriptions, error } = await supabase
     .from('push_subscriptions')
@@ -192,7 +195,10 @@ export async function shouldSendPushNotification(
   userId: string,
   notificationType: string
 ): Promise<boolean> {
-  const supabase = createAdminClient();
+  const supabase = createAdminClientOrNull();
+  if (!supabase) {
+    return false;
+  }
 
   const { data: preferences, error } = await supabase
     .from('notification_preferences')

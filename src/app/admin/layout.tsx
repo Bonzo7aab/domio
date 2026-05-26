@@ -1,10 +1,13 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { requirePlatformAdmin } from '../../lib/admin/require-platform-admin';
 import { AdminNav } from '../../components/admin/AdminNav';
 import { Button } from '../../components/ui/button';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await requirePlatformAdmin('/admin');
+  const headerStore = await headers();
+  const redirectTo = headerStore.get('x-pathname') ?? '/admin';
+  const session = await requirePlatformAdmin(redirectTo);
   const email = session.email ?? '';
 
   return (

@@ -46,6 +46,8 @@ import { ManagerJobStatusSelect } from './manager-dashboard/ManagerJobStatusSele
 import { canManagerEditJobFields, getJobWorkflowStatusLabel } from '../lib/job-workflow-status';
 import { VerificationRequiredApplyDialog } from './VerificationRequiredApplyDialog';
 import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
+import { ContestOfferSubmissionDialog } from './contest-offer/ContestOfferSubmissionDialog';
+import { fetchTenderBidOfferState } from '../lib/database/contest-offers';
 
 interface JobPageProps {
   jobId: string;
@@ -498,6 +500,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const [jobData, setJobData] = useState<JobDisplayData | null>(null);
   const [isLoadingJob, setIsLoadingJob] = useState(true);
   const [hasExistingBid, setHasExistingBid] = useState(false);
+  const [hasDraftBid, setHasDraftBid] = useState(false);
+  const [showContestOfferForm, setShowContestOfferForm] = useState(false);
   const [isCheckingBid, setIsCheckingBid] = useState(false);
   const [existingConversationId, setExistingConversationId] = useState<string | null>(null);
   const [isCheckingConversation, setIsCheckingConversation] = useState(false);
@@ -667,52 +671,30 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     };
   }, [jobData]);
 
-  // Check if user has already submitted a bid for this tender
+  // Check tender bid state (submitted vs draft) for this tender
   useEffect(() => {
-    const checkExistingBid = async () => {
+    const checkBidState = async () => {
       if (!jobData || !user?.id || !supabase || jobData.postType !== 'tender') {
         setHasExistingBid(false);
+        setHasDraftBid(false);
         return;
       }
 
       setIsCheckingBid(true);
       try {
-        // Fetch user's primary company
-        const { fetchUserPrimaryCompany } = await import('../lib/database/companies');
-        const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);
-        
-        if (!company) {
-          setHasExistingBid(false);
-          setIsCheckingBid(false);
-          return;
-        }
-
-        // Check if a non-cancelled bid exists for this tender and company
-        const { data: existingBids, error } = await supabase
-          .from('tender_bids')
-          .select('id, status')
-          .eq('tender_id', jobData.id)
-          .eq('company_id', company.id)
-          .neq('status', 'cancelled')
-          .limit(1);
-
-        if (error) {
-          console.error('Error checking for existing bid:', error);
-          setHasExistingBid(false);
-        } else {
-          // Only set hasExistingBid to true if there's a non-cancelled bid
-          const hasNonCancelledBid = existingBids && existingBids.length > 0;
-          setHasExistingBid(hasNonCancelledBid);
-        }
+        const { state } = await fetchTenderBidOfferState(supabase, jobData.id, user.id);
+        setHasExistingBid(state === 'submitted');
+        setHasDraftBid(state === 'draft');
       } catch (error) {
-        console.error('Error in checkExistingBid:', error);
+        console.error('Error in checkBidState:', error);
         setHasExistingBid(false);
+        setHasDraftBid(false);
       } finally {
         setIsCheckingBid(false);
       }
     };
 
-    checkExistingBid();
+    void checkBidState();
   }, [jobData, user?.id, supabase]);
 
   // Check if conversation already exists for this job
@@ -842,8 +824,19 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       return;
     }
 
-    // Company exists, show the application form
+    if (isContestView && job.contestInfo) {
+      setShowContestOfferForm(true);
+      return;
+    }
+
     setShowApplicationForm(true);
+  };
+
+  const refreshBidState = async () => {
+    if (!jobData || !user?.id || !supabase || jobData.postType !== 'tender') return;
+    const { state } = await fetchTenderBidOfferState(supabase, jobData.id, user.id);
+    setHasExistingBid(state === 'submitted');
+    setHasDraftBid(state === 'draft');
   };
 
   const handleApplicationFormSubmit = async (applicationData: JobApplicationSubmitPayload) => {
@@ -1662,18 +1655,22 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     size="lg"
                     disabled={job.postType === 'tender' && (hasExistingBid || isCheckingBid)}
                   >
-                    {isCheckingBid 
-                      ? 'Sprawdzanie...' 
+                    {isCheckingBid
+                      ? 'Sprawdzanie...'
                       : hasExistingBid && job.postType === 'tender'
-                      ? 'Oferta już złożona'
-                      : job.postType === 'tender' 
-                      ? 'Złóż ofertę' 
-                      : 'Złóż ofertę'
-                    }
+                        ? 'Oferta już złożona'
+                        : hasDraftBid && isContestView
+                          ? 'Kontynuuj szkic oferty'
+                          : 'Złóż ofertę'}
                   </Button>
                   {hasExistingBid && job.postType === 'tender' && (
                     <p className="text-xs text-muted-foreground text-center">
                       Już złożyłeś ofertę na ten {tenderLabel}
+                    </p>
+                  )}
+                  {hasDraftBid && !hasExistingBid && isContestView && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Masz zapisany szkic oferty w tym konkursie
                     </p>
                   )}
                   
@@ -1781,13 +1778,34 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         companyName={job.company}
       />
 
-      {/* Application Modal */}
+      {isContestView && job.contestInfo && user?.id && (
+        <ContestOfferSubmissionDialog
+          isOpen={showContestOfferForm}
+          onClose={() => setShowContestOfferForm(false)}
+          tenderId={job.id}
+          jobTitle={job.title}
+          description={job.description}
+          category={typeof job.category === 'string' ? job.category : undefined}
+          subcategory={job.subcategory}
+          contestInfo={job.contestInfo}
+          contractorId={user.id}
+          onSubmitted={() => {
+            void refreshBidState();
+          }}
+          onDraftSaved={() => {
+            void refreshBidState();
+          }}
+        />
+      )}
+
+      {/* Application Modal (jobs and legacy tenders) */}
       <JobApplicationModal
         isOpen={showApplicationForm}
         onClose={() => setShowApplicationForm(false)}
         jobTitle={job.title}
         companyName={job.company}
         jobId={job.id}
+        jobData={job as unknown as Record<string, unknown>}
         onApplicationSubmit={handleApplicationFormSubmit}
         applicationForm={applicationForm}
         setApplicationForm={(form) => setApplicationForm(form)}

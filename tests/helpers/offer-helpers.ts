@@ -347,6 +347,52 @@ export async function createTestTender(
 }
 
 /**
+ * Creates an OPD-53 contest tender (minimal formal requirements for faster E2E).
+ */
+export async function createTestContestTender(
+  managerId: string,
+  companyId: string,
+  tenderData?: { title?: string; description?: string },
+) {
+  const tender = await createTestTender(managerId, companyId, {
+    title: tenderData?.title ?? `Test Contest ${Date.now()}`,
+    description: tenderData?.description ?? 'Contest tender for E2E offer wizard.',
+  });
+
+  const adminClient = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (adminClient as any)
+    .from('tenders')
+    .update({
+      formal_requirements: {
+        insuranceOc: false,
+        zusUsCertificates: false,
+        references: false,
+        professionalCertificates: false,
+        professionalLicenses: false,
+      },
+      selection_criteria: {
+        items: [
+          { id: 'price', name: 'Cena', weight: 80, type: 'price' },
+          { id: 'warranty', name: 'Okres gwarancji', weight: 20, type: 'quality' },
+        ],
+      },
+      warranty_period: 'min_12',
+      guarantee_period: 'min_12',
+      site_visit_type: 'not_required',
+      payment_terms: { mode: 'standard_14' },
+      deposit_required: false,
+    })
+    .eq('id', tender.id);
+
+  if (error) {
+    throw new Error(`Failed to patch contest tender: ${error.message}`);
+  }
+
+  return tender;
+}
+
+/**
  * Cleans up test data (jobs, tenders, companies, users)
  * Note: Pool user companies are NOT deleted here - they're shared resources
  */
