@@ -27,7 +27,7 @@ export default function JobTypeSelection() {
     if (user.userType !== 'manager') return;
     if (hasCompany === false) return;
     if (isCheckingCompany || hasCompany === null) return;
-    router.replace('/post-tender');
+    router.replace('/post-contest');
   }, [user, isLoading, hasCompany, isCheckingCompany, router]);
 
   // Check if user has a company (only for managers)
@@ -96,7 +96,7 @@ export default function JobTypeSelection() {
       return;
     }
 
-    router.push('/post-tender');
+    router.push('/post-contest');
   };
 
   return (

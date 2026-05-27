@@ -76,10 +76,7 @@ export function FilterProvider({
       const mergedFilters: FilterState = {
         ...defaultFilters,
         ...urlFilters,
-        postTypes:
-          urlFilters.postTypes && urlFilters.postTypes.length > 0
-            ? urlFilters.postTypes
-            : defaultFilters.postTypes,
+        postTypes: defaultFilters.postTypes,
         deadline: urlFilters.deadline ?? defaultFilters.deadline,
       };
 
@@ -102,10 +99,7 @@ export function FilterProvider({
     const mergedFilters: FilterState = {
       ...defaultFilters,
       ...urlFilters,
-      postTypes:
-        urlFilters.postTypes && urlFilters.postTypes.length > 0
-          ? urlFilters.postTypes
-          : defaultFilters.postTypes,
+      postTypes: defaultFilters.postTypes,
       deadline: urlFilters.deadline ?? defaultFilters.deadline,
     };
 

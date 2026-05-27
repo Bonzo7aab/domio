@@ -191,7 +191,7 @@ export function ManagerContestPodgladDialog({
               <div className="flex flex-wrap justify-end gap-2 pt-2 border-t">
                 {!readOnly && contestId ? (
                   <Button type="button" variant="secondary" asChild>
-                    <Link href={`/post-tender/${contestId}`}>Kontynuuj konkurs</Link>
+                    <Link href={`/post-contest/${contestId}`}>Kontynuuj konkurs</Link>
                   </Button>
                 ) : null}
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

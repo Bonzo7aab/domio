@@ -84,7 +84,7 @@ export function SubmissionReviewPanel({
         return;
       }
 
-      toast.success('Opinia o zgłoszeniu została zapisana');
+      toast.success('Opinia o konkursie została zapisana');
       await loadExisting();
       onSubmitted?.();
     } catch {
@@ -103,7 +103,7 @@ export function SubmissionReviewPanel({
       <Card>
         <CardContent className="pt-6 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Opinia o zgłoszeniu <strong>{managerCompanyName}</strong> została już wystawiona.
+            Opinia o konkursie <strong>{managerCompanyName}</strong> została już wystawiona.
           </p>
           <div className="flex items-center gap-1 text-amber-600 font-semibold">
             {'★'.repeat(existing.rating)}
@@ -123,10 +123,10 @@ export function SubmissionReviewPanel({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        Oceń zgłoszenie zarządcy <strong>{managerCompanyName}</strong>.
+        Oceń konkurs organizatora <strong>{managerCompanyName}</strong>.
       </p>
 
-      <StarRatingInput label="Ocena zgłoszenia" rating={rating} onRatingChange={setRating} />
+      <StarRatingInput label="Ocena konkursu" rating={rating} onRatingChange={setRating} />
 
       <div>
         <Label htmlFor="submission-review-comment">Komentarz *</Label>
@@ -134,7 +134,7 @@ export function SubmissionReviewPanel({
           id="submission-review-comment"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Opisz swoje doświadczenie ze zgłoszeniem…"
+          placeholder="Opisz swoje doświadczenie z konkursem…"
           rows={4}
           className="mt-1 resize-none"
         />
@@ -145,7 +145,7 @@ export function SubmissionReviewPanel({
         onClick={() => void handleSubmit()}
         disabled={submitting || rating === 0 || !comment.trim()}
       >
-        {submitting ? 'Zapisywanie…' : 'Wyślij ocenę zgłoszenia'}
+        {submitting ? 'Zapisywanie…' : 'Wyślij ocenę konkursu'}
       </Button>
     </div>
   );

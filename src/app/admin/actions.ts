@@ -650,7 +650,7 @@ async function pauseTenderListingActionImpl(
     type: 'listing_admin_paused',
     title: 'Przetarg zawieszony przez administratora',
     message: `${tender.title}: ${msg}`,
-    actionUrl: `/manager-dashboard/tenders`,
+    actionUrl: `/manager-dashboard/konkursy`,
     sendPush: true,
   });
 

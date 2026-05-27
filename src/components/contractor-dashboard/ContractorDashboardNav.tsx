@@ -6,7 +6,7 @@ import { cn } from '../ui/utils';
 
 const tabs = [
   { id: 'offers', label: 'Moje Oferty', href: '/contractor-dashboard/applications' },
-  { id: 'favorites', label: 'Ulubione Zgłoszenia', href: '/contractor-dashboard/favorites' },
+  { id: 'favorites', label: 'Ulubione Konkursy', href: '/contractor-dashboard/favorites' },
   { id: 'ratings', label: 'Ocena Zgłoszeń', href: '/contractor-dashboard/ratings' },
   { id: 'services', label: 'Usługi', href: '/contractor-dashboard/pricing' },
 ];

@@ -152,13 +152,7 @@ export function ContractorContestOffersContent({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Moje Oferty</h2>
-          <p className="text-muted-foreground mt-1">
-            Śledź statusy swoich ofert w konkursach.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <Select
           value={statusFilter}
           onValueChange={(v) => setStatusFilter(v as ContractorContestOfferFilterValue)}

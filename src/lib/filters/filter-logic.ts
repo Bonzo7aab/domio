@@ -9,6 +9,10 @@ export function getJobDeadline(job: Job): Date | null {
     const d = new Date(job.deadline);
     if (!isNaN(d.getTime())) return d;
   }
+  if ('contestInfo' in job && job.contestInfo?.submissionDeadline) {
+    const d = new Date(job.contestInfo.submissionDeadline);
+    if (!isNaN(d.getTime())) return d;
+  }
   if (
     'postType' in job &&
     job.postType === 'tender' &&
@@ -96,6 +100,15 @@ export function migrateDateAddedToDeadline(values: string[]): DeadlineFilterKey[
   return values
     .map((v) => map[v])
     .filter((v): v is DeadlineFilterKey => Boolean(v));
+}
+
+export function matchesFavoritesFilter(
+  jobId: string,
+  favoritesOnly: boolean,
+  bookmarkedIds: ReadonlySet<string>,
+): boolean {
+  if (!favoritesOnly) return true;
+  return bookmarkedIds.has(jobId);
 }
 
 export function jobMatchesFilters(job: Job, filters: FilterState): boolean {

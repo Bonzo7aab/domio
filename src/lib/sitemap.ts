@@ -81,7 +81,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Dla Zarządców",
     label: "Utwórz konkurs",
-    path: "/post-tender",
+    path: "/post-contest",
     icon: Plus,
     description: "Utwórz nowy konkurs ofert",
     keywords: ["konkurs", "tender", "utwórz", "nowy", "oferty", "zgłoszenie"],

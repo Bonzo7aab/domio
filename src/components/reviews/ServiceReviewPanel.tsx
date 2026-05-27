@@ -144,7 +144,7 @@ export function ServiceReviewPanel({
         }
       }
 
-      toast.success('Opinia o usłudze została zapisana');
+      toast.success('Opinia o zleceniu została zapisana');
       await loadExisting();
       onSubmitted?.();
     } catch {
@@ -163,7 +163,7 @@ export function ServiceReviewPanel({
       <Card>
         <CardContent className="pt-6 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Opinia o usłudze wykonawcy <strong>{contractorName}</strong> została już wystawiona.
+            Opinia o zleceniu wykonawcy <strong>{contractorName}</strong> została już wystawiona.
           </p>
           <div className="flex items-center gap-1 text-amber-600 font-semibold">
             {'★'.repeat(existing.rating)}
@@ -198,10 +198,10 @@ export function ServiceReviewPanel({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        Oceń usługę wykonawcy <strong>{contractorName}</strong> po zakończeniu realizacji.
+        Oceń zlecenie wykonawcy <strong>{contractorName}</strong> po zakończeniu realizacji.
       </p>
 
-      <StarRatingInput label="Ocena usługi" rating={rating} onRatingChange={setRating} />
+      <StarRatingInput label="Ocena zlecenia" rating={rating} onRatingChange={setRating} />
 
       <div>
         <Label htmlFor="service-review-comment">Komentarz *</Label>
@@ -209,7 +209,7 @@ export function ServiceReviewPanel({
           id="service-review-comment"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Opisz jakość wykonanej usługi…"
+          placeholder="Opisz jakość realizacji zlecenia…"
           rows={4}
           className="mt-1 resize-none"
         />
@@ -255,7 +255,7 @@ export function ServiceReviewPanel({
         onClick={() => void handleSubmit()}
         disabled={submitting || rating === 0 || !comment.trim()}
       >
-        {submitting ? 'Zapisywanie…' : 'Wyślij ocenę usługi'}
+        {submitting ? 'Zapisywanie…' : 'Wyślij ocenę zlecenia'}
       </Button>
     </div>
   );

@@ -12,7 +12,9 @@ import { extractCity, extractSublocality } from '../utils/locationMapping';
 import type { Job } from '../types/job';
 import { MapLegend } from './MapLegend';
 import type { FilterState } from './JobFilters';
-import { jobMatchesFilters } from '../lib/filters/filter-logic';
+import { jobMatchesFilters, matchesFavoritesFilter } from '../lib/filters/filter-logic';
+import { getBookmarkedJobs } from '../utils/bookmarkStorage';
+import { BOOKMARK_COUNT_CHANGED_EVENT } from '../utils/bookmarkCountOverrides';
 
 interface EnhancedMapViewProps {
   isExpanded?: boolean;
@@ -82,6 +84,25 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   const [mapZoom, setMapZoom] = useState(13); // District-level view
   const [_showMapLegend] = useState(true);
   const [selectedCityName, setSelectedCityName] = useState<string | null>(null);
+  const [bookmarkedJobIds, setBookmarkedJobIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    const syncBookmarks = () => {
+      try {
+        const ids = getBookmarkedJobs().map((b) => b.id);
+        setBookmarkedJobIds(new Set(ids));
+      } catch {
+        setBookmarkedJobIds(new Set());
+      }
+    };
+    syncBookmarks();
+    window.addEventListener('focus', syncBookmarks);
+    window.addEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarks);
+    return () => {
+      window.removeEventListener('focus', syncBookmarks);
+      window.removeEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarks);
+    };
+  }, []);
 
   // Function to find city name from coordinates
   const findCityNameFromCoordinates = (lat: number, lng: number): string | null => {
@@ -313,11 +334,28 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
     // If filters haven't changed and we have cached result, we could return early
     // But since filteredJobs might have changed, we still need to filter
     
-    const result = filteredJobs.filter((job) => jobMatchesFilters(job, filters));
-    
+    const result = filteredJobs.filter((job) => {
+      if (
+        filters.favoritesOnly &&
+        !matchesFavoritesFilter(job.id, true, bookmarkedJobIds)
+      ) {
+        return false;
+      }
+      return jobMatchesFilters(job, filters);
+    });
+
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredJobs, filtersChanged, filterByPostType, filterByCategory, filterByLocation, filterByBudget]);
+  }, [
+    filteredJobs,
+    filters,
+    filtersChanged,
+    bookmarkedJobIds,
+    filterByPostType,
+    filterByCategory,
+    filterByLocation,
+    filterByBudget,
+  ]);
 
   // Convert jobs to map markers
   const mapMarkers: MapMarker[] = useMemo(() => {

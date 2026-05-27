@@ -69,19 +69,11 @@ export const MapFilters: React.FC<MapFiltersProps> = ({
   const [locationsOpen, setLocationsOpen] = useState(false);
 
   // Count active filters
-  const activeFilterCount = 
-    (filters.postTypes.length < 2 ? 1 : 0) +
+  const activeFilterCount =
     filters.categories.length +
     filters.locations.length +
     (filters.salaryRange[0] > 0 || filters.salaryRange[1] < 200 ? 1 : 0) +
     (filters.urgentOnly ? 1 : 0);
-
-  const handlePostTypeToggle = (type: string) => {
-    const newPostTypes = filters.postTypes.includes(type)
-      ? filters.postTypes.filter(t => t !== type)
-      : [...filters.postTypes, type];
-    onFilterChange({ ...filters, postTypes: newPostTypes });
-  };
 
   const handleCategoryToggle = (category: string) => {
     const newCategories = filters.categories.includes(category)
@@ -107,7 +99,7 @@ export const MapFilters: React.FC<MapFiltersProps> = ({
 
   const handleClearFilters = () => {
     onFilterChange({
-      postTypes: ['job', 'tender'],
+      postTypes: ['tender'],
       categories: [],
       locations: [],
       salaryRange: [0, 200],
@@ -129,33 +121,6 @@ export const MapFilters: React.FC<MapFiltersProps> = ({
       </CardHeader>
 
       <CardContent className="p-4 space-y-4 overflow-y-auto max-h-[calc(80vh-120px)]">
-        {/* Post Type Filter */}
-        <div className="space-y-2">
-          <Label className="text-xs font-semibold text-foreground">Typ ogłoszenia</Label>
-          <div className="flex gap-2">
-            <div className="flex items-center gap-2 flex-1">
-              <CustomCheckbox
-                id="post-type-job"
-                checked={filters.postTypes.includes('job')}
-                onCheckedChange={() => handlePostTypeToggle('job')}
-              />
-              <label htmlFor="post-type-job" className="text-sm cursor-pointer">
-                Zgłoszenia
-              </label>
-            </div>
-            <div className="flex items-center gap-2 flex-1">
-              <CustomCheckbox
-                id="post-type-tender"
-                checked={filters.postTypes.includes('tender')}
-                onCheckedChange={() => handlePostTypeToggle('tender')}
-              />
-              <label htmlFor="post-type-tender" className="text-sm cursor-pointer">
-                Przetargi
-              </label>
-            </div>
-          </div>
-        </div>
-
         {/* Categories Filter */}
         <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
           <div className="space-y-2">

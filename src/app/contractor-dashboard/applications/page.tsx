@@ -1,12 +1,11 @@
 import { Suspense } from 'react';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
-import { fetchContractorApplications } from '../../../lib/database/contractors';
 import { fetchContractorContestOffers } from '../../../lib/database/contractor-contest-offers';
 import { Card, CardContent } from '../../../components/ui/card';
-import { ApplicationsPageClient } from './ApplicationsPageClient';
+import { ContractorContestOffersContent } from '../../../components/contractor-dashboard/ContractorContestOffersContent';
 
-async function getApplicationsData(userId: string) {
+async function getContestOffersData(userId: string) {
   const supabase = await createClient();
 
   const { data: company } = await fetchUserPrimaryCompany(supabase, userId);
@@ -14,131 +13,10 @@ async function getApplicationsData(userId: string) {
     return null;
   }
 
-  const [applicationsData, contestOffers] = await Promise.all([
-    fetchContractorApplications(supabase, userId),
-    fetchContractorContestOffers(supabase, userId),
-  ]);
-
-  const contestBidIds = new Set(contestOffers.map((o) => o.id));
-
-  const statusMap: Record<string, 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'cancelled'> = {
-    pending: 'submitted',
-    submitted: 'submitted',
-    under_review: 'under_review',
-    shortlisted: 'under_review',
-    reviewing: 'under_review',
-    accepted: 'accepted',
-    rejected: 'rejected',
-    cancelled: 'cancelled',
-  };
-
-  const transformedApplications = (applicationsData.applications || []).map((app) => {
-    const proposedPrice =
-      typeof app.proposedPrice === 'string'
-        ? parseFloat(app.proposedPrice) || 0
-        : app.proposedPrice || 0;
-
-    const transformedAttachments = (app.attachments || []).map(
-      (attachment: string | Record<string, unknown>, index: number) => {
-        if (typeof attachment === 'string') {
-          return {
-            id: `attachment-${index}`,
-            name: attachment.split('/').pop() || 'Załącznik',
-            type: 'file',
-            url: attachment,
-          };
-        }
-        return {
-          id: String(attachment.id || `attachment-${index}`),
-          name: String(attachment.name || attachment.filename || 'Załącznik'),
-          type: String(attachment.type || attachment.content_type || 'file'),
-          url: String(attachment.url || attachment.path || attachment.file_path || ''),
-        };
-      },
-    );
-
-    return {
-      id: app.id,
-      jobId: app.jobId,
-      jobTitle: app.jobTitle || 'Bez tytułu',
-      jobCompany: app.companyName || 'Nieznana firma',
-      jobLocation: app.jobLocation || 'Nieznana lokalizacja',
-      jobCategory: app.jobCategory || 'Inne usługi',
-      proposedPrice,
-      proposedTimeline: app.estimatedCompletion || 'Nie określono',
-      proposedTimelineDays: app.proposedTimelineDays ?? null,
-      vatRate: app.vatRate,
-      proposedStartDate: app.proposedStartDate ?? undefined,
-      availableFrom: app.availableFrom ?? undefined,
-      guaranteePeriodMonths: app.guaranteePeriodMonths ?? undefined,
-      teamSize: app.teamSize ?? undefined,
-      status: statusMap[app.status] || 'submitted',
-      submittedAt: new Date(app.appliedAt),
-      lastUpdated: app.reviewedAt ? new Date(app.reviewedAt) : new Date(app.appliedAt),
-      coverLetter: app.coverLetter || '',
-      experience: app.experience || '',
-      additionalNotes: app.notes || undefined,
-      postedTime: app.postedTime || undefined,
-      attachments: transformedAttachments,
-      certificates: app.certificates || [],
-      reviewNotes: app.managerFeedbackMessage || undefined,
-      postType: 'job' as const,
-    };
-  });
-
-  const transformedLegacyBids = (applicationsData.bids || [])
-    .filter((bid) => !contestBidIds.has(bid.id))
-    .map((bid) => {
-      const proposedPrice =
-        typeof bid.bidAmount === 'string'
-          ? parseFloat(bid.bidAmount) || 0
-          : parseFloat(String(bid.bidAmount)) || 0;
-
-      let proposedTimeline = 'Nie określono';
-      if (bid.proposedTimeline) {
-        const days = bid.proposedTimeline;
-        if (days < 7) {
-          proposedTimeline = `${days} ${days === 1 ? 'dzień' : 'dni'}`;
-        } else if (days < 30) {
-          const weeks = Math.round(days / 7);
-          proposedTimeline = `${weeks} ${weeks === 1 ? 'tydzień' : weeks < 5 ? 'tygodnie' : 'tygodni'}`;
-        } else {
-          const months = Math.round(days / 30);
-          proposedTimeline = `${months} ${months === 1 ? 'miesiąc' : months < 5 ? 'miesiące' : 'miesięcy'}`;
-        }
-      }
-
-      return {
-        id: bid.id,
-        jobId: bid.tenderId,
-        jobTitle: bid.tenderTitle || 'Bez tytułu',
-        jobCompany: bid.companyName || 'Nieznana firma',
-        jobLocation: bid.location || 'Nieznana lokalizacja',
-        jobCategory: bid.category || 'Przetarg',
-        proposedPrice,
-        proposedTimeline,
-        proposedTimelineDays: bid.proposedTimeline ?? null,
-        tenderValidUntil: bid.validUntil || undefined,
-        status: statusMap[bid.status] || 'submitted',
-        submittedAt: new Date(bid.submittedAt),
-        lastUpdated: bid.reviewedAt ? new Date(bid.reviewedAt) : new Date(bid.submittedAt),
-        coverLetter: bid.technicalProposal || '',
-        experience: '',
-        postedTime: bid.postedTime || undefined,
-        attachments: [],
-        certificates: [],
-        reviewNotes: bid.managerFeedbackMessage || undefined,
-        postType: 'tender' as const,
-      };
-    });
-
-  const jobApplications = [...transformedApplications, ...transformedLegacyBids].sort(
-    (a, b) => b.submittedAt.getTime() - a.submittedAt.getTime(),
-  );
+  const contestOffers = await fetchContractorContestOffers(supabase, userId);
 
   return {
     contestOffers,
-    jobApplications,
     companyId: company.id,
   };
 }
@@ -166,9 +44,9 @@ async function ApplicationsDataFetcher() {
     return null;
   }
 
-  const applicationsData = await getApplicationsData(user.id);
+  const data = await getContestOffersData(user.id);
 
-  if (!applicationsData) {
+  if (!data) {
     return (
       <Card>
         <CardContent className="pt-6 text-center">
@@ -181,10 +59,9 @@ async function ApplicationsDataFetcher() {
   }
 
   return (
-    <ApplicationsPageClient
-      contestOffers={applicationsData.contestOffers}
-      jobApplications={applicationsData.jobApplications}
-      companyId={applicationsData.companyId}
+    <ContractorContestOffersContent
+      offers={data.contestOffers}
+      companyId={data.companyId}
     />
   );
 }

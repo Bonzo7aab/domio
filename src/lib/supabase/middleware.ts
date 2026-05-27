@@ -43,6 +43,7 @@ export async function updateSession(request: NextRequest) {
     '/manager-dashboard',
     '/account',
     '/post-job',
+    '/post-contest',
     '/post-tender',
     '/tender-creation',
     '/admin',

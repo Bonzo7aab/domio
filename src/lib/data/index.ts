@@ -100,9 +100,11 @@ function mockFetchJobsAndTenders(filters: DBJobFilters = {}): { data: Job[]; err
   // Convert mock data map to array format
   const mockItems = Object.values(mockJobDetailsMap) as unknown as Job[];
   
-  // Apply basic filters
-  let filtered = mockItems;
-  
+  // Public browse: contests only (no legacy jobs)
+  let filtered = mockItems.filter(
+    (item: Job) => item.postType === 'tender' && Boolean(item.contestInfo),
+  );
+
   if (filters.searchQuery) {
     const query = filters.searchQuery.toLowerCase();
     filtered = filtered.filter((item: Job) => {

@@ -6,7 +6,6 @@ import {
   Check,
   Edit3,
   Calendar,
-  Heart,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
@@ -278,23 +277,6 @@ export default function JobFilters({
           ref={scrollContainerRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6"
         >
-          <div className="mb-4 flex items-center space-x-2">
-            <CustomCheckbox
-              id="filter-favorites-only"
-              checked={!!local.favoritesOnly}
-              onCheckedChange={(checked) =>
-                patch({ favoritesOnly: checked })
-              }
-            />
-            <Label
-              htmlFor="filter-favorites-only"
-              className="text-sm cursor-pointer text-gray-900 font-light flex items-center gap-1.5"
-            >
-              <Heart className="w-3.5 h-3.5 text-gray-600" />
-              Tylko ulubione
-            </Label>
-          </div>
-
           {/* Categories — always expanded at first level; subs on chevron */}
           <Collapsible
             open={expandedFilterSections.includes('categories')}

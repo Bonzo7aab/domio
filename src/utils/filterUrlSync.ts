@@ -38,7 +38,6 @@ export function filtersToSearchParams(filters: FilterState): URLSearchParams {
   if (filters.favoritesOnly) {
     params.set('favorites', '1');
   }
-
   return params;
 }
 
@@ -97,7 +96,8 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
     filters.postTypes = postTypes.split(',').filter(Boolean);
   }
 
-  if (searchParams.get('favorites') === '1') {
+  const favorites = searchParams.get('favorites');
+  if (favorites === '1' || favorites === 'true') {
     filters.favoritesOnly = true;
   }
 

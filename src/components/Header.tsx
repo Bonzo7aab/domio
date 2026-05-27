@@ -106,7 +106,7 @@ export function Header({ initialUser }: HeaderProps) {
 
   // Navigation handlers
   const handleCreateContestClick = () => {
-    router.push('/post-tender')
+    router.push('/post-contest')
   }
 
   const handleAdminPanelClick = () => {

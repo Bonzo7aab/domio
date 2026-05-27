@@ -347,7 +347,7 @@ export function ManagerKonkursyContent({
               </SelectContent>
             </Select>
             <Button asChild className="lg:ml-auto">
-              <Link href="/post-tender">+ Utwórz konkurs</Link>
+              <Link href="/post-contest">+ Utwórz konkurs</Link>
             </Button>
           </div>
 
@@ -482,7 +482,7 @@ export function ManagerKonkursyContent({
                             </Button>
                             {row.canEdit ? (
                               <Button variant="secondary" size="sm" asChild>
-                                <Link href={`/post-tender/${row.id}`}>Kontynuuj konkurs</Link>
+                                <Link href={`/post-contest/${row.id}`}>Kontynuuj konkurs</Link>
                               </Button>
                             ) : null}
                             {canCancelContest(row.status) ? (

@@ -1,17 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, Calendar, MapPin, Building, Trash2, Eye, Search } from 'lucide-react';
+'use client';
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ArrowLeft, Heart, Search } from 'lucide-react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
 import { Input } from './ui/input';
-import { getBookmarkedJobs, removeBookmark, BookmarkedJob } from '../utils/bookmarkStorage';
-import { formatBudget, type Budget } from '../types/budget';
+import {
+  getBookmarkedJobs,
+  removeBookmark,
+  type BookmarkedJob,
+} from '../utils/bookmarkStorage';
 import { toast } from 'sonner';
+import JobCard from './JobCard';
+import {
+  bookmarkToListingJob,
+  formatKonkursCountLabel,
+  isContestBookmark,
+} from '../lib/listing/bookmark-to-listing-job';
+import { BOOKMARK_COUNT_CHANGED_EVENT } from '../utils/bookmarkCountOverrides';
+import { useContractorContestBidStatus } from '../hooks/useContractorContestBidStatus';
 
 interface BookmarkedJobsPageProps {
   onBack: () => void;
   onJobSelect: (jobId: string) => void;
-  /** When true, omits full-page chrome (for contractor dashboard tab). */
+  /** When true, omits page title (contractor dashboard nav provides it). */
   embedded?: boolean;
 }
 
@@ -21,132 +32,110 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
   embedded = false,
 }) => {
   const [bookmarks, setBookmarks] = useState<BookmarkedJob[]>([]);
-  const [filteredBookmarks, setFilteredBookmarks] = useState<BookmarkedJob[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const { submittedIds, draftIds, isLoading: isLoadingBidStatus } =
+    useContractorContestBidStatus();
 
-  // Helper function to format location as string
-  const formatLocation = (location: string | { city?: string; sublocality_level_1?: string } | undefined): string => {
-    if (!location) return 'Nieznana lokalizacja';
-    if (typeof location === 'string') return location;
-    if (typeof location === 'object' && location !== null) {
-      if (location.sublocality_level_1) {
-        return `${location.city || 'Unknown'}, ${location.sublocality_level_1}`;
-      }
-      return location.city || 'Unknown';
-    }
-    return 'Nieznana lokalizacja';
-  };
-
-  // Helper function to format budget (handles both string and object formats)
-  const formatBudgetValue = (budget: string | Budget | undefined): string => {
-    if (!budget) return '';
-    if (typeof budget === 'string') return budget;
-    return formatBudget(budget);
-  };
-
-  const loadBookmarks = () => {
-    const savedBookmarks = getBookmarkedJobs();
-    setBookmarks(savedBookmarks);
-  };
-
-  useEffect(() => {
-    // Use setTimeout to avoid synchronous setState in effect
-    setTimeout(() => {
-      loadBookmarks();
-    }, 0);
+  const loadBookmarks = useCallback(() => {
+    const saved = getBookmarkedJobs().filter(isContestBookmark);
+    setBookmarks(saved);
   }, []);
 
   useEffect(() => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const filtered = bookmarks.filter(bookmark => {
-        const locationString = formatLocation(bookmark.location);
-        return (
-          bookmark.title.toLowerCase().includes(query) ||
-          bookmark.company.toLowerCase().includes(query) ||
-          locationString.toLowerCase().includes(query)
-        );
-      });
-      // Use setTimeout to avoid synchronous setState in effect
-      setTimeout(() => {
-        setFilteredBookmarks(filtered);
-      }, 0);
-    } else {
-      // Use setTimeout to avoid synchronous setState in effect
-      setTimeout(() => {
-        setFilteredBookmarks(bookmarks);
-      }, 0);
-    }
+    queueMicrotask(() => loadBookmarks());
+    const sync = () => loadBookmarks();
+    window.addEventListener('focus', sync);
+    window.addEventListener(BOOKMARK_COUNT_CHANGED_EVENT, sync);
+    return () => {
+      window.removeEventListener('focus', sync);
+      window.removeEventListener(BOOKMARK_COUNT_CHANGED_EVENT, sync);
+    };
+  }, [loadBookmarks]);
+
+  const filteredBookmarks = useMemo(() => {
+    if (!searchQuery.trim()) return bookmarks;
+    const query = searchQuery.toLowerCase();
+    return bookmarks.filter((bookmark) => {
+      const locationStr =
+        typeof bookmark.location === 'string'
+          ? bookmark.location
+          : [bookmark.location?.city, bookmark.location?.sublocality_level_1]
+              .filter(Boolean)
+              .join(', ');
+      return (
+        bookmark.title.toLowerCase().includes(query) ||
+        bookmark.company.toLowerCase().includes(query) ||
+        locationStr.toLowerCase().includes(query)
+      );
+    });
   }, [bookmarks, searchQuery]);
 
-  const handleRemoveBookmark = (jobId: string, jobTitle: string) => {
-    removeBookmark(jobId);
-    loadBookmarks();
-    toast.success(`Usunięto z ulubionych: ${jobTitle}`);
-  };
+  const listingJobs = useMemo(
+    () => filteredBookmarks.map(bookmarkToListingJob),
+    [filteredBookmarks],
+  );
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pl-PL', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const handleRemoveBookmark = useCallback(
+    (jobId: string, jobTitle: string) => {
+      void removeBookmark(jobId);
+      loadBookmarks();
+      toast.success(`Usunięto z ulubionych: ${jobTitle}`);
+    },
+    [loadBookmarks],
+  );
 
-  const getPostTypeBadge = (postType: 'job' | 'tender') => {
-    if (postType === 'tender') {
-      return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Przetarg</Badge>;
-    }
-    return <Badge variant="outline">Zgłoszenie</Badge>;
-  };
+  const handleBookmarkToggle = useCallback(
+    (jobId: string) => {
+      const bookmark = bookmarks.find((b) => b.id === jobId);
+      if (bookmark) {
+        handleRemoveBookmark(jobId, bookmark.title);
+      }
+    },
+    [bookmarks, handleRemoveBookmark],
+  );
+
+  const countLabel = formatKonkursCountLabel(bookmarks.length);
 
   return (
-    <div className={embedded ? '' : 'min-h-screen bg-background'}>
+    <div className={embedded ? 'space-y-4' : 'min-h-screen bg-background'}>
       {!embedded && (
         <div className="border-b border-border bg-card">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" onClick={onBack} className="hidden md:flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={onBack}
+                  className="hidden md:flex items-center gap-2"
+                >
                   <ArrowLeft className="w-4 h-4" />
                   Powrót
                 </Button>
                 <div>
-                  <h1 className="text-xl font-semibold">Ulubione zgłoszenia</h1>
-                  <p className="text-sm text-muted-foreground">
-                    {bookmarks.length} {bookmarks.length === 1 ? 'ogłoszenie' : 'ogłoszeń'}
-                  </p>
+                  <h1 className="text-xl font-semibold">Ulubione konkursy</h1>
+                  <p className="text-sm text-muted-foreground">{countLabel}</p>
                 </div>
               </div>
-              <Heart className="w-6 h-6 text-primary fill-primary" />
+              <Heart className="w-6 h-6 text-primary fill-primary" aria-hidden />
             </div>
           </div>
         </div>
       )}
 
-      {embedded && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold">Ulubione zgłoszenia</h2>
-          <p className="text-sm text-muted-foreground">
-            {bookmarks.length} {bookmarks.length === 1 ? 'ogłoszenie' : 'ogłoszeń'}
-          </p>
-        </div>
-      )}
+      <div className={embedded ? 'space-y-4' : 'container mx-auto px-4 py-6 space-y-4'}>
+        {embedded && bookmarks.length > 0 && (
+          <p className="text-sm text-muted-foreground">{countLabel}</p>
+        )}
 
-      <div className={embedded ? '' : 'container mx-auto px-4 py-6'}>
         {bookmarks.length > 0 && (
-          <div className="mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Szukaj w ulubionych zgłoszeniach..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Szukaj w ulubionych konkursach…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
         )}
 
@@ -155,87 +144,34 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
             <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">Brak wyników</h3>
             <p className="text-muted-foreground">
-              Nie znaleziono ogłoszeń pasujących do wyszukiwania &quot;{searchQuery}&quot;
+              Nie znaleziono konkursów pasujących do wyszukiwania &quot;{searchQuery}&quot;
             </p>
           </div>
         ) : filteredBookmarks.length === 0 ? (
           <div className="text-center py-12">
             <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Brak ulubionych zgłoszeń</h3>
+            <h3 className="text-lg font-medium mb-2">Brak ulubionych konkursów</h3>
             <p className="text-muted-foreground mb-6">
-              Nie masz jeszcze żadnych ulubionych zgłoszeń.
+              Nie masz jeszcze żadnych ulubionych konkursów.
               <br />
-              Dodaj serce przy ogłoszeniu na liście zgłoszeń, aby je tu zobaczyć.
+              Dodaj serce przy konkursie na liście, aby zapisać go tutaj.
             </p>
-            <Button onClick={onBack}>
-              Przeglądaj ogłoszenia
-            </Button>
+            <Button onClick={onBack}>Przeglądaj konkursy</Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredBookmarks.map((bookmark) => (
-              <Card key={bookmark.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        {getPostTypeBadge(bookmark.postType)}
-                        <span className="text-sm text-muted-foreground">
-                          Dodano: {formatDate(bookmark.bookmarkedAt)}
-                        </span>
-                      </div>
-                      <CardTitle className="text-lg line-clamp-2 cursor-pointer hover:text-primary"
-                        onClick={() => onJobSelect(bookmark.id)}>
-                        {bookmark.title}
-                      </CardTitle>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveBookmark(bookmark.id, bookmark.title)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center gap-1">
-                      <Building className="w-4 h-4" />
-                      {bookmark.company}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {formatLocation(bookmark.location)}
-                    </div>
-                    {bookmark.deadline && (
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        Termin: {bookmark.deadline}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {bookmark.budget && (
-                    <div className="mb-4">
-                      <span className="text-sm font-medium text-success">
-                        Budżet: {formatBudgetValue(bookmark.budget)}
-                      </span>
-                    </div>
-                  )}
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onJobSelect(bookmark.id)}
-                      className="w-full md:w-auto"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Zobacz szczegóły
-                    </Button>
-                </CardContent>
-              </Card>
+          <div className="space-y-2">
+            {listingJobs.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                isBookmarked
+                onClick={() => onJobSelect(job.id)}
+                onBookmark={handleBookmarkToggle}
+                onApplyClick={(jobId) => onJobSelect(jobId)}
+                hasSubmittedOffer={submittedIds.has(job.id)}
+                hasDraftOffer={draftIds.has(job.id)}
+                isCheckingOffer={isLoadingBidStatus}
+              />
             ))}
           </div>
         )}

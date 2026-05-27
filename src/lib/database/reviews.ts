@@ -132,7 +132,7 @@ export async function createCompanyReview(
       data: null,
       error: new Error(
         reviewData.jobId
-          ? 'Opinia dla tego zgłoszenia została już dodana'
+          ? 'Opinia dla tego zlecenia została już dodana'
           : 'Opinia dla tej firmy została już dodana',
       ),
     };

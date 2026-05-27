@@ -179,7 +179,7 @@ export function ProjectsContent({ platformProjects: initialPlatformProjects, por
                               onClick={() => setReviewProject(project)}
                             >
                               <Star className="w-4 h-4 mr-1" />
-                              Oceń Zgłoszenie
+                              Oceń Konkurs
                             </Button>
                           ) : null}
                           <Button

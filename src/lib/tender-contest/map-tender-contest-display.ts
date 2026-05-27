@@ -12,7 +12,6 @@ import {
   parseSelectionCriteria,
 } from '../../types/tender-contest';
 import { mapTenderRowToContestForm, parseExistingTenderDocuments } from './build-tender-payload';
-
 const SITE_VISIT_LABELS: Record<SiteVisitType, string> = {
   not_required: 'Niewymagana',
   optional: 'Opcjonalna',
@@ -23,7 +22,9 @@ export function isContestTender(row: Pick<
   TenderWithCompany,
   'building_id' | 'selection_criteria' | 'formal_requirements'
 >): boolean {
-  return Boolean(row.building_id || row.selection_criteria || row.formal_requirements);
+  return Boolean(
+    row.building_id || row.selection_criteria || row.formal_requirements,
+  );
 }
 
 function buildFormalRequirementLines(formal: FormalRequirements): string[] {

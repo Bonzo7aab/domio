@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
-import { isContestTender } from '../tender-contest/map-tender-contest-display';
+import { CONTEST_TENDERS_OR_FILTER } from './jobs';
 import { getContestWorkflowStatusLabel } from '../tender-workflow-status';
 import {
   fetchUnansweredContestQuestionCounts,
@@ -53,14 +53,6 @@ function formatLocationLabel(row: TenderContestRow): string {
   return '—';
 }
 
-function isContestRow(row: Pick<TenderContestRow, 'building_id' | 'selection_criteria' | 'formal_requirements'>): boolean {
-  return isContestTender({
-    building_id: row.building_id,
-    selection_criteria: row.selection_criteria as Record<string, unknown> | null,
-    formal_requirements: row.formal_requirements as Record<string, unknown> | null,
-  });
-}
-
 /**
  * Moves contests past submission deadline from active → evaluation.
  */
@@ -75,6 +67,7 @@ export async function advanceContestsPastSubmissionDeadline(
     .update({ status: 'evaluation', updated_at: now })
     .eq('company_id', companyId)
     .eq('status', 'active')
+    .or(CONTEST_TENDERS_OR_FILTER)
     .lt('submission_deadline', now);
 }
 
@@ -109,6 +102,7 @@ export async function fetchManagerContests(
     `,
     )
     .eq('company_id', companyId)
+    .or(CONTEST_TENDERS_OR_FILTER)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -116,7 +110,7 @@ export async function fetchManagerContests(
     return [];
   }
 
-  const contestRows = ((tenderRows || []) as TenderContestRow[]).filter(isContestRow);
+  const contestRows = (tenderRows || []) as TenderContestRow[];
   const tenderIds = contestRows.map((t) => t.id);
 
   const offerCounts: Record<string, number> = {};

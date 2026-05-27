@@ -9,6 +9,16 @@ import {
   TENDER_WORKFLOW_STATUSES,
   isTenderWorkflowStatusRegression,
 } from '../tender-workflow-status';
+import { mapTenderRowToContestDisplay } from '../tender-contest/map-tender-contest-display';
+
+/** Matches contest rows in DB (see opd70_remove_legacy_tenders migration). */
+export const CONTEST_TENDERS_OR_FILTER =
+  'building_id.not.is.null,selection_criteria.not.is.null,formal_requirements.not.is.null';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyContestTendersFilter(query: any): any {
+  return query.or(CONTEST_TENDERS_OR_FILTER);
+}
 
 /** Job statuses visible on the public map/listing (accepting or reviewing offers). */
 export const PUBLIC_LISTING_JOB_STATUSES = [
@@ -31,6 +41,8 @@ export interface JobFilters {
   offset?: number;
   bounds?: { north: number; south: number; east: number; west: number };
   dateAdded?: string[]; // ['today', 'last-week', 'last-month', 'last-3-months', 'last-6-months', 'last-year']
+  /** When `contest`, only rows with contest fields (excludes legacy przetargi). */
+  tenderScope?: 'contest' | 'all';
 }
 
 export interface JobLocation {
@@ -1095,6 +1107,10 @@ export async function fetchTenders(
         )
       `);
 
+    if (filters.tenderScope === 'contest') {
+      query = applyContestTendersFilter(query);
+    }
+
     // Apply status filter
     // Only filter by status if explicitly set and not 'all'
     // If managerId is provided, RLS policies will allow them to see their own tenders regardless of status
@@ -1272,179 +1288,102 @@ export async function fetchTenders(
 }
 
 /**
- * Fetch both jobs and tenders combined
+ * Fetch public browse listings (contests only — no legacy jobs or przetargi).
  */
 export async function fetchJobsAndTenders(
   supabase: SupabaseClient<Database>,
   filters: JobFilters = {}
 ) {
-  const [jobsResult, tendersResult] = await Promise.all([
-    fetchJobs(supabase, filters),
-    fetchTenders(supabase, filters),
-  ]);
+  const tendersResult = await fetchTenders(supabase, {
+    ...filters,
+    tenderScope: 'contest',
+  });
 
-  if (jobsResult.error || tendersResult.error) {
+  if (tendersResult.error) {
     return {
       data: null,
-      error: jobsResult.error || tendersResult.error,
+      error: tendersResult.error,
     };
   }
 
-  // Combine and normalize the data
-  const jobs = (jobsResult.data || []).map((job) => {
-    // Keep location as object to preserve sublocality data
-    const locationData = typeof job.location === 'string' 
-      ? { city: job.location }
-      : job.location || { city: 'Unknown' };
-    
-    // Create consolidated budget object
-    const budget: Budget = budgetFromDatabase({
-      budget_min: job.budget_min ?? null,
-      budget_max: job.budget_max ?? null,
-      budget_type: (job.budget_type || 'fixed') as 'fixed' | 'hourly' | 'negotiable' | 'range',
-      currency: job.currency || 'PLN',
-    });
-    
+  const contests = (tendersResult.data || []).map((tender) => {
+    const locationData =
+      typeof tender.location === 'string'
+        ? { city: tender.location }
+        : tender.location || { city: 'Unknown' };
+
+    const contestInfo = mapTenderRowToContestDisplay(tender);
+
     return {
-    id: job.id,
-    title: job.title,
-    description: job.description,
-    company: job.company?.name || 'Unknown',
-    companyInfo: job.company ? {
-      id: job.company.id,
-      logo_url: job.company.logo_url,
-      is_verified: job.company.is_verified,
-    } : undefined,
-    location: locationData, // Keep as object to preserve sublocality_level_1
-    type: job.type,
-    postType: 'job' as const,
-    salary: formatBudget(budget), // Display string for salary
-    budget, // Budget object with all fields (min, max, type, currency)
-    category: job.category?.name || 'Inne',
-    subcategory: (job.subcategory as unknown as { name: string } | null | undefined)?.name || undefined,
-    deadline: job.deadline || undefined,
-    urgency: normalizeUrgency(job.urgency),
-    metrics: {
-      applications: job.applications_count,
-      visits: job.views_count || 0,
-      bookmarks: job.bookmarks_count || 0,
-    },
-    // Legacy metrics fields (for backward compatibility)
-    applications: job.applications_count,
-    visits_count: job.views_count || 0,
-    bookmarks_count: job.bookmarks_count || 0,
-    verified: job.company?.is_verified || false,
-    urgent: job.urgency === 'high',
-    premium: job.type === 'premium',
-    trust: {
-      verified: job.company?.is_verified || false,
-      isPremium: job.type === 'premium',
-      hasInsurance: false, // Would need to check certificates
-      completedJobs: 0, // Would need to query
-      certificates: [], // Would need to query
-    },
-    // Legacy trust fields (for backward compatibility)
-    isPremium: job.type === 'premium',
-    hasInsurance: false, // Would need to check certificates
-    completedJobs: 0, // Would need to query
-    certificates: [], // Would need to query
-    postedTime: getTimeAgo(job.created_at),
-    created_at: job.created_at, // Preserve original timestamp for filtering
-    lat: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lat,
-    lng: ensureValidCoordinates(job.latitude, job.longitude, locationData.city || '', job.id)?.lng,
-    requirements: job.requirements || [],
-    responsibilities: job.responsibilities || [],
-    skills: job.skills_required || [],
-    searchKeywords: job.skills_required || [],
-    clientType: mapCompanyTypeToClientType(undefined), // Company type not available in current query
-    contact: job.contact_person || job.contact_phone || job.contact_email ? {
-      person: job.contact_person || '',
-      phone: job.contact_phone || '',
-      email: job.contact_email || '',
-    } : undefined,
-    // Legacy contact fields (for backward compatibility)
-    contactPerson: job.contact_person || undefined,
-    contactPhone: job.contact_phone || undefined,
-    contactEmail: job.contact_email || undefined,
-    building: job.building_type || job.building_year || job.surface_area ? {
-      type: job.building_type || '',
-      year: job.building_year || 0,
-      surface: job.surface_area || '',
-      address: job.address || undefined,
-      additionalInfo: job.additional_info || undefined,
-    } : undefined,
-    // Legacy building fields (for backward compatibility)
-    buildingType: job.building_type || undefined,
-    buildingYear: job.building_year || undefined,
-    surface: job.surface_area || undefined,
-    additionalInfo: job.additional_info || undefined,
-    address: job.address || undefined
-  };
+      id: tender.id,
+      title: tender.title,
+      description: tender.description,
+      company: tender.company?.name || 'Unknown',
+      companyInfo: tender.company
+        ? {
+            id: tender.company.id,
+            logo_url: tender.company.logo_url,
+            is_verified: tender.company.is_verified,
+          }
+        : undefined,
+      location: locationData,
+      type: 'Konkurs',
+      postType: 'tender' as const,
+      salary: `${tender.estimated_value} ${tender.currency}`,
+      budget: `${tender.estimated_value} ${tender.currency}`,
+      category: tender.category?.name || 'Inne',
+      deadline: tender.submission_deadline,
+      urgency: 'medium' as const,
+      metrics: {
+        applications: tender.bids_count,
+        visits: tender.views_count || 0,
+        bookmarks: 0,
+      },
+      applications: tender.bids_count,
+      visits_count: tender.views_count || 0,
+      bookmarks_count: 0,
+      verified: tender.company?.is_verified || false,
+      urgent: false,
+      premium: false,
+      postedTime: getTimeAgo(tender.created_at),
+      created_at: tender.created_at,
+      lat: ensureValidCoordinates(
+        tender.latitude,
+        tender.longitude,
+        locationData.city || '',
+        tender.id,
+      )?.lat,
+      lng: ensureValidCoordinates(
+        tender.latitude,
+        tender.longitude,
+        locationData.city || '',
+        tender.id,
+      )?.lng,
+      clientType: mapCompanyTypeToClientType(undefined),
+      contestInfo,
+      tenderInfo: contestInfo
+        ? {
+            tenderType: 'Konkurs ofert',
+            phases: tender.phases || [],
+            currentPhase: tender.current_phase || 'Składanie ofert',
+            wadium: tender.wadium ? `${tender.wadium} ${tender.currency}` : '0 PLN',
+            evaluationCriteria: tender.evaluation_criteria || [],
+            documentsRequired: tender.requirements || [],
+            submissionDeadline: tender.submission_deadline,
+            projectDuration: tender.project_duration || 'Do uzgodnienia',
+          }
+        : undefined,
+    };
   });
 
-  const tenders = (tendersResult.data || []).map((tender) => {
-    // Keep location as object to preserve sublocality data
-    const locationData = typeof tender.location === 'string' 
-      ? { city: tender.location }
-      : tender.location || { city: 'Unknown' };
-    
-    return {
-    id: tender.id,
-    title: tender.title,
-    description: tender.description,
-    company: tender.company?.name || 'Unknown',
-    companyInfo: tender.company ? {
-      id: tender.company.id,
-      logo_url: tender.company.logo_url,
-      is_verified: tender.company.is_verified,
-    } : undefined,
-    location: locationData, // Keep as object to preserve sublocality_level_1
-    type: 'Przetarg',
-    postType: 'tender' as const,
-    salary: `${tender.estimated_value} ${tender.currency}`,
-    budget: `${tender.estimated_value} ${tender.currency}`,
-    category: tender.category?.name || 'Inne',
-    deadline: tender.submission_deadline,
-    urgency: 'medium' as const, // Tenders don't have urgency field, default to medium
-    applications: tender.bids_count,
-    verified: tender.company?.is_verified || false,
-    urgent: false,
-    premium: false,
-    postedTime: getTimeAgo(tender.created_at),
-    created_at: tender.created_at, // Preserve original timestamp for filtering
-    lat: ensureValidCoordinates(tender.latitude, tender.longitude, locationData.city || '', tender.id)?.lat,
-    lng: ensureValidCoordinates(tender.latitude, tender.longitude, locationData.city || '', tender.id)?.lng,
-    visits_count: tender.views_count || 0,
-    bookmarks_count: 0, // Tenders don't have bookmarks_count yet
-    clientType: mapCompanyTypeToClientType(undefined), // Company type not available in current query
-    tenderInfo: {
-      tenderType: 'Zamówienie publiczne',
-      phases: tender.phases || [],
-      currentPhase: tender.current_phase || 'Składanie ofert',
-      wadium: tender.wadium ? `${tender.wadium} ${tender.currency}` : '0 PLN',
-      evaluationCriteria: tender.evaluation_criteria || [],
-      documentsRequired: tender.requirements || [],
-      submissionDeadline: tender.submission_deadline,
-      projectDuration: tender.project_duration || 'Do uzgodnienia',
-    },
-  };
-  });
-
-  // Combine and sort
-  const combined = [...jobs, ...tenders];
-
-  // Remove duplicates based on ID to ensure no duplicates
-  const uniqueCombined = combined.filter((item, index, self) => {
-    if (!item || !item.id) return false; // Skip invalid items
-    return index === self.findIndex(i => i && i.id === item.id);
-  });
-
-  // Sort combined results
+  const sorted = [...contests];
   if (filters.sortBy === 'newest' || !filters.sortBy) {
-    uniqueCombined.sort((a, b) => new Date(b.postedTime).getTime() - new Date(a.postedTime).getTime());
+    sorted.sort(
+      (a, b) => new Date(b.postedTime).getTime() - new Date(a.postedTime).getTime(),
+    );
   }
 
-  return { data: uniqueCombined, error: null };
+  return { data: sorted, error: null };
 }
 
 /** Treat as “no row” / invalid id — do not log as application error */

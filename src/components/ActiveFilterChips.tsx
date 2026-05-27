@@ -88,21 +88,21 @@ export function ActiveFilterChips({
     });
   }
 
-  if (filters.searchQuery?.trim()) {
-    chips.push({
-      label: `Szukaj: "${filters.searchQuery.trim()}"`,
-      value: 'search',
-      onRemove: () =>
-        onFilterChange((prev) => ({ ...prev, searchQuery: '' })),
-    });
-  }
-
   if (filters.favoritesOnly) {
     chips.push({
       label: 'Ulubione',
       value: 'favorites',
       onRemove: () =>
         onFilterChange((prev) => ({ ...prev, favoritesOnly: false })),
+    });
+  }
+
+  if (filters.searchQuery?.trim()) {
+    chips.push({
+      label: `Szukaj: "${filters.searchQuery.trim()}"`,
+      value: 'search',
+      onRemove: () =>
+        onFilterChange((prev) => ({ ...prev, searchQuery: '' })),
     });
   }
 

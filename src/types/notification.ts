@@ -3,13 +3,14 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'application' | 'tender' | 'message';
-  category: 'job' | 'application' | 'tender' | 'message' | 'system';
+  type: 'info' | 'success' | 'warning' | 'error' | 'application' | 'contest' | 'message';
+  category: 'job' | 'application' | 'contest' | 'message' | 'system';
   read: boolean;
   createdAt: Date;
   data?: {
     jobId?: string;
     applicationId?: string;
+    contestId?: string;
     tenderId?: string;
     conversationId?: string;
     [key: string]: unknown;
@@ -18,8 +19,15 @@ export interface Notification {
   actionUrl?: string;
 }
 
-export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'application' | 'tender' | 'message';
-export type NotificationCategory = 'job' | 'application' | 'tender' | 'message' | 'system';
+export type NotificationType =
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'application'
+  | 'contest'
+  | 'message';
+export type NotificationCategory = 'job' | 'application' | 'contest' | 'message' | 'system';
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 // Unified Notifications Types
@@ -52,27 +60,29 @@ export interface ApplicationNotification {
   jobId: string;
 }
 
-export interface TenderNotification {
+export interface ContestNotification {
   id: string;
-  category: 'tender';
+  category: 'contest';
   type:
-    | 'new_tender'
+    | 'new_contest'
     | 'deadline_reminder'
     | 'evaluation_started'
-    | 'tender_awarded'
-    | 'tender_cancelled'
+    | 'contest_awarded'
+    | 'contest_cancelled'
     | 'contest_question';
   title: string;
   message: string;
-  tenderTitle: string;
+  contestTitle: string;
   organizerName: string;
   estimatedValue?: string;
   deadline?: Date;
   timestamp: Date;
   read: boolean;
-  tenderId: string;
+  contestId: string;
   actionUrl?: string;
 }
+
+export type TenderNotification = ContestNotification;
 
 export interface SystemNotification {
   id: string;
@@ -106,7 +116,7 @@ export interface MessageNotification {
 export type UnifiedNotification =
   | JobNotification
   | ApplicationNotification
-  | TenderNotification
+  | ContestNotification
   | SystemNotification
   | MessageNotification;
 
@@ -114,5 +124,5 @@ export interface UnifiedNotificationsProps {
   onJobSelect?: (jobId: string) => void;
   onSearchSelect?: (query: string) => void;
   onApplicationSelect?: (applicationId: string) => void;
-  onTenderSelect?: (tenderId: string) => void;
+  onTenderSelect?: (contestId: string) => void;
 }

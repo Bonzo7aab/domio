@@ -83,7 +83,7 @@ export function ManagerMojeZgloszeniaContent({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [podgladRow, setPodgladRow] = useState<ManagerSubmission | null>(null);
   const [podgladInitialTab, setPodgladInitialTab] = useState<
-    'details' | 'selected-offer' | 'rate-service'
+    'details' | 'selected-offer' | 'rate-zlecenie'
   >('details');
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -99,8 +99,12 @@ export function ManagerMojeZgloszeniaContent({
     if (!row) return;
 
     const tabParam = searchParams.get('tab');
-    const tab: 'details' | 'selected-offer' | 'rate-service' =
-      tabParam === 'selected-offer' || tabParam === 'rate-service' ? tabParam : 'details';
+    const tab: 'details' | 'selected-offer' | 'rate-zlecenie' =
+      tabParam === 'selected-offer' || tabParam === 'rate-zlecenie' || tabParam === 'rate-service'
+        ? tabParam === 'rate-service'
+          ? 'rate-zlecenie'
+          : tabParam
+        : 'details';
 
     setPodgladRow(row);
     setPodgladInitialTab(tab);
@@ -229,7 +233,7 @@ export function ManagerMojeZgloszeniaContent({
               </SelectContent>
             </Select>
             <Button asChild className="lg:ml-auto">
-              <Link href="/post-tender">Utwórz konkurs</Link>
+              <Link href="/post-contest">Utwórz konkurs</Link>
             </Button>
           </div>
 
@@ -355,7 +359,7 @@ export function ManagerMojeZgloszeniaContent({
                             )}
                             {row.kind === 'tender' && row.canEdit && (
                               <Button variant="secondary" size="sm" asChild>
-                                <Link href={`/post-tender/${row.id}`}>
+                                <Link href={`/post-contest/${row.id}`}>
                                   Kontynuuj konkurs
                                 </Link>
                               </Button>

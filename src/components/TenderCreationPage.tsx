@@ -41,8 +41,8 @@ export default function TenderCreationPage({
 
   useEffect(() => {
     const loginPath = isEditMode
-      ? `/login?redirectTo=${encodeURIComponent(`/post-tender/${tenderId}`)}`
-      : `/login?redirectTo=${encodeURIComponent('/post-tender')}`;
+      ? `/login?redirectTo=${encodeURIComponent(`/post-contest/${tenderId}`)}`
+      : `/login?redirectTo=${encodeURIComponent('/post-contest')}`;
     if (!isLoading && !user && !session) {
       router.push(loginPath);
     }

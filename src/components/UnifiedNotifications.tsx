@@ -5,7 +5,15 @@ import { useUserProfile } from '../contexts/AuthContext';
 import { deleteNotification, getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '../lib/database/notifications';
 import { createClient } from '../lib/supabase/client';
 import type { Database } from '../types/database';
-import type { ApplicationNotification, JobNotification, MessageNotification, SystemNotification, TenderNotification, UnifiedNotification, UnifiedNotificationsProps } from '../types/notification';
+import type {
+  ApplicationNotification,
+  ContestNotification,
+  JobNotification,
+  MessageNotification,
+  SystemNotification,
+  UnifiedNotification,
+  UnifiedNotificationsProps,
+} from '../types/notification';
 import { Alert, AlertDescription } from './ui/alert';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
@@ -20,17 +28,17 @@ type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 function getNotificationCategoryAndType(
   dbType: NotificationRow['type'],
   data: Record<string, unknown> | null
-): { category: 'job' | 'application' | 'tender' | 'message' | 'system'; type: string } | null {
+): { category: 'job' | 'application' | 'contest' | 'message' | 'system'; type: string } | null {
   switch (dbType) {
     // Job notifications
     case 'new_job':
       return { category: 'job', type: 'new_job' };
     case 'deadline_reminder':
-      // Check if it's job-related or tender-related based on data
+      // Check if it's job-related or contest-related based on data
       if (data?.jobId) {
         return { category: 'job', type: 'deadline_reminder' };
       } else if (data?.tenderId) {
-        return { category: 'tender', type: 'deadline_reminder' };
+        return { category: 'contest', type: 'deadline_reminder' };
       }
       return { category: 'job', type: 'deadline_reminder' }; // Default to job
 
@@ -42,13 +50,13 @@ function getNotificationCategoryAndType(
     case 'job_assigned':
       return { category: 'application', type: 'contract_signed' };
 
-    // Tender notifications (for contractors)
+    // Contest notifications (for contractors)
     case 'new_tender':
-      return { category: 'tender', type: 'new_tender' };
+      return { category: 'contest', type: 'new_contest' };
     case 'bid_status_update':
-      return { category: 'tender', type: 'evaluation_started' };
+      return { category: 'contest', type: 'evaluation_started' };
     case 'tender_awarded':
-      return { category: 'tender', type: 'tender_awarded' };
+      return { category: 'contest', type: 'contest_awarded' };
 
     // System (admin) notifications surfaced to the user
     case 'verification_approved':
@@ -60,7 +68,7 @@ function getNotificationCategoryAndType(
       return { category: 'message', type: 'new_message' };
 
     case 'contest_question':
-      return { category: 'tender', type: 'contest_question' };
+      return { category: 'contest', type: 'contest_question' };
 
     default:
       // For other types, try to infer from data
@@ -70,7 +78,7 @@ function getNotificationCategoryAndType(
       if (data?.jobId && !data?.tenderId) {
         return { category: 'job', type: 'new_job' };
       } else if (data?.tenderId) {
-        return { category: 'tender', type: 'new_tender' };
+        return { category: 'contest', type: 'new_contest' };
       } else if (data?.applicationId) {
         return { category: 'application', type: 'new_application' };
       }
@@ -127,21 +135,21 @@ function transformNotification(dbNotification: NotificationRow): UnifiedNotifica
       return appNotif;
     }
     
-    case 'tender': {
-      const tenderNotif: TenderNotification = {
+    case 'contest': {
+      const contestNotif: ContestNotification = {
         ...baseNotification,
-        category: 'tender',
-        type: categoryAndType.type as TenderNotification['type'],
+        category: 'contest',
+        type: categoryAndType.type as ContestNotification['type'],
         title: dbNotification.title,
         message: dbNotification.message,
-        tenderTitle: (data?.tenderTitle || data?.tender_title || dbNotification.title) as string,
+        contestTitle: (data?.tenderTitle || data?.tender_title || dbNotification.title) as string,
         organizerName: (data?.organizerName || data?.organizer_name || 'Nieznany organizator') as string,
         estimatedValue: (data?.estimatedValue || data?.estimated_value) as string | undefined,
         deadline: data?.deadline ? new Date(data.deadline as string | number) : dbNotification.expires_at ? new Date(dbNotification.expires_at) : undefined,
-        tenderId: (data?.tenderId || data?.tender_id || dbNotification.id) as string,
+        contestId: (data?.contestId || data?.contest_id || data?.tenderId || data?.tender_id || dbNotification.id) as string,
         actionUrl: dbNotification.action_url ?? undefined,
       };
-      return tenderNotif;
+      return contestNotif;
     }
 
     case 'system': {
@@ -346,14 +354,14 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         }
         break;
       }
-      case 'tender': {
-        const tenderNotif = notification as TenderNotification;
-        if (tenderNotif.actionUrl) {
-          router.push(tenderNotif.actionUrl);
-        } else if (onTenderSelect && tenderNotif.tenderId) {
-          onTenderSelect(tenderNotif.tenderId);
-        } else if (tenderNotif.tenderId) {
-          router.push(`/jobs/${tenderNotif.tenderId}`);
+      case 'contest': {
+        const contestNotif = notification as ContestNotification;
+        if (contestNotif.actionUrl) {
+          router.push(contestNotif.actionUrl);
+        } else if (onTenderSelect && contestNotif.contestId) {
+          onTenderSelect(contestNotif.contestId);
+        } else if (contestNotif.contestId) {
+          router.push(`/jobs/${contestNotif.contestId}`);
         }
         break;
       }
@@ -415,18 +423,18 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         }
         break;
       }
-      case 'tender': {
-        const tenderNotif = notification as TenderNotification;
-        switch (tenderNotif.type) {
-          case 'new_tender':
+      case 'contest': {
+        const contestNotif = notification as ContestNotification;
+        switch (contestNotif.type) {
+          case 'new_contest':
             return <Gavel className="h-4 w-4 text-blue-600" />;
           case 'deadline_reminder':
             return <Clock className="h-4 w-4 text-orange-600" />;
           case 'evaluation_started':
             return <Eye className="h-4 w-4 text-purple-600" />;
-          case 'tender_awarded':
+          case 'contest_awarded':
             return <Trophy className="h-4 w-4 text-green-600" />;
-          case 'tender_cancelled':
+          case 'contest_cancelled':
             return <X className="h-4 w-4 text-red-600" />;
           case 'contest_question':
             return <HelpCircle className="h-4 w-4 text-blue-600" />;
@@ -503,13 +511,13 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
                 </div>
               )}
               
-              {notification.category === 'tender' && (
+              {notification.category === 'contest' && (
                 <div className="mt-2">
                   <p className="text-xs text-gray-500">
-                    📋 {(notification as TenderNotification).tenderTitle}
+                    📋 {(notification as ContestNotification).contestTitle}
                   </p>
                   <p className="text-xs text-gray-500">
-                    Organizator: {(notification as TenderNotification).organizerName}
+                    Organizator: {(notification as ContestNotification).organizerName}
                   </p>
                   {notification.estimatedValue && (
                     <div className="flex items-center gap-1">

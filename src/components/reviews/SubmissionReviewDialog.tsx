@@ -33,11 +33,11 @@ export function SubmissionReviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Oceń Zgłoszenie</DialogTitle>
+          <DialogTitle>Oceń Konkurs</DialogTitle>
           <DialogDescription>
             {submissionTitle
-              ? `Oceń zgłoszenie: ${submissionTitle}`
-              : `Oceń zgłoszenie zarządcy ${managerCompanyName}.`}
+              ? `Oceń konkurs: ${submissionTitle}`
+              : `Oceń konkurs organizatora ${managerCompanyName}.`}
           </DialogDescription>
         </DialogHeader>
         <SubmissionReviewPanel

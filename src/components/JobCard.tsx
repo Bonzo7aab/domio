@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { MapPin, Clock, Heart, Eye, Gavel, Wrench, Users, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -8,10 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
 import { useUserProfile } from '../contexts/AuthContext';
 import type { Job } from '../types/job';
-import { AuthPromptPopover, AUTH_PROMPT_APPLY_OFFER } from './AuthPromptPopover';
-import { VerificationRequiredApplyDialog } from './VerificationRequiredApplyDialog';
-import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
-import type { AuthUser } from '../types/auth';
+import { ContestApplyOfferButton } from './contest/ContestApplyOfferButton';
 
 interface JobCardProps {
   job: Partial<Job> & {
@@ -36,69 +33,14 @@ interface JobCardProps {
   isHighlighted?: boolean;
   onApplyClick?: (jobId: string, jobData?: Job) => void;
   isExpired?: boolean;
+  hasSubmittedOffer?: boolean;
+  hasDraftOffer?: boolean;
+  isCheckingOffer?: boolean;
 }
 
 // Helper function to format numbers with spaces for thousands
 function formatNumberWithSpaces(num: number): string {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-}
-
-interface ApplyOfferButtonProps {
-  className?: string;
-  isLoggedIn: boolean;
-  user: AuthUser | null;
-  onApply: (e: React.MouseEvent) => void;
-}
-
-function ApplyOfferButton({ className, isLoggedIn, user, onApply }: ApplyOfferButtonProps) {
-  const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
-  const blockApply = needsVerificationAttention(user);
-
-  const handleApplyClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (blockApply) {
-      setVerificationDialogOpen(true);
-      return;
-    }
-    onApply(e);
-  };
-
-  if (!isLoggedIn) {
-    return (
-      <div
-        className="w-full md:w-auto"
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <AuthPromptPopover
-          title={AUTH_PROMPT_APPLY_OFFER.title}
-          description={AUTH_PROMPT_APPLY_OFFER.description}
-          align="center"
-        >
-          <Button
-            type="button"
-            className={className}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            Złóż ofertę
-          </Button>
-        </AuthPromptPopover>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <Button type="button" className={className} onClick={handleApplyClick}>
-        Złóż ofertę
-      </Button>
-      <VerificationRequiredApplyDialog
-        open={verificationDialogOpen}
-        onOpenChange={setVerificationDialogOpen}
-      />
-    </>
-  );
 }
 
 const JobCard = React.memo(function JobCard({ 
@@ -110,7 +52,10 @@ const JobCard = React.memo(function JobCard({
   onMouseLeave, 
   isHighlighted: _isHighlighted = false,
   onApplyClick,
-  isExpired = false
+  isExpired = false,
+  hasSubmittedOffer = false,
+  hasDraftOffer = false,
+  isCheckingOffer = false,
 }: JobCardProps) {
   const { user } = useUserProfile();
   const isManager = user?.userType === 'manager';
@@ -281,10 +226,13 @@ const JobCard = React.memo(function JobCard({
                   )}
                 </div>
                 {!isManager && (
-                  <ApplyOfferButton
-                    className="w-full sm:w-auto"
+                  <ContestApplyOfferButton
+                    className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
                     isLoggedIn={isLoggedIn}
                     user={user}
+                    hasSubmittedOffer={hasSubmittedOffer}
+                    hasDraftOffer={hasDraftOffer}
+                    isCheckingOffer={isCheckingOffer}
                     onApply={handleApplyClick}
                   />
                 )}
@@ -585,10 +533,13 @@ const JobCard = React.memo(function JobCard({
               {/* Apply button at bottom */}
               {!isManager && (
                 <div className="flex md:flex-wrap md:content-end">
-                  <ApplyOfferButton
-                    className="bg-blue-800 hover:bg-blue-900 text-white w-full md:w-auto"
+                  <ContestApplyOfferButton
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground w-full md:w-auto"
                     isLoggedIn={isLoggedIn}
                     user={user}
+                    hasSubmittedOffer={hasSubmittedOffer}
+                    hasDraftOffer={hasDraftOffer}
+                    isCheckingOffer={isCheckingOffer}
                     onApply={handleApplyClick}
                   />
                 </div>

@@ -41,7 +41,7 @@ interface ManagerSubmissionPodgladDialogProps {
   onOpenChange: (open: boolean) => void;
   onJobStatusUpdated?: (status: string) => void;
   /** Open this tab when the dialog mounts (e.g. after selecting an offer). */
-  initialTab?: 'details' | 'selected-offer' | 'rate-service';
+  initialTab?: 'details' | 'selected-offer' | 'rate-zlecenie';
 }
 
 export function ManagerSubmissionPodgladDialog({
@@ -74,7 +74,13 @@ export function ManagerSubmissionPodgladDialog({
     setTender(null);
     setAcceptedContractor(null);
     setHasSelectedOffer(false);
-    setActiveTab(initialTab === 'selected-offer' ? 'selected-offer' : initialTab === 'rate-service' ? 'rate-service' : 'details');
+    setActiveTab(
+      initialTab === 'selected-offer'
+        ? 'selected-offer'
+        : initialTab === 'rate-zlecenie'
+          ? 'rate-zlecenie'
+          : 'details',
+    );
 
     const run = async (): Promise<void> => {
       const supabase = createClient();
@@ -148,8 +154,8 @@ export function ManagerSubmissionPodgladDialog({
               {hasSelectedOffer ? (
                 <TabsTrigger value="selected-offer">Wybrana Oferta</TabsTrigger>
               ) : null}
-              <TabsTrigger value="rate-service" disabled={job.status !== 'completed' || !acceptedContractor}>
-                Oceń Usługę
+              <TabsTrigger value="rate-zlecenie" disabled={job.status !== 'completed' || !acceptedContractor}>
+                Oceń Zlecenie
               </TabsTrigger>
             </TabsList>
 
@@ -279,14 +285,14 @@ export function ManagerSubmissionPodgladDialog({
               )}
             </TabsContent>
 
-            <TabsContent value="rate-service" className="mt-0">
+            <TabsContent value="rate-zlecenie" className="mt-0">
               {job.status !== 'completed' ? (
                 <p className="text-muted-foreground py-4">
-                  Ocena usługi będzie dostępna po oznaczeniu zgłoszenia jako ukończone.
+                  Ocena zlecenia będzie dostępna po oznaczeniu zgłoszenia jako ukończone.
                 </p>
               ) : !acceptedContractor ? (
                 <p className="text-muted-foreground py-4">
-                  Brak zaakceptowanego wykonawcy — nie można wystawić oceny usługi.
+                  Brak zaakceptowanego wykonawcy — nie można wystawić oceny zlecenia.
                 </p>
               ) : (
                 <ServiceReviewPanel

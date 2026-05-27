@@ -31,9 +31,9 @@ export function ServiceReviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Oceń Usługę: {contractorName}</DialogTitle>
+          <DialogTitle>Oceń Zlecenie: {contractorName}</DialogTitle>
           <DialogDescription>
-            Oceń jakość usługi wykonawcy — gwiazdki, komentarz i opcjonalne zdjęcia.
+            Oceń realizację zlecenia przez wykonawcę — gwiazdki, komentarz i opcjonalne zdjęcia.
           </DialogDescription>
         </DialogHeader>
         <ServiceReviewPanel

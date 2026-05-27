@@ -151,7 +151,7 @@ export function RatingsContent({ ratingSummary, reviews, writtenReviews }: Ratin
           ) : (
             <Card>
               <CardContent className="pt-6 text-center text-muted-foreground">
-                Brak wystawionych ocen zgłoszeń. Oceń zgłoszenie po ukończeniu projektu w sekcji Projekty.
+                Brak wystawionych ocen konkursów. Oceń konkurs po ukończeniu projektu w sekcji Projekty.
               </CardContent>
             </Card>
           )}

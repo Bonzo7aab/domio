@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { ContestApplyOfferButton } from './contest/ContestApplyOfferButton';
 import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Heart, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
@@ -656,26 +657,28 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
   // Check if job is bookmarked; sync count after changes from other views
   useEffect(() => {
-    if (!jobData) return;
+    const jobIdForBookmark = jobData?.id;
+    if (!jobIdForBookmark) return;
 
     const syncBookmarkState = () => {
-      setIsBookmarked(isJobBookmarked(jobData.id));
-      const overrides = readBookmarkCountOverrides();
-      if (jobData.id in overrides) {
-        setJobData((prev) =>
-          prev ? { ...prev, bookmarks_count: overrides[jobData.id] } : prev,
-        );
-      }
+      setIsBookmarked(isJobBookmarked(jobIdForBookmark));
+      const overrideCount = readBookmarkCountOverrides()[jobIdForBookmark];
+      if (overrideCount === undefined) return;
+      setJobData((prev) => {
+        if (!prev || prev.id !== jobIdForBookmark) return prev;
+        if (prev.bookmarks_count === overrideCount) return prev;
+        return { ...prev, bookmarks_count: overrideCount };
+      });
     };
 
-    syncBookmarkState();
+    queueMicrotask(syncBookmarkState);
     window.addEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkState);
     window.addEventListener('focus', syncBookmarkState);
     return () => {
       window.removeEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkState);
       window.removeEventListener('focus', syncBookmarkState);
     };
-  }, [jobData]);
+  }, [jobData?.id]);
 
   // Check tender bid state (submitted vs draft) for this tender
   useEffect(() => {
@@ -814,14 +817,6 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     // Check if contractor has a company before showing the form
     if (!supabase || !user.id) {
       toast.error('Błąd połączenia. Spróbuj ponownie.');
-      return;
-    }
-
-    // For tenders, check if bid already exists
-    if (job.postType === 'tender' && hasExistingBid) {
-      toast.error(
-        `Już złożyłeś ofertę na ten ${tenderLabel}. Nie możesz złożyć więcej niż jednej oferty.`,
-      );
       return;
     }
 
@@ -1676,25 +1671,26 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
             <Card>
               <CardContent className="p-6">
                 <div className="space-y-3">
-                  <Button 
-                    onClick={handleApplicationSubmit}
-                    className="w-full bg-blue-800 hover:bg-blue-900 text-white"
+                  <ContestApplyOfferButton
+                    className={
+                      hasExistingBid && job.postType === 'tender'
+                        ? 'w-full'
+                        : 'w-full bg-blue-800 hover:bg-blue-900 text-white'
+                    }
                     size="lg"
-                    disabled={job.postType === 'tender' && (hasExistingBid || isCheckingBid)}
-                  >
-                    {isCheckingBid
-                      ? 'Sprawdzanie...'
-                      : hasExistingBid && job.postType === 'tender'
-                        ? 'Oferta już złożona'
-                        : hasDraftBid && isContestView
-                          ? 'Kontynuuj szkic oferty'
-                          : 'Złóż ofertę'}
-                  </Button>
-                  {hasExistingBid && job.postType === 'tender' && (
-                    <p className="text-xs text-muted-foreground text-center">
-                      Już złożyłeś ofertę na ten {tenderLabel}
-                    </p>
-                  )}
+                    isLoggedIn={Boolean(user)}
+                    user={user}
+                    hasSubmittedOffer={Boolean(
+                      hasExistingBid && job.postType === 'tender',
+                    )}
+                    hasDraftOffer={Boolean(
+                      hasDraftBid && isContestView && !hasExistingBid,
+                    )}
+                    isCheckingOffer={isCheckingBid}
+                    onApply={() => {
+                      void handleApplicationSubmit();
+                    }}
+                  />
                   {hasDraftBid && !hasExistingBid && isContestView && (
                     <p className="text-xs text-muted-foreground text-center">
                       Masz zapisany szkic oferty w tym konkursie

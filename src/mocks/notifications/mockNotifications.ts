@@ -23,8 +23,8 @@ export const mockNotifications: Notification[] = [
     userId: '1',
     title: 'Nowy przetarg',
     message: 'Opublikowano nowy przetarg: "Remont elewacji budynku mieszkalnego"',
-    type: 'tender',
-    category: 'tender',
+    type: 'contest',
+    category: 'contest',
     read: false,
     createdAt: new Date('2024-01-16T09:15:00'),
     data: {
@@ -119,7 +119,7 @@ export const mockNotifications: Notification[] = [
     title: 'Przetarg zakończony',
     message: 'Przetarg "Modernizacja instalacji elektrycznej" został zakończony. Wybrano wykonawcę: ElektroMontaż Sp. z o.o.',
     type: 'info',
-    category: 'tender',
+    category: 'contest',
     read: true,
     createdAt: new Date('2024-01-12T16:45:00'),
     data: {
