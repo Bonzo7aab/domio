@@ -1,278 +1,579 @@
 import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
-import { createNotification, findExistingConversation, createConversation, sendMessage } from './messaging';
+import { notifyContestQuestionAskerAction } from '../../app/contest-questions/actions';
+import { createNotification } from './messaging';
+import { isContestTender } from '../tender-contest/map-tender-contest-display';
+import { isContestQuestionsDeadlinePassed } from '../contest-questions/format-contest-question-label';
+import { formatPostgrestError } from './postgrest-error';
+
+export { formatPostgrestError };
+
+export interface ContestQuestionComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  authorDisplayName?: string;
+}
+
+export interface ContestQuestionPublished {
+  id: string;
+  question: string;
+  createdAt: string;
+  answeredAt: string;
+  comments: ContestQuestionComment[];
+}
+
+export interface ContestQuestionManagerRow {
+  id: string;
+  question: string;
+  createdAt: string;
+  answeredAt: string | null;
+  askerId: string;
+  askerDisplayName: string;
+  companyName: string | null;
+  comments: ContestQuestionComment[];
+}
+
+function parseContractorComments(raw: unknown): ContestQuestionComment[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as Record<string, unknown>;
+      const id = typeof row.id === 'string' ? row.id : '';
+      const body = typeof row.body === 'string' ? row.body : '';
+      const createdAt = typeof row.created_at === 'string' ? row.created_at : '';
+      if (!id || !body) return null;
+      return { id, body, createdAt };
+    })
+    .filter((c): c is ContestQuestionComment => c !== null);
+}
+
+function parseManagerComments(raw: unknown): ContestQuestionComment[] {
+  if (!Array.isArray(raw)) return [];
+  const comments: ContestQuestionComment[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const id = typeof row.id === 'string' ? row.id : '';
+    const body = typeof row.body === 'string' ? row.body : '';
+    const createdAt = typeof row.created_at === 'string' ? row.created_at : '';
+    if (!id || !body) continue;
+    const authorDisplayName =
+      typeof row.author_display_name === 'string'
+        ? row.author_display_name.trim() || 'Organizator'
+        : 'Organizator';
+    comments.push({ id, body, createdAt, authorDisplayName });
+  }
+  return comments;
+}
+
+export interface ContestQuestionPending {
+  id: string;
+  question: string;
+  createdAt: string;
+}
 
 /**
- * Submit a question about a job
+ * Published Q&A visible to all contractors (anonymous).
+ */
+export async function fetchContestQuestionsForContractor(
+  supabase: SupabaseClient<Database>,
+  tenderId: string,
+): Promise<{ data: ContestQuestionPublished[]; error: PostgrestError | null }> {
+  const { data, error } = await supabase.rpc('list_contest_questions_contractor', {
+    p_tender_id: tenderId,
+  });
+
+  if (error) {
+    return { data: [], error };
+  }
+
+  const rows = (data ?? []).map((row) => ({
+    id: row.id,
+    question: row.question,
+    createdAt: row.created_at,
+    answeredAt: row.answered_at,
+    comments: parseContractorComments(row.comments),
+  }));
+
+  return { data: rows, error: null };
+}
+
+/**
+ * Own unanswered questions (visible only to asker via RLS).
+ */
+export async function fetchOwnPendingContestQuestions(
+  supabase: SupabaseClient<Database>,
+  tenderId: string,
+  askerId: string,
+): Promise<{ data: ContestQuestionPending[]; error: PostgrestError | null }> {
+  const { data, error } = await supabase
+    .from('questions')
+    .select('id, question, created_at')
+    .eq('tender_id', tenderId)
+    .eq('asker_id', askerId)
+    .is('answered_at', null)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { data: [], error };
+  }
+
+  const rows = (data ?? []).map((row) => ({
+    id: row.id,
+    question: row.question,
+    createdAt: row.created_at,
+  }));
+
+  return { data: rows, error: null };
+}
+
+/**
+ * All contest Q&A for manager (with asker identity).
+ */
+async function fetchContestQuestionsForManagerDirect(
+  supabase: SupabaseClient<Database>,
+  tenderId: string,
+): Promise<{ data: ContestQuestionManagerRow[]; error: PostgrestError | null }> {
+  const { data: questionRows, error } = await supabase
+    .from('questions')
+    .select('id, question, answer, created_at, answered_at, asker_id')
+    .eq('tender_id', tenderId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return { data: [], error };
+  }
+
+  const askerIds = [...new Set((questionRows ?? []).map((q) => q.asker_id))];
+  const profileMap = new Map<string, { name: string; company: string | null }>();
+
+  if (askerIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('id, first_name, last_name')
+      .in('id', askerIds);
+
+    for (const profile of profiles ?? []) {
+      profileMap.set(profile.id, {
+        name: `${profile.first_name} ${profile.last_name}`.trim(),
+        company: null,
+      });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: companyLinks } = await (supabase as any)
+      .from('user_companies')
+      .select('user_id, companies(name)')
+      .in('user_id', askerIds)
+      .eq('is_primary', true);
+
+    for (const link of companyLinks ?? []) {
+      const userId = link.user_id as string;
+      const company = link.companies as { name?: string } | null;
+      const existing = profileMap.get(userId);
+      if (existing && company?.name) {
+        existing.company = company.name;
+      }
+    }
+  }
+
+  const questionIds = (questionRows ?? []).map((q) => q.id);
+  const commentsByQuestion = new Map<string, ContestQuestionComment[]>();
+
+  if (questionIds.length > 0) {
+    const { data: commentRows } = await supabase
+      .from('question_comments')
+      .select('id, question_id, body, created_at, author_id')
+      .in('question_id', questionIds)
+      .order('created_at', { ascending: true });
+
+    const authorIds = [...new Set((commentRows ?? []).map((c) => c.author_id))];
+    const authorNames = new Map<string, string>();
+
+    if (authorIds.length > 0) {
+      const { data: authors } = await supabase
+        .from('user_profiles')
+        .select('id, first_name, last_name')
+        .in('id', authorIds);
+      for (const author of authors ?? []) {
+        authorNames.set(
+          author.id,
+          `${author.first_name} ${author.last_name}`.trim() || 'Organizator',
+        );
+      }
+    }
+
+    for (const comment of commentRows ?? []) {
+      const list = commentsByQuestion.get(comment.question_id) ?? [];
+      list.push({
+        id: comment.id,
+        body: comment.body,
+        createdAt: comment.created_at,
+        authorDisplayName: authorNames.get(comment.author_id) ?? 'Organizator',
+      });
+      commentsByQuestion.set(comment.question_id, list);
+    }
+  }
+
+  const rows = (questionRows ?? []).map((row) => {
+    const profile = profileMap.get(row.asker_id);
+    const comments = commentsByQuestion.get(row.id) ?? [];
+    if (comments.length === 0 && row.answer && row.answered_at) {
+      comments.push({
+        id: `legacy-${row.id}`,
+        body: row.answer,
+        createdAt: row.answered_at,
+        authorDisplayName: 'Organizator',
+      });
+    }
+    return {
+      id: row.id,
+      question: row.question,
+      createdAt: row.created_at,
+      answeredAt: row.answered_at,
+      askerId: row.asker_id,
+      askerDisplayName: profile?.name || 'Wykonawca',
+      companyName: profile?.company ?? null,
+      comments,
+    };
+  });
+
+  return { data: rows, error: null };
+}
+
+/**
+ * All contest Q&A for manager (with asker identity).
+ */
+export async function fetchContestQuestionsForManager(
+  supabase: SupabaseClient<Database>,
+  tenderId: string,
+): Promise<{ data: ContestQuestionManagerRow[]; error: PostgrestError | null }> {
+  const { data, error } = await supabase.rpc('list_contest_questions_manager', {
+    p_tender_id: tenderId,
+  });
+
+  if (!error) {
+    const rows = (data ?? []).map((row) => ({
+      id: row.id,
+      question: row.question,
+      createdAt: row.created_at,
+      answeredAt: row.answered_at,
+      askerId: row.asker_id,
+      askerDisplayName: row.asker_display_name?.trim() || 'Wykonawca',
+      companyName: row.company_name,
+      comments: parseManagerComments(row.comments),
+    }));
+    return { data: rows, error: null };
+  }
+
+  const rpcMissing =
+    error.code === 'PGRST202' ||
+    error.message?.includes('Could not find the function') ||
+    error.message?.includes('Forbidden');
+
+  if (rpcMissing) {
+    return fetchContestQuestionsForManagerDirect(supabase, tenderId);
+  }
+
+  return { data: [], error };
+}
+
+/**
+ * Unanswered questions the manager has not opened in the Q&A dialog yet.
+ */
+/**
+ * All unanswered questions per contest (for manager tooltip / badge).
+ */
+export async function fetchUnansweredContestQuestionCounts(
+  supabase: SupabaseClient<Database>,
+  tenderIds: string[],
+): Promise<Record<string, number>> {
+  if (tenderIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('questions')
+    .select('tender_id')
+    .in('tender_id', tenderIds)
+    .is('answered_at', null);
+
+  if (error) {
+    console.error('fetchUnansweredContestQuestionCounts:', formatPostgrestError(error));
+    return {};
+  }
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    if (row.tender_id) {
+      counts[row.tender_id] = (counts[row.tender_id] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+export async function fetchUnseenContestQuestionCounts(
+  supabase: SupabaseClient<Database>,
+  tenderIds: string[],
+): Promise<Record<string, number>> {
+  if (tenderIds.length === 0) return {};
+
+  const { data, error } = await supabase.rpc('count_unseen_contest_questions', {
+    p_tender_ids: tenderIds,
+  });
+
+  if (error) {
+    console.error('fetchUnseenContestQuestionCounts:', error);
+    return {};
+  }
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    counts[row.tender_id] = Number(row.unseen_count);
+  }
+  return counts;
+}
+
+export async function markContestQuestionsSeen(
+  supabase: SupabaseClient<Database>,
+  tenderId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('mark_contest_questions_seen', {
+    p_tender_id: tenderId,
+  });
+  if (error) {
+    console.warn('markContestQuestionsSeen:', error);
+  }
+}
+
+export async function addContestQuestionComment(
+  supabase: SupabaseClient<Database>,
+  questionId: string,
+  body: string,
+): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
+  const trimmed = body.trim();
+  if (!trimmed) {
+    return { success: false, error: new Error('Treść komentarza jest wymagana') };
+  }
+
+  const { error } = await supabase.rpc('add_contest_question_comment', {
+    p_question_id: questionId,
+    p_body: trimmed,
+  });
+
+  if (!error) {
+    void notifyContestQuestionAskerAction(questionId).catch((notifError) => {
+      console.warn('notifyContestQuestionAskerAction:', notifError);
+    });
+    return { success: true, error: null };
+  }
+
+  if (
+    error.code === 'PGRST202' ||
+    error.message?.includes('Could not find the function')
+  ) {
+    const legacy = await supabase.rpc('answer_contest_question', {
+      p_question_id: questionId,
+      p_answer: trimmed,
+    });
+    if (legacy.error) {
+      return { success: false, error: legacy.error };
+    }
+    void notifyContestQuestionAskerAction(questionId).catch((notifError) => {
+      console.warn('notifyContestQuestionAskerAction:', notifError);
+    });
+    return { success: true, error: null };
+  }
+
+  return { success: false, error };
+}
+
+export async function answerContestQuestion(
+  supabase: SupabaseClient<Database>,
+  questionId: string,
+  answer: string,
+): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
+  return addContestQuestionComment(supabase, questionId, answer);
+}
+
+interface TenderMeta {
+  id: string;
+  title: string;
+  managerId: string;
+  allowQuestions: boolean;
+  submissionDeadline: string | null;
+  isContest: boolean;
+}
+
+async function resolveListingMeta(
+  supabase: SupabaseClient<Database>,
+  listingId: string,
+): Promise<{ meta: TenderMeta | null; isJob: boolean; error: PostgrestError | Error | null }> {
+  const { data: jobData, error: jobError } = await supabase
+    .from('jobs')
+    .select('id, title, manager_id')
+    .eq('id', listingId)
+    .maybeSingle();
+
+  if (!jobError && jobData) {
+    return {
+      meta: {
+        id: jobData.id,
+        title: jobData.title,
+        managerId: jobData.manager_id,
+        allowQuestions: true,
+        submissionDeadline: null,
+        isContest: false,
+      },
+      isJob: true,
+      error: null,
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: tenderData, error: tenderError } = await (supabase as any)
+    .from('tenders')
+    .select(
+      'id, title, manager_id, allow_questions, submission_deadline, building_id, selection_criteria, formal_requirements',
+    )
+    .eq('id', listingId)
+    .maybeSingle();
+
+  if (tenderError || !tenderData) {
+    return { meta: null, isJob: false, error: tenderError ?? new Error('Ogłoszenie nie istnieje') };
+  }
+
+  const isContest = isContestTender({
+    building_id: tenderData.building_id,
+    selection_criteria: tenderData.selection_criteria as Record<string, unknown> | null,
+    formal_requirements: tenderData.formal_requirements as Record<string, unknown> | null,
+  });
+
+  return {
+    meta: {
+      id: tenderData.id,
+      title: tenderData.title,
+      managerId: tenderData.manager_id,
+      allowQuestions: tenderData.allow_questions ?? true,
+      submissionDeadline: tenderData.submission_deadline,
+      isContest,
+    },
+    isJob: false,
+    error: null,
+  };
+}
+
+/**
+ * Submit a question about a job or tender.
  */
 export async function submitQuestion(
   supabase: SupabaseClient<Database>,
   jobId: string,
   askerId: string,
-  question: string
-): Promise<{ success: boolean; error: PostgrestError | null; questionId?: string }> {
+  question: string,
+): Promise<{ success: boolean; error: PostgrestError | Error | null; questionId?: string }> {
   try {
-    // 1. Verify session and get the authenticated user ID
-    // This ensures asker_id matches auth.uid() for RLS policies
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    
+
     if (sessionError || !sessionData.session) {
-      console.error('No active session:', sessionError);
-      return { success: false, error: new Error('Brak aktywnej sesji. Proszę się zalogować ponownie.') as PostgrestError };
+      return {
+        success: false,
+        error: new Error('Brak aktywnej sesji. Proszę się zalogować ponownie.'),
+      };
     }
 
     const authenticatedUserId = sessionData.session.user.id;
-    
-    // Verify the passed askerId matches the authenticated user
-    if (askerId !== authenticatedUserId) {
-      console.warn('askerId mismatch:', { askerId, authenticatedUserId });
-      // Use authenticated user ID instead to ensure RLS policy passes
+    const trimmedQuestion = question.trim();
+
+    if (!trimmedQuestion) {
+      return { success: false, error: new Error('Pytanie nie może być puste') };
     }
 
-    // 2. Check if the ID is a job or a tender
-    // The questions table supports both job_id and tender_id
-    let isJob = false;
-    let isTender = false;
-    let managerId: string | null = null;
-    let title: string | null = null;
+    const { meta, isJob, error: metaError } = await resolveListingMeta(supabase, jobId);
+    if (metaError || !meta) {
+      return { success: false, error: metaError ?? new Error('Ogłoszenie nie istnieje') };
+    }
 
-    // Try to find it as a job first
-    try {
-      const { data: jobData, error: jobError } = await supabase
-        .from('jobs')
-        .select('id, title, manager_id')
-        .eq('id', jobId)
-        .limit(1);
-      
-      if (!jobError && jobData && jobData.length > 0) {
-        isJob = true;
-        managerId = jobData[0].manager_id;
-        title = jobData[0].title;
+    if (!isJob && meta.isContest) {
+      if (!meta.allowQuestions) {
+        return { success: false, error: new Error('Pytania do tego konkursu są wyłączone') };
       }
-    } catch (err) {
-      console.warn('Error checking if ID is a job:', err);
-    }
-
-    // If not a job, try as a tender
-    if (!isJob) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: tenderData, error: tenderError } = await (supabase as any)
-          .from('tenders')
-          .select('id, title, manager_id')
-          .eq('id', jobId)
-          .limit(1);
-        
-        if (!tenderError && tenderData && Array.isArray(tenderData) && tenderData.length > 0) {
-          isTender = true;
-          managerId = (tenderData[0] as Record<string, unknown>)?.manager_id as string;
-          title = (tenderData[0] as Record<string, unknown>)?.title as string;
-        }
-      } catch (err) {
-        console.warn('Error checking if ID is a tender:', err);
+      if (isContestQuestionsDeadlinePassed(meta.submissionDeadline)) {
+        return {
+          success: false,
+          error: new Error('Termin składania ofert minął — nie można już zadawać pytań'),
+        };
       }
     }
 
-    if (!isJob && !isTender) {
-      return { success: false, error: new Error('Ogłoszenie nie istnieje') as PostgrestError };
-    }
-
-    // 3. Insert the question into the database
-    // Use authenticatedUserId to ensure it matches auth.uid() for RLS policies
-    console.log('Inserting question with:', {
-      jobId,
-      isJob,
-      isTender,
-      askerId: authenticatedUserId,
-      questionLength: question.trim().length,
-      hasSession: !!sessionData.session,
-      sessionUserId: sessionData.session?.user?.id
-    });
-
-    const insertPayload: Record<string, unknown> = {
-      asker_id: authenticatedUserId, // Use session user ID to match auth.uid()
-      question: question.trim(),
+    const insertPayload: Database['public']['Tables']['questions']['Insert'] = {
+      asker_id: authenticatedUserId,
+      question: trimmedQuestion,
       is_public: true,
+      ...(isJob ? { job_id: jobId } : { tender_id: jobId }),
     };
 
-    // Set either job_id or tender_id based on what we found
-    if (isJob) {
-      insertPayload.job_id = jobId;
-    } else if (isTender) {
-      insertPayload.tender_id = jobId;
-    }
-
-    console.log('Insert payload:', insertPayload);
-
-    // Try insert with select first
-    let questionDataArray: Array<Record<string, unknown>> | null = null;
-    let questionError: PostgrestError | null = null;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const insertResult = await (supabase as any)
+    const { data: questionRow, error: questionError } = await supabase
       .from('questions')
       .insert(insertPayload)
-      .select('id');
-
-    questionDataArray = (insertResult.data || []) as Array<Record<string, unknown>>;
-    questionError = insertResult.error;
-
-    // If select fails but insert might have succeeded, try to query the question back
-    if (questionError && (!questionError.code || questionError.code !== '23503')) {
-      console.warn('Insert with select failed, trying to query back:', questionError);
-      
-      // Wait a moment for the insert to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Try to find the question we just inserted
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: foundQuestion, error: findError } = await (supabase as any)
-        .from('questions')
-        .select('id')
-        .eq('job_id', jobId)
-        .eq('asker_id', authenticatedUserId)
-        .eq('question', question.trim())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (!findError && foundQuestion) {
-        console.log('Found question after insert:', foundQuestion);
-        questionDataArray = [foundQuestion] as Array<Record<string, unknown>>;
-        questionError = null;
-      }
-    }
+      .select('id')
+      .single();
 
     if (questionError) {
-      // Log the full error object
-      const errorDetails = {
-        error: questionError,
-        errorString: JSON.stringify(questionError, null, 2),
-        errorKeys: Object.keys(questionError),
-        code: questionError?.code,
-        message: questionError?.message,
-        details: questionError?.details,
-        hint: questionError?.hint,
-        authenticatedUserId,
-        jobId,
-        insertPayload
-      };
-      
-      console.error('Error submitting question - full details:', errorDetails);
-      
-      // Check if it's a foreign key constraint error (job doesn't exist)
-      if (questionError.code === '23503' || questionError.message?.includes('foreign key')) {
-        return { success: false, error: new Error('Ogłoszenie nie istnieje') as PostgrestError };
+      if (questionError.code === '23503') {
+        return { success: false, error: new Error('Ogłoszenie nie istnieje') };
       }
-      
-      // Check if it's an RLS policy violation
-      if (questionError.code === '42501' || questionError.message?.includes('policy') || questionError.message?.includes('permission') || questionError.message?.includes('row-level security')) {
-        return { success: false, error: new Error('Brak uprawnień do dodania pytania. Sprawdź czy jesteś zalogowany.') as PostgrestError };
+      if (
+        questionError.code === '42501' ||
+        questionError.message?.includes('policy') ||
+        questionError.message?.includes('permission')
+      ) {
+        return {
+          success: false,
+          error: new Error('Brak uprawnień do dodania pytania. Sprawdź czy jesteś zalogowany.'),
+        };
       }
-      
-      // Return a more descriptive error
-      const errorMessage = questionError.message || questionError.code || 'Nieznany błąd podczas zapisywania pytania';
-      return { success: false, error: new Error(errorMessage) as PostgrestError };
+      return { success: false, error: questionError };
     }
 
-    if (!questionDataArray || questionDataArray.length === 0) {
-      console.error('No question data returned from insert');
-      return { success: false, error: new Error('Failed to create question') as PostgrestError };
-    }
+    const questionId = questionRow?.id ?? '';
 
-    const questionData = Array.isArray(questionDataArray) ? questionDataArray[0] : questionDataArray;
+    if (meta.managerId && authenticatedUserId !== meta.managerId) {
+      const isContestQa = !isJob && meta.isContest;
+      const actionUrl = isContestQa
+        ? `/manager-dashboard/konkursy?contestId=${jobId}&tab=questions`
+        : `/jobs/${jobId}`;
 
-    // 4. Create or find conversation and add question as a message
-    let conversationId: string | null = null;
-    if (managerId && authenticatedUserId !== managerId) {
+      const notificationType = isContestQa ? 'contest_question' : 'new_message';
+      const notificationTitle = isContestQa
+        ? 'Nowe pytanie do konkursu'
+        : 'Nowe pytanie dotyczące ogłoszenia';
+
       try {
-        // Find existing conversation between asker and manager
-        const existingConvResult = await findExistingConversation(
+        await createNotification(
           supabase,
-          authenticatedUserId,
-          managerId
-        );
-
-        if (existingConvResult.error) {
-          console.warn('Error finding existing conversation:', existingConvResult.error);
-        }
-
-        // If conversation exists, use it; otherwise create a new one
-        if (existingConvResult.data) {
-          conversationId = existingConvResult.data;
-          console.log('Found existing conversation:', conversationId);
-        } else {
-          // Create new conversation
-          const convResult = await createConversation(supabase, {
-            participant1: authenticatedUserId,
-            participant2: managerId,
-            subject: `Pytanie: ${title}`,
-            jobId: isJob ? jobId : null,
-            tenderId: isTender ? jobId : null,
-          });
-
-          if (convResult.error || !convResult.data) {
-            console.warn('Failed to create conversation:', convResult.error);
-          } else {
-            conversationId = convResult.data;
-            console.log('Created new conversation:', conversationId);
-          }
-        }
-
-        // If we have a conversation, add the question as a message
-        if (conversationId) {
-          const messageResult = await sendMessage(supabase, {
-            conversationId: conversationId,
-            senderId: authenticatedUserId,
-            content: question.trim(),
-            messageType: 'text',
-            skipRecipientNotification: true,
-          });
-
-          if (messageResult.error) {
-            console.warn('Failed to add question as message:', messageResult.error);
-            // Don't fail the whole operation if message creation fails
-          } else {
-            console.log('Question added as message to conversation');
-          }
-        }
-      } catch (convError) {
-        console.warn('Error creating conversation/message for question:', convError);
-        // Don't fail the whole operation if conversation/message creation fails
-      }
-    }
-
-    // 5. Create a notification for the job/tender owner (manager) if we have the manager_id
-    if (managerId && title) {
-      try {
-        const notificationResult = await createNotification(
-          supabase,
-          managerId,
-          'new_message', // Using 'new_message' as closest match for question notifications
-          'Nowe pytanie dotyczące ogłoszenia',
-          `Otrzymałeś nowe pytanie dotyczące ogłoszenia: ${title}`,
+          meta.managerId,
+          notificationType,
+          notificationTitle,
+          isContestQa
+            ? `Otrzymałeś nowe pytanie do konkursu: ${meta.title}`
+            : `Otrzymałeś nowe pytanie dotyczące ogłoszenia: ${meta.title}`,
           {
-            questionId: ((questionData as Record<string, unknown>)?.id as string) || '',
-            [isJob ? 'jobId' : 'tenderId']: jobId,
-            title: title,
+            questionId,
+            tenderId: isJob ? undefined : jobId,
+            jobId: isJob ? jobId : undefined,
+            title: meta.title,
           },
-          isJob ? `/jobs/${jobId}` : `/tenders/${jobId}`
+          actionUrl,
         );
-
-        if (notificationResult.error) {
-          console.warn('Failed to create notification:', notificationResult.error);
-          // Don't fail the whole operation if notification fails
-        }
       } catch (notifError) {
         console.warn('Error creating notification:', notifError);
-        // Don't fail the whole operation if notification fails
       }
     }
 
-    return { success: true, error: null, questionId: ((questionData as Record<string, unknown>)?.id as string) || '' };
+    return { success: true, error: null, questionId };
   } catch (err) {
     console.error('Error submitting question:', err);
-    return { success: false, error: err };
+    return { success: false, error: err instanceof Error ? err : new Error('Unknown error') };
   }
 }
-

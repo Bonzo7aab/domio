@@ -229,6 +229,7 @@ export async function shouldSendPushNotification(
     case 'new_tender':
       return preferences.new_tender_notifications ?? true;
     case 'new_message':
+    case 'contest_question':
       return preferences.message_notifications ?? true;
     case 'application_status_update':
     case 'bid_status_update':

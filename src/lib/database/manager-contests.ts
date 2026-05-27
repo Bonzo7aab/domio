@@ -2,6 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import { isContestTender } from '../tender-contest/map-tender-contest-display';
 import { getContestWorkflowStatusLabel } from '../tender-workflow-status';
+import {
+  fetchUnansweredContestQuestionCounts,
+  fetchUnseenContestQuestionCounts,
+} from './questions';
 
 export interface ManagerContest {
   id: string;
@@ -15,6 +19,10 @@ export interface ManagerContest {
   selectedContractorName?: string;
   selectedContractorCompanyId?: string;
   createdAt: string;
+  /** Unanswered questions not yet opened by manager in Q&A dialog */
+  unseenQuestionsCount: number;
+  /** Total questions awaiting manager answer */
+  unansweredQuestionsCount: number;
 }
 
 interface TenderContestRow {
@@ -138,6 +146,14 @@ export async function fetchManagerContests(
     }
   }
 
+  const [unseenCounts, unansweredCounts] =
+    tenderIds.length > 0
+      ? await Promise.all([
+          fetchUnseenContestQuestionCounts(supabase, tenderIds),
+          fetchUnansweredContestQuestionCounts(supabase, tenderIds),
+        ])
+      : [{}, {}];
+
   return contestRows.map((t) => ({
     id: t.id,
     title: t.title,
@@ -150,6 +166,8 @@ export async function fetchManagerContests(
     selectedContractorName: winnerNames[t.id],
     selectedContractorCompanyId: winnerCompanyIds[t.id],
     createdAt: t.created_at,
+    unseenQuestionsCount: unseenCounts[t.id] ?? 0,
+    unansweredQuestionsCount: unansweredCounts[t.id] ?? 0,
   }));
 }
 

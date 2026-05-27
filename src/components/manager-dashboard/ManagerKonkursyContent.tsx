@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, Lock } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, HelpCircle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type ManagerContest,
@@ -18,6 +18,7 @@ import {
 import { formatSubmissionDeadlineDisplay, formatCompareLockedTooltip } from '../../lib/contest-submission-deadline';
 import { cancelContestAction } from '../../app/manager-dashboard/konkursy/actions';
 import { ManagerContestPodgladDialog } from './ManagerContestPodgladDialog';
+import { ManagerContestQuestionsDialog } from './ManagerContestQuestionsDialog';
 import { ContestStatusBadge } from './ContestStatusBadge';
 import { cn } from '../ui/utils';
 import { Button } from '../ui/button';
@@ -102,31 +103,83 @@ export function ManagerKonkursyContent({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [podgladRow, setPodgladRow] = useState<ManagerContest | null>(null);
-  const [podgladInitialTab, setPodgladInitialTab] = useState<'details' | 'selected-offer'>('details');
+  const [podgladInitialTab, setPodgladInitialTab] = useState<
+    'details' | 'selected-offer' | 'questions'
+  >('details');
   const [sortKey, setSortKey] = useState<SortKey>('deadline');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [cancelTarget, setCancelTarget] = useState<ManagerContest | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [questionsDialog, setQuestionsDialog] = useState<{ id: string; title: string } | null>(
+    null,
+  );
+  const [unseenCounts, setUnseenCounts] = useState<Record<string, number>>(() =>
+    Object.fromEntries(initialContests.map((c) => [c.id, c.unseenQuestionsCount])),
+  );
+  const [unansweredCounts, setUnansweredCounts] = useState<Record<string, number>>(() =>
+    Object.fromEntries(initialContests.map((c) => [c.id, c.unansweredQuestionsCount])),
+  );
 
   useEffect(() => {
     setContests(initialContests);
+    setUnseenCounts(
+      Object.fromEntries(initialContests.map((c) => [c.id, c.unseenQuestionsCount])),
+    );
+    setUnansweredCounts(
+      Object.fromEntries(initialContests.map((c) => [c.id, c.unansweredQuestionsCount])),
+    );
   }, [initialContests]);
 
   useEffect(() => {
-    const podgladId = searchParams.get('podglad');
-    if (!podgladId) return;
+    const openId = searchParams.get('contestId') ?? searchParams.get('podglad');
+    if (!openId) return;
 
-    const row = contests.find((c) => c.id === podgladId);
+    const row = contests.find((c) => c.id === openId);
     if (!row) return;
 
     const tabParam = searchParams.get('tab');
-    const tab: 'details' | 'selected-offer' =
-      tabParam === 'selected-offer' ? 'selected-offer' : 'details';
 
-    setPodgladRow(row);
-    setPodgladInitialTab(tab);
+    if (tabParam === 'questions') {
+      setQuestionsDialog({ id: row.id, title: row.title });
+      setUnseenCounts((prev) => ({ ...prev, [row.id]: 0 }));
+    } else {
+      const tab: 'details' | 'selected-offer' =
+        tabParam === 'selected-offer' ? 'selected-offer' : 'details';
+      setPodgladRow(row);
+      setPodgladInitialTab(tab);
+    }
+
     router.replace('/manager-dashboard/konkursy', { scroll: false });
   }, [searchParams, contests, router]);
+
+  const openQuestionsDialog = (row: ManagerContest): void => {
+    setQuestionsDialog({ id: row.id, title: row.title });
+  };
+
+  const handleUnseenCountChange = (contestId: string, count: number): void => {
+    setUnseenCounts((prev) => ({ ...prev, [contestId]: count }));
+  };
+
+  const handleUnansweredCountChange = (contestId: string, count: number): void => {
+    setUnansweredCounts((prev) => ({ ...prev, [contestId]: count }));
+  };
+
+  function questionsTooltipLabel(contestId: string): string {
+    const unanswered = unansweredCounts[contestId] ?? 0;
+    const unseen = unseenCounts[contestId] ?? 0;
+    if (unanswered === 0) return 'Pytania do konkursu';
+    const unansweredLabel =
+      unanswered === 1
+        ? '1 pytanie bez odpowiedzi'
+        : unanswered < 5
+          ? `${unanswered} pytania bez odpowiedzi`
+          : `${unanswered} pytań bez odpowiedzi`;
+    if (unseen > 0) {
+      const unseenLabel = unseen === 1 ? '1 nowe' : `${unseen} nowych`;
+      return `${unansweredLabel} (${unseenLabel})`;
+    }
+    return unansweredLabel;
+  }
 
   const handleSort = (key: SortKey): void => {
     if (sortKey === key) {
@@ -392,6 +445,34 @@ export function ManagerKonkursyContent({
                         <TableCell>{row.offersCount}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex flex-wrap justify-end gap-2">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="relative h-8 w-8 p-0 shrink-0"
+                                    onClick={() => openQuestionsDialog(row)}
+                                    aria-label="Pytania do konkursu"
+                                  >
+                                    <HelpCircle className="h-4 w-4" />
+                                    {(unseenCounts[row.id] ?? 0) > 0 ? (
+                                      <span
+                                        className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground"
+                                        aria-hidden
+                                      >
+                                        {(unseenCounts[row.id] ?? 0) > 9
+                                          ? '9+'
+                                          : unseenCounts[row.id]}
+                                      </span>
+                                    ) : null}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {questionsTooltipLabel(row.id)}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <Button
                               variant={isPickedRow ? 'default' : 'outline'}
                               size="sm"
@@ -426,6 +507,17 @@ export function ManagerKonkursyContent({
           </div>
         </CardContent>
       </Card>
+
+      <ManagerContestQuestionsDialog
+        contestId={questionsDialog?.id ?? null}
+        contestTitle={questionsDialog?.title ?? ''}
+        open={questionsDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setQuestionsDialog(null);
+        }}
+        onUnseenCountChange={handleUnseenCountChange}
+        onUnansweredCountChange={handleUnansweredCountChange}
+      />
 
       <ManagerContestPodgladDialog
         contestId={podgladRow?.id ?? null}

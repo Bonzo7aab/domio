@@ -1008,7 +1008,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused'
+          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused' | 'contest_question'
           title: string
           message: string
           data: Json | null
@@ -1022,7 +1022,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused'
+          type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused' | 'contest_question'
           title: string
           message: string
           data?: Json | null
@@ -1036,7 +1036,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
-          type?: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder'
+          type?: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused' | 'contest_question'
           title?: string
           message?: string
           data?: Json | null
@@ -1053,6 +1053,112 @@ export interface Database {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      question_comments: {
+        Row: {
+          id: string
+          question_id: string
+          author_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          question_id: string
+          author_id: string
+          body: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          question_id?: string
+          author_id?: string
+          body?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_comments_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      questions: {
+        Row: {
+          id: string
+          job_id: string | null
+          tender_id: string | null
+          asker_id: string
+          question: string
+          is_public: boolean
+          answer: string | null
+          answered_by: string | null
+          answered_at: string | null
+          manager_seen_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          job_id?: string | null
+          tender_id?: string | null
+          asker_id: string
+          question: string
+          is_public?: boolean
+          answer?: string | null
+          answered_by?: string | null
+          answered_at?: string | null
+          manager_seen_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          job_id?: string | null
+          tender_id?: string | null
+          asker_id?: string
+          question?: string
+          is_public?: boolean
+          answer?: string | null
+          answered_by?: string | null
+          answered_at?: string | null
+          manager_seen_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_asker_id_fkey"
+            columns: ["asker_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
             referencedColumns: ["id"]
           }
         ]
@@ -1104,7 +1210,49 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      list_contest_questions_contractor: {
+        Args: { p_tender_id: string }
+        Returns: {
+          id: string
+          question: string
+          created_at: string
+          answered_at: string
+          comments: Json
+        }[]
+      }
+      list_contest_questions_manager: {
+        Args: { p_tender_id: string }
+        Returns: {
+          id: string
+          question: string
+          created_at: string
+          answered_at: string | null
+          asker_id: string
+          asker_display_name: string
+          company_name: string | null
+          comments: Json
+        }[]
+      }
+      add_contest_question_comment: {
+        Args: { p_question_id: string; p_body: string }
+        Returns: string
+      }
+      answer_contest_question: {
+        Args: { p_question_id: string; p_answer: string }
+        Returns: string
+      }
+      count_unseen_contest_questions: {
+        Args: { p_tender_ids: string[] }
+        Returns: { tender_id: string; unseen_count: number }[]
+      }
+      mark_contest_questions_seen: {
+        Args: { p_tender_id: string }
+        Returns: number
+      }
+      user_can_manage_contest_tender: {
+        Args: { p_tender_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,4 +1,4 @@
-import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, MessageCircle, Search, ShieldCheck, ShieldX, Star, Trophy, UserCheck, X } from 'lucide-react';
+import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, HelpCircle, MessageCircle, Search, ShieldCheck, ShieldX, Star, Trophy, UserCheck, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -58,6 +58,9 @@ function getNotificationCategoryAndType(
 
     case 'new_message':
       return { category: 'message', type: 'new_message' };
+
+    case 'contest_question':
+      return { category: 'tender', type: 'contest_question' };
 
     default:
       // For other types, try to infer from data
@@ -135,7 +138,8 @@ function transformNotification(dbNotification: NotificationRow): UnifiedNotifica
         organizerName: (data?.organizerName || data?.organizer_name || 'Nieznany organizator') as string,
         estimatedValue: (data?.estimatedValue || data?.estimated_value) as string | undefined,
         deadline: data?.deadline ? new Date(data.deadline as string | number) : dbNotification.expires_at ? new Date(dbNotification.expires_at) : undefined,
-        tenderId: (data?.tenderId || data?.tender_id || dbNotification.id) as string
+        tenderId: (data?.tenderId || data?.tender_id || dbNotification.id) as string,
+        actionUrl: dbNotification.action_url ?? undefined,
       };
       return tenderNotif;
     }
@@ -344,8 +348,12 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
       }
       case 'tender': {
         const tenderNotif = notification as TenderNotification;
-        if (onTenderSelect && tenderNotif.tenderId) {
+        if (tenderNotif.actionUrl) {
+          router.push(tenderNotif.actionUrl);
+        } else if (onTenderSelect && tenderNotif.tenderId) {
           onTenderSelect(tenderNotif.tenderId);
+        } else if (tenderNotif.tenderId) {
+          router.push(`/jobs/${tenderNotif.tenderId}`);
         }
         break;
       }
@@ -420,6 +428,8 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
             return <Trophy className="h-4 w-4 text-green-600" />;
           case 'tender_cancelled':
             return <X className="h-4 w-4 text-red-600" />;
+          case 'contest_question':
+            return <HelpCircle className="h-4 w-4 text-blue-600" />;
         }
         break;
       }

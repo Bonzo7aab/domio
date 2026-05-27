@@ -72,7 +72,8 @@ CREATE TYPE notification_type AS ENUM (
     'payment_failed',
     'verification_approved',
     'verification_rejected',
-    'profile_completion_reminder'
+    'profile_completion_reminder',
+    'contest_question'
 );
 
 -- User notifications

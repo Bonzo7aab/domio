@@ -55,7 +55,13 @@ export interface ApplicationNotification {
 export interface TenderNotification {
   id: string;
   category: 'tender';
-  type: 'new_tender' | 'deadline_reminder' | 'evaluation_started' | 'tender_awarded' | 'tender_cancelled';
+  type:
+    | 'new_tender'
+    | 'deadline_reminder'
+    | 'evaluation_started'
+    | 'tender_awarded'
+    | 'tender_cancelled'
+    | 'contest_question';
   title: string;
   message: string;
   tenderTitle: string;
@@ -65,6 +71,7 @@ export interface TenderNotification {
   timestamp: Date;
   read: boolean;
   tenderId: string;
+  actionUrl?: string;
 }
 
 export interface SystemNotification {

@@ -450,23 +450,26 @@ CREATE POLICY "System can insert activity logs" ON activity_logs
 -- QUESTIONS POLICIES
 -- =============================================
 
--- Public questions can be viewed by authenticated users
-CREATE POLICY "Authenticated users can view public questions" ON questions
-    FOR SELECT USING (auth.role() = 'authenticated' AND is_public = true);
+-- OPD-70: Contractors use list_contest_questions_contractor RPC for published Q&A (anonymous).
+-- Direct SELECT: asker sees own rows; managers see all rows on their listings.
 
--- Users can view questions they asked
 CREATE POLICY "Users can view their own questions" ON questions
     FOR SELECT USING (asker_id = auth.uid());
 
--- Users can view questions for their jobs/tenders
-CREATE POLICY "Users can view questions for their jobs/tenders" ON questions
+CREATE POLICY "Managers can view questions on their tenders" ON questions
     FOR SELECT USING (
-        (job_id IS NOT NULL AND EXISTS (
-            SELECT 1 FROM jobs WHERE jobs.id = questions.job_id AND jobs.manager_id = auth.uid()
-        )) OR
-        (tender_id IS NOT NULL AND EXISTS (
-            SELECT 1 FROM tenders WHERE tenders.id = questions.tender_id AND tenders.manager_id = auth.uid()
-        ))
+        tender_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM tenders t
+            WHERE t.id = questions.tender_id AND t.manager_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Managers can view questions on their jobs" ON questions
+    FOR SELECT USING (
+        job_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM jobs j
+            WHERE j.id = questions.job_id AND j.manager_id = auth.uid()
+        )
     );
 
 -- Users can insert questions

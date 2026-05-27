@@ -13,6 +13,8 @@ import {
 import { SelectedOfferPanel } from './SelectedOfferPanel';
 import { ContestStatusBadge } from './ContestStatusBadge';
 import { ManagerContestDetailSections } from './ManagerContestDetailSections';
+import { ManagerContestQuestionsPanel } from './ManagerContestQuestionsPanel';
+import { fetchContestQuestionsForManager } from '../../lib/database/questions';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import {
@@ -27,7 +29,7 @@ interface ManagerContestPodgladDialogProps {
   contestId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialTab?: 'details' | 'selected-offer';
+  initialTab?: 'details' | 'selected-offer' | 'questions';
 }
 
 function isContestReadOnly(status: string): boolean {
@@ -46,6 +48,7 @@ export function ManagerContestPodgladDialog({
   const [winnerCompanyId, setWinnerCompanyId] = useState<string | null>(null);
   const [winnerName, setWinnerName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('details');
+  const [pendingQuestionsCount, setPendingQuestionsCount] = useState(0);
 
   useEffect(() => {
     if (!open || !contestId) {
@@ -59,7 +62,13 @@ export function ManagerContestPodgladDialog({
 
     let cancelled = false;
     setLoading(true);
-    setActiveTab(initialTab === 'selected-offer' ? 'selected-offer' : 'details');
+    setActiveTab(
+      initialTab === 'selected-offer'
+        ? 'selected-offer'
+        : initialTab === 'questions'
+          ? 'questions'
+          : 'details',
+    );
 
     const run = async (): Promise<void> => {
       const supabase = createClient();
@@ -77,6 +86,12 @@ export function ManagerContestPodgladDialog({
           return;
         }
         setTender(data);
+        const questionsResult = await fetchContestQuestionsForManager(supabase, contestId);
+        if (!cancelled && !questionsResult.error) {
+          setPendingQuestionsCount(
+            questionsResult.data.filter((q) => !q.answeredAt).length,
+          );
+        }
         const acceptedBid = await fetchAcceptedTenderBid(supabase, contestId);
         if (!cancelled) {
           const hasWinner = acceptedBid !== null;
@@ -125,8 +140,20 @@ export function ManagerContestPodgladDialog({
           </div>
         ) : tender && contestInfo ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="text-sm">
-            <TabsList className={`grid w-full mb-4 ${hasSelectedOffer ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <TabsList
+              className={`grid w-full mb-4 ${
+                hasSelectedOffer ? 'grid-cols-3' : 'grid-cols-2'
+              }`}
+            >
               <TabsTrigger value="details">Szczegóły</TabsTrigger>
+              <TabsTrigger value="questions" className="relative">
+                Pytania
+                {pendingQuestionsCount > 0 ? (
+                  <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                    {pendingQuestionsCount}
+                  </span>
+                ) : null}
+              </TabsTrigger>
               {hasSelectedOffer ? (
                 <TabsTrigger value="selected-offer">Wybrana oferta</TabsTrigger>
               ) : null}
@@ -172,6 +199,15 @@ export function ManagerContestPodgladDialog({
                 </Button>
               </div>
             </TabsContent>
+
+            {contestId ? (
+              <TabsContent value="questions" className="mt-0">
+                <ManagerContestQuestionsPanel
+                  contestId={contestId}
+                  onQuestionsChange={(pending) => setPendingQuestionsCount(pending)}
+                />
+              </TabsContent>
+            ) : null}
 
             {hasSelectedOffer && contestId ? (
               <TabsContent value="selected-offer" className="mt-0">

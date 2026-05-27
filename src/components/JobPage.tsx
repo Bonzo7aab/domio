@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Heart, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
@@ -58,9 +58,10 @@ interface JobPageProps {
 // Extended Job type for component display with additional fields
 interface JobDisplayData extends Job {
   address?: string;
-  status?: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
+  status?: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled' | 'evaluation' | 'awarded';
   published_at?: string | null;
   expires_at?: string | null;
+  allowQuestions?: boolean;
 }
 
 // Helper function to convert date to "time ago" format
@@ -460,6 +461,7 @@ function normalizeJobData(
       status: dbTender.status as JobDisplayData['status'],
       published_at: dbTender.published_at,
       contestInfo,
+      allowQuestions: dbTender.allow_questions ?? true,
       tenderInfo: {
         tenderType: contest ? 'Konkurs ofert' : 'Zamówienie publiczne',
         phases,
@@ -477,10 +479,14 @@ function normalizeJobData(
   return null;
 }
 
+const CONTEST_TAB_VALUES = new Set(CONTEST_TAB_ITEMS.map((t) => t.value));
+
 const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const { user, supabase } = useUserProfile();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('overview');
+  const [contestQuestionsCount, setContestQuestionsCount] = useState(0);
   const [showAskQuestionModal, setShowAskQuestionModal] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
@@ -735,12 +741,21 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
   useEffect(() => {
     if (!jobData) return;
+    const tabParam = searchParams.get('tab');
     if (jobData.contestInfo) {
-      setActiveTab('contest-basic');
+      if (tabParam && CONTEST_TAB_VALUES.has(tabParam as (typeof CONTEST_TAB_ITEMS)[number]['value'])) {
+        setActiveTab(tabParam);
+      } else {
+        setActiveTab('contest-basic');
+      }
     } else {
       setActiveTab('overview');
     }
-  }, [jobData?.id, jobData?.contestInfo]);
+  }, [jobData?.id, jobData?.contestInfo, searchParams]);
+
+  useEffect(() => {
+    setContestQuestionsCount(0);
+  }, [jobData?.id]);
 
   // Early returns AFTER all hooks
   if (isLoadingJob) {
@@ -1003,6 +1018,10 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   };
 
   const handleAskQuestion = () => {
+    if (jobData?.contestInfo) {
+      setActiveTab('contest-qa');
+      return;
+    }
     setShowAskQuestionModal(true);
   };
 
@@ -1097,13 +1116,18 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   key={tab.value}
                   onClick={() => setActiveTab(tab.value)}
                   className={cn(
-                    'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0',
+                    'px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1.5',
                     activeTab === tab.value
                       ? 'border-primary text-primary'
                       : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300',
                   )}
                 >
                   {tab.label}
+                  {tab.value === 'contest-qa' && contestQuestionsCount > 0 ? (
+                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px] font-semibold">
+                      {contestQuestionsCount}
+                    </Badge>
+                  ) : null}
                 </button>
               ))
             ) : (
@@ -1284,6 +1308,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
               {job.contestInfo ? (
                 <TenderContestDetailTabs
                   job={job as JobDisplayData & { contestInfo: NonNullable<JobDisplayData['contestInfo']> }}
+                  allowQuestions={job.allowQuestions ?? true}
+                  contestStatus={job.status}
+                  onQuestionsCountChange={setContestQuestionsCount}
                 />
               ) : null}
 

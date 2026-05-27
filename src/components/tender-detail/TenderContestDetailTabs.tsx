@@ -15,9 +15,13 @@ import { TabsContent } from '../ui/tabs';
 import { Badge } from '../ui/badge';
 import type { ContestInfo, Job } from '../../types/job';
 import { selectionCriteriaTotalWeight } from '../../types/tender-contest';
+import { ContestQuestionsTab } from './ContestQuestionsTab';
 
 interface TenderContestDetailTabsProps {
   job: Job & { contestInfo: ContestInfo };
+  allowQuestions?: boolean;
+  contestStatus?: string;
+  onQuestionsCountChange?: (count: number) => void;
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }): React.ReactElement | null {
@@ -30,7 +34,12 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }):
   );
 }
 
-export function TenderContestDetailTabs({ job }: TenderContestDetailTabsProps): React.ReactElement {
+export function TenderContestDetailTabs({
+  job,
+  allowQuestions = true,
+  contestStatus,
+  onQuestionsCountChange,
+}: TenderContestDetailTabsProps): React.ReactElement {
   const { contestInfo } = job;
   const categoryName =
     typeof job.category === 'string' ? job.category : job.category?.name ?? 'Inne';
@@ -232,6 +241,14 @@ export function TenderContestDetailTabs({ job }: TenderContestDetailTabsProps): 
           </CardContent>
         </Card>
       </TabsContent>
+
+      <ContestQuestionsTab
+        tenderId={job.id}
+        allowQuestions={allowQuestions}
+        submissionDeadline={contestInfo.submissionDeadline}
+        contestStatus={contestStatus}
+        onQuestionsCountChange={onQuestionsCountChange}
+      />
     </>
   );
 }
@@ -241,4 +258,5 @@ export const CONTEST_TAB_ITEMS = [
   { value: 'contest-schedule', label: 'Harmonogram i wizja' },
   { value: 'contest-formal', label: 'Wymogi formalne' },
   { value: 'contest-financial', label: 'Warunki finansowe' },
+  { value: 'contest-qa', label: 'Pytania i odpowiedzi' },
 ] as const;
