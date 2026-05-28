@@ -1,16 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { MessageSquarePlus, Send } from 'lucide-react';
+import { MessageSquarePlus, Pencil, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '../../lib/supabase/client';
 import {
   addContestQuestionComment,
   fetchContestQuestionsForManager,
   formatPostgrestError,
+  updateContestQuestionComment,
+  type ContestQuestionComment,
   type ContestQuestionManagerRow,
 } from '../../lib/database/questions';
-import { ContestQuestionCommentsList } from '../contest-questions/ContestQuestionCommentsList';
+import { useUserProfile } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
@@ -33,10 +35,129 @@ function formatManagerTimestamp(iso: string): string {
   }).format(date);
 }
 
+function ManagerCommentsBlock({
+  comments,
+  currentUserId,
+  onUpdated,
+}: {
+  comments: ContestQuestionComment[];
+  currentUserId: string | undefined;
+  onUpdated: () => Promise<void>;
+}): React.ReactElement {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  if (comments.length === 0) return <></>;
+
+  const startEdit = (comment: ContestQuestionComment): void => {
+    setEditingId(comment.id);
+    setEditDraft(comment.body);
+  };
+
+  const saveEdit = async (commentId: string): Promise<void> => {
+    const text = editDraft.trim();
+    if (!text) {
+      toast.error('Wpisz treść odpowiedzi');
+      return;
+    }
+    setIsSavingEdit(true);
+    const supabase = createClient();
+    const result = await updateContestQuestionComment(supabase, commentId, text);
+    setIsSavingEdit(false);
+    if (!result.success) {
+      const message =
+        result.error instanceof Error
+          ? result.error.message
+          : formatPostgrestError(result.error as Parameters<typeof formatPostgrestError>[0]);
+      toast.error('Nie udało się zapisać zmian', { description: message });
+      return;
+    }
+    toast.success('Odpowiedź została zaktualizowana');
+    setEditingId(null);
+    setEditDraft('');
+    await onUpdated();
+  };
+
+  return (
+    <div className="border-t border-border pt-3 space-y-3">
+      <p className="text-xs font-medium text-primary">
+        {comments.length === 1 ? 'Odpowiedź organizatora' : 'Odpowiedzi organizatora'}
+      </p>
+      {comments.map((comment, index) => {
+        const canEdit =
+          Boolean(currentUserId) &&
+          comment.authorId === currentUserId &&
+          !comment.id.startsWith('legacy-');
+        const isEditing = editingId === comment.id;
+
+        return (
+          <div
+            key={comment.id}
+            className={index > 0 ? 'border-t border-border/60 pt-3' : undefined}
+          >
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <p className="text-xs text-muted-foreground">
+                {comment.authorDisplayName ?? 'Organizator'} —{' '}
+                {formatManagerTimestamp(comment.createdAt)}
+              </p>
+              {canEdit && !isEditing ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs shrink-0"
+                  onClick={() => startEdit(comment)}
+                >
+                  <Pencil className="h-3 w-3 mr-1" />
+                  Edytuj
+                </Button>
+              ) : null}
+            </div>
+            {isEditing ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  rows={3}
+                  className="resize-none bg-background"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={!editDraft.trim() || isSavingEdit}
+                    onClick={() => void saveEdit(comment.id)}
+                  >
+                    Zapisz
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isSavingEdit}
+                    onClick={() => {
+                      setEditingId(null);
+                      setEditDraft('');
+                    }}
+                  >
+                    Anuluj
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">{comment.body}</p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ManagerContestQuestionsPanel({
   contestId,
   onQuestionsChange,
 }: ManagerContestQuestionsPanelProps): React.ReactElement {
+  const { user } = useUserProfile();
   const [rows, setRows] = useState<ContestQuestionManagerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -234,7 +355,11 @@ export function ManagerContestQuestionsPanel({
                     </span>
                   </p>
                   <p className="text-sm whitespace-pre-wrap">{row.question}</p>
-                  <ContestQuestionCommentsList comments={row.comments} variant="manager" />
+                  <ManagerCommentsBlock
+                    comments={row.comments}
+                    currentUserId={user?.id}
+                    onUpdated={loadQuestions}
+                  />
                   {renderComposer(row, false)}
                 </article>
               ))}

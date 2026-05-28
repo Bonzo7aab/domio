@@ -12,6 +12,7 @@ export interface ContestQuestionComment {
   id: string;
   body: string;
   createdAt: string;
+  authorId?: string;
   authorDisplayName?: string;
 }
 
@@ -63,7 +64,8 @@ function parseManagerComments(raw: unknown): ContestQuestionComment[] {
       typeof row.author_display_name === 'string'
         ? row.author_display_name.trim() || 'Organizator'
         : 'Organizator';
-    comments.push({ id, body, createdAt, authorDisplayName });
+    const authorId = typeof row.author_id === 'string' ? row.author_id : undefined;
+    comments.push({ id, body, createdAt, authorId, authorDisplayName });
   }
   return comments;
 }
@@ -211,6 +213,7 @@ async function fetchContestQuestionsForManagerDirect(
         id: comment.id,
         body: comment.body,
         createdAt: comment.created_at,
+        authorId: comment.author_id,
         authorDisplayName: authorNames.get(comment.author_id) ?? 'Organizator',
       });
       commentsByQuestion.set(comment.question_id, list);
@@ -250,6 +253,11 @@ export async function fetchContestQuestionsForManager(
   supabase: SupabaseClient<Database>,
   tenderId: string,
 ): Promise<{ data: ContestQuestionManagerRow[]; error: PostgrestError | null }> {
+  const direct = await fetchContestQuestionsForManagerDirect(supabase, tenderId);
+  if (!direct.error) {
+    return direct;
+  }
+
   const { data, error } = await supabase.rpc('list_contest_questions_manager', {
     p_tender_id: tenderId,
   });
@@ -268,16 +276,33 @@ export async function fetchContestQuestionsForManager(
     return { data: rows, error: null };
   }
 
-  const rpcMissing =
-    error.code === 'PGRST202' ||
-    error.message?.includes('Could not find the function') ||
-    error.message?.includes('Forbidden');
+  return direct.error ? direct : { data: [], error };
+}
 
-  if (rpcMissing) {
-    return fetchContestQuestionsForManagerDirect(supabase, tenderId);
+export async function updateContestQuestionComment(
+  supabase: SupabaseClient<Database>,
+  commentId: string,
+  body: string,
+): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
+  const trimmed = body.trim();
+  if (!trimmed) {
+    return { success: false, error: new Error('Treść komentarza jest wymagana') };
   }
 
-  return { data: [], error };
+  if (commentId.startsWith('legacy-')) {
+    return { success: false, error: new Error('Nie można edytować tej odpowiedzi w systemie') };
+  }
+
+  const { error } = await supabase
+    .from('question_comments')
+    .update({ body: trimmed })
+    .eq('id', commentId);
+
+  if (error) {
+    return { success: false, error };
+  }
+
+  return { success: true, error: null };
 }
 
 /**

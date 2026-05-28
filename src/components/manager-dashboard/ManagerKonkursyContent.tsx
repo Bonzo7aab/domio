@@ -8,8 +8,8 @@ import {
   ArrowUp,
   ArrowUpDown,
   BarChart3,
+  ExternalLink,
   HelpCircle,
-  Info,
   Lock,
   MoreVertical,
   Pencil,
@@ -27,8 +27,9 @@ import {
 } from '../../lib/tender-workflow-status';
 import { formatSubmissionDeadlineDisplay, formatCompareLockedTooltip } from '../../lib/contest-submission-deadline';
 import { cancelContestAction } from '../../app/manager-dashboard/konkursy/actions';
-import { ManagerContestPodgladDialog } from './ManagerContestPodgladDialog';
+import { ManagerContestOffersDialog } from './ManagerContestOffersDialog';
 import { ManagerContestQuestionsDialog } from './ManagerContestQuestionsDialog';
+import { ManagerContestWinnerDialog } from './ManagerContestWinnerDialog';
 import { ContestStatusBadge } from './ContestStatusBadge';
 import { cn } from '../ui/utils';
 import { Button } from '../ui/button';
@@ -119,10 +120,8 @@ export function ManagerKonkursyContent({
   const [contests, setContests] = useState(initialContests);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [podgladRow, setPodgladRow] = useState<ManagerContest | null>(null);
-  const [podgladInitialTab, setPodgladInitialTab] = useState<
-    'details' | 'selected-offer' | 'questions'
-  >('details');
+  const [winnerDialogRow, setWinnerDialogRow] = useState<ManagerContest | null>(null);
+  const [offersDialogRow, setOffersDialogRow] = useState<ManagerContest | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('deadline');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [cancelTarget, setCancelTarget] = useState<ManagerContest | null>(null);
@@ -159,11 +158,10 @@ export function ManagerKonkursyContent({
     if (tabParam === 'questions') {
       setQuestionsDialog({ id: row.id, title: row.title });
       setUnseenCounts((prev) => ({ ...prev, [row.id]: 0 }));
-    } else {
-      const tab: 'details' | 'selected-offer' =
-        tabParam === 'selected-offer' ? 'selected-offer' : 'details';
-      setPodgladRow(row);
-      setPodgladInitialTab(tab);
+    } else if (tabParam === 'selected-offer' && row.hasSelectedOffer) {
+      setWinnerDialogRow(row);
+    } else if (tabParam === 'offers') {
+      setOffersDialogRow(row);
     }
 
     router.replace('/manager-dashboard/konkursy', { scroll: false });
@@ -256,14 +254,6 @@ export function ManagerKonkursyContent({
     router.refresh();
   };
 
-  const openSzczegoly = (
-    row: ManagerContest,
-    tab: 'details' | 'selected-offer' = row.hasSelectedOffer ? 'selected-offer' : 'details',
-  ): void => {
-    setPodgladInitialTab(tab);
-    setPodgladRow(row);
-  };
-
   const confirmCancel = async (): Promise<void> => {
     if (!cancelTarget) return;
     setCancelling(true);
@@ -282,33 +272,11 @@ export function ManagerKonkursyContent({
   };
 
   const renderPrimaryCompareIcon = (row: ManagerContest): ReactElement | null => {
-    if (row.status === 'cancelled') {
+    if (row.status === 'cancelled' || row.status === 'awarded') {
       return null;
     }
 
-    if (row.status === 'awarded') {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => openSzczegoly(row, 'selected-offer')}
-                aria-label="Zobacz wyniki"
-              >
-                <BarChart3 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Zobacz wyniki</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
     const canCompare = canCompareContestOffers(row.status);
-    const readOnlyCompare = isContestCompareReadOnly(row.status);
 
     if (row.status === 'active' || !canCompare) {
       return (
@@ -335,8 +303,7 @@ export function ManagerKonkursyContent({
       );
     }
 
-    const label = readOnlyCompare ? 'Zobacz wyniki' : 'Porównaj oferty';
-    const disabled = row.offersCount === 0 && !readOnlyCompare;
+    const disabled = row.offersCount === 0;
 
     return (
       <TooltipProvider>
@@ -344,28 +311,33 @@ export function ManagerKonkursyContent({
           <TooltipTrigger asChild>
             <span className="inline-flex">
               <Button
-                variant={readOnlyCompare ? 'outline' : 'default'}
+                variant="default"
                 size="icon"
                 className="h-8 w-8 shrink-0"
                 disabled={disabled}
-                aria-label={label}
+                aria-label="Porównaj oferty"
                 onClick={() => router.push(compareHref(row.id))}
               >
                 <BarChart3 className="h-4 w-4" />
               </Button>
             </span>
           </TooltipTrigger>
-          <TooltipContent>{label}</TooltipContent>
+          <TooltipContent>Porównaj oferty</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
   };
 
   const renderActionsMenu = (row: ManagerContest): ReactElement | null => {
+    const showViewResults =
+      row.status !== 'cancelled' &&
+      (row.offersCount > 0 ||
+        row.hasSelectedOffer ||
+        canCompareContestOffers(row.status) ||
+        isContestCompareReadOnly(row.status));
+
     const hasMenuItems =
-      row.canEdit ||
-      canCancelContest(row.status) ||
-      row.status === 'cancelled';
+      row.canEdit || canCancelContest(row.status) || showViewResults;
 
     if (!hasMenuItems) {
       return null;
@@ -392,19 +364,12 @@ export function ManagerKonkursyContent({
               </Link>
             </DropdownMenuItem>
           ) : null}
-          {row.status === 'cancelled' ? (
-            <DropdownMenuItem onClick={() => openSzczegoly(row)}>
-              Zobacz konkurs
-            </DropdownMenuItem>
-          ) : null}
-          {canCompareContestOffers(row.status) &&
-          row.status !== 'active' &&
-          row.status !== 'awarded' ? (
+          {showViewResults ? (
             <DropdownMenuItem
-              disabled={row.offersCount === 0}
-              onClick={() => router.push(compareHref(row.id))}
+              disabled={row.offersCount === 0 && !row.hasSelectedOffer}
+              onClick={() => setOffersDialogRow(row)}
             >
-              {isContestCompareReadOnly(row.status) ? 'Zobacz wyniki' : 'Porównaj oferty'}
+              Zobacz wyniki
             </DropdownMenuItem>
           ) : null}
           {canCancelContest(row.status) ? (
@@ -453,9 +418,6 @@ export function ManagerKonkursyContent({
                 ))}
               </SelectContent>
             </Select>
-            <Button asChild className="lg:ml-auto">
-              <Link href="/post-contest">+ Utwórz konkurs</Link>
-            </Button>
           </div>
 
           <div className="rounded-md border overflow-x-auto">
@@ -513,7 +475,6 @@ export function ManagerKonkursyContent({
                       row.submissionDeadline,
                     );
                     const isPickedRow = row.hasSelectedOffer;
-                    const isActiveRow = podgladRow?.id === row.id;
 
                     return (
                       <TableRow
@@ -521,14 +482,29 @@ export function ManagerKonkursyContent({
                         className={cn(
                           isPickedRow &&
                             'bg-primary/5 border-l-4 border-l-primary hover:bg-primary/10',
-                          isActiveRow && !isPickedRow && 'bg-muted/50',
                         )}
                       >
                         <TableCell
-                          className={cn('font-medium max-w-[280px]', isPickedRow && 'text-primary')}
+                          className={cn('font-medium max-w-[300px]', isPickedRow && 'text-primary')}
                         >
-                          <div className="flex items-start gap-1.5 min-w-0">
-                            <span className="min-w-0 flex-1 leading-snug">{row.title}</span>
+                          <div className="flex items-center gap-0.5 min-w-0">
+                            <span className="min-w-0 truncate leading-snug">{row.title}</span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link
+                                    href={`/jobs/${row.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                                    aria-label="Otwórz stronę konkursu"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent>Strona konkursu</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -536,14 +512,24 @@ export function ManagerKonkursyContent({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                                    onClick={() => openSzczegoly(row)}
-                                    aria-label="Informacje o konkursie"
+                                    className="relative h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                                    onClick={() => openQuestionsDialog(row)}
+                                    aria-label="Pytania do konkursu"
                                   >
-                                    <Info className="h-3.5 w-3.5" />
+                                    <HelpCircle className="h-3.5 w-3.5" />
+                                    {(unseenCounts[row.id] ?? 0) > 0 ? (
+                                      <span
+                                        className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold leading-none text-destructive-foreground"
+                                        aria-hidden
+                                      >
+                                        {(unseenCounts[row.id] ?? 0) > 9
+                                          ? '9+'
+                                          : unseenCounts[row.id]}
+                                      </span>
+                                    ) : null}
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Informacje o konkursie</TooltipContent>
+                                <TooltipContent>{questionsTooltipLabel(row.id)}</TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
                           </div>
@@ -574,7 +560,7 @@ export function ManagerKonkursyContent({
                             <button
                               type="button"
                               className="ml-1 text-xs font-medium text-primary hover:underline"
-                              onClick={() => openSzczegoly(row, 'selected-offer')}
+                              onClick={() => setWinnerDialogRow(row)}
                               title={
                                 row.selectedContractorName
                                   ? `Wygrana: ${row.selectedContractorName}`
@@ -587,34 +573,6 @@ export function ManagerKonkursyContent({
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="relative h-8 w-8 shrink-0"
-                                    onClick={() => openQuestionsDialog(row)}
-                                    aria-label="Pytania do konkursu"
-                                  >
-                                    <HelpCircle className="h-4 w-4" />
-                                    {(unseenCounts[row.id] ?? 0) > 0 ? (
-                                      <span
-                                        className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground"
-                                        aria-hidden
-                                      >
-                                        {(unseenCounts[row.id] ?? 0) > 9
-                                          ? '9+'
-                                          : unseenCounts[row.id]}
-                                      </span>
-                                    ) : null}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {questionsTooltipLabel(row.id)}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
                             {renderPrimaryCompareIcon(row)}
                             {renderActionsMenu(row)}
                           </div>
@@ -640,15 +598,21 @@ export function ManagerKonkursyContent({
         onUnansweredCountChange={handleUnansweredCountChange}
       />
 
-      <ManagerContestPodgladDialog
-        contestId={podgladRow?.id ?? null}
-        open={podgladRow !== null}
-        initialTab={podgladInitialTab}
+      <ManagerContestWinnerDialog
+        contestId={winnerDialogRow?.id ?? null}
+        contestTitle={winnerDialogRow?.title}
+        open={winnerDialogRow !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setPodgladRow(null);
-            setPodgladInitialTab('details');
-          }
+          if (!open) setWinnerDialogRow(null);
+        }}
+      />
+
+      <ManagerContestOffersDialog
+        contestId={offersDialogRow?.id ?? null}
+        contestTitle={offersDialogRow?.title}
+        open={offersDialogRow !== null}
+        onOpenChange={(open) => {
+          if (!open) setOffersDialogRow(null);
         }}
       />
 
