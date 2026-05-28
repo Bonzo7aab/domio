@@ -20,6 +20,7 @@ import {
   getJobDeadline,
 } from '../lib/filters/filter-logic';
 import { useFilterContext } from '../contexts/FilterContext';
+import { useUserProfile } from '../contexts/AuthContext';
 import { useContractorContestBidStatus } from '../hooks/useContractorContestBidStatus';
 import type { Job } from '../types/job';
 import { cn } from './ui/utils';
@@ -46,6 +47,8 @@ export default function JobList({
   onApplyClick,
 }: JobListProps) {
   const { primaryLocation } = useFilterContext();
+  const { user } = useUserProfile();
+  const isManager = user?.userType === 'manager';
   const { submittedIds, draftIds, isLoading: isLoadingBidStatus } =
     useContractorContestBidStatus();
   const [sortBy, setSortBy] = useState('newest');
@@ -222,7 +225,7 @@ export default function JobList({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {filters && onFilterChange && (
+          {filters && onFilterChange && !isManager && (
             <Toggle
               variant="outline"
               size="sm"
@@ -316,8 +319,8 @@ export default function JobList({
               key={job.id}
               job={job}
               onClick={() => onJobSelect?.(job.id)}
-              onBookmark={handleBookmark}
-              isBookmarked={bookmarkedJobs.includes(job.id)}
+              onBookmark={isManager ? undefined : handleBookmark}
+              isBookmarked={!isManager && bookmarkedJobs.includes(job.id)}
               onApplyClick={onApplyClick}
               isExpired={false}
               hasSubmittedOffer={submittedIds.has(job.id)}

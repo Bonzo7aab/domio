@@ -165,15 +165,16 @@ const JobCard = React.memo(function JobCard({
                   </div>
                 </div>
                 
-                {/* Action buttons in top right block */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={`text-muted-foreground hover:text-foreground flex-shrink-0 ${isBookmarked ? 'text-primary' : ''}`}
-                  onClick={handleBookmarkClick}
-                >
-                  <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
-                </Button>
+                {!isManager && onBookmark ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`text-muted-foreground hover:text-foreground flex-shrink-0 ${isBookmarked ? 'text-primary' : ''}`}
+                    onClick={handleBookmarkClick}
+                  >
+                    <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
+                  </Button>
+                ) : null}
               </div>
               
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-3">
@@ -316,14 +317,16 @@ const JobCard = React.memo(function JobCard({
                     </>
                   )}
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
-                  onClick={handleBookmarkClick}
-                >
-                  <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
-                </Button>
+                {!isManager && onBookmark ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
+                    onClick={handleBookmarkClick}
+                  >
+                    <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
+                  </Button>
+                ) : null}
               </div>
             </div>
             
@@ -394,14 +397,16 @@ const JobCard = React.memo(function JobCard({
                     </>
                   )}
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
-                  onClick={handleBookmarkClick}
-                >
-                  <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
-                </Button> 
+                {!isManager && onBookmark ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
+                    onClick={handleBookmarkClick}
+                  >
+                    <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
+                  </Button>
+                ) : null}
               </div>
             </div>
             

@@ -3,7 +3,17 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, HelpCircle, Lock } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  BarChart3,
+  HelpCircle,
+  Info,
+  Lock,
+  MoreVertical,
+  Pencil,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type ManagerContest,
@@ -55,6 +65,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 interface ManagerKonkursyContentProps {
   contests: ManagerContest[];
@@ -264,20 +281,29 @@ export function ManagerKonkursyContent({
     }
   };
 
-  const renderCompareAction = (row: ManagerContest): ReactElement => {
-    if (row.status === 'awarded') {
-      return (
-        <Button size="sm" variant="outline" onClick={() => openSzczegoly(row, 'selected-offer')}>
-          Zobacz wyniki
-        </Button>
-      );
+  const renderPrimaryCompareIcon = (row: ManagerContest): ReactElement | null => {
+    if (row.status === 'cancelled') {
+      return null;
     }
 
-    if (row.status === 'cancelled') {
+    if (row.status === 'awarded') {
       return (
-        <Button size="sm" variant="outline" onClick={() => openSzczegoly(row)}>
-          Zobacz konkurs
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => openSzczegoly(row, 'selected-offer')}
+                aria-label="Zobacz wyniki"
+              >
+                <BarChart3 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Zobacz wyniki</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       );
     }
 
@@ -290,9 +316,14 @@ export function ManagerKonkursyContent({
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="inline-flex">
-                <Button size="sm" variant="outline" disabled className="gap-1">
-                  <Lock className="h-3.5 w-3.5" aria-hidden />
-                  Porównaj oferty
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  disabled
+                  aria-label="Porównaj oferty"
+                >
+                  <Lock className="h-4 w-4" aria-hidden />
                 </Button>
               </span>
             </TooltipTrigger>
@@ -304,15 +335,91 @@ export function ManagerKonkursyContent({
       );
     }
 
+    const label = readOnlyCompare ? 'Zobacz wyniki' : 'Porównaj oferty';
+    const disabled = row.offersCount === 0 && !readOnlyCompare;
+
     return (
-      <Button
-        size="sm"
-        variant={readOnlyCompare ? 'outline' : 'default'}
-        disabled={row.offersCount === 0 && !readOnlyCompare}
-        onClick={() => router.push(compareHref(row.id))}
-      >
-        {readOnlyCompare ? 'Zobacz wyniki' : 'Porównaj oferty'}
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                variant={readOnlyCompare ? 'outline' : 'default'}
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                disabled={disabled}
+                aria-label={label}
+                onClick={() => router.push(compareHref(row.id))}
+              >
+                <BarChart3 className="h-4 w-4" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
+  const renderActionsMenu = (row: ManagerContest): ReactElement | null => {
+    const hasMenuItems =
+      row.canEdit ||
+      canCancelContest(row.status) ||
+      row.status === 'cancelled';
+
+    if (!hasMenuItems) {
+      return null;
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            aria-label="Więcej akcji"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {row.canEdit ? (
+            <DropdownMenuItem asChild>
+              <Link href={`/post-contest/${row.id}`} className="flex items-center gap-2">
+                <Pencil className="h-4 w-4" />
+                Kontynuuj konkurs
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
+          {row.status === 'cancelled' ? (
+            <DropdownMenuItem onClick={() => openSzczegoly(row)}>
+              Zobacz konkurs
+            </DropdownMenuItem>
+          ) : null}
+          {canCompareContestOffers(row.status) &&
+          row.status !== 'active' &&
+          row.status !== 'awarded' ? (
+            <DropdownMenuItem
+              disabled={row.offersCount === 0}
+              onClick={() => router.push(compareHref(row.id))}
+            >
+              {isContestCompareReadOnly(row.status) ? 'Zobacz wyniki' : 'Porównaj oferty'}
+            </DropdownMenuItem>
+          ) : null}
+          {canCancelContest(row.status) ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => setCancelTarget(row)}
+              >
+                Unieważnij
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   };
 
@@ -418,9 +525,28 @@ export function ManagerKonkursyContent({
                         )}
                       >
                         <TableCell
-                          className={cn('font-medium max-w-[240px]', isPickedRow && 'text-primary')}
+                          className={cn('font-medium max-w-[280px]', isPickedRow && 'text-primary')}
                         >
-                          {row.title}
+                          <div className="flex items-start gap-1.5 min-w-0">
+                            <span className="min-w-0 flex-1 leading-snug">{row.title}</span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                                    onClick={() => openSzczegoly(row)}
+                                    aria-label="Informacje o konkursie"
+                                  >
+                                    <Info className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Informacje o konkursie</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px]">
                           {row.locationLabel}
@@ -442,16 +568,32 @@ export function ManagerKonkursyContent({
                         <TableCell>
                           <ContestStatusBadge status={row.status} />
                         </TableCell>
-                        <TableCell>{row.offersCount}</TableCell>
+                        <TableCell>
+                          <span className="tabular-nums">{row.offersCount}</span>
+                          {row.hasSelectedOffer ? (
+                            <button
+                              type="button"
+                              className="ml-1 text-xs font-medium text-primary hover:underline"
+                              onClick={() => openSzczegoly(row, 'selected-offer')}
+                              title={
+                                row.selectedContractorName
+                                  ? `Wygrana: ${row.selectedContractorName}`
+                                  : 'Zobacz zwycięską ofertę'
+                              }
+                            >
+                              (wygrana)
+                            </button>
+                          ) : null}
+                        </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex flex-wrap justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1">
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    size="sm"
-                                    className="relative h-8 w-8 p-0 shrink-0"
+                                    size="icon"
+                                    className="relative h-8 w-8 shrink-0"
                                     onClick={() => openQuestionsDialog(row)}
                                     aria-label="Pytania do konkursu"
                                   >
@@ -473,29 +615,8 @@ export function ManagerKonkursyContent({
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
-                            <Button
-                              variant={isPickedRow ? 'default' : 'outline'}
-                              size="sm"
-                              onClick={() => openSzczegoly(row)}
-                            >
-                              Szczegóły
-                            </Button>
-                            {row.canEdit ? (
-                              <Button variant="secondary" size="sm" asChild>
-                                <Link href={`/post-contest/${row.id}`}>Kontynuuj konkurs</Link>
-                              </Button>
-                            ) : null}
-                            {canCancelContest(row.status) ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => setCancelTarget(row)}
-                              >
-                                Unieważnij
-                              </Button>
-                            ) : null}
-                            {renderCompareAction(row)}
+                            {renderPrimaryCompareIcon(row)}
+                            {renderActionsMenu(row)}
                           </div>
                         </TableCell>
                       </TableRow>

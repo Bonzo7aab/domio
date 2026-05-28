@@ -83,6 +83,10 @@ export function Header({ initialUser }: HeaderProps) {
     } as AuthUser : null)
 
   const showVerificationAttention = needsVerificationAttention(currentUser)
+  const isAdmin = currentUser?.platformRole === 'platform_admin'
+  const showFavoritesNav =
+    !currentUser ||
+    (currentUser.userType !== 'manager' && currentUser.platformRole !== 'platform_admin')
 
   // Enhanced logout that redirects to login
   // We don't call router.refresh() to avoid race condition where server might still see session cookie
@@ -92,8 +96,6 @@ export function Header({ initialUser }: HeaderProps) {
     // Redirect to login - the new page load will have correct server state
     router.push('/login')
   }
-
-  const isAdmin = currentUser?.platformRole === 'platform_admin'
 
   const userRoleLabel = isAdmin
     ? 'ADMIN'
@@ -266,34 +268,34 @@ export function Header({ initialUser }: HeaderProps) {
                 </Button>
               </AuthPromptPopover>
             )}
-            {/* Unified Notifications - only visible for authenticated users */}
-            {userIsAuthenticated ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                onClick={handleBookmarkedJobsClick}
-                aria-label="Ulubione zgłoszenia"
-              >
-                <Heart className="h-5 w-5" />
-              </Button>
-            ) : (
-              <AuthPromptPopover
-                title={AUTH_PROMPT_FAVORITES.title}
-                description={AUTH_PROMPT_FAVORITES.description}
-              >
+            {showFavoritesNav &&
+              (userIsAuthenticated ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                  onClick={handleBookmarkedJobsClick}
                   aria-label="Ulubione zgłoszenia"
                 >
                   <Heart className="h-5 w-5" />
                 </Button>
-              </AuthPromptPopover>
-            )}
+              ) : (
+                <AuthPromptPopover
+                  title={AUTH_PROMPT_FAVORITES.title}
+                  description={AUTH_PROMPT_FAVORITES.description}
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                    aria-label="Ulubione zgłoszenia"
+                  >
+                    <Heart className="h-5 w-5" />
+                  </Button>
+                </AuthPromptPopover>
+              ))}
             {userIsAuthenticated && (
               <UnifiedNotifications 
                 onJobSelect={handleJobSelect}

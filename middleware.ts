@@ -24,6 +24,7 @@ const ALLOWED_FIRST_SEGMENTS = new Set<string>([
   'messages',
   'onboarding',
   'post-job',
+  'post-contest',
   'post-tender',
   'privacy',
   'profile-completion',
