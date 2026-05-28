@@ -7,6 +7,7 @@ import { cn } from '../ui/utils';
 const tabs = [
   { id: 'overview', label: 'Przegląd', href: '/manager-dashboard/overview' },
   { id: 'konkursy', label: 'Konkursy', href: '/manager-dashboard/konkursy' },
+  { id: 'zamowienia', label: 'Zamówienia', href: '/manager-dashboard/zamowienia' },
   { id: 'ocena', label: 'Ocena Zgłoszeń', href: '/manager-dashboard/ocena-zgloszen' },
 ];
 
@@ -25,6 +26,8 @@ export function ManagerDashboardNav() {
               (tab.id === 'konkursy' &&
                 (pathname.startsWith('/manager-dashboard/konkursy') ||
                   pathname.startsWith('/manager-dashboard/zgloszenia'))) ||
+              (tab.id === 'zamowienia' &&
+                pathname.startsWith('/manager-dashboard/zamowienia')) ||
               (tab.id === 'ocena' && pathname.startsWith('/manager-dashboard/ocena-zgloszen'));
             return (
               <Link

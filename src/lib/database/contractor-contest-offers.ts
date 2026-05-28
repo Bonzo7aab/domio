@@ -32,7 +32,7 @@ function parseOfferDetails(raw: unknown): ContestOfferDetails | null {
   return raw as ContestOfferDetails;
 }
 
-function resolvePricing(
+export function resolveContestBidPricing(
   offerDetails: ContestOfferDetails | null,
   bidAmount: string | number | null | undefined,
 ): { netPrice: number; grossPrice: number; vatRate: ContestOfferVatRate; vatLabel: string } {
@@ -148,7 +148,7 @@ export async function fetchContractorContestOffers(
     });
 
     const offerDetails = parseOfferDetails(bid.offer_details);
-    const pricing = resolvePricing(offerDetails, bid.bid_amount);
+    const pricing = resolveContestBidPricing(offerDetails, bid.bid_amount);
 
     rows.push({
       id: bid.id,

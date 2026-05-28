@@ -196,6 +196,8 @@ export async function acceptTenderOfferAction(
   if (result.success) {
     revalidatePath('/manager-dashboard/zgloszenia');
     revalidatePath('/manager-dashboard/konkursy');
+    revalidatePath('/manager-dashboard/zamowienia');
+    revalidatePath('/contractor-dashboard/zamowienia');
     revalidatePath(`/manager-dashboard/zgloszenia/porownaj/${tenderId.trim()}`);
     revalidatePath(`/manager-dashboard/konkursy/porownaj/${tenderId.trim()}`);
   }

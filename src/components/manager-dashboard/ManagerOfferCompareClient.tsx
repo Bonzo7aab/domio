@@ -660,13 +660,7 @@ export function ManagerOfferCompareClient({
                             Szczegóły
                           </Button>
                           {canSelectWinner && !isWinner ? (
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setDetailBid(bid);
-                                openConfirmSelect();
-                              }}
-                            >
+                            <Button size="sm" onClick={() => openDetailFromBid(bid)}>
                               Wybierz ofertę
                             </Button>
                           ) : null}

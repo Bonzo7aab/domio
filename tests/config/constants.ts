@@ -33,6 +33,8 @@ export const ROUTES = {
   forgotPassword: '/forgot-password',
   contractorDashboard: '/contractor-dashboard',
   managerDashboard: '/manager-dashboard',
+  managerOrders: '/manager-dashboard/zamowienia',
+  contractorOrders: '/contractor-dashboard/zamowienia',
   account: '/account',
   postJob: '/post-job',
   tenderCreation: '/tender-creation',

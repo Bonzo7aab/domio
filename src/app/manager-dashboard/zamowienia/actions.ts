@@ -1,0 +1,89 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { createClient } from '../../../lib/supabase/server';
+import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
+import { acceptOrderWork, cancelOrder } from '../../../lib/database/order-mutations';
+
+const MANAGER_ORDERS_PATH = '/manager-dashboard/zamowienia';
+const CONTRACTOR_ORDERS_PATH = '/contractor-dashboard/zamowienia';
+
+function revalidateOrderPaths(): void {
+  revalidatePath(MANAGER_ORDERS_PATH);
+  revalidatePath(CONTRACTOR_ORDERS_PATH);
+}
+
+export async function acceptOrderWorkAction(
+  orderId: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!orderId?.trim()) {
+    return { success: false, error: 'Nieprawidłowe dane' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: 'Wymagane logowanie' };
+  }
+
+  const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+    supabase,
+    user.id,
+  );
+
+  if (companyError || !company) {
+    return { success: false, error: 'Brak firmy zarządcy' };
+  }
+
+  const result = await acceptOrderWork(supabase, orderId.trim(), company.id);
+
+  if (result.success) {
+    revalidateOrderPaths();
+  }
+
+  return result;
+}
+
+export async function cancelOrderAction(
+  orderId: string,
+  cancelReason: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!orderId?.trim()) {
+    return { success: false, error: 'Nieprawidłowe dane' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: 'Wymagane logowanie' };
+  }
+
+  const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+    supabase,
+    user.id,
+  );
+
+  if (companyError || !company) {
+    return { success: false, error: 'Brak firmy zarządcy' };
+  }
+
+  const result = await cancelOrder(
+    supabase,
+    orderId.trim(),
+    user.id,
+    company.id,
+    cancelReason,
+  );
+
+  if (result.success) {
+    revalidateOrderPaths();
+  }
+
+  return result;
+}

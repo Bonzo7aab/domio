@@ -1,0 +1,1 @@
+-- OPD-63 parity: Zamówienia (orders) — see supabase/migrations/20260528120000_opd63_orders.sql

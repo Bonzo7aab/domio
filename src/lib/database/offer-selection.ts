@@ -1,11 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
+import type { ContestOfferDetails } from '../../types/contest-offer';
 import {
   fetchJobApplicationsByJobId,
   fetchTenderBidsByTenderId,
   updateManagerJobWorkflowStatus,
 } from './jobs';
+import { resolveContestBidPricing } from './contractor-contest-offers';
 
 export interface AcceptOfferResult {
   success: boolean;
@@ -277,24 +279,166 @@ export async function acceptManagerTenderOffer(
     };
   }
 
-  await createOrderFromContestWinner({
+  const orderResult = await createOrderFromContestWinner(supabase, {
     tenderId,
     bidId,
     managerId: params.managerId,
     companyId: params.companyId,
   });
 
+  if (!orderResult.success) {
+    console.error('createOrderFromContestWinner:', orderResult.error);
+  }
+
   return { success: true };
 }
 
+function formatTenderLocationLabel(tender: {
+  address?: string | null;
+  building?: {
+    name?: string | null;
+    street_address?: string | null;
+    city?: string | null;
+  } | null;
+}): string {
+  const building = tender.building;
+  if (building?.street_address || building?.city) {
+    const parts = [building.street_address, building.city].filter(Boolean);
+    return parts.join(', ');
+  }
+  if (tender.address?.trim()) return tender.address.trim();
+  if (building?.name?.trim()) return building.name.trim();
+  return '—';
+}
+
 /** OPD-63: creates Zamówienie when manager selects contest winner. */
-async function createOrderFromContestWinner(_params: {
-  tenderId: string;
-  bidId: string;
-  managerId: string;
-  companyId: string;
-}): Promise<void> {
-  // Stub — full Zamówienia flow tracked in OPD-63.
+export async function createOrderFromContestWinner(
+  supabase: SupabaseClient<Database>,
+  params: {
+    tenderId: string;
+    bidId: string;
+    managerId: string;
+    companyId: string;
+  },
+): Promise<{ success: boolean; error?: string }> {
+  const tenderId = params.tenderId.trim();
+  const bidId = params.bidId.trim();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existingOrder } = await (supabase as any)
+    .from('orders')
+    .select('id')
+    .eq('tender_id', tenderId)
+    .maybeSingle();
+
+  if (existingOrder?.id) {
+    return { success: true };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: tender, error: tenderErr } = await (supabase as any)
+    .from('tenders')
+    .select(
+      `
+      id,
+      title,
+      completion_date,
+      address,
+      manager_id,
+      company_id,
+      building:buildings!tenders_building_id_fkey (
+        name,
+        street_address,
+        city
+      )
+    `,
+    )
+    .eq('id', tenderId)
+    .maybeSingle();
+
+  if (tenderErr || !tender) {
+    return { success: false, error: 'Nie znaleziono konkursu' };
+  }
+
+  if (tender.manager_id !== params.managerId || tender.company_id !== params.companyId) {
+    return { success: false, error: 'Brak uprawnień' };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: bid, error: bidErr } = await (supabase as any)
+    .from('tender_bids')
+    .select(
+      `
+      id,
+      tender_id,
+      contractor_id,
+      company_id,
+      bid_amount,
+      offer_details,
+      currency,
+      status,
+      company:companies!tender_bids_company_id_fkey ( name )
+    `,
+    )
+    .eq('id', bidId)
+    .eq('tender_id', tenderId)
+    .maybeSingle();
+
+  if (bidErr || !bid) {
+    return { success: false, error: 'Nie znaleziono oferty' };
+  }
+
+  if (bid.status !== 'accepted') {
+    return { success: false, error: 'Oferta nie jest zaakceptowana' };
+  }
+
+  const offerDetails = bid.offer_details as ContestOfferDetails | null | undefined;
+  const pricing = resolveContestBidPricing(offerDetails ?? null, bid.bid_amount);
+  const now = new Date().toISOString();
+  const winnerName =
+    (bid.company as { name?: string } | null)?.name?.trim() || null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: insertErr } = await (supabase as any).from('orders').insert({
+    tender_id: tenderId,
+    tender_bid_id: bidId,
+    manager_id: params.managerId,
+    manager_company_id: params.companyId,
+    contractor_id: bid.contractor_id,
+    contractor_company_id: bid.company_id,
+    status: 'in_progress',
+    title: tender.title || 'Zamówienie',
+    location_label: formatTenderLocationLabel(tender),
+    completion_deadline: tender.completion_date ?? null,
+    net_amount: pricing.netPrice,
+    gross_amount: pricing.grossPrice,
+    vat_rate: pricing.vatRate,
+    currency: bid.currency || 'PLN',
+    created_at: now,
+    updated_at: now,
+  });
+
+  if (insertErr) {
+    if (insertErr.code === '23505') {
+      return { success: true };
+    }
+    return {
+      success: false,
+      error: insertErr.message || 'Nie udało się utworzyć zamówienia',
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
+    .from('tenders')
+    .update({
+      winning_bid_id: bidId,
+      winner_name: winnerName,
+      updated_at: now,
+    })
+    .eq('id', tenderId);
+
+  return { success: true };
 }
 
 /** Load accepted job application for manager "Wybrana Oferta" tab. */

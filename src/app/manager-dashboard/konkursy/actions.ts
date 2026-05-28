@@ -51,6 +51,8 @@ export async function acceptTenderOfferAction(
   if (result.success) {
     revalidateKonkursy(tenderId.trim());
     revalidatePath('/manager-dashboard/zgloszenia');
+    revalidatePath('/manager-dashboard/zamowienia');
+    revalidatePath('/contractor-dashboard/zamowienia');
   }
 
   return result;

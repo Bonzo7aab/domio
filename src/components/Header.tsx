@@ -12,6 +12,7 @@ import {
   LogOut,
   ClipboardList,
   ChevronDown,
+  Package,
 } from 'lucide-react';
 import { VerificationAttentionIcon } from './VerificationAttentionIcon';
 import { HeaderJobSearch } from './HeaderJobSearch';
@@ -102,6 +103,14 @@ export function Header({ initialUser }: HeaderProps) {
 
   const handleZgloszeniaClick = () => {
     router.push('/manager-dashboard/konkursy')
+  }
+
+  const handleZamowieniaClick = () => {
+    router.push(
+      currentUser?.userType === 'manager'
+        ? '/manager-dashboard/zamowienia'
+        : '/contractor-dashboard/zamowienia',
+    )
   }
 
   // Navigation handlers
@@ -379,6 +388,14 @@ export function Header({ initialUser }: HeaderProps) {
                             <Button
                               variant="ghost"
                               className="w-full justify-start"
+                              onClick={handleZamowieniaClick}
+                            >
+                              <Package className="mr-2 h-4 w-4" />
+                              <span>Zamówienia</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
                               onClick={handleOffersClick}
                             >
                               <Bookmark className="mr-2 h-4 w-4" />
@@ -402,6 +419,14 @@ export function Header({ initialUser }: HeaderProps) {
                             >
                               <User className="mr-2 h-4 w-4" />
                               <span>Konto</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={handleZamowieniaClick}
+                            >
+                              <Package className="mr-2 h-4 w-4" />
+                              <span>Zamówienia</span>
                             </Button>
                             <Button
                               variant="ghost"
@@ -543,6 +568,10 @@ export function Header({ initialUser }: HeaderProps) {
                             <span>{verificationMenuLabel(currentUser)}</span>
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem onClick={handleZamowieniaClick}>
+                          <Package className="mr-2 h-4 w-4" />
+                          <span>Zamówienia</span>
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleOffersClick}>
                           <Bookmark className="mr-2 h-4 w-4" />
                           <span>Oferty</span>
@@ -558,6 +587,10 @@ export function Header({ initialUser }: HeaderProps) {
                         <DropdownMenuItem onClick={handleAccountClick}>
                           <User className="mr-2 h-4 w-4" />
                           <span>Konto</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleZamowieniaClick}>
+                          <Package className="mr-2 h-4 w-4" />
+                          <span>Zamówienia</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleZgloszeniaClick}>
                           <ClipboardList className="mr-2 h-4 w-4" />

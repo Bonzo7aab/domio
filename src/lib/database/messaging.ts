@@ -120,6 +120,31 @@ export async function sendMessage(
   data: MessageData
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: conversation, error: convFetchErr } = await (supabase as any)
+      .from('conversations')
+      .select('tender_id')
+      .eq('id', data.conversationId)
+      .maybeSingle();
+
+    if (convFetchErr) {
+      console.error('sendMessage: conversation lookup', convFetchErr);
+    } else if (conversation?.tender_id) {
+      const { isOrderMessagingBlocked } = await import('./order-mutations');
+      const blocked = await isOrderMessagingBlocked(
+        supabase,
+        conversation.tender_id as string,
+      );
+      if (blocked) {
+        return {
+          data: null,
+          error: new Error(
+            'Wiadomości są zablokowane — zamówienie zostało przerwane lub anulowane.',
+          ) as PostgrestError,
+        };
+      }
+    }
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: message, error } = await (supabase as any)
       .from('messages')

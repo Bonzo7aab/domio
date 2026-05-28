@@ -54,6 +54,28 @@ test.describe('Route Protection', () => {
     // The middleware or layout redirect happened, which is what we're testing
   });
 
+  test('should redirect to login when accessing manager zamowienia without auth', async ({
+    page,
+    browserName,
+  }) => {
+    await page.goto(ROUTES.managerOrders, { waitUntil: 'domcontentloaded' });
+
+    const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
+    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
+    expect(page.url()).toContain('/login');
+  });
+
+  test('should redirect to login when accessing contractor zamowienia without auth', async ({
+    page,
+    browserName,
+  }) => {
+    await page.goto(ROUTES.contractorOrders, { waitUntil: 'domcontentloaded' });
+
+    const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
+    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
+    expect(page.url()).toContain('/login');
+  });
+
   test('should redirect to login when accessing manager-dashboard without auth', async ({ page, browserName }) => {
     await page.goto(ROUTES.managerDashboard, { waitUntil: 'domcontentloaded' });
     
