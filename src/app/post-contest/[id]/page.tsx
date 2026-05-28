@@ -1,21 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useUserProfile } from '../../../contexts/AuthContext';
 import TenderCreationPage from '../../../components/TenderCreationPage';
 
 export default function PostContestEditPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, isLoading } = useUserProfile();
   const id = typeof params.id === 'string' ? params.id : '';
-
-  useEffect(() => {
-    if (!isLoading && !user && id) {
-      router.push(`/login?redirectTo=${encodeURIComponent(`/post-contest/${id}`)}`);
-    }
-  }, [user, isLoading, router, id]);
 
   if (!id) {
     return (
@@ -23,10 +14,6 @@ export default function PostContestEditPage() {
         <p className="text-muted-foreground">Nieprawidłowy identyfikator konkursu.</p>
       </div>
     );
-  }
-
-  if (isLoading || !user) {
-    return null;
   }
 
   return (

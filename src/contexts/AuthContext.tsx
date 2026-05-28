@@ -35,11 +35,28 @@ export default function AuthProvider({
         .from('user_profiles')
         .select('*')
         .eq('id', authUser.id)
-        .single()
+        .maybeSingle()
 
       if (profileError || !profile) {
         console.warn('No profile found for user:', authUser.id, profileError)
-        return null
+        // Match HeaderWithSession fallback so protected routes do not loop on session-without-profile.
+        return {
+          id: authUser.id,
+          email: authUser.email ?? '',
+          firstName:
+            (authUser.user_metadata?.first_name as string | undefined) ??
+            authUser.email?.split('@')[0] ??
+            'User',
+          lastName: (authUser.user_metadata?.last_name as string | undefined) ?? '',
+          userType:
+            (authUser.user_metadata?.user_type as AuthUser['userType'] | undefined) ??
+            'contractor',
+          isVerified: false,
+          verificationSubmittedAt: null,
+          profileCompleted: false,
+          onboardingCompleted: false,
+          platformRole: 'user',
+        }
       }
 
       return {
