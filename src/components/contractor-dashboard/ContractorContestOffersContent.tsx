@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ExternalLink, MessageSquare, MoreVertical } from 'lucide-react';
+import { ExternalLink, FilePen, MessageSquare, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -232,7 +232,7 @@ export function ContractorContestOffersContent({
             </h3>
             <p className="text-sm text-muted-foreground">
               {offers.length === 0
-                ? 'Nie masz jeszcze ofert w konkursach. Przeglądaj konkursy i składaj oferty.'
+                ? 'Nie masz jeszcze ofert w konkursach. Przeglądaj konkursy i składaj oferty — zapisane szkice też pojawią się tutaj.'
                 : 'Zmień filtr statusów, aby zobaczyć inne oferty.'}
             </p>
           </CardContent>
@@ -264,6 +264,8 @@ export function ContractorContestOffersContent({
                     submissionDeadlineIso: row.submissionDeadline,
                   });
                   const messageAllowed = canMessageManagerOnContestOffer(row.derivedStatus);
+                  const isDraft = row.derivedStatus === 'draft';
+                  const hasPricing = row.netPrice > 0;
 
                   return (
                     <TableRow key={row.id}>
@@ -296,11 +298,19 @@ export function ContractorContestOffersContent({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <p className="font-medium">{formatMoneyPl(row.netPrice)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatMoneyPl(row.grossPrice)}{' '}
-                          <span className="text-xs">({row.vatLabel})</span>
-                        </p>
+                        {hasPricing ? (
+                          <>
+                            <p className="font-medium">{formatMoneyPl(row.netPrice)}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatMoneyPl(row.grossPrice)}{' '}
+                              <span className="text-xs">({row.vatLabel})</span>
+                            </p>
+                          </>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            {isDraft ? 'Uzupełnij w szkicu' : '—'}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {deadlineDisplay ? (
@@ -321,6 +331,14 @@ export function ContractorContestOffersContent({
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {isDraft ? (
+                            <Button asChild variant="default" size="sm" className="h-8">
+                              <Link href={`/jobs/${row.tenderId}`}>
+                                <FilePen className="h-4 w-4 mr-1.5" />
+                                Kontynuuj szkic
+                              </Link>
+                            </Button>
+                          ) : null}
                           {renderActionsMenu(row, messageAllowed, withdrawAllowed)}
                         </div>
                       </TableCell>

@@ -1,39 +1,19 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  ExternalLink,
-  FileText,
-  Loader2,
-  Upload,
-  X,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { Label } from '../ui/label';
-import { Input } from '../ui/input';
-import { Textarea } from '../ui/textarea';
-import { Checkbox } from '../ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Progress } from '../ui/progress';
-import { Alert, AlertDescription } from '../ui/alert';
-import { Badge } from '../ui/badge';
 import type { ContestInfo } from '../../types/job';
 import type {
-  ContestOfferAttachmentRef,
   ContestOfferFormData,
   FormalRequirementKey,
   ResolvedContractorDocument,
@@ -50,7 +30,13 @@ import {
   hydrateContestOfferFormFromBid,
   submitTenderBid,
   upsertTenderBidDraft,
-  validateContestOfferSubmit,
+  firstContestOfferStepWithErrors,
+  filterFieldErrorsForStep,
+  getContestOfferAllFieldErrors,
+  getContestOfferStepFieldErrors,
+  hasContestOfferFieldErrors,
+  type ContestOfferFieldErrors,
+  type ContestOfferWizardStep,
 } from '../../lib/database/contest-offers';
 import {
   applyProfileDocumentsToForm,
@@ -60,11 +46,11 @@ import {
   loadContractorReferencesPrefill,
   resolveContractorDocuments,
 } from '../../lib/contest-offer/resolve-contractor-documents';
-import {
-  formatMonthsLabel,
-  warrantyMonthsOptions,
-} from '../../lib/contest-offer/warranty-period-options';
-import { CONTRACTOR_VERIFICATION_DOCUMENTS_PATH } from '../../lib/verification/documents-route';
+import { ContestOfferWizardStepper } from './ContestOfferWizardStepper';
+import { ContestOfferStepOverview } from './ContestOfferStepOverview';
+import { ContestOfferStepSchedule } from './ContestOfferStepSchedule';
+import { ContestOfferStepFormal } from './ContestOfferStepFormal';
+import { ContestOfferStepFinancial } from './ContestOfferStepFinancial';
 
 const STEP_LABELS = [
   'Informacje',
@@ -101,17 +87,16 @@ export function ContestOfferSubmissionDialog({
   onDraftSaved,
 }: ContestOfferSubmissionDialogProps): React.ReactElement {
   const supabase = useMemo(() => createClient(), []);
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState<ContestOfferWizardStep>(1);
   const [form, setForm] = useState<ContestOfferFormData>(createEmptyContestOfferForm);
   const [resolvedDocs, setResolvedDocs] = useState<ResolvedContractorDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<ContestOfferFieldErrors>({});
   const profileDocsAppliedRef = useRef(false);
 
   const totalSteps = 4;
-  const warrantyOptions = warrantyMonthsOptions(contestInfo.warrantyPeriod);
-  const guaranteeOptions = warrantyMonthsOptions(contestInfo.guaranteePeriod);
 
   const grossDisplay = useMemo(() => {
     const net = Number.parseFloat(form.netPrice);
@@ -142,7 +127,9 @@ export function ContestOfferSubmissionDialog({
         const hydrated = hydrateContestOfferFormFromBid(draft);
         if (draft.offer_details && typeof draft.offer_details === 'object') {
           const step = (draft.offer_details as { currentStep?: number }).currentStep;
-          if (step && step >= 1 && step <= 4) setCurrentStep(step);
+          if (step && step >= 1 && step <= 4) {
+            setCurrentStep(step as ContestOfferWizardStep);
+          }
         }
         hydrated.formalAttachments = applyProfileDocumentsToForm(
           docs,
@@ -163,6 +150,7 @@ export function ContestOfferSubmissionDialog({
         setCurrentStep(1);
         profileDocsAppliedRef.current = true;
       }
+      setFieldErrors({});
     } catch (e) {
       console.error(e);
       toast.error('Nie udało się załadować szkicu oferty');
@@ -178,6 +166,7 @@ export function ContestOfferSubmissionDialog({
   useEffect(() => {
     if (!isOpen) {
       profileDocsAppliedRef.current = false;
+      setFieldErrors({});
     }
   }, [isOpen]);
 
@@ -193,11 +182,17 @@ export function ContestOfferSubmissionDialog({
     }));
   }, [currentStep, isLoading, resolvedDocs]);
 
-  const patchForm = (patch: Partial<ContestOfferFormData>) => {
+  const displayedFieldErrors = useMemo(
+    () => filterFieldErrorsForStep(currentStep, fieldErrors),
+    [currentStep, fieldErrors],
+  );
+
+  const patchForm = (patch: Partial<ContestOfferFormData>): void => {
+    setFieldErrors({});
     setForm((prev) => ({ ...prev, ...patch }));
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (): Promise<void> => {
     setIsSavingDraft(true);
     try {
       const { error } = await upsertTenderBidDraft(
@@ -218,12 +213,15 @@ export function ContestOfferSubmissionDialog({
     }
   };
 
-  const handleSubmit = async () => {
-    const err = validateContestOfferSubmit(form, contestInfo);
-    if (err) {
-      toast.error(err);
+  const handleSubmit = async (): Promise<void> => {
+    const allErrors = getContestOfferAllFieldErrors(form, contestInfo);
+    if (hasContestOfferFieldErrors(allErrors)) {
+      setFieldErrors(allErrors);
+      const targetStep = firstContestOfferStepWithErrors(allErrors);
+      if (targetStep) setCurrentStep(targetStep);
       return;
     }
+    setFieldErrors({});
     setIsSubmitting(true);
     try {
       const { error } = await submitTenderBid(
@@ -245,7 +243,23 @@ export function ContestOfferSubmissionDialog({
     }
   };
 
-  const stageFile = (key: keyof ContestOfferFormData['stagedFiles'], file: File) => {
+  const handleNextStep = (): void => {
+    const errors = getContestOfferStepFieldErrors(currentStep, form, contestInfo);
+    if (hasContestOfferFieldErrors(errors)) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
+    setCurrentStep((s) => Math.min(totalSteps, s + 1) as ContestOfferWizardStep);
+  };
+
+  const handlePrevStep = (): void => {
+    setFieldErrors({});
+    setCurrentStep((s) => Math.max(1, s - 1) as ContestOfferWizardStep);
+  };
+
+  const stageFile = (key: keyof ContestOfferFormData['stagedFiles'], file: File): void => {
+    setFieldErrors({});
     setForm((prev) => ({
       ...prev,
       stagedFiles: { ...prev.stagedFiles, [key]: [file] },
@@ -258,6 +272,7 @@ export function ContestOfferSubmissionDialog({
       const { [key]: _staged, ...stagedFiles } = prev.stagedFiles;
       return { ...prev, formalAttachments, stagedFiles };
     });
+    setFieldErrors({});
   };
 
   const replaceFormalDocument = (key: FormalRequirementKey, file: File): void => {
@@ -269,6 +284,7 @@ export function ContestOfferSubmissionDialog({
         stagedFiles: { ...prev.stagedFiles, [key]: [file] },
       };
     });
+    setFieldErrors({});
   };
 
   const applyProfileDocument = (doc: ResolvedContractorDocument): void => {
@@ -285,9 +301,11 @@ export function ContestOfferSubmissionDialog({
         stagedFiles,
       };
     });
+    setFieldErrors({});
   };
 
   const removeExtraAttachment = (id: string): void => {
+    setFieldErrors({});
     setForm((prev) => ({
       ...prev,
       extraAttachments: prev.extraAttachments.filter((a) => a.id !== id),
@@ -296,24 +314,30 @@ export function ContestOfferSubmissionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex max-h-[92vh] min-h-0 flex-col gap-0 overflow-hidden p-0 lg:max-w-3xl">
-        <DialogHeader className="shrink-0 space-y-2 border-b px-6 py-4 pr-12">
-          <DialogTitle className="text-left text-lg leading-snug">
-            Składasz ofertę w konkursie: {jobTitle}
-          </DialogTitle>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4 shrink-0" aria-hidden />
-            Czas na złożenie oferty: {contestCountdownLabel(contestInfo.submissionDeadline)}
-          </p>
-          <div className="space-y-2 pt-1">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>
-                Krok {currentStep} z {totalSteps}: {STEP_LABELS[currentStep - 1]}
-              </span>
-              <span>{Math.round((currentStep / totalSteps) * 100)}%</span>
-            </div>
-            <Progress value={(currentStep / totalSteps) * 100} className="h-1.5" />
+      <DialogContent className="flex max-h-[92vh] min-h-0 flex-col gap-0 overflow-hidden p-0 lg:max-w-4xl">
+        <DialogHeader className="shrink-0 space-y-3 border-b bg-muted/30 px-6 py-4 pr-12">
+          <div className="space-y-1">
+            <DialogTitle className="text-left text-lg leading-snug">
+              Składasz ofertę w konkursie
+            </DialogTitle>
+            <DialogDescription className="text-left text-sm">
+              <span className="font-medium text-foreground">{jobTitle}</span>
+            </DialogDescription>
           </div>
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+            <span>
+              Czas na złożenie:{' '}
+              <span className="font-medium text-foreground">
+                {contestCountdownLabel(contestInfo.submissionDeadline)}
+              </span>
+            </span>
+          </p>
+          <ContestOfferWizardStepper
+            currentStep={currentStep}
+            totalSteps={totalSteps}
+            labels={STEP_LABELS}
+          />
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
@@ -324,337 +348,57 @@ export function ContestOfferSubmissionDialog({
           ) : (
             <>
               {currentStep === 1 && (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold mb-2">Opis konkursu</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{description}</p>
-                  </div>
-                  <div className="rounded-lg border bg-muted/40 p-4 grid gap-3 sm:grid-cols-2">
-                    {category && (
-                      <div>
-                        <div className="text-xs text-muted-foreground">Kategoria</div>
-                        <div className="font-medium">{category}</div>
-                      </div>
-                    )}
-                    {subcategory && (
-                      <div>
-                        <div className="text-xs text-muted-foreground">Podkategoria</div>
-                        <div className="font-medium">{subcategory}</div>
-                      </div>
-                    )}
-                    {contestInfo.buildingName && (
-                      <div>
-                        <div className="text-xs text-muted-foreground">Nieruchomość</div>
-                        <div className="font-medium">{contestInfo.buildingName}</div>
-                      </div>
-                    )}
-                    {contestInfo.buildingAddress && (
-                      <div>
-                        <div className="text-xs text-muted-foreground">Adres</div>
-                        <div className="font-medium">{contestInfo.buildingAddress}</div>
-                      </div>
-                    )}
-                  </div>
-                  {contestInfo.documents.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Dokumentacja</h3>
-                      <ul className="space-y-2">
-                        {contestInfo.documents.map((doc) => (
-                          <li key={doc.id} className="flex items-center gap-2 text-sm">
-                            <FileText className="h-4 w-4 shrink-0" />
-                            {doc.url ? (
-                              <Link
-                                href={doc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                {doc.name}
-                              </Link>
-                            ) : (
-                              <span>{doc.name}</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+                <ContestOfferStepOverview
+                  description={description}
+                  category={category}
+                  subcategory={subcategory}
+                  contestInfo={contestInfo}
+                />
               )}
-
               {currentStep === 2 && (
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-muted-foreground">Termin składania ofert</Label>
-                    <p className="font-medium">
-                      Oferty przyjmowane są do:{' '}
-                      {new Date(contestInfo.submissionDeadline).toLocaleString('pl-PL', {
-                        dateStyle: 'long',
-                        timeStyle: 'short',
-                      })}
-                    </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="proposedCompletionDate">Oferowany termin wykonania *</Label>
-                    <Input
-                      id="proposedCompletionDate"
-                      type="date"
-                      value={form.proposedCompletionDate}
-                      onChange={(e) => patchForm({ proposedCompletionDate: e.target.value })}
-                      className="mt-1"
-                    />
-                    {completionWarning && (
-                      <Alert variant="default" className="mt-2 border-amber-200 bg-amber-50">
-                        <AlertTriangle className="h-4 w-4 text-amber-700" />
-                        <AlertDescription className="text-amber-900">
-                          {completionWarning}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                  <div className="rounded-lg border p-4 space-y-3">
-                    <div>
-                      <span className="text-sm text-muted-foreground">Wizja lokalna</span>
-                      <p className="font-medium">{contestInfo.siteVisitTypeLabel}</p>
-                    </div>
-                    {contestInfo.siteVisitNotes && (
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {contestInfo.siteVisitNotes}
-                      </p>
-                    )}
-                    {contestInfo.siteVisitType === 'mandatory' && (
-                      <label className="flex items-start gap-2 cursor-pointer">
-                        <Checkbox
-                          checked={form.siteVisitConfirmed}
-                          onCheckedChange={(v) => patchForm({ siteVisitConfirmed: v === true })}
-                        />
-                        <span className="text-sm leading-snug">
-                          Potwierdzam odbycie wizji lokalnej w terminie wskazanym przez zarządcę.
-                        </span>
-                      </label>
-                    )}
-                  </div>
-                </div>
+                <ContestOfferStepSchedule
+                  form={form}
+                  contestInfo={contestInfo}
+                  completionWarning={completionWarning}
+                  fieldErrors={displayedFieldErrors}
+                  onPatch={patchForm}
+                />
               )}
-
               {currentStep === 3 && (
-                <div className="space-y-6">
-                  <p className="text-sm text-muted-foreground rounded-lg border bg-muted/40 p-3">
-                    Wymagane dokumenty są uzupełniane automatycznie z Twojego profilu, jeśli są
-                    dostępne. Możesz je usunąć, zastąpić innym plikiem lub wgrać brakujące
-                    dokumenty.
-                  </p>
-                  {resolvedDocs
-                    .filter((doc) => doc.requirementKey !== 'references')
-                    .map((doc) => (
-                      <FormalDocBlock
-                        key={doc.requirementKey}
-                        doc={doc}
-                        attached={form.formalAttachments[doc.requirementKey]}
-                        stagedName={form.stagedFiles[doc.requirementKey]?.[0]?.name}
-                        onUseProfile={() => applyProfileDocument(doc)}
-                        onUpload={(file) => replaceFormalDocument(doc.requirementKey, file)}
-                        onRemove={() => removeFormalDocument(doc.requirementKey)}
-                      />
-                    ))}
-                  {contestInfo.formalRequirements.references && (
-                    <div>
-                      <Label htmlFor="referencesText">Referencje – wykaz zrealizowanych prac *</Label>
-                      {contestInfo.formalRequirementLines
-                        .filter((l) => l.toLowerCase().includes('referenc'))
-                        .map((line) => (
-                          <p key={line} className="text-xs text-muted-foreground mt-1 mb-2">
-                            {line}
-                          </p>
-                        ))}
-                      <Textarea
-                        id="referencesText"
-                        rows={5}
-                        value={form.referencesText}
-                        onChange={(e) => patchForm({ referencesText: e.target.value })}
-                      />
-                    </div>
-                  )}
-                  <div className="space-y-3">
-                    <Label>Inne załączniki</Label>
-                    {form.extraAttachments.length > 0 ? (
-                      <ul className="space-y-2">
-                        {form.extraAttachments.map((att) => (
-                          <li
-                            key={att.id}
-                            className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-                          >
-                            <span className="flex items-center gap-2 min-w-0">
-                              <FileText className="h-4 w-4 shrink-0" />
-                              <span className="truncate">{att.name}</span>
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="shrink-0 h-8 w-8"
-                              aria-label={`Usuń ${att.name}`}
-                              onClick={() => removeExtraAttachment(att.id)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {form.stagedFiles.other?.[0] ? (
-                      <p className="text-xs text-muted-foreground">
-                        Do wgrania przy zapisie: {form.stagedFiles.other[0].name}
-                      </p>
-                    ) : null}
-                    <Input
-                      type="file"
-                      accept=".pdf,.doc,.docx,image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) stageFile('other', file);
-                        e.target.value = '';
-                      }}
-                    />
-                  </div>
-                </div>
+                <ContestOfferStepFormal
+                  form={form}
+                  contestInfo={contestInfo}
+                  resolvedDocs={resolvedDocs}
+                  fieldErrors={displayedFieldErrors}
+                  onPatch={patchForm}
+                  onUseProfile={applyProfileDocument}
+                  onUploadFormal={replaceFormalDocument}
+                  onRemoveFormal={removeFormalDocument}
+                  onStageOther={(file) => stageFile('other', file)}
+                  onRemoveExtra={removeExtraAttachment}
+                />
               )}
-
               {currentStep === 4 && (
-                <div className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <Label htmlFor="netPrice">Cena NETTO za całość prac (zł) *</Label>
-                      <Input
-                        id="netPrice"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={form.netPrice}
-                        onChange={(e) => patchForm({ netPrice: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Stawka VAT *</Label>
-                      <Select
-                        value={form.vatRate}
-                        onValueChange={(v) =>
-                          patchForm({ vatRate: v as ContestOfferFormData['vatRate'] })
-                        }
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="8">8%</SelectItem>
-                          <SelectItem value="23">23%</SelectItem>
-                          <SelectItem value="zw">zw.</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Cena BRUTTO</Label>
-                    <p className="text-lg font-semibold mt-1">{grossDisplay} zł</p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <Label>Oferowany okres gwarancji *</Label>
-                      <Select
-                        value={form.warrantyMonths}
-                        onValueChange={(v) => patchForm({ warrantyMonths: v })}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Wybierz" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {warrantyOptions.map((m) => (
-                            <SelectItem key={m} value={String(m)}>
-                              {formatMonthsLabel(m)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Oferowany okres rękojmi *</Label>
-                      <Select
-                        value={form.guaranteeMonths}
-                        onValueChange={(v) => patchForm({ guaranteeMonths: v })}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Wybierz" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {guaranteeOptions.map((m) => (
-                            <SelectItem key={m} value={String(m)}>
-                              {formatMonthsLabel(m)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  {contestInfo.depositRequired && (
-                    <div className="rounded-lg border p-4 space-y-3">
-                      <div>
-                        <span className="font-medium">Wadium</span>
-                        {contestInfo.depositAmount != null && (
-                          <p className="text-sm">
-                            Kwota: {contestInfo.depositAmount.toLocaleString('pl-PL')} zł
-                          </p>
-                        )}
-                        {contestInfo.depositInstructions && (
-                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                            {contestInfo.depositInstructions}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label>Wgraj potwierdzenie przelewu wadium (PDF) *</Label>
-                        <Input
-                          type="file"
-                          accept=".pdf,image/*"
-                          className="mt-1"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) stageFile('deposit', file);
-                          }}
-                        />
-                        {form.stagedFiles.deposit?.[0] && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Wybrano: {form.stagedFiles.deposit[0].name}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {contestInfo.paymentTerms.mode === 'custom' &&
-                    (contestInfo.paymentTerms.customDays ?? 0) > 14 && (
-                      <label className="flex items-start gap-2 cursor-pointer">
-                        <Checkbox
-                          checked={form.paymentTermsAccepted}
-                          onCheckedChange={(v) => patchForm({ paymentTermsAccepted: v === true })}
-                        />
-                        <span className="text-sm leading-snug">
-                          Akceptuję wymagany przez zarządcę termin płatności faktury wynoszący{' '}
-                          {contestInfo.paymentTerms.customDays} dni.
-                        </span>
-                      </label>
-                    )}
-                </div>
+                <ContestOfferStepFinancial
+                  form={form}
+                  contestInfo={contestInfo}
+                  grossDisplay={grossDisplay}
+                  fieldErrors={displayedFieldErrors}
+                  onPatch={patchForm}
+                  onStageDeposit={(file) => stageFile('deposit', file)}
+                />
               )}
             </>
           )}
         </div>
 
-        <DialogFooter className="shrink-0 flex-col gap-2 border-t px-6 py-4 sm:flex-row sm:justify-between">
+        <DialogFooter className="shrink-0 flex-col gap-2 border-t bg-muted/20 px-6 py-4 sm:flex-row sm:justify-between">
           <div className="flex gap-2 w-full sm:w-auto">
             <Button
               type="button"
               variant="outline"
               disabled={currentStep <= 1 || isLoading}
-              onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
+              onClick={handlePrevStep}
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Wstecz
@@ -664,7 +408,7 @@ export function ContestOfferSubmissionDialog({
                 type="button"
                 variant="secondary"
                 disabled={isLoading}
-                onClick={() => setCurrentStep((s) => Math.min(totalSteps, s + 1))}
+                onClick={handleNextStep}
               >
                 Dalej
                 <ChevronRight className="h-4 w-4 ml-1" />
@@ -696,136 +440,5 @@ export function ContestOfferSubmissionDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function FormalDocBlock({
-  doc,
-  attached,
-  stagedName,
-  onUseProfile,
-  onUpload,
-  onRemove,
-}: {
-  doc: ResolvedContractorDocument;
-  attached?: ContestOfferAttachmentRef;
-  stagedName?: string;
-  onUseProfile: () => void;
-  onUpload: (file: File) => void;
-  onRemove: () => void;
-}): React.ReactElement {
-  const displayName = stagedName ?? attached?.name;
-  const isAttached = Boolean(displayName);
-  const fromProfile = attached?.source === 'profile' && !stagedName;
-  const pendingUpload = Boolean(stagedName);
-
-  return (
-    <div className="rounded-lg border p-4 space-y-3">
-      <div className="font-medium">{doc.label}</div>
-
-      {isAttached ? (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="space-y-1 text-sm min-w-0">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                <span className="font-medium truncate">{displayName}</span>
-              </div>
-              {fromProfile ? (
-                <p className="text-muted-foreground pl-6">
-                  Dokument został dodany z profilu.
-                </p>
-              ) : pendingUpload ? (
-                <p className="text-muted-foreground pl-6">
-                  Nowy plik zostanie dołączony po zapisaniu szkicu lub wysłaniu oferty.
-                </p>
-              ) : (
-                <p className="text-muted-foreground pl-6">Dokument dołączony do oferty.</p>
-              )}
-              {attached?.url && !stagedName ? (
-                <Link
-                  href={attached.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary text-xs pl-6 hover:underline inline-flex items-center gap-1"
-                >
-                  Podgląd pliku
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              ) : null}
-            </div>
-            <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
-              Usuń
-            </Button>
-          </div>
-          <div>
-            <Label className="text-xs">Zmień plik</Label>
-            <div className="flex items-center gap-2 mt-1">
-              <Input
-                type="file"
-                accept=".pdf,.doc,.docx,image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onUpload(file);
-                  e.target.value = '';
-                }}
-              />
-              <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {doc.missing ? (
-            <p className="text-sm text-muted-foreground">
-              Brak tego dokumentu w profilu.{' '}
-              <Link
-                href={CONTRACTOR_VERIFICATION_DOCUMENTS_PATH}
-                className="text-primary inline-flex items-center gap-1 hover:underline"
-              >
-                Uzupełnij w profilu
-                <ExternalLink className="h-3 w-3" />
-              </Link>
-            </p>
-          ) : (
-            <div className="text-sm space-y-2">
-              <p className="text-muted-foreground">W profilu masz:</p>
-              <div className="flex flex-wrap items-center gap-2">
-                {doc.signedUrl ? (
-                  <Link
-                    href={doc.signedUrl}
-                    target="_blank"
-                    className="text-primary hover:underline"
-                  >
-                    {doc.fileName}
-                  </Link>
-                ) : (
-                  <span>{doc.fileName}</span>
-                )}
-                {doc.hint ? <Badge variant="secondary">{doc.hint}</Badge> : null}
-                <Button type="button" size="sm" variant="outline" onClick={onUseProfile}>
-                  Użyj z profilu
-                </Button>
-              </div>
-            </div>
-          )}
-          <div>
-            <Label className="text-xs">Wgraj dokument do oferty</Label>
-            <div className="flex items-center gap-2 mt-1">
-              <Input
-                type="file"
-                accept=".pdf,.doc,.docx,image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onUpload(file);
-                  e.target.value = '';
-                }}
-              />
-              <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }

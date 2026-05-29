@@ -4,6 +4,7 @@ import {
   deriveContractorContestOfferStatus,
   type ContractorContestOfferStatus,
 } from '../contest-offer/contractor-contest-offer-status';
+import { fetchUserPrimaryCompany } from './companies';
 import { isContestTender } from '../tender-contest/map-tender-contest-display';
 import {
   computeGrossFromNet,
@@ -89,6 +90,14 @@ export async function fetchContractorContestOffers(
   supabase: SupabaseClient<Database>,
   contractorUserId: string,
 ): Promise<ContractorContestOfferRow[]> {
+  const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+    supabase,
+    contractorUserId,
+  );
+  if (companyError || !company) {
+    return [];
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: bids, error } = await (supabase as any)
     .from('tender_bids')
@@ -113,9 +122,8 @@ export async function fetchContractorContestOffers(
       )
     `,
     )
-    .eq('contractor_id', contractorUserId)
+    .eq('company_id', company.id)
     .neq('admin_moderation_status', 'suspended')
-    .neq('status', 'draft')
     .order('submitted_at', { ascending: false });
 
   if (error) {

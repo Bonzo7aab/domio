@@ -3,6 +3,7 @@
  */
 
 export type ContractorContestOfferStatus =
+  | 'draft'
   | 'submitted'
   | 'in_evaluation'
   | 'selected'
@@ -17,6 +18,7 @@ export interface ContractorContestOfferStatusInput {
 }
 
 const LABELS: Record<ContractorContestOfferStatus, string> = {
+  draft: 'Szkic',
   submitted: 'Oferta złożona',
   in_evaluation: 'Oferta w ocenie',
   selected: 'Wybrana',
@@ -26,6 +28,7 @@ const LABELS: Record<ContractorContestOfferStatus, string> = {
 
 export const CONTRACTOR_CONTEST_OFFER_FILTER_OPTIONS = [
   { value: 'all', label: 'Wszystkie oferty' },
+  { value: 'draft', label: 'Szkic' },
   { value: 'submitted', label: 'Złożona (Sejf zamknięty)' },
   { value: 'in_evaluation', label: 'W ocenie (Sejf otwarty)' },
   { value: 'selected', label: 'Wybrana' },
@@ -52,6 +55,10 @@ export function deriveContractorContestOfferStatus(
   const { bidStatus, tenderStatus, submissionDeadlineIso } = input;
   const now = input.now ?? new Date();
   const deadlinePassed = isSubmissionDeadlinePast(submissionDeadlineIso, now);
+
+  if (bidStatus === 'draft') {
+    return 'draft';
+  }
 
   if (bidStatus === 'cancelled') {
     return 'withdrawn';
@@ -99,6 +106,8 @@ export function getContractorContestOfferStatusVariant(
   status: ContractorContestOfferStatus,
 ): ContractorContestOfferStatusVariant {
   switch (status) {
+    case 'draft':
+      return 'outline';
     case 'selected':
       return 'success';
     case 'not_selected':
@@ -118,7 +127,12 @@ export function canWithdrawContestOffer(
   const { bidStatus, tenderStatus, submissionDeadlineIso } = input;
   const now = input.now ?? new Date();
 
-  if (bidStatus === 'cancelled' || bidStatus === 'accepted' || bidStatus === 'rejected') {
+  if (
+    bidStatus === 'draft' ||
+    bidStatus === 'cancelled' ||
+    bidStatus === 'accepted' ||
+    bidStatus === 'rejected'
+  ) {
     return false;
   }
 

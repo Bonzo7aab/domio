@@ -1,4 +1,4 @@
-import { Lock, Unlock, CheckCircle2, XCircle, Ban } from 'lucide-react';
+import { Lock, Unlock, CheckCircle2, XCircle, Ban, FilePen } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { Badge } from '../ui/badge';
 import {
@@ -23,6 +23,15 @@ export function ContractorContestOfferStatusBadge({
     variant === 'success' && 'border-green-600 text-green-700',
     variant === 'destructive' && status === 'withdrawn' && 'text-muted-foreground border-muted',
   );
+
+  if (status === 'draft') {
+    return (
+      <Badge variant="outline" className={cn(className, 'border-amber-500/50 text-amber-800 dark:text-amber-200')}>
+        <FilePen className="h-3 w-3" aria-hidden />
+        {label}
+      </Badge>
+    );
+  }
 
   if (status === 'submitted') {
     return (

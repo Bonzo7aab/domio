@@ -148,65 +148,237 @@ function buildRowFromForm(
   };
 }
 
+export type ContestOfferWizardStep = 1 | 2 | 3 | 4;
+
+export interface ContestOfferFieldErrors {
+  proposedCompletionDate?: string;
+  siteVisitConfirmed?: string;
+  referencesText?: string;
+  netPrice?: string;
+  warrantyMonths?: string;
+  guaranteeMonths?: string;
+  paymentTermsAccepted?: string;
+  deposit?: string;
+  formal?: Partial<Record<FormalRequirementKey, string>>;
+}
+
+export const FORMAL_REQUIREMENT_LABELS: Record<FormalRequirementKey, string> = {
+  insuranceOc: 'Polisa OC',
+  zusUsCertificates: 'Zaświadczenia ZUS/US',
+  references: 'Referencje – wykaz zrealizowanych prac',
+  professionalCertificates: 'Certyfikaty zawodowe',
+  professionalLicenses: 'Uprawnienia zawodowe',
+};
+
+export function hasContestOfferFieldErrors(errors: ContestOfferFieldErrors): boolean {
+  if (
+    errors.proposedCompletionDate ||
+    errors.siteVisitConfirmed ||
+    errors.referencesText ||
+    errors.netPrice ||
+    errors.warrantyMonths ||
+    errors.guaranteeMonths ||
+    errors.paymentTermsAccepted ||
+    errors.deposit
+  ) {
+    return true;
+  }
+  return Boolean(errors.formal && Object.keys(errors.formal).length > 0);
+}
+
+export function getContestOfferStepFieldErrors(
+  step: ContestOfferWizardStep,
+  form: ContestOfferFormData,
+  contestInfo: ContestInfo,
+): ContestOfferFieldErrors {
+  const errors: ContestOfferFieldErrors = {};
+
+  if (step === 2) {
+    if (!form.proposedCompletionDate) {
+      errors.proposedCompletionDate = 'Podaj oferowany termin wykonania';
+    }
+    if (contestInfo.siteVisitType === 'mandatory' && !form.siteVisitConfirmed) {
+      errors.siteVisitConfirmed = 'Potwierdź odbycie wizji lokalnej';
+    }
+    return errors;
+  }
+
+  if (step === 3) {
+    const formal: Partial<Record<FormalRequirementKey, string>> = {};
+    const required = requiredFormalKeys(contestInfo.formalRequirements);
+    for (const key of required) {
+      if (key === 'references') {
+        if (!form.referencesText.trim()) {
+          errors.referencesText = 'Uzupełnij wykaz zrealizowanych prac';
+        }
+        continue;
+      }
+      const attached = form.formalAttachments[key];
+      const staged = form.stagedFiles[key]?.length;
+      if (!attached && !staged) {
+        formal[key] = `Wgraj lub wybierz z profilu: ${FORMAL_REQUIREMENT_LABELS[key]}`;
+      }
+    }
+    if (Object.keys(formal).length > 0) {
+      errors.formal = formal;
+    }
+    return errors;
+  }
+
+  if (step === 4) {
+    const net = Number.parseFloat(form.netPrice);
+    if (!form.netPrice.trim() || Number.isNaN(net) || net <= 0) {
+      errors.netPrice = 'Podaj cenę netto';
+    }
+    if (!form.warrantyMonths) {
+      errors.warrantyMonths = 'Wybierz okres gwarancji';
+    }
+    if (!form.guaranteeMonths) {
+      errors.guaranteeMonths = 'Wybierz okres rękojmi';
+    }
+    if (
+      contestInfo.paymentTerms.mode === 'custom' &&
+      (contestInfo.paymentTerms.customDays ?? 0) > 14 &&
+      !form.paymentTermsAccepted
+    ) {
+      errors.paymentTermsAccepted = 'Zaakceptuj wymagany termin płatności';
+    }
+    if (contestInfo.depositRequired) {
+      const depositFile = form.extraAttachments.find((a) => a.requirementKey === 'deposit');
+      const stagedDeposit = form.stagedFiles.deposit?.length;
+      if (!depositFile && !stagedDeposit) {
+        errors.deposit = 'Wgraj potwierdzenie przelewu wadium';
+      }
+    }
+    return errors;
+  }
+
+  return errors;
+}
+
+export function getContestOfferAllFieldErrors(
+  form: ContestOfferFormData,
+  contestInfo: ContestInfo,
+): ContestOfferFieldErrors {
+  const step2 = getContestOfferStepFieldErrors(2, form, contestInfo);
+  const step3 = getContestOfferStepFieldErrors(3, form, contestInfo);
+  const step4 = getContestOfferStepFieldErrors(4, form, contestInfo);
+
+  const formal = { ...step3.formal };
+
+  return {
+    proposedCompletionDate: step2.proposedCompletionDate,
+    siteVisitConfirmed: step2.siteVisitConfirmed,
+    referencesText: step3.referencesText,
+    netPrice: step4.netPrice,
+    warrantyMonths: step4.warrantyMonths,
+    guaranteeMonths: step4.guaranteeMonths,
+    paymentTermsAccepted: step4.paymentTermsAccepted,
+    deposit: step4.deposit,
+    ...(Object.keys(formal).length > 0 ? { formal } : {}),
+  };
+}
+
+export function filterFieldErrorsForStep(
+  step: ContestOfferWizardStep,
+  errors: ContestOfferFieldErrors,
+): ContestOfferFieldErrors {
+  switch (step) {
+    case 1:
+      return {};
+    case 2:
+      return {
+        proposedCompletionDate: errors.proposedCompletionDate,
+        siteVisitConfirmed: errors.siteVisitConfirmed,
+      };
+    case 3:
+      return {
+        referencesText: errors.referencesText,
+        formal: errors.formal,
+      };
+    case 4:
+      return {
+        netPrice: errors.netPrice,
+        warrantyMonths: errors.warrantyMonths,
+        guaranteeMonths: errors.guaranteeMonths,
+        paymentTermsAccepted: errors.paymentTermsAccepted,
+        deposit: errors.deposit,
+      };
+    default:
+      return {};
+  }
+}
+
+export function firstContestOfferStepWithErrors(
+  errors: ContestOfferFieldErrors,
+): ContestOfferWizardStep | null {
+  if (errors.proposedCompletionDate || errors.siteVisitConfirmed) return 2;
+  if (errors.referencesText || (errors.formal && Object.keys(errors.formal).length > 0)) {
+    return 3;
+  }
+  if (
+    errors.netPrice ||
+    errors.warrantyMonths ||
+    errors.guaranteeMonths ||
+    errors.paymentTermsAccepted ||
+    errors.deposit
+  ) {
+    return 4;
+  }
+  return null;
+}
+
+function firstFieldErrorMessage(errors: ContestOfferFieldErrors): string | null {
+  if (errors.proposedCompletionDate) return errors.proposedCompletionDate;
+  if (errors.siteVisitConfirmed) return errors.siteVisitConfirmed;
+  if (errors.referencesText) return errors.referencesText;
+  if (errors.formal) {
+    const first = Object.values(errors.formal)[0];
+    if (first) return first;
+  }
+  if (errors.netPrice) return errors.netPrice;
+  if (errors.warrantyMonths) return errors.warrantyMonths;
+  if (errors.guaranteeMonths) return errors.guaranteeMonths;
+  if (errors.paymentTermsAccepted) return errors.paymentTermsAccepted;
+  if (errors.deposit) return errors.deposit;
+  return null;
+}
+
+export function isFormalRequirementComplete(
+  form: ContestOfferFormData,
+  key: FormalRequirementKey,
+): boolean {
+  if (key === 'references') {
+    return form.referencesText.trim().length > 0;
+  }
+  return Boolean(form.formalAttachments[key] || form.stagedFiles[key]?.length);
+}
+
+export function countFormalRequirementsProgress(
+  form: ContestOfferFormData,
+  contestInfo: ContestInfo,
+): { completed: number; total: number } {
+  const keys = requiredFormalKeys(contestInfo.formalRequirements);
+  const completed = keys.filter((key) => isFormalRequirementComplete(form, key)).length;
+  return { completed, total: keys.length };
+}
+
+export function validateContestOfferStep(
+  step: ContestOfferWizardStep,
+  form: ContestOfferFormData,
+  contestInfo: ContestInfo,
+): string | null {
+  if (step === 1) return null;
+  const errors = getContestOfferStepFieldErrors(step, form, contestInfo);
+  return firstFieldErrorMessage(errors);
+}
+
 export function validateContestOfferSubmit(
   form: ContestOfferFormData,
   contestInfo: ContestInfo,
 ): string | null {
-  if (!form.proposedCompletionDate) {
-    return 'Podaj oferowany termin wykonania';
-  }
-
-  if (contestInfo.siteVisitType === 'mandatory' && !form.siteVisitConfirmed) {
-    return 'Potwierdź odbycie wizji lokalnej';
-  }
-
-  const net = Number.parseFloat(form.netPrice);
-  if (!form.netPrice.trim() || Number.isNaN(net) || net <= 0) {
-    return 'Podaj cenę netto';
-  }
-
-  if (!form.warrantyMonths) return 'Wybierz okres gwarancji';
-  if (!form.guaranteeMonths) return 'Wybierz okres rękojmi';
-
-  if (
-    contestInfo.paymentTerms.mode === 'custom' &&
-    (contestInfo.paymentTerms.customDays ?? 0) > 14 &&
-    !form.paymentTermsAccepted
-  ) {
-    return 'Zaakceptuj wymagany termin płatności';
-  }
-
-  if (contestInfo.depositRequired) {
-    const depositFile = form.extraAttachments.find((a) => a.requirementKey === 'deposit');
-    const stagedDeposit = form.stagedFiles.deposit?.length;
-    if (!depositFile && !stagedDeposit) {
-      return 'Wgraj potwierdzenie przelewu wadium';
-    }
-  }
-
-  const required = requiredFormalKeys(contestInfo.formalRequirements);
-  for (const key of required) {
-    if (key === 'references') {
-      if (!form.referencesText.trim()) {
-        return 'Uzupełnij wykaz zrealizowanych prac';
-      }
-      continue;
-    }
-    const attached = form.formalAttachments[key];
-    const staged = form.stagedFiles[key]?.length;
-    if (!attached && !staged) {
-      const labels: Record<FormalRequirementKey, string> = {
-        insuranceOc: 'polisa OC',
-        zusUsCertificates: 'zaświadczenia ZUS/US',
-        references: 'referencje',
-        professionalCertificates: 'certyfikaty zawodowe',
-        professionalLicenses: 'uprawnienia zawodowe',
-      };
-      return `Brakuje wymaganego dokumentu: ${labels[key]}`;
-    }
-  }
-
-  return null;
+  const errors = getContestOfferAllFieldErrors(form, contestInfo);
+  return firstFieldErrorMessage(errors);
 }
 
 export async function fetchTenderBidOfferState(
