@@ -372,7 +372,6 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
         setIsUploading(true);
         try {
           const uploadResult = await uploadJobAttachments(
-            supabase,
             attachments,
             managerId,
             jobIdProp || undefined,
@@ -474,7 +473,7 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
       console.error(error);
       if (uploadedFileUrls.length > 0) {
         try {
-          await deleteJobAttachments(supabase, uploadedFileUrls);
+          await deleteJobAttachments(uploadedFileUrls);
         } catch {
           /* ignore */
         }

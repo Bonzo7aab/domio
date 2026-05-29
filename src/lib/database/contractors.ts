@@ -1,4 +1,6 @@
 import { createClient } from '../supabase/client';
+import { getStoragePublicUrl } from '../storage/public-url';
+import { STORAGE_BUCKETS } from '../storage/buckets';
 import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import { ContractorProfile, ServicePricing } from '../../types/contractor';
@@ -2076,12 +2078,7 @@ export async function fetchPortfolioProjectById(
         return filePath;
       }
       
-      const supabaseClient = createClient();
-      const { data: urlData } = supabaseClient.storage
-        .from('job-attachments')
-        .getPublicUrl(String(filePath));
-      
-      return urlData.publicUrl;
+      return getStoragePublicUrl(STORAGE_BUCKETS.JOB_ATTACHMENTS, String(filePath));
     }).filter(Boolean) as string[];
 
     return {
@@ -2170,12 +2167,7 @@ export async function fetchContractorPortfolio(contractorId: string): Promise<Ar
         }
         
         // Otherwise, convert storage path to public URL
-        const supabase = createClient();
-        const { data: urlData } = supabase.storage
-          .from('job-attachments')
-          .getPublicUrl(filePath);
-        
-        return urlData.publicUrl;
+        return getStoragePublicUrl(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath);
       }).filter(Boolean) as string[];
 
       return {
@@ -2266,12 +2258,7 @@ export async function fetchContractorFeaturedPortfolio(contractorId: string, lim
         }
         
         // Otherwise, convert storage path to public URL
-        const supabase = createClient();
-        const { data: urlData } = supabase.storage
-          .from('job-attachments')
-          .getPublicUrl(filePath);
-        
-        return urlData.publicUrl;
+        return getStoragePublicUrl(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath);
       }).filter(Boolean) as string[];
 
       return {

@@ -28,6 +28,7 @@ import {
   type PortfolioProjectInput 
 } from '../lib/database/contractors';
 import { uploadPortfolioImage } from '../lib/storage/portfolio-images';
+import { deleteJobAttachment } from '../lib/storage/job-attachments';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { toast } from 'sonner';
 import Image from 'next/image';
@@ -245,7 +246,6 @@ export default function PortfolioProjectForm({
 
         for (const image of images) {
           const { data: uploadResult, error: uploadError } = await uploadPortfolioImage(
-            supabase,
             image,
             user.id,
             savedProjectId
@@ -279,7 +279,7 @@ export default function PortfolioProjectForm({
             failedCount++;
             // Try to clean up the uploaded file if we can't link it
             try {
-              await supabase.storage.from('job-attachments').remove([uploadResult.path]);
+              await deleteJobAttachment(uploadResult.path);
             } catch (cleanupError) {
               console.error('Error cleaning up uploaded file:', cleanupError);
             }

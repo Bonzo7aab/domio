@@ -1,5 +1,4 @@
 import { createClient } from '../supabase/client';
-import { isStorageObjectNotFound, normalizeStorageObjectPath } from '../storage/signed-url';
 import type {
   ContractorServiceAreaSettings,
   ContractorVatStatus,
@@ -7,25 +6,20 @@ import type {
 import { DEFAULT_SERVICE_AREA } from '../contractor/constants';
 import { normalizeIbanInput } from '../contractor/iban';
 
-const CONTRACTOR_POLICY_BUCKET = 'verification-documents';
-
-/** Rozszerzenia i MIME dla skanu polisy OC (spójne z UI i walidacją uploadu). */
-export const OC_POLICY_ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'] as const;
-
-const OC_POLICY_ALLOWED_MIME = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-]);
-
-const OC_POLICY_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
-const OC_POLICY_SIGNED_URL_TTL_SEC = 3600;
-
-export function getOcPolicyAllowedFormatsLabel(): string {
-  return 'PDF, JPG, JPEG, PNG, WEBP';
-}
+export {
+  getOcPolicyAllowedFormatsLabel,
+  OC_POLICY_ALLOWED_EXTENSIONS,
+} from './contractor-account-constants';
+export {
+  getOcPolicyScanSignedUrl,
+  getVerificationDocumentSignedUrl,
+  removeVerificationDocumentsFromBucket,
+  uploadOcPolicyScan,
+  uploadProfessionalQualificationsScan,
+  uploadReferenceDocumentScan,
+  uploadTaxCertificateScan,
+  uploadZusCertificateScan,
+} from './contractor-account-storage';
 
 export interface ContractorNotificationChannels {
   email: boolean;
@@ -448,143 +442,5 @@ export async function upsertContractorAccountSettings(
   }
 
   return normalizeSettings((data as Record<string, unknown>) || null);
-}
-
-function validateVerificationScanFile(file: File): void {
-  if (file.size > OC_POLICY_MAX_BYTES) {
-    throw new Error(`Plik jest zbyt duży. Maksymalny rozmiar: ${OC_POLICY_MAX_BYTES / (1024 * 1024)} MB`);
-  }
-
-  const rawExt = file.name.includes('.') ? file.name.split('.').pop() : '';
-  const extension = rawExt ? rawExt.toLowerCase() : '';
-  const mime = file.type?.toLowerCase() ?? '';
-
-  const extOk = OC_POLICY_ALLOWED_EXTENSIONS.includes(
-    extension as (typeof OC_POLICY_ALLOWED_EXTENSIONS)[number]
-  );
-  const mimeOk =
-    mime === '' ||
-    OC_POLICY_ALLOWED_MIME.has(mime) ||
-    mime === 'image/pjpeg';
-
-  if (!extOk && !mimeOk) {
-    throw new Error(
-      `Nieobsługiwany format pliku. Dozwolone: ${getOcPolicyAllowedFormatsLabel()} (max ${OC_POLICY_MAX_BYTES / (1024 * 1024)} MB)`
-    );
-  }
-}
-
-export async function uploadOcPolicyScan(userId: string, file: File): Promise<{ path: string }> {
-  validateVerificationScanFile(file);
-
-  const supabase = createClient();
-  const rawExt = file.name.includes('.') ? file.name.split('.').pop() : 'pdf';
-  const extension = rawExt ? rawExt.toLowerCase() : 'pdf';
-  const safeExt = OC_POLICY_ALLOWED_EXTENSIONS.includes(
-    extension as (typeof OC_POLICY_ALLOWED_EXTENSIONS)[number]
-  )
-    ? extension
-    : 'pdf';
-
-  const filePath = `${userId}/verification/oc-policy/${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}.${safeExt}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from(CONTRACTOR_POLICY_BUCKET)
-    .upload(filePath, file, { upsert: false });
-
-  if (uploadError) {
-    throw uploadError;
-  }
-
-  return { path: filePath };
-}
-
-export async function uploadProfessionalQualificationsScan(
-  userId: string,
-  file: File
-): Promise<{ path: string }> {
-  return uploadVerificationScan(userId, file, 'professional-qualifications');
-}
-
-async function uploadVerificationScan(
-  userId: string,
-  file: File,
-  folder: string
-): Promise<{ path: string }> {
-  validateVerificationScanFile(file);
-
-  const supabase = createClient();
-  const rawExt = file.name.includes('.') ? file.name.split('.').pop() : 'pdf';
-  const extension = rawExt ? rawExt.toLowerCase() : 'pdf';
-  const safeExt = OC_POLICY_ALLOWED_EXTENSIONS.includes(
-    extension as (typeof OC_POLICY_ALLOWED_EXTENSIONS)[number]
-  )
-    ? extension
-    : 'pdf';
-
-  const filePath = `${userId}/verification/${folder}/${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}.${safeExt}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from(CONTRACTOR_POLICY_BUCKET)
-    .upload(filePath, file, { upsert: false });
-
-  if (uploadError) {
-    throw uploadError;
-  }
-
-  return { path: filePath };
-}
-
-export async function uploadZusCertificateScan(userId: string, file: File): Promise<{ path: string }> {
-  return uploadVerificationScan(userId, file, 'zus-certificate');
-}
-
-export async function uploadTaxCertificateScan(userId: string, file: File): Promise<{ path: string }> {
-  return uploadVerificationScan(userId, file, 'tax-certificate');
-}
-
-export async function uploadReferenceDocumentScan(userId: string, file: File): Promise<{ path: string }> {
-  return uploadVerificationScan(userId, file, 'references');
-}
-
-/** Best-effort removal of objects from the verification-documents bucket (ignores missing files). */
-export async function removeVerificationDocumentsFromBucket(paths: string[]): Promise<void> {
-  const filtered = paths.map((p) => p.trim()).filter(Boolean);
-  if (filtered.length === 0) return;
-
-  const supabase = createClient();
-  const { error } = await supabase.storage.from(CONTRACTOR_POLICY_BUCKET).remove(filtered);
-  if (error) {
-    console.error('removeVerificationDocumentsFromBucket:', error);
-  }
-}
-
-/**
- * Podpisany URL — bucket jest zwykle prywatny; `getPublicUrl` nie działa w przeglądarce bez polityki public read.
- */
-export async function getVerificationDocumentSignedUrl(path: string): Promise<string | null> {
-  const supabase = createClient();
-  const objectPath = normalizeStorageObjectPath(path, CONTRACTOR_POLICY_BUCKET);
-  const { data, error } = await supabase.storage
-    .from(CONTRACTOR_POLICY_BUCKET)
-    .createSignedUrl(objectPath, OC_POLICY_SIGNED_URL_TTL_SEC);
-
-  if (error || !data?.signedUrl) {
-    if (error && !isStorageObjectNotFound(error)) {
-      console.warn('getVerificationDocumentSignedUrl:', (error as { message?: string }).message);
-    }
-    return null;
-  }
-
-  return data.signedUrl;
-}
-
-/** @deprecated Use getVerificationDocumentSignedUrl */
-export async function getOcPolicyScanSignedUrl(path: string): Promise<string | null> {
-  return getVerificationDocumentSignedUrl(path);
 }
 

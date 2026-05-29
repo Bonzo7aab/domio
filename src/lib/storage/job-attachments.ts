@@ -1,13 +1,17 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '../../types/database';
+'use server';
 
-const JOB_ATTACHMENTS_BUCKET = 'job-attachments';
+import { STORAGE_BUCKETS } from './buckets';
+import { requireAuthenticatedUser } from './auth';
+import { normalizeStorageObjectPath } from './path-utils';
+import { getStoragePublicUrl } from './public-url';
+import { deleteObject, uploadObject } from './r2/operations';
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_DOCUMENT_TYPES = [
   'application/pdf',
   'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
 const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_DOCUMENT_TYPES];
 
@@ -17,109 +21,75 @@ export interface UploadResult {
   type: 'image' | 'document';
 }
 
-/**
- * Upload a job attachment to Supabase storage
- * @param supabase - Supabase client
- * @param file - File to upload
- * @param userId - User ID
- * @param jobId - Job ID (optional, use 'draft' for files uploaded before job creation)
- */
 export async function uploadJobAttachment(
-  supabase: SupabaseClient<Database>,
   file: File,
   userId: string,
-  jobId?: string
+  jobId?: string,
 ): Promise<{ data: UploadResult | null; error: Error | null }> {
   try {
-    // Validate file type
+    await requireAuthenticatedUser(userId);
+
     const fileType = file.type.toLowerCase();
-    const normalizedAllowedTypes = ALLOWED_TYPES.map(t => t.toLowerCase());
-    const isValidType = normalizedAllowedTypes.includes(fileType) || 
-                       (fileType === 'image/jpeg' && normalizedAllowedTypes.includes('image/jpg'));
-    
+    const normalizedAllowedTypes = ALLOWED_TYPES.map((t) => t.toLowerCase());
+    const isValidType =
+      normalizedAllowedTypes.includes(fileType) ||
+      (fileType === 'image/jpeg' && normalizedAllowedTypes.includes('image/jpg'));
+
     if (!isValidType) {
       return {
         data: null,
-        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX')
+        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX'),
       };
     }
 
-    // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return {
         data: null,
-        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB')
+        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB'),
       };
     }
 
-    // Determine file type category
-    const isImage = ALLOWED_IMAGE_TYPES.some(type => 
-      fileType.includes(type.split('/')[1]) || fileType === type
+    const isImage = ALLOWED_IMAGE_TYPES.some(
+      (type) => fileType.includes(type.split('/')[1]) || fileType === type,
     );
     const attachmentType: 'image' | 'document' = isImage ? 'image' : 'document';
 
-    // Generate unique filename
     const fileExt = file.name.split('.').pop();
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
     const fileName = `${timestamp}-${random}.${fileExt}`;
-    
-    // Use 'draft' folder if no jobId provided, otherwise use jobId
     const jobFolder = jobId || 'draft';
     const filePath = `${userId}/jobs/${jobFolder}/${fileName}`;
 
-    // Upload file to storage
-    const { error: uploadError } = await supabase.storage
-      .from(JOB_ATTACHMENTS_BUCKET)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Error uploading job attachment:', uploadError);
-      return {
-        data: null,
-        error: uploadError
-      };
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(JOB_ATTACHMENTS_BUCKET)
-      .getPublicUrl(filePath);
+    await uploadObject(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath, file);
 
     return {
       data: {
-        url: urlData.publicUrl,
+        url: getStoragePublicUrl(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath),
         path: filePath,
-        type: attachmentType
+        type: attachmentType,
       },
-      error: null
+      error: null,
     };
   } catch (err) {
     console.error('Error in uploadJobAttachment:', err);
     return {
       data: null,
-      error: err
+      error: err instanceof Error ? err : new Error(String(err)),
     };
   }
 }
 
-/**
- * Upload multiple job attachments
- */
 export async function uploadJobAttachments(
-  supabase: SupabaseClient<Database>,
   files: File[],
   userId: string,
-  jobId?: string
+  jobId?: string,
 ): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
   const errors: unknown[] = [];
 
   for (const file of files) {
-    const { data, error } = await uploadJobAttachment(supabase, file, userId, jobId);
+    const { data, error } = await uploadJobAttachment(file, userId, jobId);
     if (error || !data) {
       errors.push({ file: file.name, error });
     } else {
@@ -130,60 +100,28 @@ export async function uploadJobAttachments(
   return { data: results, errors };
 }
 
-/**
- * Delete a job attachment from Supabase storage
- */
 export async function deleteJobAttachment(
-  supabase: SupabaseClient<Database>,
-  imagePath: string
+  imagePath: string,
 ): Promise<{ success: boolean; error: Error | null }> {
   try {
-    // Extract path from URL if full URL is provided
-    let path = imagePath;
-    
-    // If it's a full URL, extract the path
-    if (imagePath.startsWith('http')) {
-      // Extract path from URL like: https://...supabase.co/storage/v1/object/public/job-attachments/userId/jobs/jobId/file.jpg
-      const urlParts = imagePath.split(`${JOB_ATTACHMENTS_BUCKET}/`);
-      if (urlParts.length > 1) {
-        path = urlParts[1].split('?')[0]; // Remove query params
-      }
-    } else if (imagePath.includes(JOB_ATTACHMENTS_BUCKET)) {
-      // If it contains bucket name but not full URL
-      const urlParts = imagePath.split(`${JOB_ATTACHMENTS_BUCKET}/`);
-      if (urlParts.length > 1) {
-        path = urlParts[1].split('?')[0];
-      }
-    }
-    // Otherwise, assume it's already a path
-
-    const { error } = await supabase.storage
-      .from(JOB_ATTACHMENTS_BUCKET)
-      .remove([path]);
-
-    if (error) {
-      console.error('Error deleting job attachment:', error);
-      return { success: false, error };
-    }
-
+    const path = normalizeStorageObjectPath(imagePath, STORAGE_BUCKETS.JOB_ATTACHMENTS);
+    const userId = path.split('/')[0];
+    await requireAuthenticatedUser(userId);
+    await deleteObject(STORAGE_BUCKETS.JOB_ATTACHMENTS, path);
     return { success: true, error: null };
   } catch (err) {
     console.error('Error in deleteJobAttachment:', err);
-    return { success: false, error: err };
+    return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
 }
 
-/**
- * Delete multiple job attachments
- */
 export async function deleteJobAttachments(
-  supabase: SupabaseClient<Database>,
-  paths: string[]
+  paths: string[],
 ): Promise<{ success: boolean; errors: unknown[] }> {
   const errors: unknown[] = [];
-  
+
   for (const path of paths) {
-    const { error } = await deleteJobAttachment(supabase, path);
+    const { error } = await deleteJobAttachment(path);
     if (error) {
       errors.push({ path, error });
     }
@@ -191,7 +129,6 @@ export async function deleteJobAttachments(
 
   return {
     success: errors.length === 0,
-    errors
+    errors,
   };
 }
-

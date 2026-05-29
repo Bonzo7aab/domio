@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '../../lib/supabase/server';
 import type { Database, Json } from '../../types/database';
+import { STORAGE_BUCKETS } from '../../lib/storage/buckets';
+import { uploadObject } from '../../lib/storage/r2/operations';
 
 const DEFAULT_CONTRACTOR_NOTIFICATION_CHANNELS = {
   email: true,
@@ -96,7 +98,6 @@ async function fetchOcPolicyScanPathServer(
   return (data?.oc_policy_scan_path as string | null) ?? null;
 }
 
-const BUCKET = 'verification-documents';
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EXT = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp']);
 
@@ -168,9 +169,13 @@ export async function submitVerificationDocumentsAction(
       const ext = entry.name.includes('.') ? entry.name.split('.').pop()?.toLowerCase() ?? 'pdf' : 'pdf';
       const safeExt = ALLOWED_EXT.has(ext) ? ext : 'pdf';
       const path = `${user.id}/verification/${key}/${Date.now()}-${safeFilename(entry.name) || `upload.${safeExt}`}`;
-      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, entry, { upsert: false });
-      if (upErr) {
-        return { ok: false, error: upErr.message };
+      try {
+        await uploadObject(STORAGE_BUCKETS.VERIFICATION_DOCUMENTS, path, entry);
+      } catch (upErr) {
+        return {
+          ok: false,
+          error: upErr instanceof Error ? upErr.message : 'Nie udało się przesłać pliku.',
+        };
       }
       newPaths[key] = path;
     }

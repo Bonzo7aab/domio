@@ -74,7 +74,6 @@ function daysUntilCompletion(completionDateIso: string): number | null {
 }
 
 async function uploadStagedFiles(
-  supabase: SupabaseClient<Database>,
   userId: string,
   tenderId: string,
   form: ContestOfferFormData,
@@ -85,7 +84,7 @@ async function uploadStagedFiles(
   for (const [key, files] of Object.entries(staged)) {
     if (!files?.length) continue;
     const file = files[0];
-    const { data, error } = await uploadBidAttachment(supabase, file, userId, tenderId);
+    const { data, error } = await uploadBidAttachment(file, userId, tenderId);
     if (error || !data) {
       return { form: next, error: error?.message ?? 'Nie udało się wgrać pliku' };
     }
@@ -445,7 +444,6 @@ export async function upsertTenderBidDraft(
     }
 
     const { form: uploadedForm, error: uploadError } = await uploadStagedFiles(
-      supabase,
       contractorId,
       tenderId,
       form,
@@ -508,7 +506,6 @@ export async function submitTenderBid(
   }
 
   const { form: uploadedForm, error: uploadError } = await uploadStagedFiles(
-    supabase,
     contractorId,
     tenderId,
     form,

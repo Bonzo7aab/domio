@@ -7,6 +7,8 @@ import { createClient } from '../../lib/supabase/server';
 import { requirePlatformAdmin } from '../../lib/admin/require-platform-admin';
 import { createNotificationWithPush } from '../../lib/database/notifications-server';
 import { sendVerificationRejectionEmail } from '../../lib/email/verification-rejection';
+import { createPresignedGetUrl } from '../../lib/storage/r2/operations';
+import { STORAGE_BUCKETS } from '../../lib/storage/buckets';
 
 async function logAdminAction(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -233,15 +235,19 @@ async function getOcPreviewSignedUrlActionImpl(subjectUserId: string): Promise<{
     return { url: null, error: error?.message ?? 'Brak skanu OC.' };
   }
 
-  const { data: signed, error: signErr } = await sb.storage
-    .from('verification-documents')
-    .createSignedUrl(row.oc_policy_scan_path, 3600);
-
-  if (signErr || !signed?.signedUrl) {
-    return { url: null, error: signErr?.message ?? 'Nie udało się wygenerować podglądu.' };
+  try {
+    const signedUrl = await createPresignedGetUrl(
+      STORAGE_BUCKETS.VERIFICATION_DOCUMENTS,
+      row.oc_policy_scan_path,
+      3600,
+    );
+    return { url: signedUrl };
+  } catch (signErr) {
+    return {
+      url: null,
+      error: signErr instanceof Error ? signErr.message : 'Nie udało się wygenerować podglądu.',
+    };
   }
-
-  return { url: signed.signedUrl };
 }
 
 async function suspendJobApplicationActionImpl(

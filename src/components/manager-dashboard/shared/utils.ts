@@ -1,6 +1,7 @@
-import { createClient } from '../../../lib/supabase/client';
 import type { CompanyData } from '../../../lib/database/companies';
 import { getJobWorkflowStatusLabel } from '../../../lib/job-workflow-status';
+import { getStoragePublicUrl } from '../../../lib/storage/public-url';
+import { STORAGE_BUCKETS } from '../../../lib/storage/buckets';
 
 /**
  * Map company type to Polish display name
@@ -35,19 +36,16 @@ export function getCompanyAddress(company: CompanyData | null): string {
  */
 export function getBuildingImageUrl(imagePath: string | null | undefined): string | null {
   if (!imagePath) return null;
-  
-  // If it's already a full URL, return it
+
   if (imagePath.startsWith('http')) {
     return imagePath;
   }
-  
-  // Otherwise, convert storage path to public URL
-  const supabase = createClient();
-  const { data } = supabase.storage
-    .from('building-images')
-    .getPublicUrl(imagePath);
-  
-  return data.publicUrl;
+
+  try {
+    return getStoragePublicUrl(STORAGE_BUCKETS.BUILDING_IMAGES, imagePath);
+  } catch {
+    return imagePath;
+  }
 }
 
 /**

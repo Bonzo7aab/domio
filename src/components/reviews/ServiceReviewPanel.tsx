@@ -121,7 +121,6 @@ export function ServiceReviewPanel({
       const imageUrls: string[] = [];
       for (const file of photoFiles) {
         const { url, error: uploadError } = await uploadReviewImage(
-          supabase,
           file,
           user.id,
           created.id,

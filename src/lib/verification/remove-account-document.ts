@@ -24,12 +24,9 @@ export interface RemoveAccountDocumentResult {
   verificationReset?: boolean;
 }
 
-async function removeStoragePath(
-  supabase: SupabaseClient<Database>,
-  path: string | null | undefined
-): Promise<void> {
+async function removeStoragePath(path: string | null | undefined): Promise<void> {
   if (!path?.trim()) return;
-  const { error } = await deleteVerificationDocument(supabase, path.trim());
+  const { error } = await deleteVerificationDocument(path.trim());
   if (error) {
     console.error('removeStoragePath:', error);
   }
@@ -80,7 +77,7 @@ export async function removeAccountDocumentForUser(
     }
 
     for (const p of pathToDelete) {
-      await removeStoragePath(supabase, p);
+      await removeStoragePath(p);
     }
 
     const nextPaths = { ...paths };
@@ -131,7 +128,7 @@ export async function removeAccountDocumentForUser(
       return { ok: false, error: 'Brak zapisanego pliku do usunięcia.' };
     }
 
-    await removeStoragePath(supabase, path);
+    await removeStoragePath(path);
 
     await sb
       .from('contractor_account_settings')
@@ -164,7 +161,7 @@ export async function removeAccountDocumentForUser(
     return { ok: false, error: 'Brak zapisanego pliku do usunięcia.' };
   }
 
-  await removeStoragePath(supabase, path);
+  await removeStoragePath(path);
 
   await sb
     .from('contractor_account_settings')

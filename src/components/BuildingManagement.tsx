@@ -267,7 +267,6 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
           setIsUploadingImages(true);
           try {
             const { data: uploadedImages, errors: uploadErrors } = await uploadBuildingImages(
-              supabase,
               imageFiles,
               editingBuilding.id,
               authUser.id
@@ -352,7 +351,6 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
           setIsUploadingImages(true);
           try {
             const { data: uploadedImages, errors: uploadErrors } = await uploadBuildingImages(
-              supabase,
               imageFiles,
               newBuilding.id,
               authUser.id

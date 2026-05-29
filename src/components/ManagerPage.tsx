@@ -22,6 +22,8 @@ import { createTender, updateTender, fetchTenderById, fetchJobApplicationsByJobI
 import { fetchUserPrimaryCompany, type CompanyData } from '../lib/database/companies';
 import { fetchCompanyBuildings } from '../lib/database/buildings';
 import { fetchContractorsByWorkHistory } from '../lib/database/contractors';
+import { getStoragePublicUrl } from '../lib/storage/public-url';
+import { STORAGE_BUCKETS } from '../lib/storage/buckets';
 import type { Application } from '../types/application';
 import type { Building } from '../types/building';
 import { BUILDING_TYPE_OPTIONS } from '../types/building';
@@ -123,19 +125,16 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
   // Helper function to get public URL for building images
   const getBuildingImageUrl = React.useCallback((imagePath: string | null | undefined): string | null => {
     if (!imagePath) return null;
-    
-    // If it's already a full URL, return it
+
     if (imagePath.startsWith('http')) {
       return imagePath;
     }
-    
-    // Otherwise, convert storage path to public URL
-    const supabase = createClient();
-    const { data } = supabase.storage
-      .from('building-images')
-      .getPublicUrl(imagePath);
-    
-    return data.publicUrl;
+
+    try {
+      return getStoragePublicUrl(STORAGE_BUCKETS.BUILDING_IMAGES, imagePath);
+    } catch {
+      return imagePath;
+    }
   }, []);
 
   // Helper function to map company type to Polish display name

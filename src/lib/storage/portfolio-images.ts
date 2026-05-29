@@ -1,8 +1,13 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '../../types/database';
+'use server';
 
-const PORTFOLIO_IMAGES_BUCKET = 'job-attachments'; // Reuse job-attachments bucket
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+import { createClient } from '../supabase/server';
+import { STORAGE_BUCKETS } from './buckets';
+import { requireAuthenticatedUser } from './auth';
+import { normalizeStorageObjectPath } from './path-utils';
+import { getStoragePublicUrl } from './public-url';
+import { deleteObject, uploadObject } from './r2/operations';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
 export interface UploadResult {
@@ -11,66 +16,43 @@ export interface UploadResult {
   fileId: string;
 }
 
-/**
- * Upload a portfolio image to Supabase storage and create file_uploads record
- */
 export async function uploadPortfolioImage(
-  supabase: SupabaseClient<Database>,
   file: File,
   userId: string,
-  projectId: string
+  projectId: string,
 ): Promise<{ data: UploadResult | null; error: Error | null }> {
   try {
-    // Validate file type
+    await requireAuthenticatedUser(userId);
+    const supabase = await createClient();
+
     const fileType = file.type.toLowerCase();
-    const normalizedAllowedTypes = ALLOWED_IMAGE_TYPES.map(t => t.toLowerCase());
-    const isValidType = normalizedAllowedTypes.includes(fileType) || 
-                       (fileType === 'image/jpeg' && normalizedAllowedTypes.includes('image/jpg'));
-    
+    const normalizedAllowedTypes = ALLOWED_IMAGE_TYPES.map((t) => t.toLowerCase());
+    const isValidType =
+      normalizedAllowedTypes.includes(fileType) ||
+      (fileType === 'image/jpeg' && normalizedAllowedTypes.includes('image/jpg'));
+
     if (!isValidType) {
       return {
         data: null,
-        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF')
+        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF'),
       };
     }
 
-    // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return {
         data: null,
-        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB')
+        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB'),
       };
     }
 
-    // Generate unique filename
     const fileExt = file.name.split('.').pop();
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
     const fileName = `${timestamp}-${random}.${fileExt}`;
     const filePath = `${userId}/portfolio/${projectId}/${fileName}`;
 
-    // Upload file to storage
-    const { error: uploadError } = await supabase.storage
-      .from(PORTFOLIO_IMAGES_BUCKET)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    await uploadObject(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath, file);
 
-    if (uploadError) {
-      console.error('Error uploading portfolio image:', uploadError);
-      return {
-        data: null,
-        error: uploadError
-      };
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(PORTFOLIO_IMAGES_BUCKET)
-      .getPublicUrl(filePath);
-
-    // Create file_uploads record
     const { data: fileUploadData, error: fileUploadError } = await supabase
       .from('file_uploads')
       .insert({
@@ -89,46 +71,40 @@ export async function uploadPortfolioImage(
       .single();
 
     if (fileUploadError) {
-      console.error('Error creating file_uploads record:', fileUploadError);
-      // Try to clean up uploaded file
-      await supabase.storage.from(PORTFOLIO_IMAGES_BUCKET).remove([filePath]);
+      await deleteObject(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath);
       return {
         data: null,
-        error: fileUploadError
+        error: fileUploadError,
       };
     }
 
     return {
       data: {
-        url: urlData.publicUrl,
+        url: getStoragePublicUrl(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath),
         path: filePath,
-        fileId: fileUploadData.id
+        fileId: fileUploadData.id,
       },
-      error: null
+      error: null,
     };
   } catch (err) {
     console.error('Error in uploadPortfolioImage:', err);
     return {
       data: null,
-      error: err
+      error: err instanceof Error ? err : new Error(String(err)),
     };
   }
 }
 
-/**
- * Upload multiple portfolio images
- */
 export async function uploadPortfolioImages(
-  supabase: SupabaseClient<Database>,
   files: File[],
   userId: string,
-  projectId: string
+  projectId: string,
 ): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
   const errors: unknown[] = [];
 
   for (const file of files) {
-    const { data, error } = await uploadPortfolioImage(supabase, file, userId, projectId);
+    const { data, error } = await uploadPortfolioImage(file, userId, projectId);
     if (error || !data) {
       errors.push({ file: file.name, error });
     } else {
@@ -139,55 +115,31 @@ export async function uploadPortfolioImages(
   return { data: results, errors };
 }
 
-/**
- * Delete a portfolio image from Supabase storage and file_uploads
- */
 export async function deletePortfolioImage(
-  supabase: SupabaseClient<Database>,
   fileUploadId: string,
-  imagePath: string
+  imagePath: string,
 ): Promise<{ success: boolean; error: Error | null }> {
   try {
-    // Extract path from URL if full URL is provided
-    let path = imagePath;
-    
-    if (imagePath.startsWith('http')) {
-      const urlParts = imagePath.split(`${PORTFOLIO_IMAGES_BUCKET}/`);
-      if (urlParts.length > 1) {
-        path = urlParts[1].split('?')[0];
-      }
-    } else if (imagePath.includes(PORTFOLIO_IMAGES_BUCKET)) {
-      const urlParts = imagePath.split(`${PORTFOLIO_IMAGES_BUCKET}/`);
-      if (urlParts.length > 1) {
-        path = urlParts[1].split('?')[0];
-      }
-    }
+    const supabase = await createClient();
+    const path = normalizeStorageObjectPath(imagePath, STORAGE_BUCKETS.JOB_ATTACHMENTS);
+    const userId = path.split('/')[0];
+    await requireAuthenticatedUser(userId);
 
-    // Delete from storage
-    const { error: storageError } = await supabase.storage
-      .from(PORTFOLIO_IMAGES_BUCKET)
-      .remove([path]);
-
-    if (storageError) {
+    try {
+      await deleteObject(STORAGE_BUCKETS.JOB_ATTACHMENTS, path);
+    } catch (storageError) {
       console.error('Error deleting portfolio image from storage:', storageError);
-      // Continue to try deleting file_uploads record
     }
 
-    // Delete file_uploads record (portfolio_project_images will be deleted via CASCADE)
-    const { error: fileUploadError } = await supabase
-      .from('file_uploads')
-      .delete()
-      .eq('id', fileUploadId);
+    const { error: fileUploadError } = await supabase.from('file_uploads').delete().eq('id', fileUploadId);
 
     if (fileUploadError) {
-      console.error('Error deleting file_uploads record:', fileUploadError);
       return { success: false, error: fileUploadError };
     }
 
     return { success: true, error: null };
   } catch (err) {
     console.error('Error in deletePortfolioImage:', err);
-    return { success: false, error: err };
+    return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
 }
-

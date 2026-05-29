@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
+import { createSignedUrlSafe } from '../storage/signed-url-actions';
 
 export interface VerificationQueueRowBase {
   userId: string;
@@ -153,8 +154,6 @@ export interface DocumentReview {
 
 export type DocumentReviewMap = Record<string, DocumentReview>;
 
-const VERIFICATION_BUCKET = 'verification-documents';
-
 const DOC_LABELS: Record<string, string> = {
   company_registration: 'Wypis z KRS / CEIDG',
   insurance: 'Polisa ubezpieczeniowa',
@@ -210,11 +209,9 @@ function parseUploadedAtFromFilename(filename: string): string | null {
  * Build view + download signed URLs for a map of doc key -> storage path.
  */
 export async function getVerificationDocumentSignedUrls(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   paths: Record<string, string>
 ): Promise<VerificationDocumentEntry[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
   const entries: VerificationDocumentEntry[] = [];
 
   for (const [key, path] of Object.entries(paths)) {
@@ -223,11 +220,9 @@ export async function getVerificationDocumentSignedUrls(
     }
     const filename = path.split('/').pop() ?? key;
     const uploadedAt = parseUploadedAtFromFilename(filename);
-    const { data, error } = await sb.storage
-      .from(VERIFICATION_BUCKET)
-      .createSignedUrl(path, 3600);
+    const signedUrl = await createSignedUrlSafe(path, 3600);
 
-    if (error || !data?.signedUrl) {
+    if (!signedUrl) {
       entries.push({
         key,
         label: verificationDocumentLabel(key),
@@ -236,7 +231,7 @@ export async function getVerificationDocumentSignedUrls(
         uploadedAt,
         viewUrl: null,
         downloadUrl: null,
-        error: (error as { message?: string } | null)?.message ?? 'Nie udało się wygenerować linku.',
+        error: 'Nie udało się wygenerować linku.',
       });
       continue;
     }
@@ -247,8 +242,8 @@ export async function getVerificationDocumentSignedUrls(
       path,
       filename,
       uploadedAt,
-      viewUrl: data.signedUrl,
-      downloadUrl: appendDownloadParam(data.signedUrl, filename),
+      viewUrl: signedUrl,
+      downloadUrl: appendDownloadParam(signedUrl, filename),
     });
   }
 

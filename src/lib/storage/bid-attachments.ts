@@ -1,7 +1,9 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '../../types/database';
+'use server';
 
-const BID_ATTACHMENTS_BUCKET = 'bid-attachments';
+import { STORAGE_BUCKETS } from './buckets';
+import { requireAuthenticatedUser } from './auth';
+import { createPresignedGetUrl, uploadObject } from './r2/operations';
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const ALLOWED_DOCUMENT_TYPES = [
@@ -18,12 +20,13 @@ export interface BidUploadResult {
 }
 
 export async function uploadBidAttachment(
-  supabase: SupabaseClient<Database>,
   file: File,
   userId: string,
   tenderId: string,
 ): Promise<{ data: BidUploadResult | null; error: Error | null }> {
   try {
+    await requireAuthenticatedUser(userId);
+
     const fileType = file.type.toLowerCase();
     const normalizedAllowed = ALLOWED_TYPES.map((t) => t.toLowerCase());
     const isValid =
@@ -53,22 +56,13 @@ export async function uploadBidAttachment(
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
     const filePath = `${userId}/tenders/${tenderId}/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from(BID_ATTACHMENTS_BUCKET)
-      .upload(filePath, file, { cacheControl: '3600', upsert: false });
-
-    if (uploadError) {
-      return { data: null, error: uploadError };
-    }
-
-    const { data: signed } = await supabase.storage
-      .from(BID_ATTACHMENTS_BUCKET)
-      .createSignedUrl(filePath, 3600);
+    await uploadObject(STORAGE_BUCKETS.BID_ATTACHMENTS, filePath, file);
+    const signedUrl = await createPresignedGetUrl(STORAGE_BUCKETS.BID_ATTACHMENTS, filePath, 3600);
 
     return {
       data: {
         path: filePath,
-        url: signed?.signedUrl ?? filePath,
+        url: signedUrl,
         type: attachmentType,
       },
       error: null,
@@ -82,10 +76,9 @@ export async function uploadBidAttachment(
 }
 
 export async function getBidAttachmentSignedUrl(
-  supabase: SupabaseClient<Database>,
   path: string,
   expiresIn = 3600,
 ): Promise<string | null> {
-  const { createSignedUrlSafe } = await import('./signed-url');
-  return createSignedUrlSafe(supabase, path, expiresIn);
+  const { createSignedUrlSafe } = await import('./signed-url-actions');
+  return createSignedUrlSafe(path, expiresIn);
 }

@@ -132,7 +132,6 @@ export default function TenderCreationPage({
       }
 
       const { data: uploaded, errors: uploadErrors } = await uploadTenderDocuments(
-        supabase,
         newFiles,
         user.id,
         'draft',

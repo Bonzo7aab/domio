@@ -28,8 +28,6 @@ import {
   contestCountdownLabel,
   fetchTenderBidDraft,
   hydrateContestOfferFormFromBid,
-  submitTenderBid,
-  upsertTenderBidDraft,
   firstContestOfferStepWithErrors,
   filterFieldErrorsForStep,
   getContestOfferAllFieldErrors,
@@ -38,14 +36,15 @@ import {
   type ContestOfferFieldErrors,
   type ContestOfferWizardStep,
 } from '../../lib/database/contest-offers';
+import { submitTenderBid, upsertTenderBidDraft } from '../../lib/database/contest-offers-actions';
 import {
   applyProfileDocumentsToForm,
   buildFormalAttachmentFromProfile,
 } from '../../lib/contest-offer/build-profile-formal-attachment';
 import {
   loadContractorReferencesPrefill,
-  resolveContractorDocuments,
 } from '../../lib/contest-offer/resolve-contractor-documents';
+import { resolveContractorDocuments } from '../../lib/contest-offer/resolve-contractor-documents-actions';
 import { ContestOfferWizardStepper } from './ContestOfferWizardStepper';
 import { ContestOfferStepOverview } from './ContestOfferStepOverview';
 import { ContestOfferStepSchedule } from './ContestOfferStepSchedule';
@@ -118,7 +117,7 @@ export function ContestOfferSubmissionDialog({
     try {
       const [{ data: draft }, docs, referencesPrefill] = await Promise.all([
         fetchTenderBidDraft(supabase, tenderId, contractorId),
-        resolveContractorDocuments(supabase, contractorId, contestInfo.formalRequirements),
+        resolveContractorDocuments(contractorId, contestInfo.formalRequirements),
         loadContractorReferencesPrefill(supabase, contractorId),
       ]);
       setResolvedDocs(docs);
@@ -196,7 +195,6 @@ export function ContestOfferSubmissionDialog({
     setIsSavingDraft(true);
     try {
       const { error } = await upsertTenderBidDraft(
-        supabase,
         tenderId,
         contractorId,
         form,
@@ -225,7 +223,6 @@ export function ContestOfferSubmissionDialog({
     setIsSubmitting(true);
     try {
       const { error } = await submitTenderBid(
-        supabase,
         tenderId,
         contractorId,
         form,

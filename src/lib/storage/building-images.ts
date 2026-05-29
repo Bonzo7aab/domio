@@ -1,7 +1,11 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '../../types/database';
+'use server';
 
-const BUILDING_IMAGES_BUCKET = 'building-images';
+import { STORAGE_BUCKETS } from './buckets';
+import { requireAuthenticatedUser } from './auth';
+import { normalizeStorageObjectPath } from './path-utils';
+import { getStoragePublicUrl } from './public-url';
+import { deleteObject, uploadObject } from './r2/operations';
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
@@ -10,136 +14,81 @@ export interface UploadResult {
   path: string;
 }
 
-/**
- * Upload a building image to Supabase storage
- */
 export async function uploadBuildingImage(
-  supabase: SupabaseClient<Database>,
   file: File,
   buildingId: string,
-  userId: string
+  userId: string,
 ): Promise<{ data: UploadResult | null; error: Error | null }> {
   try {
-    // Validate file type
+    await requireAuthenticatedUser(userId);
+
     const fileType = file.type.toLowerCase();
-    const normalizedAllowedTypes = ALLOWED_TYPES.map(t => t.toLowerCase());
-    const isValidType = normalizedAllowedTypes.includes(fileType) || 
-                       (fileType === 'image/jpeg' && normalizedAllowedTypes.includes('image/jpg'));
-    
+    const normalizedAllowedTypes = ALLOWED_TYPES.map((t) => t.toLowerCase());
+    const isValidType =
+      normalizedAllowedTypes.includes(fileType) ||
+      (fileType === 'image/jpeg' && normalizedAllowedTypes.includes('image/jpg'));
+
     if (!isValidType) {
       return {
         data: null,
-        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP')
+        error: new Error('Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP'),
       };
     }
 
-    // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return {
         data: null,
-        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 5MB')
+        error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 5MB'),
       };
     }
 
-    // Generate unique filename
     const fileExt = file.name.split('.').pop();
     const fileName = `${buildingId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
     const filePath = `${userId}/${fileName}`;
 
-    // Upload file to storage
-    const { error: uploadError } = await supabase.storage
-      .from(BUILDING_IMAGES_BUCKET)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Error uploading image:', uploadError);
-      return {
-        data: null,
-        error: uploadError
-      };
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(BUILDING_IMAGES_BUCKET)
-      .getPublicUrl(filePath);
+    await uploadObject(STORAGE_BUCKETS.BUILDING_IMAGES, filePath, file);
 
     return {
       data: {
-        url: urlData.publicUrl,
-        path: filePath
+        url: getStoragePublicUrl(STORAGE_BUCKETS.BUILDING_IMAGES, filePath),
+        path: filePath,
       },
-      error: null
+      error: null,
     };
   } catch (err) {
     console.error('Error in uploadBuildingImage:', err);
     return {
       data: null,
-      error: err
+      error: err instanceof Error ? err : new Error(String(err)),
     };
   }
 }
 
-/**
- * Delete a building image from Supabase storage
- */
 export async function deleteBuildingImage(
-  supabase: SupabaseClient<Database>,
-  imagePath: string
+  imagePath: string,
 ): Promise<{ success: boolean; error: Error | null }> {
   try {
-    // Extract path from URL if full URL is provided
-    let path = imagePath;
-    
-    // If it's a full URL, extract the path
-    if (imagePath.startsWith('http')) {
-      // Extract path from URL like: https://...supabase.co/storage/v1/object/public/building-images/userId/buildingId/file.jpg
-      const urlParts = imagePath.split(`${BUILDING_IMAGES_BUCKET}/`);
-      if (urlParts.length > 1) {
-        path = urlParts[1].split('?')[0]; // Remove query params
-      }
-    } else if (imagePath.includes(BUILDING_IMAGES_BUCKET)) {
-      // If it contains bucket name but not full URL
-      const urlParts = imagePath.split(`${BUILDING_IMAGES_BUCKET}/`);
-      if (urlParts.length > 1) {
-        path = urlParts[1].split('?')[0];
-      }
-    }
-    // Otherwise, assume it's already a path
-
-    const { error } = await supabase.storage
-      .from(BUILDING_IMAGES_BUCKET)
-      .remove([path]);
-
-    if (error) {
-      console.error('Error deleting image:', error);
-      return { success: false, error };
-    }
-
+    const path = normalizeStorageObjectPath(imagePath, STORAGE_BUCKETS.BUILDING_IMAGES);
+    const userId = path.split('/')[0];
+    await requireAuthenticatedUser(userId);
+    await deleteObject(STORAGE_BUCKETS.BUILDING_IMAGES, path);
     return { success: true, error: null };
   } catch (err) {
     console.error('Error in deleteBuildingImage:', err);
-    return { success: false, error: err };
+    return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
 }
 
-/**
- * Upload multiple building images
- */
 export async function uploadBuildingImages(
-  supabase: SupabaseClient<Database>,
   files: File[],
   buildingId: string,
-  userId: string
+  userId: string,
 ): Promise<{ data: UploadResult[]; errors: unknown[] }> {
   const results: UploadResult[] = [];
   const errors: unknown[] = [];
 
   for (const file of files) {
-    const { data, error } = await uploadBuildingImage(supabase, file, buildingId, userId);
+    const { data, error } = await uploadBuildingImage(file, buildingId, userId);
     if (error || !data) {
       errors.push({ file: file.name, error });
     } else {
@@ -149,4 +98,3 @@ export async function uploadBuildingImages(
 
   return { data: results, errors };
 }
-

@@ -20,9 +20,13 @@
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset",
     "supabase:migrate-local": "bash scripts/migrate-local-db.sh",
-    "supabase:studio": "open http://localhost:54323 || echo 'Studio is available at: http://localhost:54323 (make sure Supabase is running with: npm run supabase:start)'"
+    "supabase:studio": "open http://localhost:54323 || echo 'Studio is available at: http://localhost:54323 (make sure Supabase is running with: npm run supabase:start)'",
+    "storage:migrate-to-r2": "npx tsx scripts/migrate-supabase-storage-to-r2.ts",
+    "storage:migrate-to-r2:dry-run": "npx tsx scripts/migrate-supabase-storage-to-r2.ts --dry-run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1057.0",
+    "@aws-sdk/s3-request-presigner": "^3.1057.0",
     "@googlemaps/react-wrapper": "^1.2.0",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",
@@ -72,6 +76,7 @@
     "react-medium-image-zoom": "^5.4.0",
     "react-resizable-panels": "^3.0.6",
     "recharts": "^3.2.1",
+    "server-only": "^0.0.1",
     "sonner": "^1.2.4",
     "tailwind-merge": "^2.0.0",
     "tailwindcss-animate": "^1.0.7",
@@ -84,7 +89,7 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "autoprefixer": "^10.0.1",
-    "baseline-browser-mapping": "^2.10.27",
+    "baseline-browser-mapping": "^2.10.32",
     "eslint": "^9",
     "eslint-config-next": "16.0.7",
     "husky": "^9.1.7",

@@ -1,8 +1,11 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '../../types/database';
-import type { TenderContestDocumentMeta } from '../../types/tender-contest';
+'use server';
 
-const BUCKET = 'job-attachments';
+import type { TenderContestDocumentMeta } from '../../types/tender-contest';
+import { STORAGE_BUCKETS } from './buckets';
+import { requireAuthenticatedUser } from './auth';
+import { getStoragePublicUrl } from './public-url';
+import { uploadObject } from './r2/operations';
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const ALLOWED_TYPES = [
@@ -27,56 +30,54 @@ function inferDocumentType(fileName: string): TenderContestDocumentMeta['type'] 
 }
 
 export async function uploadTenderDocument(
-  supabase: SupabaseClient<Database>,
   file: File,
   userId: string,
   tenderId?: string,
 ): Promise<{ data: TenderContestDocumentMeta | null; error: Error | null }> {
-  const fileType = file.type.toLowerCase();
-  const allowed = ALLOWED_TYPES.map((t) => t.toLowerCase());
-  if (!allowed.includes(fileType) && fileType !== 'image/jpeg') {
+  try {
+    await requireAuthenticatedUser(userId);
+
+    const fileType = file.type.toLowerCase();
+    const allowed = ALLOWED_TYPES.map((t) => t.toLowerCase());
+    if (!allowed.includes(fileType) && fileType !== 'image/jpeg') {
+      return {
+        data: null,
+        error: new Error(
+          'Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX, XLS, XLSX',
+        ),
+      };
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return { data: null, error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB') };
+    }
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const folder = tenderId || 'draft';
+    const filePath = `${userId}/tenders/${folder}/${fileName}`;
+
+    await uploadObject(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath, file);
+
+    return {
+      data: {
+        id: crypto.randomUUID(),
+        name: file.name,
+        url: getStoragePublicUrl(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath),
+        path: filePath,
+        type: inferDocumentType(file.name),
+      },
+      error: null,
+    };
+  } catch (err) {
     return {
       data: null,
-      error: new Error(
-        'Nieprawidłowy typ pliku. Dozwolone: JPG, PNG, WEBP, GIF, PDF, DOC, DOCX, XLS, XLSX',
-      ),
+      error: err instanceof Error ? err : new Error(String(err)),
     };
   }
-
-  if (file.size > MAX_FILE_SIZE) {
-    return { data: null, error: new Error('Plik jest zbyt duży. Maksymalny rozmiar: 10MB') };
-  }
-
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-  const folder = tenderId || 'draft';
-  const filePath = `${userId}/tenders/${folder}/${fileName}`;
-
-  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file, {
-    cacheControl: '3600',
-    upsert: false,
-  });
-
-  if (uploadError) {
-    return { data: null, error: uploadError };
-  }
-
-  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-
-  return {
-    data: {
-      id: crypto.randomUUID(),
-      name: file.name,
-      url: urlData.publicUrl,
-      path: filePath,
-      type: inferDocumentType(file.name),
-    },
-    error: null,
-  };
 }
 
 export async function uploadTenderDocuments(
-  supabase: SupabaseClient<Database>,
   files: File[],
   userId: string,
   tenderId?: string,
@@ -85,7 +86,7 @@ export async function uploadTenderDocuments(
   const errors: unknown[] = [];
 
   for (const file of files) {
-    const { data, error } = await uploadTenderDocument(supabase, file, userId, tenderId);
+    const { data, error } = await uploadTenderDocument(file, userId, tenderId);
     if (error || !data) {
       errors.push({ file: file.name, error });
     } else {

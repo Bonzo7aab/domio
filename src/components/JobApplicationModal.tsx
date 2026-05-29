@@ -240,7 +240,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
         const uploaded: Array<{ id: string; name: string; type: string; url: string; size: number }> = [];
 
         for (const file of stagedFiles) {
-          const { data: up, error: upErr } = await uploadJobAttachment(supabase, file, user.id, jobId);
+          const { data: up, error: upErr } = await uploadJobAttachment(file, user.id, jobId);
           if (upErr || !up) {
             toast.error(upErr?.message || 'Nie udało się przesłać załącznika');
             setIsSubmitting(false);
