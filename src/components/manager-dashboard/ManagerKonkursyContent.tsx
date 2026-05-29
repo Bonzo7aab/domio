@@ -271,8 +271,87 @@ export function ManagerKonkursyContent({
     }
   };
 
+  const shouldShowQuestionsButton = (row: ManagerContest): boolean => {
+    const total = row.questionsCount ?? 0;
+    const unanswered = unansweredCounts[row.id] ?? row.unansweredQuestionsCount ?? 0;
+    return total > 0 && unanswered > 0;
+  };
+
+  const renderQuestionsButton = (row: ManagerContest): ReactElement | null => {
+    if (!shouldShowQuestionsButton(row)) {
+      return null;
+    }
+
+    const commentCount = row.commentsCount;
+    const pendingCount = unansweredCounts[row.id] ?? 0;
+    const badgeCount = commentCount > 0 ? commentCount : pendingCount;
+    const unseen = unseenCounts[row.id] ?? 0;
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="relative h-8 w-8 shrink-0"
+                onClick={() => openQuestionsDialog(row)}
+                aria-label="Pytania do konkursu"
+              >
+                <HelpCircle className="h-4 w-4" />
+                {badgeCount > 0 ? (
+                  <span
+                    className={cn(
+                      'absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold leading-none',
+                      unseen > 0 || pendingCount > 0
+                        ? 'bg-destructive text-destructive-foreground'
+                        : 'bg-primary text-primary-foreground',
+                    )}
+                    aria-hidden
+                  >
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                ) : null}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{questionsTooltipLabel(row.id)}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
+  const renderDraftContinueButton = (row: ManagerContest): ReactElement | null => {
+    if (row.status !== 'draft') return null;
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                variant="default"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                asChild
+                aria-label="Kontynuuj tworzenie konkursu"
+              >
+                <Link href={`/post-contest/${row.id}`}>
+                  <Pencil className="h-4 w-4" />
+                </Link>
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Kontynuuj tworzenie konkursu</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   const renderPrimaryCompareIcon = (row: ManagerContest): ReactElement | null => {
-    if (row.status === 'cancelled' || row.status === 'awarded') {
+    if (row.status === 'draft' || row.status === 'cancelled' || row.status === 'awarded') {
       return null;
     }
 
@@ -337,7 +416,7 @@ export function ManagerKonkursyContent({
         isContestCompareReadOnly(row.status));
 
     const hasMenuItems =
-      row.canEdit || canCancelContest(row.status) || showViewResults;
+      canCancelContest(row.status) || showViewResults;
 
     if (!hasMenuItems) {
       return null;
@@ -356,14 +435,6 @@ export function ManagerKonkursyContent({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          {row.canEdit ? (
-            <DropdownMenuItem asChild>
-              <Link href={`/post-contest/${row.id}`} className="flex items-center gap-2">
-                <Pencil className="h-4 w-4" />
-                Kontynuuj konkurs
-              </Link>
-            </DropdownMenuItem>
-          ) : null}
           {showViewResults ? (
             <DropdownMenuItem
               disabled={row.offersCount === 0 && !row.hasSelectedOffer}
@@ -505,33 +576,6 @@ export function ManagerKonkursyContent({
                                 <TooltipContent>Strona konkursu</TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="relative h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                                    onClick={() => openQuestionsDialog(row)}
-                                    aria-label="Pytania do konkursu"
-                                  >
-                                    <HelpCircle className="h-3.5 w-3.5" />
-                                    {(unseenCounts[row.id] ?? 0) > 0 ? (
-                                      <span
-                                        className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold leading-none text-destructive-foreground"
-                                        aria-hidden
-                                      >
-                                        {(unseenCounts[row.id] ?? 0) > 9
-                                          ? '9+'
-                                          : unseenCounts[row.id]}
-                                      </span>
-                                    ) : null}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>{questionsTooltipLabel(row.id)}</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px]">
@@ -573,7 +617,9 @@ export function ManagerKonkursyContent({
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {renderDraftContinueButton(row)}
                             {renderPrimaryCompareIcon(row)}
+                            {renderQuestionsButton(row)}
                             {renderActionsMenu(row)}
                           </div>
                         </TableCell>

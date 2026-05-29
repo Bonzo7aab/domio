@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Eye, MessageSquare, X } from 'lucide-react';
+import { ExternalLink, MessageSquare, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -33,6 +34,19 @@ import {
 import { formatSubmissionDeadlineDisplay } from '../../lib/contest-submission-deadline';
 import { ContractorContestOfferStatusBadge } from './ContractorContestOfferStatusBadge';
 import type { TenderWithCompany } from '../../lib/database/jobs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 interface ContractorContestOffersContentProps {
   offers: ContractorContestOfferRow[];
@@ -61,10 +75,6 @@ export function ContractorContestOffersContent({
       offers.filter((row) => matchesContestOfferFilter(row.derivedStatus, statusFilter)),
     [offers, statusFilter],
   );
-
-  const handleViewContest = (tenderId: string) => {
-    router.push(`/jobs/${tenderId}`);
-  };
 
   const handleWithdraw = async (bidId: string) => {
     const supabase = createClient();
@@ -150,6 +160,50 @@ export function ContractorContestOffersContent({
     }
   };
 
+  const renderActionsMenu = (
+    row: ContractorContestOfferRow,
+    messageAllowed: boolean,
+    withdrawAllowed: boolean,
+  ): ReactElement | null => {
+    if (!messageAllowed && !withdrawAllowed) {
+      return null;
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            aria-label="Więcej akcji"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {messageAllowed ? (
+            <DropdownMenuItem onClick={() => void handleMessage(row)}>
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Wiadomość do organizatora
+            </DropdownMenuItem>
+          ) : null}
+          {withdrawAllowed ? (
+            <>
+              {messageAllowed ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => void handleWithdraw(row.id)}
+              >
+                Wycofaj ofertę
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -196,7 +250,7 @@ export function ContractorContestOffersContent({
                   <TableHead>Twoja wycena (Netto / Brutto)</TableHead>
                   <TableHead>Termin składania</TableHead>
                   <TableHead>Status oferty</TableHead>
-                  <TableHead className="text-right">Dostępne akcje</TableHead>
+                  <TableHead className="text-right">Akcje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -213,9 +267,33 @@ export function ContractorContestOffersContent({
 
                   return (
                     <TableRow key={row.id}>
-                      <TableCell>
-                        <p className="font-medium">{row.contestTitle}</p>
-                        <p className="text-sm text-muted-foreground">{row.organizerName}</p>
+                      <TableCell className="max-w-[300px]">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-0.5 min-w-0">
+                            <span className="font-medium truncate min-w-0 leading-snug">
+                              {row.contestTitle}
+                            </span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link
+                                    href={`/jobs/${row.tenderId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                                    aria-label="Szczegóły konkursu"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent>Szczegóły konkursu</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {row.organizerName}
+                          </p>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <p className="font-medium">{formatMoneyPl(row.netPrice)}</p>
@@ -242,36 +320,8 @@ export function ContractorContestOffersContent({
                         <ContractorContestOfferStatusBadge status={row.derivedStatus} />
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewContest(row.tenderId)}
-                          >
-                            <Eye className="mr-2 h-3.5 w-3.5" />
-                            Szczegóły
-                          </Button>
-                          {messageAllowed ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleMessage(row)}
-                            >
-                              <MessageSquare className="mr-2 h-3.5 w-3.5" />
-                              Wiadomość
-                            </Button>
-                          ) : null}
-                          {withdrawAllowed ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => handleWithdraw(row.id)}
-                            >
-                              <X className="mr-2 h-3.5 w-3.5" />
-                              Wycofaj ofertę
-                            </Button>
-                          ) : null}
+                        <div className="flex items-center justify-end gap-1">
+                          {renderActionsMenu(row, messageAllowed, withdrawAllowed)}
                         </div>
                       </TableCell>
                     </TableRow>

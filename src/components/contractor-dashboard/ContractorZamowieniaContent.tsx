@@ -3,6 +3,12 @@
 import { useState, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, MessageSquare } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
 import { toast } from 'sonner';
 import type { ContractorOrderRow } from '../../lib/database/contractor-orders';
 import {
@@ -172,33 +178,62 @@ export function ContractorZamowieniaContent({
                         <OrderStatusBadge status={row.status} audience="contractor" />
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2 flex-wrap">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={!canMessageOnOrder(row.status)}
-                            onClick={() => handleMessage(row)}
-                          >
-                            <MessageSquare className="h-4 w-4 mr-1" />
-                            Wiadomość
-                          </Button>
-                          {row.status === 'cancelled' ? null : canReport ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={pendingId === row.id}
-                              onClick={() => handleReport(row.id)}
-                            >
-                              <Bell className="h-4 w-4 mr-1" />
-                              Zgłoś do odbioru
-                            </Button>
-                          ) : row.status === 'awaiting_acceptance' ? (
-                            <Button type="button" size="sm" disabled>
-                              <Bell className="h-4 w-4 mr-1" />
-                              Zgłoś do odbioru
-                            </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          {row.status === 'cancelled' ? null : canReport ||
+                            row.status === 'awaiting_acceptance' ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex">
+                                    <Button
+                                      type="button"
+                                      variant={canReport ? 'default' : 'outline'}
+                                      size="icon"
+                                      className="h-8 w-8 shrink-0"
+                                      disabled={
+                                        !canReport ||
+                                        pendingId === row.id ||
+                                        row.status === 'awaiting_acceptance'
+                                      }
+                                      onClick={() => handleReport(row.id)}
+                                      aria-label="Zgłoś do odbioru"
+                                    >
+                                      <Bell className="h-4 w-4" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {canReport
+                                    ? 'Zgłoś do odbioru'
+                                    : 'Oczekuje na odbiór przez zarządcę'}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           ) : null}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    disabled={!canMessageOnOrder(row.status)}
+                                    onClick={() => handleMessage(row)}
+                                    aria-label="Wiadomość"
+                                  >
+                                    <MessageSquare className="h-4 w-4" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {canMessageOnOrder(row.status)
+                                  ? 'Wiadomość do zarządcy'
+                                  : 'Wiadomość niedostępna'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </TableCell>
                     </TableRow>

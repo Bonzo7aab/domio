@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, PanelTopOpen, Pencil } from 'lucide-react';
+import { normalizeJobStatus } from '../../lib/job-workflow-status';
 import {
   type ManagerSubmission,
   getSubmissionStatusLabel,
@@ -30,6 +31,20 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
+
+function workflowShowsCompareNavigation(row: ManagerSubmission): boolean {
+  if (row.hasSelectedOffer || row.offersCount === 0) return false;
+  if (row.kind === 'job') {
+    return normalizeJobStatus(row.status) === 'selecting_offer';
+  }
+  return row.status === 'evaluation';
+}
 
 interface ManagerMojeZgloszeniaContentProps {
   submissions: ManagerSubmission[];
@@ -336,44 +351,92 @@ export function ManagerMojeZgloszeniaContent({
                           })}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <Button
-                              variant={isPickedRow ? 'default' : 'outline'}
-                              size="sm"
-                              onClick={() => openSzczegoly(row)}
-                            >
-                              Szczegóły
-                            </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            {row.canEdit ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                      <Button
+                                        variant="default"
+                                        size="icon"
+                                        className="h-8 w-8 shrink-0"
+                                        asChild
+                                        aria-label={
+                                          row.kind === 'job'
+                                            ? 'Edytuj zgłoszenie'
+                                            : 'Kontynuuj tworzenie konkursu'
+                                        }
+                                      >
+                                        <Link
+                                          href={
+                                            row.kind === 'job'
+                                              ? `/manager-dashboard/zgloszenia/edytuj/${row.id}`
+                                              : `/post-contest/${row.id}`
+                                          }
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Link>
+                                      </Button>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {row.kind === 'job'
+                                      ? 'Edytuj zgłoszenie'
+                                      : 'Kontynuuj tworzenie konkursu'}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : null}
                             <ManagerWorkflowAdvanceButton
                               row={row}
+                              compact
                               onStatusUpdated={(next) =>
                                 handleStatusUpdated(row.id, row.kind, next)
                               }
                             />
-                            {row.kind === 'job' && row.canEdit && (
-                              <Button variant="secondary" size="sm" asChild>
-                                <Link href={`/manager-dashboard/zgloszenia/edytuj/${row.id}`}>
-                                  Edytuj
-                                </Link>
-                              </Button>
-                            )}
-                            {row.kind === 'tender' && row.canEdit && (
-                              <Button variant="secondary" size="sm" asChild>
-                                <Link href={`/post-contest/${row.id}`}>
-                                  Kontynuuj konkurs
-                                </Link>
-                              </Button>
-                            )}
-                            {!row.hasSelectedOffer && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={row.offersCount === 0}
-                                onClick={() => router.push(compareHref(row))}
-                              >
-                                Porównaj oferty
-                              </Button>
-                            )}
+                            {!row.hasSelectedOffer &&
+                            row.offersCount > 0 &&
+                            !workflowShowsCompareNavigation(row) ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 shrink-0"
+                                        onClick={() => router.push(compareHref(row))}
+                                        aria-label="Porównaj oferty"
+                                      >
+                                        <BarChart3 className="h-4 w-4" />
+                                      </Button>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Porównaj oferty</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : null}
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex">
+                                    <Button
+                                      type="button"
+                                      variant={isPickedRow ? 'default' : 'outline'}
+                                      size="icon"
+                                      className="h-8 w-8 shrink-0"
+                                      onClick={() => openSzczegoly(row)}
+                                      aria-label="Szczegóły"
+                                    >
+                                      <PanelTopOpen className="h-4 w-4" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Szczegóły</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </TableCell>
                       </TableRow>

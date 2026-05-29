@@ -3,6 +3,8 @@ import type { Database } from '../../types/database';
 import { CONTEST_TENDERS_OR_FILTER } from './jobs';
 import { getContestWorkflowStatusLabel } from '../tender-workflow-status';
 import {
+  fetchContestCommentCounts,
+  fetchContestQuestionCounts,
   fetchUnansweredContestQuestionCounts,
   fetchUnseenContestQuestionCounts,
 } from './questions';
@@ -23,6 +25,10 @@ export interface ManagerContest {
   unseenQuestionsCount: number;
   /** Total questions awaiting manager answer */
   unansweredQuestionsCount: number;
+  /** All Q&A threads on this contest */
+  questionsCount: number;
+  /** Published manager comments on contest questions */
+  commentsCount: number;
 }
 
 interface TenderContestRow {
@@ -140,13 +146,15 @@ export async function fetchManagerContests(
     }
   }
 
-  const [unseenCounts, unansweredCounts] =
+  const [unseenCounts, unansweredCounts, questionCounts, commentCounts] =
     tenderIds.length > 0
       ? await Promise.all([
           fetchUnseenContestQuestionCounts(supabase, tenderIds),
           fetchUnansweredContestQuestionCounts(supabase, tenderIds),
+          fetchContestQuestionCounts(supabase, tenderIds),
+          fetchContestCommentCounts(supabase, tenderIds),
         ])
-      : [{}, {}];
+      : [{}, {}, {}, {}];
 
   return contestRows.map((t) => ({
     id: t.id,
@@ -162,6 +170,8 @@ export async function fetchManagerContests(
     createdAt: t.created_at,
     unseenQuestionsCount: unseenCounts[t.id] ?? 0,
     unansweredQuestionsCount: unansweredCounts[t.id] ?? 0,
+    questionsCount: questionCounts[t.id] ?? 0,
+    commentsCount: commentCounts[t.id] ?? 0,
   }));
 }
 

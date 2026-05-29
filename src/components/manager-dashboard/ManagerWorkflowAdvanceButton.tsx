@@ -2,7 +2,7 @@
 
 import { useTransition, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   updateJobWorkflowStatusAction,
@@ -20,10 +20,17 @@ import {
 } from '../../lib/tender-workflow-status';
 import type { ManagerSubmission } from '../../lib/database/manager-submissions';
 import { Button } from '../ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
 
 interface ManagerWorkflowAdvanceButtonProps {
   row: ManagerSubmission;
   onStatusUpdated?: (status: string) => void;
+  compact?: boolean;
 }
 
 function TransitionLabel({
@@ -42,9 +49,51 @@ function TransitionLabel({
   );
 }
 
+function compactTooltipLabel(currentLabel: string, nextLabel: string): string {
+  return `${currentLabel} → ${nextLabel}`;
+}
+
+function CompactWorkflowIconButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  variant = 'secondary',
+}: {
+  label: string;
+  icon: ReactElement;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: 'default' | 'secondary' | 'outline';
+}): ReactElement {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <Button
+              type="button"
+              variant={variant}
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              disabled={disabled}
+              onClick={onClick}
+              aria-label={label}
+            >
+              {icon}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">{label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export function ManagerWorkflowAdvanceButton({
   row,
   onStatusUpdated,
+  compact = false,
 }: ManagerWorkflowAdvanceButtonProps): ReactElement | null {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -58,6 +107,22 @@ export function ManagerWorkflowAdvanceButton({
         return null;
       }
       const currentLabel = getJobWorkflowStatusLabel(row.status);
+      const compareLabel = compactTooltipLabel(currentLabel, 'Porównaj oferty');
+      if (compact) {
+        return (
+          <CompactWorkflowIconButton
+            label={compareLabel}
+            icon={<BarChart3 className="h-4 w-4" />}
+            disabled={isPending}
+            variant="default"
+            onClick={() =>
+              router.push(
+                `/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=zgłoszenie`,
+              )
+            }
+          />
+        );
+      }
       return (
         <Button
           size="sm"
@@ -90,6 +155,21 @@ export function ManagerWorkflowAdvanceButton({
       });
     };
 
+    if (compact) {
+      return (
+        <CompactWorkflowIconButton
+          label={
+            isPending
+              ? 'Zapisywanie…'
+              : compactTooltipLabel(advance.currentLabel, advance.nextLabel)
+          }
+          icon={<ArrowRight className="h-4 w-4" />}
+          disabled={isPending}
+          onClick={handleAdvance}
+        />
+      );
+    }
+
     return (
       <Button size="sm" variant="secondary" onClick={handleAdvance} disabled={isPending}>
         {isPending ? (
@@ -108,6 +188,20 @@ export function ManagerWorkflowAdvanceButton({
       return null;
     }
     const currentLabel = getTenderWorkflowStatusLabel(row.status);
+    const compareLabel = compactTooltipLabel(currentLabel, 'Porównaj oferty');
+    if (compact) {
+      return (
+        <CompactWorkflowIconButton
+          label={compareLabel}
+          icon={<BarChart3 className="h-4 w-4" />}
+          disabled={isPending}
+          variant="default"
+          onClick={() =>
+            router.push(`/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=przetarg`)
+          }
+        />
+      );
+    }
     return (
       <Button
         size="sm"
@@ -137,6 +231,21 @@ export function ManagerWorkflowAdvanceButton({
       onStatusUpdated?.(advance.nextStatus);
     });
   };
+
+  if (compact) {
+    return (
+      <CompactWorkflowIconButton
+        label={
+          isPending
+            ? 'Zapisywanie…'
+            : compactTooltipLabel(advance.currentLabel, advance.nextLabel)
+        }
+        icon={<ArrowRight className="h-4 w-4" />}
+        disabled={isPending}
+        onClick={handleTenderAdvance}
+      />
+    );
+  }
 
   return (
     <Button size="sm" variant="secondary" onClick={handleTenderAdvance} disabled={isPending}>

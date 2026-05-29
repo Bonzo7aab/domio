@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { MessageSquarePlus, Pencil, Send } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pencil, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '../../lib/supabase/client';
 import {
   addContestQuestionComment,
+  deleteContestQuestionComment,
   fetchContestQuestionsForManager,
   formatPostgrestError,
   updateContestQuestionComment,
@@ -17,6 +18,16 @@ import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 interface ManagerContestQuestionsPanelProps {
   contestId: string;
@@ -47,6 +58,8 @@ function ManagerCommentsBlock({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ContestQuestionComment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (comments.length === 0) return <></>;
 
@@ -79,13 +92,32 @@ function ManagerCommentsBlock({
     await onUpdated();
   };
 
+  const confirmDelete = async (): Promise<void> => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const supabase = createClient();
+    const result = await deleteContestQuestionComment(supabase, deleteTarget.id);
+    setIsDeleting(false);
+    if (!result.success) {
+      const message =
+        result.error instanceof Error
+          ? result.error.message
+          : formatPostgrestError(result.error as Parameters<typeof formatPostgrestError>[0]);
+      toast.error('Nie udało się usunąć komentarza', { description: message });
+      return;
+    }
+    toast.success('Komentarz został usunięty');
+    setDeleteTarget(null);
+    await onUpdated();
+  };
+
   return (
-    <div className="border-t border-border pt-3 space-y-3">
+    <div className="ml-4 md:ml-6 pl-4 border-l-2 border-primary/25 space-y-3">
       <p className="text-xs font-medium text-primary">
         {comments.length === 1 ? 'Odpowiedź organizatora' : 'Odpowiedzi organizatora'}
       </p>
       {comments.map((comment, index) => {
-        const canEdit =
+        const canManage =
           Boolean(currentUserId) &&
           comment.authorId === currentUserId &&
           !comment.id.startsWith('legacy-');
@@ -101,17 +133,29 @@ function ManagerCommentsBlock({
                 {comment.authorDisplayName ?? 'Organizator'} —{' '}
                 {formatManagerTimestamp(comment.createdAt)}
               </p>
-              {canEdit && !isEditing ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs shrink-0"
-                  onClick={() => startEdit(comment)}
-                >
-                  <Pencil className="h-3 w-3 mr-1" />
-                  Edytuj
-                </Button>
+              {canManage && !isEditing ? (
+                <div className="flex shrink-0 gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => startEdit(comment)}
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Edytuj
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                    onClick={() => setDeleteTarget(comment)}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Usuń
+                  </Button>
+                </div>
               ) : null}
             </div>
             {isEditing ? (
@@ -149,6 +193,34 @@ function ManagerCommentsBlock({
           </div>
         );
       })}
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && !isDeleting && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć komentarz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Komentarz zostanie trwale usunięty. Jeśli to jedyna odpowiedź, pytanie wróci do
+              listy oczekujących.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+            >
+              {isDeleting ? 'Usuwanie…' : 'Usuń'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -165,27 +237,34 @@ export function ManagerContestQuestionsPanel({
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const onQuestionsChangeRef = useRef(onQuestionsChange);
+
+  useEffect(() => {
+    onQuestionsChangeRef.current = onQuestionsChange;
+  }, [onQuestionsChange]);
+
   const loadQuestions = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const supabase = createClient();
-    const { data, error } = await fetchContestQuestionsForManager(supabase, contestId);
-    if (error) {
-      const message = formatPostgrestError(error);
-      setLoadError(message);
-      setRows([]);
-      toast.error('Nie udało się wczytać pytań', { description: message });
-    } else {
-      setRows(data);
-      onQuestionsChange?.(data.filter((r) => !r.answeredAt).length);
+    try {
+      const supabase = createClient();
+      const { data, error } = await fetchContestQuestionsForManager(supabase, contestId);
+      if (error) {
+        const message = formatPostgrestError(error);
+        setLoadError(message);
+        setRows([]);
+        toast.error('Nie udało się wczytać pytań', { description: message });
+      } else {
+        setRows(data);
+        onQuestionsChangeRef.current?.(data.filter((r) => !r.answeredAt).length);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [contestId, onQuestionsChange]);
+  }, [contestId]);
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- load manager Q&A on mount / contest change */
     void loadQuestions();
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [loadQuestions]);
 
   const pending = rows.filter((r) => !r.answeredAt);
@@ -203,7 +282,7 @@ export function ManagerContestQuestionsPanel({
   const handleSubmitComment = async (questionId: string) => {
     const text = commentDrafts[questionId]?.trim() ?? '';
     if (!text) {
-      toast.error('Wpisz treść komentarza');
+      toast.error('Wpisz treść odpowiedzi');
       return;
     }
 
@@ -217,30 +296,23 @@ export function ManagerContestQuestionsPanel({
         result.error instanceof Error
           ? result.error.message
           : formatPostgrestError(result.error as Parameters<typeof formatPostgrestError>[0]);
-      toast.error('Nie udało się dodać komentarza', { description: message });
+      toast.error('Nie udało się opublikować odpowiedzi', { description: message });
       return;
     }
 
-    const wasFirst = rows.find((r) => r.id === questionId && !r.answeredAt);
-    toast.success(
-      wasFirst
-        ? 'Odpowiedź opublikowana — widoczna dla wszystkich wykonawców'
-        : 'Komentarz został dodany',
-    );
+    toast.success('Odpowiedź opublikowana — widoczna dla wszystkich wykonawców');
     setComposingQuestionId(null);
     setCommentDrafts((prev) => ({ ...prev, [questionId]: '' }));
     await loadQuestions();
   };
 
-  const renderComposer = (row: ContestQuestionManagerRow, isPending: boolean) => {
+  const renderAnswerComposer = (row: ContestQuestionManagerRow) => {
     const isComposing = composingQuestionId === row.id;
     if (isComposing) {
       return (
-        <div className="space-y-3 border-t border-amber-300/40 pt-3">
+        <div className="ml-4 md:ml-6 pl-4 border-l-2 border-amber-300/50 space-y-3">
           <div className="space-y-2">
-            <Label htmlFor={`manager-comment-${row.id}`}>
-              {isPending ? 'Twoja odpowiedź' : 'Dodaj komentarz'}
-            </Label>
+            <Label htmlFor={`manager-comment-${row.id}`}>Twoja odpowiedź</Label>
             <Textarea
               id={`manager-comment-${row.id}`}
               value={commentDrafts[row.id] ?? ''}
@@ -249,15 +321,11 @@ export function ManagerContestQuestionsPanel({
               }
               rows={4}
               className="resize-none bg-background"
-              placeholder={
-                isPending
-                  ? 'Treść odpowiedzi widoczna publicznie dla wszystkich wykonawców…'
-                  : 'Kolejny komentarz do tego pytania…'
-              }
+              placeholder="Treść odpowiedzi widoczna publicznie dla wszystkich wykonawców…"
               autoFocus
             />
             <p className="text-xs text-muted-foreground">
-              Komentarz będzie widoczny publicznie dla wszystkich wykonawców.
+              Odpowiedź będzie widoczna publicznie dla wszystkich wykonawców.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -281,19 +349,11 @@ export function ManagerContestQuestionsPanel({
     return (
       <Button
         size="sm"
-        variant={isPending ? 'default' : 'outline'}
-        className="gap-1.5"
+        variant="default"
         onClick={() => handleStartComment(row.id)}
         disabled={composingQuestionId !== null && composingQuestionId !== row.id}
       >
-        {isPending ? (
-          'Odpowiedz'
-        ) : (
-          <>
-            <MessageSquarePlus className="h-4 w-4" />
-            Dodaj komentarz
-          </>
-        )}
+        Odpowiedz
       </Button>
     );
   };
@@ -328,7 +388,7 @@ export function ManagerContestQuestionsPanel({
                   <p className="text-xs text-muted-foreground">
                     {formatManagerTimestamp(row.createdAt)}
                   </p>
-                  {renderComposer(row, true)}
+                  {renderAnswerComposer(row)}
                 </article>
               ))}
             </div>
@@ -360,7 +420,6 @@ export function ManagerContestQuestionsPanel({
                     currentUserId={user?.id}
                     onUpdated={loadQuestions}
                   />
-                  {renderComposer(row, false)}
                 </article>
               ))}
             </div>

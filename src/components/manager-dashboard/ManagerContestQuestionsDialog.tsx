@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { HelpCircle } from 'lucide-react';
 import { createClient } from '../../lib/supabase/client';
 import { markContestQuestionsSeen } from '../../lib/database/questions';
@@ -30,14 +30,20 @@ export function ManagerContestQuestionsDialog({
   onUnseenCountChange,
   onUnansweredCountChange,
 }: ManagerContestQuestionsDialogProps): ReactElement {
+  const onUnseenRef = useRef(onUnseenCountChange);
+
+  useEffect(() => {
+    onUnseenRef.current = onUnseenCountChange;
+  }, [onUnseenCountChange]);
+
   useEffect(() => {
     if (!open || !contestId) return;
 
     const supabase = createClient();
     void markContestQuestionsSeen(supabase, contestId).then(() => {
-      onUnseenCountChange?.(contestId, 0);
+      onUnseenRef.current?.(contestId, 0);
     });
-  }, [open, contestId, onUnseenCountChange]);
+  }, [open, contestId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

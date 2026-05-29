@@ -305,6 +305,139 @@ export async function updateContestQuestionComment(
   return { success: true, error: null };
 }
 
+export async function deleteContestQuestionComment(
+  supabase: SupabaseClient<Database>,
+  commentId: string,
+): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
+  if (commentId.startsWith('legacy-')) {
+    return { success: false, error: new Error('Nie można usunąć tej odpowiedzi w systemie') };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).rpc('delete_contest_question_comment', {
+    p_comment_id: commentId,
+  });
+
+  if (error) {
+    if (
+      error.code === 'PGRST202' ||
+      error.message?.includes('Could not find the function')
+    ) {
+      const { data: row, error: fetchError } = await supabase
+        .from('question_comments')
+        .select('question_id')
+        .eq('id', commentId)
+        .maybeSingle();
+
+      if (fetchError || !row?.question_id) {
+        return { success: false, error: fetchError ?? new Error('Komentarz nie istnieje') };
+      }
+
+      const { error: deleteError } = await supabase
+        .from('question_comments')
+        .delete()
+        .eq('id', commentId);
+
+      if (deleteError) {
+        return { success: false, error: deleteError };
+      }
+
+      const { data: remaining, error: listError } = await supabase
+        .from('question_comments')
+        .select('body, created_at')
+        .eq('question_id', row.question_id)
+        .order('created_at', { ascending: false });
+
+      if (listError) {
+        return { success: false, error: listError };
+      }
+
+      const latest = remaining?.[0];
+      const { error: syncError } = await supabase
+        .from('questions')
+        .update(
+          latest
+            ? { answer: latest.body, updated_at: new Date().toISOString() }
+            : {
+                answer: null,
+                answered_by: null,
+                answered_at: null,
+                updated_at: new Date().toISOString(),
+              },
+        )
+        .eq('id', row.question_id);
+
+      if (syncError) {
+        return { success: false, error: syncError };
+      }
+
+      return { success: true, error: null };
+    }
+
+    return { success: false, error };
+  }
+
+  return { success: true, error: null };
+}
+
+/**
+ * Manager comments per contest (for Konkursy table badge).
+ */
+export async function fetchContestCommentCounts(
+  supabase: SupabaseClient<Database>,
+  tenderIds: string[],
+): Promise<Record<string, number>> {
+  if (tenderIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('question_comments')
+    .select('id, questions!question_comments_question_id_fkey ( tender_id )')
+    .in('questions.tender_id', tenderIds);
+
+  if (error) {
+    console.error('fetchContestCommentCounts:', formatPostgrestError(error));
+    return {};
+  }
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const questions = row.questions as { tender_id?: string } | null;
+    const tenderId = questions?.tender_id;
+    if (tenderId) {
+      counts[tenderId] = (counts[tenderId] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Total Q&A threads per contest (for manager table badge).
+ */
+export async function fetchContestQuestionCounts(
+  supabase: SupabaseClient<Database>,
+  tenderIds: string[],
+): Promise<Record<string, number>> {
+  if (tenderIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('questions')
+    .select('tender_id')
+    .in('tender_id', tenderIds);
+
+  if (error) {
+    console.error('fetchContestQuestionCounts:', formatPostgrestError(error));
+    return {};
+  }
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    if (row.tender_id) {
+      counts[row.tender_id] = (counts[row.tender_id] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
 /**
  * Unanswered questions the manager has not opened in the Q&A dialog yet.
  */

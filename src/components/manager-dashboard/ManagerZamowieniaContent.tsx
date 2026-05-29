@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageSquare } from 'lucide-react';
+import { CheckCircle2, MessageSquare, PanelTopOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ManagerOrderRow } from '../../lib/database/manager-orders';
 import {
@@ -38,6 +38,12 @@ import {
 } from '../ui/alert-dialog';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
 
 interface ManagerZamowieniaContentProps {
   orders: ManagerOrderRow[];
@@ -223,35 +229,72 @@ export function ManagerZamowieniaContent({
                       <OrderStatusBadge status={row.status} audience="manager" />
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2 flex-wrap">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openDetails(row)}
-                        >
-                          Szczegóły
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={!canMessageOnOrder(row.status)}
-                          onClick={() => handleMessage(row)}
-                        >
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          Wiadomość
-                        </Button>
+                      <div className="flex items-center justify-end gap-1">
                         {canManagerAcceptWork(row.status) ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={pendingId === row.id}
-                            onClick={() => handleAcceptWork(row.id)}
-                          >
-                            Odbierz prace
-                          </Button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex">
+                                  <Button
+                                    type="button"
+                                    variant="default"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    disabled={pendingId === row.id}
+                                    onClick={() => handleAcceptWork(row.id)}
+                                    aria-label="Odbierz prace"
+                                  >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>Odbierz prace</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : null}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  disabled={!canMessageOnOrder(row.status)}
+                                  onClick={() => handleMessage(row)}
+                                  aria-label="Wiadomość"
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {canMessageOnOrder(row.status)
+                                ? 'Wiadomość do wykonawcy'
+                                : 'Wiadomość niedostępna'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={() => openDetails(row)}
+                                  aria-label="Szczegóły zamówienia"
+                                >
+                                  <PanelTopOpen className="h-4 w-4" />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>Szczegóły zamówienia</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </TableCell>
                   </TableRow>
