@@ -22,12 +22,16 @@
     "supabase:migrate-local": "bash scripts/migrate-local-db.sh",
     "supabase:studio": "open http://localhost:54323 || echo 'Studio is available at: http://localhost:54323 (make sure Supabase is running with: npm run supabase:start)'",
     "storage:migrate-to-r2": "npx tsx scripts/migrate-supabase-storage-to-r2.ts",
-    "storage:migrate-to-r2:dry-run": "npx tsx scripts/migrate-supabase-storage-to-r2.ts --dry-run"
+    "storage:migrate-to-r2:dry-run": "npx tsx scripts/migrate-supabase-storage-to-r2.ts --dry-run",
+    "flagship:check": "npx tsx scripts/check-flagship-connection.ts",
+    "flagship:list-permissions": "npx tsx scripts/list-cloudflare-token-permissions.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1057.0",
     "@aws-sdk/s3-request-presigner": "^3.1057.0",
+    "@cloudflare/flagship": "^0.3.1",
     "@googlemaps/react-wrapper": "^1.2.0",
+    "@openfeature/server-sdk": "^1.21.0",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",
     "@radix-ui/react-aspect-ratio": "^1.0.3",

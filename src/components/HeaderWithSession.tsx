@@ -1,4 +1,7 @@
 import { createClient } from '../lib/supabase/server';
+import { buildEvaluationContext } from '../lib/flagship/context';
+import { isFeatureEnabled } from '../lib/flagship/evaluate';
+import { FLAGSHIP_FLAG_KEYS } from '../lib/flagship/keys';
 import { Header } from './Header';
 import type { AuthUser } from '../types/auth';
 
@@ -48,5 +51,26 @@ export async function HeaderWithSession() {
     }
   }
 
-  return <Header initialUser={initialUser} />;
+  const evaluationContext = buildEvaluationContext(
+    initialUser
+      ? {
+          id: initialUser.id,
+          email: initialUser.email,
+          userType: initialUser.userType,
+          platformRole: initialUser.platformRole,
+        }
+      : null,
+  );
+
+  const useVestiqoBrand = await isFeatureEnabled(
+    FLAGSHIP_FLAG_KEYS.NEW_TENDER_SYSTEM,
+    evaluationContext,
+  );
+
+  return (
+    <Header
+      initialUser={initialUser}
+      brandTitle={useVestiqoBrand ? 'Vestiqo' : 'Domio'}
+    />
+  );
 }

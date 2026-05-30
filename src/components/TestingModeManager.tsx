@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -15,9 +17,18 @@ import {
   Eye,
   AlertTriangle,
   Info,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
 import { getDataSourceConfig } from '../lib/config/data-source';
+import { getTestingFeatureFlagsAction } from '../lib/flagship/actions';
+import {
+  FLAGSHIP_FLAG_KEYS,
+  FLAGSHIP_FLAG_LABELS,
+  type FlagshipFlagKey,
+  type TestingFeatureFlags,
+} from '../lib/flagship/keys';
 
 interface TestingModeManagerProps {
   onBack: () => void;
@@ -31,37 +42,80 @@ interface TestingSettings {
   errorLogging: boolean;
   userFeedbackCollection: boolean;
   performanceMonitoring: boolean;
-  featureFlags: {
-    newTenderSystem: boolean;
-    enhancedMap: boolean;
-    advancedFilters: boolean;
-    mobileOptimizations: boolean;
-  };
 }
+
+const STORAGE_KEY = 'urbi-testing-settings';
+
+const DEFAULT_SETTINGS: TestingSettings = {
+  betaMode: true,
+  mockData: true,
+  debugMode: false,
+  analyticsTracking: true,
+  errorLogging: true,
+  userFeedbackCollection: true,
+  performanceMonitoring: true,
+};
+
+function parseStoredSettings(raw: string | null): TestingSettings {
+  if (!raw) return DEFAULT_SETTINGS;
+  try {
+    const parsed = JSON.parse(raw) as Partial<TestingSettings> & {
+      featureFlags?: unknown;
+    };
+    return {
+      betaMode: parsed.betaMode ?? DEFAULT_SETTINGS.betaMode,
+      mockData: parsed.mockData ?? DEFAULT_SETTINGS.mockData,
+      debugMode: parsed.debugMode ?? DEFAULT_SETTINGS.debugMode,
+      analyticsTracking: parsed.analyticsTracking ?? DEFAULT_SETTINGS.analyticsTracking,
+      errorLogging: parsed.errorLogging ?? DEFAULT_SETTINGS.errorLogging,
+      userFeedbackCollection:
+        parsed.userFeedbackCollection ?? DEFAULT_SETTINGS.userFeedbackCollection,
+      performanceMonitoring:
+        parsed.performanceMonitoring ?? DEFAULT_SETTINGS.performanceMonitoring,
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+const FLAG_DESCRIPTIONS: Record<FlagshipFlagKey, string> = {
+  [FLAGSHIP_FLAG_KEYS.NEW_TENDER_SYSTEM]: 'Ulepszona wersja systemu przetargowego',
+  [FLAGSHIP_FLAG_KEYS.ENHANCED_MAP]: 'Nowa wersja mapy z dodatkowymi funkcjami',
+  [FLAGSHIP_FLAG_KEYS.ADVANCED_FILTERS]: 'Dodatkowe opcje filtrowania zgłoszeń',
+  [FLAGSHIP_FLAG_KEYS.MOBILE_OPTIMIZATIONS]: 'Ulepszenia dla urządzeń mobilnych',
+};
 
 export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }) => {
   const [settings, setSettings] = useState<TestingSettings>(() => {
-    // Load settings from localStorage
-    const savedSettings = localStorage.getItem('urbi-testing-settings');
-    if (savedSettings) {
-      return JSON.parse(savedSettings);
-    }
-    return {
-      betaMode: true,
-      mockData: true,
-      debugMode: false,
-      analyticsTracking: true,
-      errorLogging: true,
-      userFeedbackCollection: true,
-      performanceMonitoring: true,
-      featureFlags: {
-        newTenderSystem: true,
-        enhancedMap: true,
-        advancedFilters: true,
-        mobileOptimizations: true
-      }
-    };
+    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+    return parseStoredSettings(localStorage.getItem(STORAGE_KEY));
   });
+
+  const [featureFlags, setFeatureFlags] = useState<TestingFeatureFlags | null>(null);
+  const [flagsEvaluatedAt, setFlagsEvaluatedAt] = useState<string | null>(null);
+  const [flagsConfigured, setFlagsConfigured] = useState(true);
+  const [flagsError, setFlagsError] = useState<string | null>(null);
+  const [flagsLoading, setFlagsLoading] = useState(true);
+
+  const loadFeatureFlags = useCallback(async () => {
+    setFlagsLoading(true);
+    setFlagsError(null);
+    try {
+      const result = await getTestingFeatureFlagsAction();
+      setFeatureFlags(result.flags);
+      setFlagsEvaluatedAt(result.evaluatedAt);
+      setFlagsConfigured(result.configured);
+      if (result.error) setFlagsError(result.error);
+    } catch (err) {
+      setFlagsError(err instanceof Error ? err.message : 'Nie udało się pobrać flag');
+    } finally {
+      setFlagsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadFeatureFlags();
+  }, [loadFeatureFlags]);
 
   const [testingStats] = useState({
     activeTesters: 8,
@@ -72,49 +126,28 @@ export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }
     avgSessionTime: '24 min'
   });
 
-  const updateSetting = (key: keyof TestingSettings, value: boolean) => {
-    const newSettings = { ...settings, [key]: value };
+  const persistSettings = (newSettings: TestingSettings) => {
     setSettings(newSettings);
-    localStorage.setItem('urbi-testing-settings', JSON.stringify(newSettings));
-    
-    // Show confirmation
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
+  };
+
+  const updateSetting = (key: keyof TestingSettings, value: boolean) => {
+    persistSettings({ ...settings, [key]: value });
     console.log(`Testing setting updated: ${key} = ${value}`);
   };
 
-  const updateFeatureFlag = (flag: keyof TestingSettings['featureFlags'], value: boolean) => {
-    const newSettings = {
-      ...settings,
-      featureFlags: { ...settings.featureFlags, [flag]: value }
-    };
-    setSettings(newSettings);
-    localStorage.setItem('urbi-testing-settings', JSON.stringify(newSettings));
-    
-    console.log(`Feature flag updated: ${flag} = ${value}`);
+  const resetToDefaults = () => {
+    persistSettings(DEFAULT_SETTINGS);
   };
 
-  const resetToDefaults = () => {
-    const defaultSettings: TestingSettings = {
-      betaMode: true,
-      mockData: true,
-      debugMode: false,
-      analyticsTracking: true,
-      errorLogging: true,
-      userFeedbackCollection: true,
-      performanceMonitoring: true,
-      featureFlags: {
-        newTenderSystem: true,
-        enhancedMap: true,
-        advancedFilters: true,
-        mobileOptimizations: true
-      }
-    };
-    setSettings(defaultSettings);
-    localStorage.setItem('urbi-testing-settings', JSON.stringify(defaultSettings));
-  };
+  const enabledFlagCount =
+    featureFlags === null ? 0 : Object.values(featureFlags).filter(Boolean).length;
 
   const exportLogs = () => {
     const logs = {
       settings,
+      featureFlags,
+      flagsEvaluatedAt,
       testingStats,
       exportedAt: new Date().toISOString(),
       userAgent: navigator.userAgent,
@@ -336,71 +369,92 @@ export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }
             </div>
           </TabsContent>
 
-          {/* Feature Flags Tab */}
+          {/* Feature Flags Tab — read-only from Cloudflare Flagship */}
           <TabsContent value="features">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="h-5 w-5 text-success" />
-                  Feature Flags
-                </CardTitle>
-                <CardDescription>
-                  Włączaj/wyłączaj nowe funkcjonalności w czasie testów
-                </CardDescription>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Eye className="h-5 w-5 text-success" />
+                      Feature Flags (Cloudflare Flagship)
+                    </CardTitle>
+                    <CardDescription>
+                      Wartości z serwera — zmiany w dashboardzie Cloudflare (Compute → Flagship)
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadFeatureFlags()}
+                    disabled={flagsLoading}
+                    className="shrink-0"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${flagsLoading ? 'animate-spin' : ''}`} />
+                    Odśwież
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Flagi nie są zapisywane w localStorage. Zarządzaj nimi w{' '}
+                    <a
+                      href="https://dash.cloudflare.com/?to=/:account/workers/flagship"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-medium underline"
+                    >
+                      Cloudflare Flagship
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    .
+                  </AlertDescription>
+                </Alert>
+
+                {!flagsConfigured && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Brak konfiguracji Flagship. Ustaw FLAGSHIP_APP_ID i CLOUDFLARE_FLAGSHIP_API_TOKEN
+                      (patrz .env.example).
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {flagsError && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{flagsError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {flagsEvaluatedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Ostatnia ewaluacja: {new Date(flagsEvaluatedAt).toLocaleString('pl-PL')}
+                  </p>
+                )}
+
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Nowy system przetargów</Label>
-                      <div className="text-sm text-muted-foreground">
-                        Ulepszona wersja systemu przetargowego
+                  {(Object.keys(FLAGSHIP_FLAG_LABELS) as FlagshipFlagKey[]).map((flagKey) => (
+                    <div key={flagKey} className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>{FLAGSHIP_FLAG_LABELS[flagKey]}</Label>
+                        <div className="text-sm text-muted-foreground">
+                          {FLAG_DESCRIPTIONS[flagKey]}
+                        </div>
+                        <code className="text-xs text-muted-foreground">{flagKey}</code>
                       </div>
+                      {flagsLoading || featureFlags === null ? (
+                        <Badge variant="secondary">Ładowanie…</Badge>
+                      ) : (
+                        <Badge variant={featureFlags[flagKey] ? 'default' : 'secondary'}>
+                          {featureFlags[flagKey] ? 'Włączona' : 'Wyłączona'}
+                        </Badge>
+                      )}
                     </div>
-                    <Switch
-                      checked={settings.featureFlags.newTenderSystem}
-                      onCheckedChange={(value) => updateFeatureFlag('newTenderSystem', value)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Ulepszona mapa</Label>
-                      <div className="text-sm text-muted-foreground">
-                        Nowa wersja mapy z dodatkowymi funkcjami
-                      </div>
-                    </div>
-                    <Switch
-                      checked={settings.featureFlags.enhancedMap}
-                      onCheckedChange={(value) => updateFeatureFlag('enhancedMap', value)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Zaawansowane filtry</Label>
-                      <div className="text-sm text-muted-foreground">
-                        Dodatkowe opcje filtrowania zgłoszeń
-                      </div>
-                    </div>
-                    <Switch
-                      checked={settings.featureFlags.advancedFilters}
-                      onCheckedChange={(value) => updateFeatureFlag('advancedFilters', value)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Optymalizacje mobile</Label>
-                      <div className="text-sm text-muted-foreground">
-                        Ulepszenia dla urządzeń mobilnych
-                      </div>
-                    </div>
-                    <Switch
-                      checked={settings.featureFlags.mobileOptimizations}
-                      onCheckedChange={(value) => updateFeatureFlag('mobileOptimizations', value)}
-                    />
-                  </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -530,8 +584,8 @@ export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }
                     <div>Debug mode: <Badge variant={settings.debugMode ? "default" : "secondary"}>{settings.debugMode ? "Włączony" : "Wyłączony"}</Badge></div>
                     <div>Analytics: <Badge variant={settings.analyticsTracking ? "default" : "secondary"}>{settings.analyticsTracking ? "Aktywne" : "Wyłączone"}</Badge></div>
                     <div>
-                      Feature flags: {' '}
-                      {Object.entries(settings.featureFlags).filter(([_, enabled]) => enabled).length} z {Object.keys(settings.featureFlags).length} włączonych
+                      Feature flags (Flagship): {enabledFlagCount} z{' '}
+                      {Object.keys(FLAGSHIP_FLAG_LABELS).length} włączonych
                     </div>
                   </div>
                 </CardContent>

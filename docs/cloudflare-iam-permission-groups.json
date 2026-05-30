@@ -1,0 +1,467 @@
+[
+  {
+    "id": "b60cc91e22e54235b0191b059eac9838",
+    "name": "Access for Infrastructure Target Admin",
+    "scopes": "com.cloudflare.team.ztia.target"
+  },
+  {
+    "id": "762732aa993a40e6a6301f8a89dddf0b",
+    "name": "AI Crawl Control Read Only",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "be296927020642b29f540f2db9429dbe",
+    "name": "AI Search (Read-only)",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "fae8a11f507d49acab98d5fb8f6d3c5a",
+    "name": "AI Search Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "6a5047f646c34525910f237abf5f0433",
+    "name": "API Gateway",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "f662acb8c11e443d89fdd225336cc994",
+    "name": "API Gateway Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "072f34e14de74abeab96931bb1a768bf",
+    "name": "Application Security Reports Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "44befc657c1d4ec3a257d67567b432df",
+    "name": "Bot Management",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "c59bb8bb15474725ad76d6a176ac8db1",
+    "name": "Bot Management (Account-Wide)",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "2f28d5132ab644cdbff24375b11a702e",
+    "name": "Brand Protection",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "e713d034437c4c6d936daf981f29bf88",
+    "name": "Cache Domain Purge",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "d45c5f8ff2b941afaff712f5c7d1f4c2",
+    "name": "Cloudchamber Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "2bd4a5596858468f8f7001f2883dae43",
+    "name": "Cloudchamber Admin Read Only",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "ceb4c3f8819a4166b376c09f24865446",
+    "name": "Cloudflare Access App Admin",
+    "scopes": "com.cloudflare.edge.access.app"
+  },
+  {
+    "id": "d6e07461b6d540fd8adbe656119018ba",
+    "name": "Cloudflare Access Identity Provider Admin",
+    "scopes": "com.cloudflare.edge.access.identity-provider"
+  },
+  {
+    "id": "7e9ceb9ceae54adc938ef3f4738ab7d0",
+    "name": "Cloudflare Access Policy Admin",
+    "scopes": "com.cloudflare.edge.access.policy"
+  },
+  {
+    "id": "e44c56c28f9647cbbb81096ddd084272",
+    "name": "Cloudflare Access Service Token Admin",
+    "scopes": "com.cloudflare.edge.access.service-token"
+  },
+  {
+    "id": "6702b12e019b49a592c533dafbec2e5f",
+    "name": "Cloudflare CASB",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "1554e7139f85483485fb3c0baf5876ac",
+    "name": "Cloudflare CASB Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "086efe51df864f939756a19b7ec5b324",
+    "name": "Cloudflare DEX",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "bd837b12789e45cdb2e3867bc4e41377",
+    "name": "Cloudflare One Connector Read and Monitor: cloudflared",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "e0d1f652c7d84d35a4e356734cad1c2b",
+    "name": "Cloudflare R2 Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "f2bfce71c75a4c1b86e288eb50549efc",
+    "name": "Cloudflare R2 Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "0e0634783b73472f977b74fae9e198bf",
+    "name": "Cloudflare Tunnel - Granular Connector cloudflared Read",
+    "scopes": "com.cloudflare.team.connector.cloudflared"
+  },
+  {
+    "id": "738f8d32cf094d1eba729432c8e40bfe",
+    "name": "Cloudflare Tunnel - Granular Connector cloudflared Write",
+    "scopes": "com.cloudflare.team.connector.cloudflared"
+  },
+  {
+    "id": "dfe397853d0f4325a1b6ab5c369eecc3",
+    "name": "Cloudflare Tunnel - Granular Connector WARP Read",
+    "scopes": "com.cloudflare.team.connector.warp"
+  },
+  {
+    "id": "917841eb2293457c90819882657ce313",
+    "name": "Cloudflare Tunnel - Granular Connector WARP Write",
+    "scopes": "com.cloudflare.team.connector.warp"
+  },
+  {
+    "id": "27d030bf92ef4f52a9ac4c54a72e5987",
+    "name": "Cloudflare Zero Trust Secure DNS Locations Write",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "f40f0530e98346f8b0eb62bcbbcc3adb",
+    "name": "Cloudforce One Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "dfe1bb5cd2d448e8bf69d9adca41d47d",
+    "name": "Cloudforce One Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "3a4ed3070a9e488ea944f1ec499ac8bd",
+    "name": "Connectivity Directory Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "bb3a385beafb4d05b62b86d99dd2c06b",
+    "name": "Connectivity Directory Bind",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "5248046b05c74278ba398e730e2928da",
+    "name": "Connectivity Directory Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "f5828b643f7d4c8da0dfa036f45dd6cd",
+    "name": "DLS (Read-only)",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "27b6b50cb9a443cfb1596dfd5ca50b04",
+    "name": "DLS Write",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "7276dc8e5e31412297b6075e614a67dd",
+    "name": "Domain API Gateway",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "4757eb7bd807416ba3164efaae1d516e",
+    "name": "Domain API Gateway Read",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "6d5a15bbb1c84d6e8d74ea65de18dfde",
+    "name": "Domain Page Shield",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "1b6236cae9ec4156aaae43758d7c01cb",
+    "name": "Domain Page Shield Read",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "799e2611cdbe47da8ec3a5c880f301cf",
+    "name": "Domain Waiting Room Admin",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "2c9401002e4c48d4a1eb1240c5fc5ba7",
+    "name": "Domain Waiting Room Read",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "6724f553082248a48c3975dc82ec846b",
+    "name": "Email Configuration Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "fb91a691900046b6b1f29cf6237a5f71",
+    "name": "Email Integration Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "42f7377dedb84b16995efe881bb9d453",
+    "name": "Email Security Analyst",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "93bfefc58321459f8d0fbcd695dd7a21",
+    "name": "Email Security Policy Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "3ad3a9ed71a2405cab2b81e4c5488be1",
+    "name": "Email Security Readonly",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "b446806c7314472798f9364be7619455",
+    "name": "Email Security Reporting",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "0a7d9e6cd7934e4fa8a8b5ebb9c1c1f4",
+    "name": "Flagship Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "4c11be9f5a7740eaa7390ae7e38d91bc",
+    "name": "Flagship Write",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "521da3c731144bbbb7f8789e5ddfe8af",
+    "name": "HTTP Applications",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "0da6404c048a404db7b1baf83f9ccf90",
+    "name": "HTTP Applications Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "4c01441b87174734ae833d067db2b348",
+    "name": "Hyperdrive Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "cc8fa7eeb40045e4b58b3468266ded55",
+    "name": "Hyperdrive Readonly",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "8766bf899e744589abec58c52d3dbf87",
+    "name": "IP Addressing Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "46b5ab47811a4a99976231421b5b5134",
+    "name": "IP Addressing Write",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "9980cc3581984d47b5ebed30ac64e81a",
+    "name": "Load Balancing Account Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "6ca015c8f17243ec9a17e1cccbe8ce38",
+    "name": "Magic Network Monitoring",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "d27089fbc0e54f0885a5976f43aa6138",
+    "name": "Magic Network Monitoring Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "4fcdfb31bbf145edaca18ebb421f85de",
+    "name": "Magic Network Monitoring Read-Only",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "6795348d3cef44a0be48be200828858b",
+    "name": "Minimal Account Access",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "c695c6a83d5e4fa5afb50d66dda69a98",
+    "name": "Network Services Read (Magic)",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "4d2c224037764ae3bbc85ed0c986009b",
+    "name": "Network Services Write (Magic)",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "ec5d3eb3836242b1bd3d5befe5710d66",
+    "name": "Page Rules Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "a3b04f5739884131b8638ba6e0f4a653",
+    "name": "Page Rules Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "20aa4bf3db5d4e3b8abf81395140d2dd",
+    "name": "Page Shield",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "2457a73d15924e53a952c7fad10608f3",
+    "name": "Page Shield Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "05de3906d34245b98a47e94967017f3f",
+    "name": "Realtime",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "1d2fc01062e14b8d893f2de176180a82",
+    "name": "Realtime Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "71cfcdaa2cc34bce816c6b97da997723",
+    "name": "Resource Library Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "e95672d8dbec4d2a908382b847200d62",
+    "name": "Secrets Store Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "756b9a2d193c493785722199501108bf",
+    "name": "Secrets Store Deployer",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "0eacc372c1484c479e56a4165b95ac36",
+    "name": "Secrets Store Reporter",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "99013518df5643068a0b239142d138d1",
+    "name": "Security Center Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "fef65fd54e3a4585a8f7a5fa2f0a620f",
+    "name": "SSL/TLS Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "bcc5aea5000742b5a8363b45475d654c",
+    "name": "Tag Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "70cbea96c1764a40b221b1524cc3b30d",
+    "name": "Trust and Safety",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "c258d1a22bb243b09e4d4bc6b29f0197",
+    "name": "Turnstile",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "036e5767654c48149b30a91c03f2e5c2",
+    "name": "Turnstile Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "c40299dfa99048bd8ce9043afafc3034",
+    "name": "Vectorize Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "f15a31fae6c4433abbf43ad868aed734",
+    "name": "Vectorize Readonly",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "b3dae31ebc9a4573943c475576fe03a5",
+    "name": "Waiting Room Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "6ea34564715143d288e9ab830ad4485b",
+    "name": "Waiting Room Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "6e9acdac73e643978ec0b648bbad75e0",
+    "name": "Workers Editor",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "edc4cc794f1e4a9d88c498992156a0a0",
+    "name": "Workers Platform (Read-only)",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "2c627567e4b4465d862e6be258a4bb3f",
+    "name": "Workers Platform Metadata (Read-Only)",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "f3f2473673b149e6a8b53d182dbf3e81",
+    "name": "Zaraz Edit",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "38864f72afce4b27a85747cd496fc005",
+    "name": "Zero Trust Account Lists Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "958d8f0526e540bea9957da34ed28f72",
+    "name": "Zero Trust Gateway Policies Read",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "4f5d96cfd1d7465fbd537de02ff31a9a",
+    "name": "Zone Settings Admin",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "d6543484f53d4612a8bb577439169f72",
+    "name": "Zone Versioning",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "ff9304c53c6441c683a9a2b0a277d386",
+    "name": "Zone Versioning (Account-Wide)",
+    "scopes": "com.cloudflare.api.account"
+  },
+  {
+    "id": "01a5d978c1f44ab78951b45354107a04",
+    "name": "Zone Versioning Read",
+    "scopes": "com.cloudflare.api.account.zone"
+  },
+  {
+    "id": "d658f06e1bfd4db1b9be75f866671ebb",
+    "name": "Zone Versioning Read (Account-Wide)",
+    "scopes": "com.cloudflare.api.account"
+  }
+]

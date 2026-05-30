@@ -48,9 +48,11 @@ import { CONTRACTOR_VERIFICATION_DOCUMENTS_PATH } from '../lib/verification/docu
 
 interface HeaderProps {
   initialUser?: AuthUser | null;
+  /** Set server-side from Flagship `new-tender-system` flag. Defaults to Domio. */
+  brandTitle?: string;
 }
 
-export function Header({ initialUser }: HeaderProps) {
+export function Header({ initialUser, brandTitle = 'Domio' }: HeaderProps) {
   const router = useNavigationWithLoading();
   const pathname = usePathname();
   const { setIsMapExpanded } = useLayoutContext();
@@ -205,7 +207,9 @@ export function Header({ initialUser }: HeaderProps) {
         <div className="flex items-center justify-between h-16">
           {/* 1. Logo Section - Left */}
           <div className="flex-shrink-0">
-            <h1 className="text-2xl font-bold cursor-pointer" style={{ color: '#1e40af' }} onClick={handleHomeClick}>Domio</h1>
+            <h1 className="text-2xl font-bold cursor-pointer" style={{ color: '#1e40af' }} onClick={handleHomeClick}>
+              {brandTitle}
+            </h1>
           </div>
 
           {/* 2. Center - Search (hidden on mobile) */}
