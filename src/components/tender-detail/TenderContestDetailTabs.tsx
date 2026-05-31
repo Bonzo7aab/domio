@@ -51,7 +51,7 @@ export function TenderContestDetailTabs({
         <Card>
           <CardContent className="min-w-0 space-y-6 p-6">
             <div className="min-w-0">
-              <h3 className="text-lg font-semibold mb-3">Opis konkursu</h3>
+              <h3 className="text-lg font-semibold mb-3">Szczegółowy zakres i uwagi</h3>
               <p className="max-w-full break-words text-muted-foreground leading-relaxed whitespace-pre-wrap">
                 {job.description}
               </p>
@@ -111,7 +111,7 @@ export function TenderContestDetailTabs({
           <CardContent className="p-6 space-y-6">
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              Harmonogram i wizja lokalna
+              Harmonogram
             </h3>
             <div className="bg-muted/50 border border-border rounded-lg p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -122,6 +122,16 @@ export function TenderContestDetailTabs({
                     timeStyle: 'short',
                   })}
                 />
+                {contestInfo.evaluationDeadline ? (
+                  <DetailRow
+                    label="Rozstrzygnięcia konkursu"
+                    value={new Date(contestInfo.evaluationDeadline).toLocaleDateString('pl-PL', {
+                      dateStyle: 'long',
+                    })}
+                  />
+                ) : (
+                  <DetailRow label="Rozstrzygnięcia konkursu" value="Nie określono" />
+                )}
                 {contestInfo.completionDate ? (
                   <DetailRow
                     label="Termin wykonania"
@@ -150,7 +160,7 @@ export function TenderContestDetailTabs({
       <TabsContent value="contest-formal">
         <Card>
           <CardContent className="p-6 space-y-6">
-            <h3 className="text-lg font-semibold mb-3">Wymogi formalne wobec wykonawcy</h3>
+            <h3 className="text-lg font-semibold mb-3">Wymogi</h3>
             {contestInfo.formalRequirementLines.length > 0 ? (
               <ul className="space-y-3">
                 {contestInfo.formalRequirementLines.map((line, index) => (
@@ -184,7 +194,7 @@ export function TenderContestDetailTabs({
       <TabsContent value="contest-financial">
         <Card>
           <CardContent className="p-6 space-y-6">
-            <h3 className="text-lg font-semibold mb-3">Warunki finansowe i wymogi kontraktowe</h3>
+            <h3 className="text-lg font-semibold mb-3">Warunki</h3>
 
             {contestInfo.selectionCriteria.items.length > 0 ? (
               <div>
@@ -254,9 +264,9 @@ export function TenderContestDetailTabs({
 }
 
 export const CONTEST_TAB_ITEMS = [
-  { value: 'contest-basic', label: 'Podstawowe i dokumenty' },
-  { value: 'contest-schedule', label: 'Harmonogram i wizja' },
-  { value: 'contest-formal', label: 'Wymogi formalne' },
-  { value: 'contest-financial', label: 'Warunki finansowe' },
+  { value: 'contest-basic', label: 'Informacje podstawowe' },
+  { value: 'contest-schedule', label: 'Harmonogram' },
+  { value: 'contest-formal', label: 'Wymogi' },
+  { value: 'contest-financial', label: 'Warunki' },
   { value: 'contest-qa', label: 'Pytania i odpowiedzi' },
 ] as const;

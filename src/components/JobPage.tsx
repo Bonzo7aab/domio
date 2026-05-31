@@ -1198,62 +1198,17 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           {/* Main Content */}
           <div className="lg:col-span-2 min-w-0 space-y-6">
 
-            {/* Key tender / contest summary */}
-            {job.postType === 'tender' && job.tenderInfo && (
+            {/* Key tender summary — contests show details in tabs, not this pinned widget */}
+            {job.postType === 'tender' && job.tenderInfo && !job.contestInfo && (
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
                     <Gavel className="w-5 h-5" />
-                    {job.contestInfo
-                      ? 'Kluczowe informacje konkursu'
-                      : 'Kluczowe informacje przetargu'}
+                    Kluczowe informacje przetargu
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-6">
-                  {job.contestInfo ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                      <div className="bg-background/80 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">
-                          Termin składania
-                        </div>
-                        <div className="font-bold text-foreground text-sm">
-                          {new Date(job.contestInfo.submissionDeadline).toLocaleString('pl-PL', {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })}
-                        </div>
-                      </div>
-                      {job.contestInfo.completionDate ? (
-                        <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                          <div className="text-xs text-muted-foreground font-medium mb-1">
-                            Termin wykonania
-                          </div>
-                          <div className="font-bold text-foreground text-sm">
-                            {new Date(job.contestInfo.completionDate).toLocaleDateString('pl-PL')}
-                          </div>
-                        </div>
-                      ) : null}
-                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">Wadium</div>
-                        <div className="font-bold text-foreground text-sm">{job.tenderInfo.wadium}</div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">
-                          Złożone oferty
-                        </div>
-                        <div className="font-bold text-foreground text-sm">{job.applications}</div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3 border-2 shadow-sm border-border/50">
-                        <div className="text-xs text-muted-foreground font-medium mb-1">
-                          Wizja lokalna
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {job.contestInfo.siteVisitTypeLabel}
-                        </Badge>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                       <div className="bg-background/80 rounded-lg p-3 border-2 shadow-sm border-border/50">
                         <div className="text-xs text-muted-foreground font-medium mb-1">
                           Termin składania
@@ -1293,7 +1248,6 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         </Badge>
                       </div>
                     </div>
-                  )}
                 </CardContent>
               </Card>
             )}

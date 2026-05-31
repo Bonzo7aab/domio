@@ -83,6 +83,14 @@ function minCompletionDateAfterSubmission(submission: Date): string {
 
 function validateContestFormConsistency(form: TenderContestFormData): string | null {
   if (
+    form.evaluationDeadline &&
+    form.submissionDeadline &&
+    !Number.isNaN(form.submissionDeadline.getTime()) &&
+    form.evaluationDeadline.getTime() <= form.submissionDeadline.getTime()
+  ) {
+    return 'Rozstrzygnięcie konkursu musi być po dacie zakończenia przyjmowania ofert';
+  }
+  if (
     (form.siteVisitType === 'optional' || form.siteVisitType === 'mandatory') &&
     !form.siteVisitNotes.trim()
   ) {
@@ -116,8 +124,7 @@ function validateContestForm(
   hasBuildings: boolean,
   status: 'draft' | 'active',
 ): string | null {
-  if (form.title.length > 55) return 'Tytuł może mieć maksymalnie 55 znaków';
-  if (form.description.length > 255) return 'Opis może mieć maksymalnie 255 znaków';
+  if (form.title.length > 75) return 'Tytuł może mieć maksymalnie 75 znaków';
 
   const consistencyError = validateContestFormConsistency(form);
   if (consistencyError) return consistencyError;
@@ -127,7 +134,7 @@ function validateContestForm(
   }
 
   if (!form.title.trim()) return 'Podaj tytuł konkursu';
-  if (!form.description.trim()) return 'Podaj opis konkursu';
+  if (!form.description.trim()) return 'Podaj szczegółowy zakres i uwagi';
   if (hasBuildings && !form.buildingId) return 'Wybierz nieruchomość';
   if (!form.category) return 'Wybierz kategorię';
   if (!form.subcategory) return 'Wybierz podkategorię';
@@ -136,6 +143,9 @@ function validateContestForm(
   }
   if (!form.submissionDeadline || Number.isNaN(form.submissionDeadline.getTime())) {
     return 'Podaj datę i godzinę zakończenia przyjmowania ofert';
+  }
+  if (!form.evaluationDeadline || Number.isNaN(form.evaluationDeadline.getTime())) {
+    return 'Podaj datę rozstrzygnięcia konkursu';
   }
 
   const criteriaItems = form.selectionCriteria.items;
@@ -296,6 +306,12 @@ export function TenderContestForm({
       ) {
         next.completionDate = null;
       }
+      if (
+        prev.evaluationDeadline &&
+        prev.evaluationDeadline.getTime() <= d.getTime()
+      ) {
+        next.evaluationDeadline = null;
+      }
       return next;
     });
   };
@@ -314,7 +330,7 @@ export function TenderContestForm({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Informacje podstawowe i dokumenty
+            Informacje podstawowe
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -322,27 +338,25 @@ export function TenderContestForm({
             <Label htmlFor="contest-title">Tytuł konkursu *</Label>
             <Input
               id="contest-title"
-              maxLength={55}
+              maxLength={75}
               value={form.title}
               onChange={(e) => patchForm({ title: e.target.value })}
               placeholder="np. Remont posadzek"
               className="mt-1"
             />
-            <p className="text-xs text-muted-foreground mt-1">{form.title.length}/55</p>
+            <p className="text-xs text-muted-foreground mt-1">{form.title.length}/75</p>
           </div>
 
           <div>
-            <Label htmlFor="contest-desc">Opis konkursu *</Label>
+            <Label htmlFor="contest-desc">Szczegółowy zakres i uwagi *</Label>
             <Textarea
               id="contest-desc"
-              maxLength={255}
-              rows={4}
+              rows={6}
               value={form.description}
               onChange={(e) => patchForm({ description: e.target.value })}
-              placeholder="Krótki opis zakresu prac..."
+              placeholder="Opisz zakres prac, oczekiwania i inne istotne informacje..."
               className="mt-1"
             />
-            <p className="text-xs text-muted-foreground mt-1">{form.description.length}/255</p>
           </div>
 
           <div>
@@ -499,11 +513,11 @@ export function TenderContestForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Harmonogram i wizja lokalna</CardTitle>
+          <CardTitle>Harmonogram</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <Label htmlFor="submission-deadline">Data i godzina zakończenia przyjmowania ofert *</Label>
+            <Label htmlFor="submission-deadline">Zakończenie przyjmowania ofert *</Label>
             <Input
               id="submission-deadline"
               type="datetime-local"
@@ -511,6 +525,28 @@ export function TenderContestForm({
               value={toDatetimeLocalValue(form.submissionDeadline)}
               onChange={(e) => handleSubmissionDeadlineChange(e.target.value)}
             />
+          </div>
+
+          <div>
+            <Label htmlFor="evaluation-deadline">Rozstrzygnięcia konkursu *</Label>
+            <Input
+              id="evaluation-deadline"
+              type="date"
+              className="mt-1"
+              disabled={!hasValidSubmissionDeadline}
+              min={minCompletionDateAfterSubmission(form.submissionDeadline)}
+              value={toDateInputValue(form.evaluationDeadline)}
+              onChange={(e) => {
+                patchForm({
+                  evaluationDeadline: e.target.value ? new Date(e.target.value) : null,
+                });
+              }}
+            />
+            {!hasValidSubmissionDeadline && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Najpierw ustaw datę zakończenia przyjmowania ofert.
+              </p>
+            )}
           </div>
 
           <div>
@@ -585,7 +621,7 @@ export function TenderContestForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Wymogi formalne wobec wykonawcy (opcjonalne)</CardTitle>
+          <CardTitle>Wymogi (opcjonalne)</CardTitle>
           <p className="text-sm text-muted-foreground">
             Zaznacz dokumenty i oświadczenia oczekiwane od firm składających oferty.
           </p>
@@ -739,7 +775,7 @@ export function TenderContestForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Warunki finansowe i wymogi kontraktowe (opcjonalne)</CardTitle>
+          <CardTitle>Warunki (opcjonalne)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>

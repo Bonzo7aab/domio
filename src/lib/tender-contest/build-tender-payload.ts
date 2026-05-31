@@ -141,10 +141,13 @@ export async function buildCreateTenderPayload(
         return fallback;
       })();
 
-  let evaluationDeadline: Date | null = null;
-  if (hasValidSubmissionDeadline) {
-    evaluationDeadline = new Date(form.submissionDeadline);
-    evaluationDeadline.setDate(evaluationDeadline.getDate() + 7);
+  let evaluationDeadline: Date | null = form.evaluationDeadline;
+  if (
+    evaluationDeadline &&
+    hasValidSubmissionDeadline &&
+    evaluationDeadline.getTime() <= form.submissionDeadline.getTime()
+  ) {
+    evaluationDeadline = null;
   }
 
   const requirements = buildRequirementsStrings(form.formalRequirements);
@@ -246,6 +249,9 @@ export function mapTenderRowToContestForm(
   const submissionDeadline = tender.submission_deadline
     ? new Date(tender.submission_deadline as string)
     : new Date();
+  const evaluationDeadline = tender.evaluation_deadline
+    ? new Date(tender.evaluation_deadline as string)
+    : null;
   const completionDate = tender.completion_date
     ? new Date(tender.completion_date as string)
     : null;
@@ -257,6 +263,7 @@ export function mapTenderRowToContestForm(
     category: categoryName ?? '',
     subcategory: subcategoryName ?? '',
     submissionDeadline,
+    evaluationDeadline,
     completionDate,
     siteVisitType: ((tender.site_visit_type as SiteVisitType) ?? 'not_required'),
     siteVisitNotes: (tender.site_visit_notes as string) ?? '',

@@ -50,7 +50,7 @@ export function ManagerContestDetailSections({
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <h3 className="text-base font-semibold">Opis konkursu</h3>
+        <h3 className="text-base font-semibold">Szczegółowy zakres i uwagi</h3>
         {tender.description ? (
           <p className="text-sm text-muted-foreground whitespace-pre-wrap">{tender.description}</p>
         ) : (
@@ -112,17 +112,27 @@ export function ManagerContestDetailSections({
       <section className="space-y-3">
         <h3 className="text-base font-semibold flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          Harmonogram i wizja lokalna
+          Harmonogram
         </h3>
         <div className="rounded-lg border bg-muted/40 p-4 grid gap-3 sm:grid-cols-2">
           <DetailRow
-            label="Termin składania ofert"
+            label="Zakończenie przyjmowania ofert"
             value={
               deadlineDisplay
                 ? `${deadlineDisplay.formatted}${deadlineDisplay.hint ? ` (${deadlineDisplay.hint})` : ''}`
                 : null
             }
           />
+          {contestInfo.evaluationDeadline ? (
+            <DetailRow
+              label="Rozstrzygnięcia konkursu"
+              value={new Date(contestInfo.evaluationDeadline).toLocaleDateString('pl-PL', {
+                dateStyle: 'long',
+              })}
+            />
+          ) : (
+            <DetailRow label="Rozstrzygnięcia konkursu" value="Nie określono" />
+          )}
           {contestInfo.completionDate ? (
             <DetailRow
               label="Termin wykonania"
@@ -146,7 +156,7 @@ export function ManagerContestDetailSections({
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-base font-semibold">Wymogi formalne wobec wykonawcy</h3>
+        <h3 className="text-base font-semibold">Wymogi</h3>
         {contestInfo.formalRequirementLines.length > 0 ? (
           <ul className="space-y-2">
             {contestInfo.formalRequirementLines.map((line) => (
@@ -171,7 +181,7 @@ export function ManagerContestDetailSections({
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-base font-semibold">Warunki finansowe i wymogi kontraktowe</h3>
+        <h3 className="text-base font-semibold">Warunki</h3>
 
         {contestInfo.selectionCriteria.items.length > 0 ? (
           <div>

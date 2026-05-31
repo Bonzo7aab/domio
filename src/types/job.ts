@@ -141,6 +141,7 @@ export interface ContestInfo {
   buildingAddress: string | null;
   documents: TenderContestDocumentMeta[];
   submissionDeadline: string;
+  evaluationDeadline: string | null;
   completionDate: string | null;
   siteVisitType: SiteVisitType;
   siteVisitTypeLabel: string;
