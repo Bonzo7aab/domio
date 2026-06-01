@@ -70,7 +70,7 @@ function PendingTable({ rows }: { rows: PendingVerificationRow[] }) {
             <TableHead>Użytkownik</TableHead>
             <TableHead>Firma</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Dokumenty</TableHead>
+            <TableHead>Wymagane dokumenty</TableHead>
             <TableHead>Rozpoczęta</TableHead>
             <TableHead>Zaktualizowana</TableHead>
             <TableHead />
@@ -112,7 +112,7 @@ function RejectedTable({ rows }: { rows: RejectedVerificationRow[] }) {
             <TableHead>Użytkownik</TableHead>
             <TableHead>Firma</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Dokumenty</TableHead>
+            <TableHead>Wymagane dokumenty</TableHead>
             <TableHead>Rozpoczęta</TableHead>
             <TableHead>Zaktualizowana</TableHead>
             <TableHead>Odrzucono</TableHead>
@@ -158,7 +158,7 @@ function ApprovedTable({ rows }: { rows: ApprovedVerificationRow[] }) {
             <TableHead>Użytkownik</TableHead>
             <TableHead>Firma</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Dokumenty</TableHead>
+            <TableHead>Wymagane dokumenty</TableHead>
             <TableHead>Rozpoczęta</TableHead>
             <TableHead>Zaktualizowana</TableHead>
             <TableHead>Zaakceptowano</TableHead>

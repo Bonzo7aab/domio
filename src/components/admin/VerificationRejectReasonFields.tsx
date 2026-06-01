@@ -22,6 +22,7 @@ interface VerificationRejectReasonFieldsProps {
   onReasonIdChange: (id: VerificationRejectionReasonId | '') => void;
   onCustomReasonChange: (text: string) => void;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 export function VerificationRejectReasonFields({
@@ -30,17 +31,18 @@ export function VerificationRejectReasonFields({
   onReasonIdChange,
   onCustomReasonChange,
   disabled,
+  compact = false,
 }: VerificationRejectReasonFieldsProps) {
   return (
-    <div className="space-y-3">
-      <div className="space-y-2">
-        <Label htmlFor="rejectReasonPreset">Powód odrzucenia</Label>
+    <div className={compact ? 'space-y-2' : 'space-y-3'}>
+      <div className={compact ? 'space-y-1' : 'space-y-2'}>
+        {!compact && <Label htmlFor="rejectReasonPreset">Powód odrzucenia</Label>}
         <Select
           value={reasonId || undefined}
           onValueChange={value => onReasonIdChange(value as VerificationRejectionReasonId)}
           disabled={disabled}
         >
-          <SelectTrigger id="rejectReasonPreset" className="w-full">
+          <SelectTrigger id="rejectReasonPreset" className={compact ? 'h-9 w-full' : 'w-full'}>
             <SelectValue placeholder="Wybierz powód odrzucenia…" />
           </SelectTrigger>
           <SelectContent>
@@ -53,15 +55,16 @@ export function VerificationRejectReasonFields({
         </Select>
       </div>
       {reasonId === 'other' && (
-        <div className="space-y-2">
-          <Label htmlFor="rejectReasonCustom">Szczegóły (Inne)</Label>
+        <div className={compact ? 'space-y-1' : 'space-y-2'}>
+          {!compact && <Label htmlFor="rejectReasonCustom">Szczegóły (Inne)</Label>}
           <Textarea
             id="rejectReasonCustom"
             value={customReason}
             onChange={e => onCustomReasonChange(e.target.value)}
-            placeholder="Opisz powód odrzucenia widoczny dla użytkownika…"
-            rows={3}
+            placeholder={compact ? 'Opisz powód odrzucenia…' : 'Opisz powód odrzucenia widoczny dla użytkownika…'}
+            rows={compact ? 2 : 3}
             disabled={disabled}
+            className={compact ? 'min-h-0 resize-none text-sm' : undefined}
           />
         </div>
       )}
