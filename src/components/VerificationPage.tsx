@@ -49,6 +49,7 @@ import {
   getContractorAccountSettings,
   upsertContractorAccountSettings,
 } from '../lib/database/contractor-account';
+import { createClient } from '../lib/supabase/client';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import type { VerificationStatus } from '../lib/database/verification';
 import type {
@@ -685,9 +686,10 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     let cancelled = false;
     void (async () => {
       try {
-        const [settings, company] = await Promise.all([
+        const supabase = createClient();
+        const [settings, { data: company }] = await Promise.all([
           getContractorAccountSettings(user.id),
-          fetchUserPrimaryCompany(user.id),
+          fetchUserPrimaryCompany(supabase, user.id),
         ]);
         if (!cancelled) {
           setHasOcPolicyInAccount(Boolean(settings.ocPolicyScanPath));
