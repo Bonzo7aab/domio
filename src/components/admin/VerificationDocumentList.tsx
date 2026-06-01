@@ -130,15 +130,17 @@ export function VerificationDocumentList({
 
   return (
     <ul className="space-y-3">
-      {documents.map(doc => {
-        const updated = isUpdatedSince(doc.uploadedAt, updatedSince);
+      {documents.map((doc) => {
+        const isMissing = Boolean(doc.missing);
+        const updated = !isMissing && isUpdatedSince(doc.uploadedAt, updatedSince);
         const uploadedLabel = formatDateTime(doc.uploadedAt);
         const review = (reviews && reviews[doc.key]) ?? null;
-        const stale = isReviewStale(doc.uploadedAt, review);
+        const stale = !isMissing && isReviewStale(doc.uploadedAt, review);
         const isApprovedFresh = review?.status === 'approved' && !stale;
         const isRejectedFresh = review?.status === 'rejected' && !stale;
 
         const rowClasses = (() => {
+          if (isMissing) return 'border-dashed bg-muted/30';
           if (isApprovedFresh) return 'border-emerald-500/40 bg-emerald-500/5';
           if (isRejectedFresh) return 'border-destructive/40 bg-destructive/5';
           if (updated) return 'border-amber-500/40 bg-amber-500/5';
@@ -154,6 +156,11 @@ export function VerificationDocumentList({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{doc.label}</span>
+                  {isMissing && (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Brak w profilu
+                    </Badge>
+                  )}
                   {isApprovedFresh && (
                     <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
                       <Check className="h-3 w-3" />
@@ -179,16 +186,18 @@ export function VerificationDocumentList({
                     </Badge>
                   )}
                 </div>
-                <div className="truncate text-xs text-muted-foreground" title={doc.filename}>
-                  {doc.filename}
-                </div>
-                {uploadedLabel && (
+                {!isMissing && (
+                  <div className="truncate text-xs text-muted-foreground" title={doc.filename}>
+                    {doc.filename}
+                  </div>
+                )}
+                {!isMissing && uploadedLabel && (
                   <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                     <CalendarClock className="h-3 w-3" />
                     Przesłano: {uploadedLabel}
                   </div>
                 )}
-                {doc.key === 'insurance' && (
+                {doc.key === 'insurance' && !isMissing && (
                   <div
                     className={`mt-0.5 flex flex-wrap items-center gap-1 text-xs ${
                       ocValidity?.status === 'expired'
@@ -220,9 +229,10 @@ export function VerificationDocumentList({
                     )}
                   </div>
                 )}
-                {doc.error && <div className="text-xs text-destructive">{doc.error}</div>}
+                {doc.error && !isMissing && <div className="text-xs text-destructive">{doc.error}</div>}
               </div>
-              <div className="flex flex-wrap gap-2 sm:items-start">
+              {!isMissing && (
+                <div className="flex flex-wrap gap-2 sm:items-start">
                 <Button asChild type="button" size="sm" variant="outline" disabled={!doc.viewUrl}>
                   {doc.viewUrl ? (
                     <a href={doc.viewUrl} target="_blank" rel="noopener noreferrer">
@@ -251,18 +261,19 @@ export function VerificationDocumentList({
                     </span>
                   )}
                 </Button>
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Active reason (rejection) */}
-            {isRejectedFresh && review?.reason && (
+            {!isMissing && isRejectedFresh && review?.reason && (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-sm text-destructive">
                 <span className="font-medium">Powód:</span> {review.reason}
               </div>
             )}
 
             {/* Stale review breadcrumb so we keep an audit trail before the new evaluation */}
-            {stale && review && (
+            {!isMissing && stale && review && (
               <div className="rounded-md border border-amber-500/30 bg-background p-2 text-xs text-muted-foreground">
                 <span className="font-medium">
                   Poprzednia ocena ({review.status === 'approved' ? 'zaakceptowany' : 'odrzucony'}):
@@ -272,7 +283,7 @@ export function VerificationDocumentList({
               </div>
             )}
 
-            {showControls && subjectUserId && (
+            {!isMissing && showControls && subjectUserId && (
               <DocumentReviewControls
                 subjectUserId={subjectUserId}
                 documentKey={doc.key}

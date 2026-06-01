@@ -146,16 +146,16 @@ export async function submitVerificationDocumentsAction(
     return { ok: false, error: 'Nie udało się wczytać profilu.' };
   }
 
-  if (profile.is_verified) {
-    const { invalidateUserVerification } = await import('../../lib/verification/invalidate-verification');
-    await invalidateUserVerification(supabase, user.id);
-  }
-
   const userType = profile.user_type;
   const docKeys =
     userType === 'contractor'
       ? ['company_registration', 'insurance', 'certifications', 'references']
       : ['company_registration', 'insurance', 'management_license', 'management_contracts'];
+
+  const optionalDocKeys =
+    userType === 'contractor'
+      ? new Set(['certifications', 'references'])
+      : new Set(['management_license', 'management_contracts']);
 
   const existingPaths =
     (profile.verification_document_paths as Record<string, string> | null | undefined) ?? {};
@@ -182,6 +182,16 @@ export async function submitVerificationDocumentsAction(
   }
 
   const merged = { ...existingPaths, ...newPaths };
+  const newPathKeys = Object.keys(newPaths);
+  const onlyOptionalUploads =
+    profile.is_verified &&
+    newPathKeys.length > 0 &&
+    newPathKeys.every((key) => optionalDocKeys.has(key));
+
+  if (profile.is_verified && !onlyOptionalUploads && newPathKeys.length > 0) {
+    const { invalidateUserVerification } = await import('../../lib/verification/invalidate-verification');
+    await invalidateUserVerification(supabase, user.id);
+  }
 
   let hasInsuranceDoc = Boolean(merged.insurance);
   if (userType === 'contractor' && !hasInsuranceDoc) {
@@ -239,12 +249,16 @@ export async function submitVerificationDocumentsAction(
     };
   }
 
+  const profileUpdate: { verification_document_paths: Json; verification_submitted_at?: string } = {
+    verification_document_paths: merged as Json,
+  };
+  if (!onlyOptionalUploads) {
+    profileUpdate.verification_submitted_at = new Date().toISOString();
+  }
+
   const { error: updateErr } = await supabase
     .from('user_profiles')
-    .update({
-      verification_document_paths: merged as Json,
-      verification_submitted_at: new Date().toISOString(),
-    })
+    .update(profileUpdate)
     .eq('id', user.id);
 
   if (updateErr) {

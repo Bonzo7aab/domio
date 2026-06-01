@@ -23,7 +23,7 @@ export function ContestOfferStepOverview({
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Opis konkursu</CardTitle>
+          <CardTitle className="text-base">Szczegółowy zakres i uwagi</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground whitespace-pre-wrap">{description}</p>

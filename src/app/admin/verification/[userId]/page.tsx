@@ -1,8 +1,6 @@
-import { RefreshCw } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { requirePlatformAdmin } from '../../../../lib/admin/require-platform-admin';
 import { getUserVerificationStatus } from '../../../../lib/database/verification-queries';
-import { VerificationSubjectHeader } from '../../../../components/admin/VerificationSubjectHeader';
 import { createAdminClientOrNull } from '../../../../lib/supabase/admin';
 import {
   countSubmittedDocuments,
@@ -10,14 +8,16 @@ import {
   fetchAdminNotesForUser,
   fetchLatestDecisionAtForUser,
   fetchVerificationDocumentReviews,
+  filterPathsToRequiredDocuments,
   getVerificationDocumentSignedUrls,
+  mergeRequiredVerificationDocuments,
   resolveUpdatedAt,
+  type AdminVerificationSubjectProfile,
 } from '../../../../lib/database/admin-verification';
-import { VerificationSubjectReview } from '../../../../components/admin/VerificationSubjectReview';
-import { VerificationDocumentList } from '../../../../components/admin/VerificationDocumentList';
-import { AdminUserNotes } from '../../../../components/admin/AdminUserNotes';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card';
-import { Badge } from '../../../../components/ui/badge';
+import { VAT_STATUS_OPTIONS } from '../../../../lib/contractor/constants';
+import { normalizeIbanInput } from '../../../../lib/contractor/iban';
+import { VerificationSubjectPanel } from '../../../../components/admin/VerificationSubjectPanel';
+import { AdminNotesCollapsibleSection } from '../../../../components/admin/AdminNotesCollapsibleSection';
 
 interface PageProps {
   params: Promise<{ userId: string }>;
@@ -51,9 +51,14 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
           name,
           type,
           nip,
+          regon,
+          krs,
+          address,
+          city,
+          postal_code,
           email,
           phone,
-          city
+          website
         )
       )
     `
@@ -102,11 +107,25 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
 
   let ocValidUntil: string | null = null;
   let ocPolicyScanPath: string | null = null;
+  let subjectProfile: AdminVerificationSubjectProfile = {
+    companyRegon: null,
+    companyKrs: null,
+    companyAddress: null,
+    companyPostalCode: null,
+    companyPhone: null,
+    companyEmail: null,
+    companyWebsite: null,
+    bankAccountIban: null,
+    vatStatusLabel: null,
+    ocGuaranteeAmountPln: null,
+  };
 
   if (profile.user_type === 'contractor') {
     const { data: cas, error: casError } = await sb
       .from('contractor_account_settings')
-      .select('oc_valid_until, oc_policy_scan_path')
+      .select(
+        'oc_valid_until, oc_policy_scan_path, bank_account_iban, vat_status, oc_guarantee_amount'
+      )
       .eq('user_id', userId)
       .maybeSingle();
     if (casError) {
@@ -118,6 +137,22 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
     }
     ocValidUntil = (cas?.oc_valid_until as string) ?? null;
     ocPolicyScanPath = (cas?.oc_policy_scan_path as string) ?? null;
+
+    const rawIban = typeof cas?.bank_account_iban === 'string' ? cas.bank_account_iban : null;
+    const ibanDigits = rawIban ? normalizeIbanInput(rawIban) : '';
+    subjectProfile.bankAccountIban = ibanDigits.length === 26 ? ibanDigits : rawIban;
+
+    const vatStatus = cas?.vat_status as string | null | undefined;
+    subjectProfile.vatStatusLabel =
+      VAT_STATUS_OPTIONS.find((o) => o.value === vatStatus)?.label ?? null;
+
+    const guarantee = cas?.oc_guarantee_amount;
+    if (typeof guarantee === 'number' && Number.isFinite(guarantee)) {
+      subjectProfile.ocGuaranteeAmountPln = guarantee;
+    } else if (typeof guarantee === 'string' && guarantee.trim()) {
+      const parsed = Number(guarantee);
+      subjectProfile.ocGuaranteeAmountPln = Number.isFinite(parsed) ? parsed : null;
+    }
   }
 
   const docPaths: Record<string, string> = {
@@ -128,8 +163,9 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
   }
 
   const userType = (profile.user_type as string) ?? '';
+  const requiredDocPaths = filterPathsToRequiredDocuments(userType, docPaths);
   const paths = profile.verification_document_paths as Record<string, string> | null | undefined;
-  const documentsSubmitted = countSubmittedDocuments(userType, paths);
+  const documentsSubmitted = countSubmittedDocuments(userType, docPaths);
   const documentsExpected = expectedDocumentCount(userType);
 
   const ucs = (profile.user_companies ?? []) as Array<{
@@ -137,24 +173,48 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
     companies?: {
       name?: string;
       nip?: string;
+      regon?: string;
+      krs?: string;
+      address?: string;
+      city?: string;
+      postal_code?: string;
       email?: string;
       phone?: string;
-      city?: string;
+      website?: string;
     };
   }>;
   const primary = ucs.find((uc) => uc.is_primary) ?? ucs[0];
   const company = primary?.companies;
 
-  const [documents, lastDecisionAt, reviews, verificationStatus] = await Promise.all([
-    getVerificationDocumentSignedUrls(supabase, docPaths),
+  const trimOrNull = (value: string | null | undefined): string | null => {
+    const t = value?.trim();
+    return t ? t : null;
+  };
+
+  subjectProfile = {
+    ...subjectProfile,
+    companyRegon: trimOrNull(company?.regon),
+    companyKrs: trimOrNull(company?.krs),
+    companyAddress: trimOrNull(company?.address),
+    companyPostalCode: trimOrNull(company?.postal_code),
+    companyPhone: trimOrNull(company?.phone),
+    companyEmail: trimOrNull(company?.email),
+    companyWebsite: trimOrNull(company?.website),
+  };
+
+  const [uploadedDocuments, lastDecisionAt, reviews, verificationStatus] = await Promise.all([
+    getVerificationDocumentSignedUrls(supabase, requiredDocPaths),
     fetchLatestDecisionAtForUser(supabase, userId),
     fetchVerificationDocumentReviews(supabase, userId),
     getUserVerificationStatus(userId, supabase),
   ]);
 
+  const documents = mergeRequiredVerificationDocuments(userType, uploadedDocuments);
+
   return (
     <div className="space-y-6">
-      <VerificationSubjectHeader
+      <VerificationSubjectPanel
+        subjectUserId={userId}
         firstName={(profile.first_name as string) ?? ''}
         lastName={(profile.last_name as string) ?? ''}
         userType={userType}
@@ -175,67 +235,14 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
         )}
         submittedAt={(profile.verification_submitted_at as string | null) ?? null}
         notesCount={notes.length}
-      />
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-base">Dokumenty</CardTitle>
-            {(() => {
-              if (!lastDecisionAt) return null;
-              const updatedCount = documents.filter(
-                (d) => d.uploadedAt && Date.parse(d.uploadedAt) > Date.parse(lastDecisionAt)
-              ).length;
-              if (updatedCount === 0) {
-                return (
-                  <Badge variant="outline" className="text-xs">
-                    Brak zmian od ostatniej decyzji
-                  </Badge>
-                );
-              }
-              return (
-                <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 text-xs">
-                  <RefreshCw className="h-3 w-3" />
-                  {updatedCount} z {documents.length}{' '}
-                  {documents.length === 1 ? 'dokument' : 'dokumentów'} zaktualizowanych
-                </Badge>
-              );
-            })()}
-          </div>
-          {lastDecisionAt && (
-            <p className="text-xs text-muted-foreground">
-              Ostatnia decyzja: {new Date(lastDecisionAt).toLocaleString('pl-PL')}
-            </p>
-          )}
-        </CardHeader>
-        <CardContent>
-          <VerificationDocumentList
-            documents={documents}
-            updatedSince={lastDecisionAt}
-            reviews={reviews}
-            subjectUserId={userId}
-            ocValidUntil={profile.user_type === 'contractor' ? ocValidUntil : null}
-          />
-        </CardContent>
-      </Card>
-
-      <VerificationSubjectReview
-        subjectUserId={userId}
-        userType={profile.user_type}
-        ocValidUntil={ocValidUntil}
-        hasOcScan={Boolean(ocPolicyScanPath)}
         documents={documents}
         reviews={reviews}
+        lastDecisionAt={lastDecisionAt}
+        ocValidUntil={ocValidUntil}
+        profileDetails={subjectProfile}
       />
 
-      <Card id="admin-notes" className="scroll-mt-6">
-        <CardHeader>
-          <CardTitle className="text-base">Notatki wewnętrzne</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AdminUserNotes subjectUserId={userId} notes={notes} variant="section" />
-        </CardContent>
-      </Card>
+      <AdminNotesCollapsibleSection subjectUserId={userId} notes={notes} />
     </div>
   );
 }

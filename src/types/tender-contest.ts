@@ -54,6 +54,7 @@ export interface TenderContestFormData {
   category: string;
   subcategory: string;
   submissionDeadline: Date;
+  evaluationDeadline: Date | null;
   completionDate: Date | null;
   siteVisitType: SiteVisitType;
   siteVisitNotes: string;
@@ -180,6 +181,7 @@ export function createEmptyTenderContestForm(): TenderContestFormData {
     category: '',
     subcategory: '',
     submissionDeadline: new Date(),
+    evaluationDeadline: null,
     completionDate: null,
     siteVisitType: 'not_required',
     siteVisitNotes: '',
