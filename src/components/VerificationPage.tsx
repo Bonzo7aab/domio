@@ -22,7 +22,8 @@ import {
   Building2,
   Award,
   Users,
-  type LucideIcon,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -34,6 +35,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { cn } from './ui/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { useUserProfile } from '../contexts/AuthContext';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from './ui/dropzone';
 import type { FileRejection } from 'react-dropzone';
@@ -47,6 +49,7 @@ import {
   getContractorAccountSettings,
   upsertContractorAccountSettings,
 } from '../lib/database/contractor-account';
+import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import type { VerificationStatus } from '../lib/database/verification';
 import type {
   DocumentReview,
@@ -73,6 +76,8 @@ interface VerificationPageProps {
 }
 
 type DocumentReviewState = 'approved' | 'rejected' | 'pending' | 'stale';
+/** File on record or satisfied via profile (KRS/OC) — shown in section header, not on file row. */
+type DocHighlightStatus = DocumentReviewState | 'attached';
 
 interface DocumentUpload {
   type: string;
@@ -104,19 +109,19 @@ function formatFileSize(bytes: number): string {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
-function getDocumentIcon(type: string): LucideIcon {
+function renderDocumentIcon(type: string, className?: string): React.ReactElement {
   switch (type) {
     case 'company_registration':
-      return Building2;
+      return <Building2 className={className} />;
     case 'insurance':
-      return Shield;
+      return <Shield className={className} />;
     case 'certifications':
     case 'management_license':
-      return Award;
+      return <Award className={className} />;
     case 'references':
-      return Users;
+      return <Users className={className} />;
     default:
-      return FileText;
+      return <FileText className={className} />;
   }
 }
 
@@ -126,6 +131,7 @@ function isRequiredDocComplete(
   uploads: Record<string, DocumentUpload>,
   isContractor: boolean,
   hasOcPolicyInAccount: boolean,
+  hasCompanyKrsOrRegon: boolean,
 ): boolean {
   if (!doc.required) return true;
   const hasExisting = Boolean(existingByKey[doc.type]);
@@ -133,7 +139,51 @@ function isRequiredDocComplete(
   if (doc.type === 'insurance' && isContractor) {
     return hasNew || hasExisting || hasOcPolicyInAccount;
   }
+  if (doc.type === 'company_registration' && isContractor) {
+    return hasNew || hasExisting || hasCompanyKrsOrRegon;
+  }
   return hasNew || hasExisting;
+}
+
+function resolveDocHighlightStatus(
+  doc: { type: string; required: boolean },
+  existingByKey: Record<string, VerificationDocumentEntry>,
+  uploads: Record<string, DocumentUpload>,
+  reviewByKey: DocumentReviewMap,
+  isContractor: boolean,
+  hasOcPolicyInAccount: boolean,
+  hasCompanyKrsOrRegon: boolean,
+): DocHighlightStatus | null {
+  const existing = existingByKey[doc.type];
+  const newFile = uploads[doc.type]?.file;
+  if (existing) {
+    const review = reviewByKey[existing.key] ?? null;
+    const state = deriveDocumentReviewState(existing, review);
+    if (state === 'approved' || state === 'rejected' || state === 'stale') {
+      return state;
+    }
+    return 'attached';
+  }
+  if (newFile) {
+    return 'attached';
+  }
+  // Optional slots (certifications, references) — badge only when a file exists, not via profile fallbacks.
+  if (!doc.required) {
+    return null;
+  }
+  if (
+    isRequiredDocComplete(
+      doc,
+      existingByKey,
+      uploads,
+      isContractor,
+      hasOcPolicyInAccount,
+      hasCompanyKrsOrRegon,
+    )
+  ) {
+    return 'attached';
+  }
+  return null;
 }
 
 interface StateBannerProps {
@@ -240,10 +290,6 @@ function VerificationStateBanner({ status, onAction }: StateBannerProps) {
               <p className="mt-1 text-sm text-foreground whitespace-pre-line">{reason}</p>
             </div>
           )}
-          <p className="text-sm text-muted-foreground">
-            Popraw wskazane elementy i prześlij dokumenty ponownie poniżej. Możesz zachować
-            dotychczas przesłane pliki i zastąpić tylko te, które wymagają korekty.
-          </p>
         </CardContent>
       </Card>
     );
@@ -269,45 +315,119 @@ function VerificationStateBanner({ status, onAction }: StateBannerProps) {
   );
 }
 
-interface DocumentsSectionShellProps {
-  /** Short section marker, e.g. „Sekcja A”. */
+interface DocumentsCollapsibleSectionProps {
   eyebrow?: string;
-  /** Clear subject title for this block. */
   heading: string;
   description?: string;
   id?: string;
+  required?: boolean;
+  highlightStatus?: DocHighlightStatus | null;
   children: React.ReactNode;
 }
 
-function DocumentsSectionShell({
+function DocumentsCollapsibleSection({
   eyebrow,
   heading,
   description,
   id,
+  required = false,
+  highlightStatus = null,
   children,
-}: DocumentsSectionShellProps) {
+}: DocumentsCollapsibleSectionProps) {
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <section id={id} className="scroll-mt-24 border-t first:border-t-0">
-      <div className="border-b bg-muted/40 px-4 py-4 sm:px-6">
-        {eyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {eyebrow}
-          </p>
-        ) : null}
-        <h3
-          className={cn(
-            'text-base font-semibold tracking-tight text-foreground',
-            eyebrow ? 'mt-1' : '',
-          )}
-        >
-          {heading}
-        </h3>
-        {description ? (
-          <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
-        ) : null}
-      </div>
-      <div className="px-4 py-5 sm:px-6">{children}</div>
-    </section>
+    <Collapsible
+      id={id}
+      open={open}
+      onOpenChange={setOpen}
+      className="scroll-mt-24 border-b border-border last:border-b-0"
+    >
+      <CollapsibleTrigger className="flex w-full items-start gap-3 bg-muted/40 px-4 py-3 text-left hover:bg-muted/60 sm:px-6">
+        <span className="mt-0.5 shrink-0 text-muted-foreground">
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          {eyebrow ? (
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {eyebrow}
+            </p>
+          ) : null}
+          <span className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                'text-base font-semibold tracking-tight text-foreground',
+                eyebrow ? 'mt-0.5' : '',
+              )}
+            >
+              {heading}
+            </span>
+            {required ? (
+              <Badge variant="secondary" className="text-[10px] font-medium uppercase">
+                Wymagane
+              </Badge>
+            ) : null}
+            {highlightStatus ? <HeaderDocStatusBadge status={highlightStatus} /> : null}
+          </span>
+          {description ? (
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          ) : null}
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="px-4 py-4 sm:px-6">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+interface VerificationDocumentCollapsibleItemProps {
+  doc: { type: string; name: string; description: string; required: boolean };
+  highlightStatus?: DocHighlightStatus | null;
+  children: React.ReactNode;
+}
+
+function VerificationDocumentCollapsibleItem({
+  doc,
+  highlightStatus = null,
+  children,
+}: VerificationDocumentCollapsibleItemProps) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="border-b border-border last:border-b-0"
+    >
+      <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted/40 sm:px-6">
+        <span className="mt-0.5 shrink-0 text-muted-foreground">
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </span>
+        <span className="flex min-w-0 flex-1 gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground">
+            {renderDocumentIcon(doc.type, 'h-4 w-4')}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">{doc.name}</span>
+              {doc.required ? (
+                <Badge variant="secondary" className="text-[10px] font-medium uppercase">
+                  Wymagane
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] font-medium uppercase text-muted-foreground">
+                  Opcjonalne
+                </Badge>
+              )}
+              {highlightStatus ? <HeaderDocStatusBadge status={highlightStatus} /> : null}
+            </span>
+            <p className="mt-0.5 text-xs text-muted-foreground">{doc.description}</p>
+          </span>
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>{children}</CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -327,6 +447,19 @@ interface ExistingDocChipProps {
   isRemoving?: boolean;
   /** When set, shown above the file card (e.g. approved list). */
   headingAboveFile?: string;
+}
+
+/** Status next to „Wymagane” / „Opcjonalne” in section headers. */
+function HeaderDocStatusBadge({ status }: { status: DocHighlightStatus }) {
+  if (status === 'attached') {
+    return (
+      <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
+        <Check className="h-3 w-3" />
+        Przesłano
+      </Badge>
+    );
+  }
+  return <ReviewBadge state={status} />;
 }
 
 function ReviewBadge({ state }: { state: DocumentReviewState }) {
@@ -388,7 +521,9 @@ function ExistingDocChip({
               <span className="text-xs font-medium text-foreground">
                 {headingAboveFile ? 'Plik do weryfikacji' : 'Przesłany plik'}
               </span>
-              <ReviewBadge state={reviewState} />
+              {(reviewState === 'rejected' || reviewState === 'stale') && (
+                <ReviewBadge state={reviewState} />
+              )}
             </div>
             <div className="truncate text-sm font-medium" title={doc.filename}>
               {doc.filename}
@@ -508,6 +643,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasOcPolicyInAccount, setHasOcPolicyInAccount] = useState(false);
+  const [hasCompanyKrsOrRegon, setHasCompanyKrsOrRegon] = useState(false);
   const [replaceMode, setReplaceMode] = useState<Record<string, boolean>>({});
   const [pendingDocRemovalKey, setPendingDocRemovalKey] = useState<string | null>(null);
   const [isRemovingDoc, setIsRemovingDoc] = useState(false);
@@ -524,7 +660,9 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   const isContractor = user?.userType === 'contractor';
   const useContractorDocumentSections = embedded && isContractor;
   const status = initialStatus.state;
-  const showUploadForm = status !== 'approved';
+  /** Standalone /verification page: hide upload UI once approved. Account tab always shows sections. */
+  const showDocumentSections = embedded || status !== 'approved';
+  const showVerificationSubmit = status !== 'approved';
 
   const existingByKey = useMemo(() => {
     const map: Record<string, VerificationDocumentEntry> = {};
@@ -539,6 +677,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   useEffect(() => {
     if (!user?.id || !isContractor) {
       setHasOcPolicyInAccount(false);
+      setHasCompanyKrsOrRegon(false);
       setOcValidUntil('');
       setInitialOcValidUntil('');
       return;
@@ -546,9 +685,15 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     let cancelled = false;
     void (async () => {
       try {
-        const settings = await getContractorAccountSettings(user.id);
+        const [settings, company] = await Promise.all([
+          getContractorAccountSettings(user.id),
+          fetchUserPrimaryCompany(user.id),
+        ]);
         if (!cancelled) {
           setHasOcPolicyInAccount(Boolean(settings.ocPolicyScanPath));
+          setHasCompanyKrsOrRegon(
+            Boolean(company?.krs?.trim() || company?.regon?.trim()),
+          );
           const dateValue = settings.ocValidUntil ?? '';
           setOcValidUntil(dateValue);
           setInitialOcValidUntil(dateValue);
@@ -560,6 +705,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       } catch {
         if (!cancelled) {
           setHasOcPolicyInAccount(false);
+          setHasCompanyKrsOrRegon(false);
           setOcValidUntil('');
           setInitialOcValidUntil('');
         }
@@ -660,6 +806,10 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   ];
 
   const documents = isContractor ? contractorDocuments : managerDocuments;
+  /** KRS/CEIDG + OC — always two required slots for verification (admin + submit gate). */
+  const verificationRequiredDocs = documents.filter(
+    doc => doc.type === 'company_registration' || doc.type === 'insurance',
+  );
   const visibleDocuments = useContractorDocumentSections
     ? documents.filter(doc => doc.type !== 'company_registration')
     : documents;
@@ -768,7 +918,8 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 
     try {
       const fd = new FormData();
-      for (const doc of visibleDocuments) {
+      // Include all document slots (e.g. company_registration is hidden from visibleDocuments for contractors).
+      for (const doc of documents) {
         const file = uploads[doc.type]?.file;
         if (file) {
           fd.append(doc.type, file);
@@ -780,7 +931,11 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
         toast.error(result.error ?? 'Nie udało się przesłać dokumentów');
         return;
       }
-      toast.success('Dokumenty zostały przesłane do weryfikacji');
+      toast.success(
+        embedded && status === 'approved'
+          ? 'Dokumenty zostały zapisane'
+          : 'Dokumenty zostały przesłane do weryfikacji',
+      );
       router.refresh();
     } catch (e) {
       console.error(e);
@@ -792,27 +947,43 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 
   // A required doc is "covered" if there's a new file OR a previously uploaded
   // file. Contractor OC is also covered by an OC scan stored in account settings.
-  const requiredDocumentsUploaded = visibleDocuments
-    .filter(doc => doc.required)
-    .every(doc =>
-      isRequiredDocComplete(doc, existingByKey, uploads, isContractor, hasOcPolicyInAccount),
-    );
+  const requiredDocumentsUploaded = verificationRequiredDocs.every(doc =>
+    isRequiredDocComplete(
+      doc,
+      existingByKey,
+      uploads,
+      isContractor,
+      hasOcPolicyInAccount,
+      hasCompanyKrsOrRegon,
+    ),
+  );
 
-  const requiredDocs = visibleDocuments.filter(doc => doc.required);
-  const requiredCompleteCount = requiredDocs.filter(doc =>
-    isRequiredDocComplete(doc, existingByKey, uploads, isContractor, hasOcPolicyInAccount),
+  const requiredCompleteCount = verificationRequiredDocs.filter(doc =>
+    isRequiredDocComplete(
+      doc,
+      existingByKey,
+      uploads,
+      isContractor,
+      hasOcPolicyInAccount,
+      hasCompanyKrsOrRegon,
+    ),
   ).length;
   const requiredProgressPct =
-    requiredDocs.length > 0
-      ? Math.round((requiredCompleteCount / requiredDocs.length) * 100)
+    verificationRequiredDocs.length > 0
+      ? Math.round((requiredCompleteCount / verificationRequiredDocs.length) * 100)
       : 100;
 
-  const newUploadsCount = visibleDocuments.reduce(
+  const newUploadsCount = documents.reduce(
     (count, doc) => count + (uploads[doc.type]?.file ? 1 : 0),
     0
   );
 
+  const showOptionalSave = embedded && status === 'approved' && newUploadsCount > 0;
+
   const submitLabel = (() => {
+    if (embedded && status === 'approved') {
+      return 'Zapisz dokumenty';
+    }
     if (status === 'rejected') {
       return newUploadsCount > 0 ? 'Prześlij ponownie' : 'Wyślij ponownie do weryfikacji';
     }
@@ -831,9 +1002,22 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
           ? 'Weryfikacja została odrzucona — możesz przesłać dokumenty ponownie'
           : 'Prześlij dokumenty aby zweryfikować swoje konto';
 
+  const getDocHighlightStatus = (
+    doc: { type: string; required: boolean },
+  ): DocHighlightStatus | null =>
+    resolveDocHighlightStatus(
+      doc,
+      existingByKey,
+      uploads,
+      reviewByKey,
+      isContractor,
+      hasOcPolicyInAccount,
+      hasCompanyKrsOrRegon,
+    );
+
   const renderContractorDocumentRow = (
     doc: { type: string; name: string; description: string; required: boolean },
-    options?: { nestedInSectionShell?: boolean },
+    options?: { nestedInSectionShell?: boolean; hideHeader?: boolean },
   ) => {
     const existing = existingByKey[doc.type];
     const newFile = uploads[doc.type]?.file ?? null;
@@ -842,114 +1026,28 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     const reviewState = existing ? deriveDocumentReviewState(existing, review) : 'pending';
     const isReplacing = !!replaceMode[doc.type];
     const showUploadSection = !existing || isReplacing;
-    const DocIcon = getDocumentIcon(doc.type);
-    const isComplete = isRequiredDocComplete(
-      doc,
-      existingByKey,
-      uploads,
-      isContractor,
-      hasOcPolicyInAccount,
-    );
+
+    const hideHeader = options?.hideHeader ?? false;
 
     return (
       <section
         key={doc.type}
-        id={doc.type === 'insurance' && isContractor ? 'oc-policy' : undefined}
+        id={doc.type === 'insurance' && isContractor && !hideHeader ? 'oc-policy' : undefined}
         className={cn(
-          !options?.nestedInSectionShell && 'px-4 py-5 sm:px-6',
           reviewState === 'rejected' && 'bg-destructive/[0.03]',
           reviewState === 'approved' && existing && 'bg-emerald-500/[0.03]',
         )}
       >
-        {options?.nestedInSectionShell ? (
-          <div className="mb-4 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-base font-semibold tracking-tight text-foreground">{doc.name}</h4>
-              {doc.required ? (
-                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
-                  Wymagany
-                </span>
-              ) : (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Opcjonalny
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">{doc.description}</p>
-            <div className="flex flex-wrap items-center gap-2 pt-0.5">
-              <div
-                className={cn(
-                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border',
-                  isComplete && doc.required
-                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                    : 'border-border bg-muted/50 text-muted-foreground',
-                )}
-              >
-                <DocIcon className="h-4 w-4" />
-              </div>
-              {existing ? (
-                <ReviewBadge state={reviewState} />
-              ) : doc.required && isComplete ? (
-                <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
-                  <Check className="h-3 w-3" />
-                  Gotowe
-                </Badge>
-              ) : null}
-              {willReplace && (
-                <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">
-                  <RefreshCw className="h-3 w-3" />
-                  Do zastąpienia
-                </Badge>
-              )}
-            </div>
+        {hideHeader ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {willReplace && (
+              <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">
+                <RefreshCw className="h-3 w-3" />
+                Do zastąpienia
+              </Badge>
+            )}
           </div>
-        ) : (
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 gap-3">
-              <div
-                className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border',
-                  isComplete && doc.required
-                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                    : 'border-border bg-muted/50 text-muted-foreground',
-                )}
-              >
-                <DocIcon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold">{doc.name}</h3>
-                  {doc.required ? (
-                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
-                      Wymagany
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Opcjonalny
-                    </span>
-                  )}
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">{doc.description}</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-              {existing ? (
-                <ReviewBadge state={reviewState} />
-              ) : doc.required && isComplete ? (
-                <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
-                  <Check className="h-3 w-3" />
-                  Gotowe
-                </Badge>
-              ) : null}
-              {willReplace && (
-                <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">
-                  <RefreshCw className="h-3 w-3" />
-                  Do zastąpienia
-                </Badge>
-              )}
-            </div>
-          </div>
-        )}
+        ) : null}
 
         <div className="space-y-4">
           {existing && (
@@ -1128,7 +1226,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
           )}
 
           {/* Approved: read-only documents list */}
-          {status === 'approved' && existingDocuments.length > 0 && (
+          {status === 'approved' && existingDocuments.length > 0 && !embedded && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Twoje dokumenty weryfikacyjne</CardTitle>
@@ -1157,7 +1255,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             </Card>
           )}
 
-          {!showUploadForm && !embedded && (
+          {!showDocumentSections && !embedded && (
             <Card className="border-primary/20 bg-primary/5">
               <CardContent className="px-4 py-3">
                 <div className="flex items-start gap-3">
@@ -1176,7 +1274,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             </Card>
           )}
 
-          {showUploadForm && (
+          {showDocumentSections && (
             <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
               <div className="border-b bg-muted/30 px-4 py-4 sm:px-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1186,48 +1284,54 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                     </div>
                     <div className="min-w-0">
                       <h2 className="text-base font-semibold tracking-tight">
-                        {existingDocuments.length > 0
-                          ? 'Twoje dokumenty weryfikacyjne'
-                          : 'Dokumenty do weryfikacji'}
+                        {status === 'approved' && embedded
+                          ? 'Dokumenty i załączniki'
+                          : existingDocuments.length > 0
+                            ? 'Twoje dokumenty weryfikacyjne'
+                            : 'Dokumenty do weryfikacji'}
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Zweryfikowane konto buduje zaufanie i poprawia widoczność w wynikach.
-                        Weryfikacja jest bezpłatna i trwa zwykle 1–3 dni robocze.
+                        {status === 'approved' && embedded
+                          ? 'Konto jest zweryfikowane. Możesz uzupełniać opcjonalne dokumenty (referencje, certyfikaty) i aktualizować zaświadczenia.'
+                          : 'Zweryfikowane konto buduje zaufanie i poprawia widoczność w wynikach. Weryfikacja jest bezpłatna i trwa zwykle 1–3 dni robocze.'}
                       </p>
-                      {existingDocuments.length > 0 && (
+                      {existingDocuments.length > 0 && !(status === 'approved' && embedded) && (
                         <p className="mt-2 text-xs text-muted-foreground">
                           Użyj „Zastąp”, aby wymienić plik w wybranym polu.
                         </p>
                       )}
                     </div>
                   </div>
-                  <div className="w-full shrink-0 lg:w-52">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-muted-foreground">Wymagane dokumenty</span>
-                      <span className="tabular-nums font-semibold text-foreground">
-                        {requiredCompleteCount}/{requiredDocs.length}
-                      </span>
-                    </div>
-                    <div
-                      className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
-                      role="progressbar"
-                      aria-valuenow={requiredProgressPct}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    >
+                  {showVerificationSubmit ? (
+                    <div className="w-full shrink-0 lg:w-52">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-muted-foreground">Wymagane dokumenty</span>
+                        <span className="tabular-nums font-semibold text-foreground">
+                          {requiredCompleteCount}/{verificationRequiredDocs.length}
+                        </span>
+                      </div>
                       <div
-                        className={cn(
-                          'h-full rounded-full transition-all duration-300',
-                          requiredDocumentsUploaded ? 'bg-emerald-500' : 'bg-primary',
-                        )}
-                        style={{ width: `${requiredProgressPct}%` }}
-                      />
+                        className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
+                        role="progressbar"
+                        aria-valuenow={requiredProgressPct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all duration-300',
+                            requiredDocumentsUploaded ? 'bg-emerald-500' : 'bg-primary',
+                          )}
+                          style={{ width: `${requiredProgressPct}%` }}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
               </div>
 
-              {(() => {
+              {showVerificationSubmit &&
+              (() => {
                 const rejectedCount = existingDocuments.filter(d => {
                   const r = reviewByKey[d.key] ?? null;
                   return deriveDocumentReviewState(d, r) === 'rejected';
@@ -1249,40 +1353,74 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 
               <div
                 className={cn(
-                  'divide-y',
                   useContractorDocumentSections && 'overflow-hidden rounded-lg border',
                 )}
               >
                 {useContractorDocumentSections && userId ? (
                   <>
-                    <DocumentsSectionShell
+                    {documents
+                      .filter(doc => doc.type === 'company_registration')
+                      .map(doc => (
+                        <DocumentsCollapsibleSection
+                          key={doc.type}
+                          heading={doc.name}
+                          description={doc.description}
+                          required
+                          highlightStatus={getDocHighlightStatus(doc)}
+                        >
+                          {renderContractorDocumentRow(doc, {
+                            nestedInSectionShell: true,
+                            hideHeader: true,
+                          })}
+                        </DocumentsCollapsibleSection>
+                      ))}
+                    <DocumentsCollapsibleSection
                       eyebrow="Sekcja A"
                       heading="Polisa OC (odpowiedzialność cywilna)"
                       id="oc-policy"
+                      required
+                      highlightStatus={getDocHighlightStatus(
+                        documents.find(d => d.type === 'insurance') ?? {
+                          type: 'insurance',
+                          required: true,
+                        },
+                      )}
                     >
                       {visibleDocuments
                         .filter(doc => doc.type === 'insurance')
                         .map(doc =>
-                          renderContractorDocumentRow(doc, { nestedInSectionShell: true }),
+                          renderContractorDocumentRow(doc, {
+                            nestedInSectionShell: true,
+                            hideHeader: true,
+                          }),
                         )}
-                    </DocumentsSectionShell>
-                    <DocumentsSectionShell
+                    </DocumentsCollapsibleSection>
+                    <DocumentsCollapsibleSection
                       eyebrow="Sekcja B"
                       heading="Zaświadczenia urzędowe: ZUS i US"
                       description="Zarządcy wymagają dokumentów nie starszych niż 3 miesiące."
                     >
                       <ContractorOfficialCertificatesSettings userId={userId} />
-                    </DocumentsSectionShell>
-                    <DocumentsSectionShell
+                    </DocumentsCollapsibleSection>
+                    <DocumentsCollapsibleSection
                       eyebrow="Sekcja C"
                       heading="Certyfikaty i zadeklarowane uprawnienia"
+                      highlightStatus={getDocHighlightStatus(
+                        documents.find(d => d.type === 'certifications') ?? {
+                          type: 'certifications',
+                          required: false,
+                        },
+                      )}
                     >
                       {visibleDocuments
                         .filter(doc => doc.type === 'certifications')
                         .map(doc =>
-                          renderContractorDocumentRow(doc, { nestedInSectionShell: true }),
+                          renderContractorDocumentRow(doc, {
+                            nestedInSectionShell: true,
+                            hideHeader: true,
+                          }),
                         )}
-                      <div className="mt-8 space-y-3 border-t border-border pt-6">
+                      <div className="mt-6 space-y-3 border-t border-border pt-5">
                         <div>
                           <h4 className="text-sm font-semibold text-foreground">
                             Typy uprawnień w profilu
@@ -1294,14 +1432,26 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                         </div>
                         <ContractorProfessionalQualificationsChecklist userId={userId} />
                       </div>
-                    </DocumentsSectionShell>
-                    <DocumentsSectionShell eyebrow="Sekcja D" heading="Referencje i dodatkowy skan kwalifikacji">
+                    </DocumentsCollapsibleSection>
+                    <DocumentsCollapsibleSection
+                      eyebrow="Sekcja D"
+                      heading="Referencje i dodatkowy skan kwalifikacji"
+                      highlightStatus={getDocHighlightStatus(
+                        documents.find(d => d.type === 'references') ?? {
+                          type: 'references',
+                          required: false,
+                        },
+                      )}
+                    >
                       {visibleDocuments
                         .filter(doc => doc.type === 'references')
                         .map(doc =>
-                          renderContractorDocumentRow(doc, { nestedInSectionShell: true }),
+                          renderContractorDocumentRow(doc, {
+                            nestedInSectionShell: true,
+                            hideHeader: true,
+                          }),
                         )}
-                      <div className="mt-8 space-y-3 border-t border-border pt-6">
+                      <div className="mt-6 space-y-3 border-t border-border pt-5">
                         <div>
                           <h4 className="text-sm font-semibold text-foreground">
                             Skan certyfikatu lub licencji (opcjonalnie)
@@ -1317,61 +1467,80 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                           hideSectionChrome
                         />
                       </div>
-                    </DocumentsSectionShell>
+                    </DocumentsCollapsibleSection>
                   </>
                 ) : (
-                  visibleDocuments.map(doc => renderContractorDocumentRow(doc))
+                  visibleDocuments.map(doc => (
+                    <VerificationDocumentCollapsibleItem
+                      key={doc.type}
+                      doc={doc}
+                      highlightStatus={getDocHighlightStatus(doc)}
+                    >
+                      <div className="px-4 py-4 sm:px-6">
+                        {renderContractorDocumentRow(doc, { hideHeader: true })}
+                      </div>
+                    </VerificationDocumentCollapsibleItem>
+                  ))
                 )}
               </div>
 
+              {(showVerificationSubmit || showOptionalSave) && (
               <div className="space-y-4 border-t bg-muted/20 px-4 py-5 sm:px-6">
-                <div className="space-y-2">
-                  <Label htmlFor="verification-additional-info" className="text-sm font-medium">
-                    Uwagi do całego wniosku (opcjonalnie)
-                  </Label>
-                  <Textarea
-                    id="verification-additional-info"
-                    value={additionalInfo}
-                    onChange={e => setAdditionalInfo(e.target.value)}
-                    placeholder="Doświadczenie, dodatkowe kwalifikacje lub kontekst pomocny przy weryfikacji..."
-                    rows={3}
-                    className="bg-background"
-                  />
-                </div>
+                {showVerificationSubmit ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="verification-additional-info" className="text-sm font-medium">
+                        Uwagi do całego wniosku (opcjonalnie)
+                      </Label>
+                      <Textarea
+                        id="verification-additional-info"
+                        value={additionalInfo}
+                        onChange={e => setAdditionalInfo(e.target.value)}
+                        placeholder="Doświadczenie, dodatkowe kwalifikacje lub kontekst pomocny przy weryfikacji..."
+                        rows={3}
+                        className="bg-background"
+                      />
+                    </div>
 
-                <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 sm:p-4">
-                  <p className="text-xs font-semibold text-amber-900">Przed wysłaniem</p>
-                  <ul className="mt-2 space-y-1 text-xs text-amber-900/90">
-                    {useContractorDocumentSections && (
-                      <li>· Dokumenty urzędowe (ZUS, US) nie starsze niż 3 miesiące</li>
-                    )}
-                    <li>· Dokumenty aktualne (nie starsze niż 6 miesięcy) i czytelne</li>
-                    <li>· Do dokumentów obcojęzycznych dołącz tłumaczenie</li>
-                    <li className="font-medium">
-                      · Fałszywe dokumenty skutkują trwałym zablokowaniem konta
-                    </li>
-                  </ul>
-                </div>
+                    <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 sm:p-4">
+                      <p className="text-xs font-semibold text-amber-900">Przed wysłaniem</p>
+                      <ul className="mt-2 space-y-1 text-xs text-amber-900/90">
+                        {useContractorDocumentSections && (
+                          <li>· Dokumenty urzędowe (ZUS, US) nie starsze niż 3 miesiące</li>
+                        )}
+                        <li>· Dokumenty aktualne (nie starsze niż 6 miesięcy) i czytelne</li>
+                        <li>· Do dokumentów obcojęzycznych dołącz tłumaczenie</li>
+                        <li className="font-medium">
+                          · Fałszywe dokumenty skutkują trwałym zablokowaniem konta
+                        </li>
+                      </ul>
+                    </div>
 
-                <div className="rounded-lg border bg-background/80 p-3 text-xs leading-relaxed text-muted-foreground">
-                  <Info className="mb-1 inline h-3.5 w-3.5 text-primary" />{' '}
-                  <strong className="text-foreground">RODO:</strong> dokumenty przetwarzamy wyłącznie
-                  w celu weryfikacji (art. 6 ust. 1 lit. f RODO), przechowujemy bezpiecznie i
-                  usuwamy po zakończeniu procesu.{' '}
-                  <Link href="/privacy" className="font-medium text-primary hover:underline">
-                    Polityka prywatności
-                  </Link>
-                </div>
+                    <div className="rounded-lg border bg-background/80 p-3 text-xs leading-relaxed text-muted-foreground">
+                      <Info className="mb-1 inline h-3.5 w-3.5 text-primary" />{' '}
+                      <strong className="text-foreground">RODO:</strong> dokumenty przetwarzamy wyłącznie
+                      w celu weryfikacji (art. 6 ust. 1 lit. f RODO), przechowujemy bezpiecznie i
+                      usuwamy po zakończeniu procesu.{' '}
+                      <Link href="/privacy" className="font-medium text-primary hover:underline">
+                        Polityka prywatności
+                      </Link>
+                    </div>
+                  </>
+                ) : null}
 
                 <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end sm:gap-3">
-                  {!embedded && (
+                  {!embedded && showVerificationSubmit && (
                     <Button variant="outline" onClick={() => router.push('/account')}>
                       Anuluj
                     </Button>
                   )}
                   <Button
                     onClick={handleSubmit}
-                    disabled={!requiredDocumentsUploaded || isSubmitting}
+                    disabled={
+                      showVerificationSubmit
+                        ? !requiredDocumentsUploaded || isSubmitting
+                        : isSubmitting
+                    }
                     className="w-full sm:min-w-40 sm:w-auto"
                     size="lg"
                   >
@@ -1389,6 +1558,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                   </Button>
                 </div>
               </div>
+              )}
             </div>
           )}
         </div>

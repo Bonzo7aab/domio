@@ -28,29 +28,85 @@ export interface ApprovedVerificationRow extends VerificationQueueRowBase {
   decidedAt: string;
 }
 
+/** Company + contractor fields shown on admin verification subject profile card. */
+export interface AdminVerificationSubjectProfile {
+  companyRegon: string | null;
+  companyKrs: string | null;
+  companyAddress: string | null;
+  companyPostalCode: string | null;
+  companyPhone: string | null;
+  companyEmail: string | null;
+  companyWebsite: string | null;
+  bankAccountIban: string | null;
+  vatStatusLabel: string | null;
+  ocGuaranteeAmountPln: number | null;
+}
+
+const CONTRACTOR_REQUIRED_DOC_KEYS = ['company_registration', 'insurance'] as const;
+const CONTRACTOR_OPTIONAL_DOC_KEYS = ['certifications', 'references'] as const;
+
+const MANAGER_REQUIRED_DOC_KEYS = ['company_registration', 'insurance'] as const;
+const MANAGER_OPTIONAL_DOC_KEYS = ['management_license', 'management_contracts'] as const;
+
 const CONTRACTOR_DOC_KEYS = [
-  'company_registration',
-  'insurance',
-  'certifications',
-  'references',
+  ...CONTRACTOR_REQUIRED_DOC_KEYS,
+  ...CONTRACTOR_OPTIONAL_DOC_KEYS,
 ] as const;
 
 const MANAGER_DOC_KEYS = [
-  'company_registration',
-  'insurance',
-  'management_license',
-  'management_contracts',
+  ...MANAGER_REQUIRED_DOC_KEYS,
+  ...MANAGER_OPTIONAL_DOC_KEYS,
 ] as const;
 
+export function getRequiredDocumentKeys(userType: string): readonly string[] {
+  return userType === 'contractor' ? CONTRACTOR_REQUIRED_DOC_KEYS : MANAGER_REQUIRED_DOC_KEYS;
+}
+
+export function filterPathsToRequiredDocuments(
+  userType: string,
+  paths: Record<string, string> | null | undefined
+): Record<string, string> {
+  const required = new Set(getRequiredDocumentKeys(userType));
+  const filtered: Record<string, string> = {};
+  for (const [key, path] of Object.entries(paths ?? {})) {
+    if (required.has(key) && typeof path === 'string' && path.trim().length > 0) {
+      filtered[key] = path;
+    }
+  }
+  return filtered;
+}
+
+/** Ensures every required slot appears once, with placeholders for missing uploads. */
+export function mergeRequiredVerificationDocuments(
+  userType: string,
+  uploaded: VerificationDocumentEntry[]
+): VerificationDocumentEntry[] {
+  const byKey = new Map(uploaded.map((doc) => [doc.key, doc]));
+  return getRequiredDocumentKeys(userType).map((key) => {
+    const existing = byKey.get(key);
+    if (existing) return existing;
+    return {
+      key,
+      label: verificationDocumentLabel(key),
+      path: '',
+      filename: '',
+      uploadedAt: null,
+      viewUrl: null,
+      downloadUrl: null,
+      missing: true,
+    };
+  });
+}
+
 export function expectedDocumentCount(userType: string): number {
-  return userType === 'contractor' ? CONTRACTOR_DOC_KEYS.length : MANAGER_DOC_KEYS.length;
+  return getRequiredDocumentKeys(userType).length;
 }
 
 export function countSubmittedDocuments(
   userType: string,
   paths: Record<string, string> | null | undefined
 ): number {
-  const keys = userType === 'contractor' ? CONTRACTOR_DOC_KEYS : MANAGER_DOC_KEYS;
+  const keys = getRequiredDocumentKeys(userType);
   let count = 0;
   for (const key of keys) {
     const path = paths?.[key];
@@ -142,6 +198,8 @@ export interface VerificationDocumentEntry {
   viewUrl: string | null;
   downloadUrl: string | null;
   error?: string;
+  /** True when the required document slot has no file in the user's profile. */
+  missing?: boolean;
 }
 
 export interface DocumentReview {

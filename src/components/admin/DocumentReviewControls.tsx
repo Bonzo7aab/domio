@@ -101,27 +101,19 @@ export function DocumentReviewControls({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant={isApproved ? 'default' : 'outline'}
-          disabled={pending}
-          onClick={() => {
-            if (isApproved) {
-              submitClear();
-            } else {
-              submitApprove();
-            }
-          }}
-          className={
-            isApproved
-              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-              : 'border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10'
-          }
-        >
-          <Check className="h-3.5 w-3.5" />
-          {isApproved ? 'Zaakceptowany' : 'Akceptuj'}
-        </Button>
+        {!isApproved && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={submitApprove}
+            className="border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+          >
+            <Check className="h-3.5 w-3.5" />
+            Akceptuj
+          </Button>
+        )}
         <Button
           type="button"
           size="sm"
