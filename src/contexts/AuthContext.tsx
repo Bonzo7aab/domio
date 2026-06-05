@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/nextjs'
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js'
 import { createClient } from '../lib/supabase/client'
+import { isInvalidRefreshTokenError } from '../lib/auth/sessionErrors'
 import type { AuthUser } from '../types/auth'
 
 type AuthContextType = {
@@ -96,13 +97,29 @@ export default function AuthProvider({
     [fetchUserProfile]
   )
 
+  const clearStaleSession = useCallback(async () => {
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch {
+      // Stale cookies may already be invalid; clearing local state is enough.
+    }
+    Sentry.setUser(null)
+    setSession(null)
+    setUser(null)
+    setIsLoading(false)
+  }, [supabase])
+
   const refreshSession = useCallback(async () => {
     try {
-      const { data, error } = await supabase.auth.getUser()
+      const { error } = await supabase.auth.getUser()
       if (error) {
-        setSession(null)
-        setUser(null)
-        setIsLoading(false)
+        if (isInvalidRefreshTokenError(error)) {
+          await clearStaleSession()
+        } else {
+          setSession(null)
+          setUser(null)
+          setIsLoading(false)
+        }
         return
       }
 
@@ -110,14 +127,18 @@ export default function AuthProvider({
       setSession(sessionData.session)
       await loadProfileForSession(sessionData.session)
     } catch (error) {
+      if (isInvalidRefreshTokenError(error)) {
+        await clearStaleSession()
+        return
+      }
       console.error('Error refreshing session:', error)
       setIsLoading(false)
     }
-  }, [supabase, loadProfileForSession])
+  }, [supabase, loadProfileForSession, clearStaleSession])
 
   const logout = useCallback(async () => {
     try {
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
       Sentry.setUser(null)
       setSession(null)
       setUser(null)

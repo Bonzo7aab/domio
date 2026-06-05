@@ -51,7 +51,7 @@ export default function UpdatePasswordPage() {
       }
 
       setSuccess(true)
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
       setTimeout(() => router.push('/login'), 2000)
     } catch {
       setError('Wystąpił błąd podczas ustawiania hasła')

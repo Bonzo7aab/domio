@@ -294,14 +294,14 @@ async function registerActionImpl(
 async function logoutActionImpl() {
   const supabase = await createClient()
   
-  const { error } = await supabase.auth.signOut()
-  
+  const { error } = await supabase.auth.signOut({ scope: 'local' })
+
   if (error) {
     return { error: error.message }
   }
-  
+
   revalidatePath('/', 'layout')
-  redirect('/login')
+  redirect('/login?refresh_browser_auth=1')
 }
 
 /**
@@ -419,7 +419,7 @@ async function deleteAccountActionImpl() {
     
     // Sign out and redirect to homepage
     // Note: User is already deleted, but we clear any remaining session
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     
     redirect('/')
   } catch (error: unknown) {

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isInvalidRefreshTokenError } from '../auth/sessionErrors'
 import type { Database } from '../../types/database'
 
 export async function updateSession(request: NextRequest) {
@@ -35,7 +36,12 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
+
+  if (authError && isInvalidRefreshTokenError(authError)) {
+    await supabase.auth.signOut({ scope: 'local' })
+  }
 
   // Protected routes that require authentication
   const protectedPaths = [
