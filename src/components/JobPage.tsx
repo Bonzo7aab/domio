@@ -518,6 +518,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const isContractorViewer = user?.userType === 'contractor';
   const isJobOwner =
     isManager && Boolean(user?.id && managerId && user.id === managerId && jobData?.postType === 'job');
+  const isContestOwner =
+    isManager &&
+    Boolean(user?.id && managerId && user.id === managerId && jobData?.contestInfo);
   const canManagerEditThisJob =
     isJobOwner &&
     Boolean(jobData?.status && canManagerEditJobFields(jobData.status)) &&
@@ -755,6 +758,78 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       setActiveTab('overview');
     }
   }, [jobData?.id, jobData?.contestInfo, searchParams]);
+
+  const continueOfferHandledRef = useRef(false);
+
+  useEffect(() => {
+    continueOfferHandledRef.current = false;
+  }, [jobId]);
+
+  useEffect(() => {
+    if (searchParams.get('continueOffer') !== 'draft') return;
+    if (continueOfferHandledRef.current) return;
+    if (isLoadingJob || !jobData?.contestInfo || jobData.postType !== 'tender') return;
+    if (isCheckingBid) return;
+
+    if (!hasDraftBid) {
+      router.replace(`/jobs/${jobId}`, { scroll: false });
+      return;
+    }
+
+    continueOfferHandledRef.current = true;
+
+    const openDraftOffer = async (): Promise<void> => {
+      if (!user) {
+        toast.error('Musisz się zalogować aby kontynuować szkic');
+        return;
+      }
+
+      if (user.userType !== 'contractor') {
+        return;
+      }
+
+      if (needsVerificationAttention(user)) {
+        setVerificationApplyDialogOpen(true);
+        return;
+      }
+
+      if (!supabase || !user.id) {
+        toast.error('Błąd połączenia. Spróbuj ponownie.');
+        return;
+      }
+
+      const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+        supabase,
+        user.id,
+      );
+
+      if (companyError) {
+        console.error('Error checking company:', companyError);
+        toast.error('Błąd podczas sprawdzania danych firmy');
+        return;
+      }
+
+      if (!company) {
+        setShowCompanyRequiredDialog(true);
+        return;
+      }
+
+      setShowContestOfferForm(true);
+      router.replace(`/jobs/${jobId}`, { scroll: false });
+    };
+
+    void openDraftOffer();
+  }, [
+    searchParams,
+    isLoadingJob,
+    jobData,
+    isCheckingBid,
+    hasDraftBid,
+    user,
+    supabase,
+    jobId,
+    router,
+  ]);
 
   useEffect(() => {
     setContestQuestionsCount(0);
@@ -1259,6 +1334,8 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   job={job as JobDisplayData & { contestInfo: NonNullable<JobDisplayData['contestInfo']> }}
                   allowQuestions={job.allowQuestions ?? true}
                   contestStatus={job.status}
+                  isContestOwner={isContestOwner}
+                  isManager={isManager}
                   onQuestionsCountChange={setContestQuestionsCount}
                 />
               ) : null}
@@ -1770,6 +1847,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
             void refreshBidState();
           }}
           onDraftSaved={() => {
+            void refreshBidState();
+          }}
+          onDraftAbandoned={() => {
             void refreshBidState();
           }}
         />

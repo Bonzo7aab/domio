@@ -15,6 +15,7 @@ import { CookieConsentBanner } from '../components/CookieConsentBanner'
 import { ScrollbarManager } from '../components/ScrollbarManager'
 import { NavigationProvider } from '../contexts/NavigationContext'
 import { NavigationProgressBar } from '../components/NavigationProgressBar'
+import { BrowserAuthSync } from '../components/BrowserAuthSync'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -57,6 +58,9 @@ export default function RootLayout({
         <AuthProvider>
           <NavigationProvider>
             <NavigationProgressBar />
+            <Suspense fallback={null}>
+              <BrowserAuthSync />
+            </Suspense>
             <Suspense fallback={
               <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center">

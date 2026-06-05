@@ -3,10 +3,11 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ExternalLink, FilePen, MessageSquare, MoreVertical } from 'lucide-react';
+import { FilePen, Loader2, MessageSquare, MoreVertical, Star } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import {
   Select,
   SelectContent,
@@ -25,21 +26,24 @@ import {
 import { createClient } from '../../lib/supabase/client';
 import type { ContractorContestOfferRow } from '../../lib/database/contractor-contest-offers';
 import {
-  CONTRACTOR_CONTEST_OFFER_FILTER_OPTIONS,
+  canAbandonContestOfferDraft,
   canMessageManagerOnContestOffer,
+  canRateCooperationOnContestOffer,
   canWithdrawContestOffer,
-  matchesContestOfferFilter,
-  type ContractorContestOfferFilterValue,
 } from '../../lib/contest-offer/contractor-contest-offer-status';
+import { CONTEST_STATUS_FILTER_OPTIONS } from '../../lib/tender-workflow-status';
+import { abandonTenderBidDraftAction } from '../../lib/database/contest-offers-actions';
+import { getTenderById } from '../../lib/data';
+import {
+  isContestTender,
+  mapTenderRowToContestDisplay,
+} from '../../lib/tender-contest/map-tender-contest-display';
+import { ContestOfferSubmissionDialog } from '../contest-offer/ContestOfferSubmissionDialog';
+import { useUserProfile } from '../../contexts/AuthContext';
+import type { ContestInfo } from '../../types/job';
 import { formatSubmissionDeadlineDisplay } from '../../lib/contest-submission-deadline';
 import { ContractorContestOfferStatusBadge } from './ContractorContestOfferStatusBadge';
 import type { TenderWithCompany } from '../../lib/database/jobs';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '../ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,10 +51,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import { CooperationReviewDialog } from '../reviews/CooperationReviewDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 interface ContractorContestOffersContentProps {
   offers: ContractorContestOfferRow[];
   companyId: string;
+}
+
+interface ContinueDraftDialogContext {
+  tenderId: string;
+  jobTitle: string;
+  description: string;
+  category?: string;
+  subcategory?: string;
+  contestInfo: ContestInfo;
 }
 
 function formatMoneyPl(price: number): string {
@@ -67,14 +91,35 @@ export function ContractorContestOffersContent({
   companyId,
 }: ContractorContestOffersContentProps) {
   const router = useRouter();
-  const [statusFilter, setStatusFilter] =
-    useState<ContractorContestOfferFilterValue>('all');
+  const { user } = useUserProfile();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [abandonTarget, setAbandonTarget] = useState<ContractorContestOfferRow | null>(null);
+  const [isAbandoning, setIsAbandoning] = useState(false);
+  const [continueDraftDialog, setContinueDraftDialog] =
+    useState<ContinueDraftDialogContext | null>(null);
+  const [loadingDraftId, setLoadingDraftId] = useState<string | null>(null);
+  const [cooperationReviewTarget, setCooperationReviewTarget] =
+    useState<ContractorContestOfferRow | null>(null);
+  const [reviewedTenderIds, setReviewedTenderIds] = useState<Set<string>>(() => new Set());
 
-  const filteredOffers = useMemo(
-    () =>
-      offers.filter((row) => matchesContestOfferFilter(row.derivedStatus, statusFilter)),
-    [offers, statusFilter],
-  );
+  const filteredOffers = useMemo(() => {
+    return offers.filter((row) => {
+      if (statusFilter !== 'all' && row.tenderStatus !== statusFilter) {
+        return false;
+      }
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        if (
+          !row.contestTitle.toLowerCase().includes(q) &&
+          !row.organizerName.toLowerCase().includes(q)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [offers, statusFilter, search]);
 
   const handleWithdraw = async (bidId: string) => {
     const supabase = createClient();
@@ -104,6 +149,39 @@ export function ContractorContestOffersContent({
     } catch (error) {
       console.error('Error withdrawing contest offer:', error);
       toast.error('Wystąpił błąd podczas wycofywania oferty');
+    }
+  };
+
+  const handleContinueDraft = async (row: ContractorContestOfferRow): Promise<void> => {
+    if (!user?.id) {
+      toast.error('Musisz być zalogowany aby kontynuować szkic');
+      return;
+    }
+
+    setLoadingDraftId(row.id);
+    try {
+      const { data: dbTender, error } = await getTenderById(row.tenderId);
+
+      if (error || !dbTender || !isContestTender(dbTender)) {
+        toast.error('Nie można otworzyć szkicu oferty');
+        return;
+      }
+
+      const contestInfo = mapTenderRowToContestDisplay(dbTender);
+
+      setContinueDraftDialog({
+        tenderId: row.tenderId,
+        jobTitle: dbTender.title ?? row.contestTitle,
+        description: dbTender.description ?? '',
+        category: dbTender.category?.name,
+        subcategory: dbTender.subcategory ?? undefined,
+        contestInfo,
+      });
+    } catch (error) {
+      console.error('Error opening draft:', error);
+      toast.error('Wystąpił błąd podczas otwierania szkicu');
+    } finally {
+      setLoadingDraftId(null);
     }
   };
 
@@ -160,12 +238,51 @@ export function ContractorContestOffersContent({
     }
   };
 
+  const handleAbandonDraft = async (): Promise<void> => {
+    if (!abandonTarget) return;
+
+    setIsAbandoning(true);
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      const result = await abandonTenderBidDraftAction({
+        contractorId: user.id,
+        bidId: abandonTarget.id,
+        tenderId: abandonTarget.tenderId,
+      });
+
+      if (!result.success) {
+        toast.error(result.error ?? 'Nie udało się odrzucić szkicu oferty');
+        return;
+      }
+
+      toast.success('Szkic oferty został odrzucony');
+      setAbandonTarget(null);
+      router.refresh();
+    } finally {
+      setIsAbandoning(false);
+    }
+  };
+
+  const hasCooperationReview = (row: ContractorContestOfferRow): boolean =>
+    row.hasCooperationReview || reviewedTenderIds.has(row.tenderId);
+
   const renderActionsMenu = (
     row: ContractorContestOfferRow,
     messageAllowed: boolean,
     withdrawAllowed: boolean,
+    abandonAllowed: boolean,
+    cooperationReviewMenuAllowed: boolean,
   ): ReactElement | null => {
-    if (!messageAllowed && !withdrawAllowed) {
+    if (!messageAllowed && !withdrawAllowed && !abandonAllowed && !cooperationReviewMenuAllowed) {
       return null;
     }
 
@@ -182,20 +299,42 @@ export function ContractorContestOffersContent({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          {messageAllowed ? (
-            <DropdownMenuItem onClick={() => void handleMessage(row)}>
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Wiadomość do organizatora
+          {abandonAllowed ? (
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => setAbandonTarget(row)}
+            >
+              Odrzuć szkic
             </DropdownMenuItem>
+          ) : null}
+          {messageAllowed ? (
+            <>
+              {abandonAllowed ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuItem onClick={() => void handleMessage(row)}>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Wiadomość do organizatora
+              </DropdownMenuItem>
+            </>
           ) : null}
           {withdrawAllowed ? (
             <>
-              {messageAllowed ? <DropdownMenuSeparator /> : null}
+              {messageAllowed || abandonAllowed ? <DropdownMenuSeparator /> : null}
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => void handleWithdraw(row.id)}
               >
                 Wycofaj ofertę
+              </DropdownMenuItem>
+            </>
+          ) : null}
+          {cooperationReviewMenuAllowed ? (
+            <>
+              {messageAllowed || abandonAllowed || withdrawAllowed ? (
+                <DropdownMenuSeparator />
+              ) : null}
+              <DropdownMenuItem onClick={() => setCooperationReviewTarget(row)}>
+                <Star className="h-4 w-4 mr-2" />
+                Ocena współpracy
               </DropdownMenuItem>
             </>
           ) : null}
@@ -205,44 +344,50 @@ export function ContractorContestOffersContent({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <Select
-          value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as ContractorContestOfferFilterValue)}
-        >
-          <SelectTrigger className="w-full sm:w-[280px]">
-            <SelectValue placeholder="Filtr statusów" />
-          </SelectTrigger>
-          <SelectContent>
-            {CONTRACTOR_CONTEST_OFFER_FILTER_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Moje oferty</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Przeglądaj szkice i złożone oferty w konkursach organizatorów.
+        </p>
       </div>
 
-      {filteredOffers.length === 0 ? (
-        <Card>
-          <CardContent className="p-6 text-center">
-            <h3 className="text-base font-medium text-muted-foreground mb-2">
-              Brak ofert w tej kategorii
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {offers.length === 0
-                ? 'Nie masz jeszcze ofert w konkursach. Przeglądaj konkursy i składaj oferty — zapisane szkice też pojawią się tutaj.'
-                : 'Zmień filtr statusów, aby zobaczyć inne oferty.'}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Oferty w konkursach</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <Input
+              placeholder="Szukaj po nazwie konkursu lub organizatorze…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-md"
+            />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full lg:w-[280px]">
+                <SelectValue placeholder="Wszystkie statusy" />
+              </SelectTrigger>
+              <SelectContent>
+                {CONTEST_STATUS_FILTER_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {filteredOffers.length === 0 ? (
+            <div className="rounded-md border p-6 text-center">
+              <h3 className="text-base font-medium text-muted-foreground mb-2">
+                Brak ofert w tej kategorii
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {offers.length === 0
+                  ? 'Nie masz jeszcze ofert w konkursach. Przeglądaj konkursy i składaj oferty — zapisane szkice też pojawią się tutaj.'
+                  : 'Zmień filtr lub wyszukiwanie, aby zobaczyć inne oferty.'}
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -264,6 +409,9 @@ export function ContractorContestOffersContent({
                     submissionDeadlineIso: row.submissionDeadline,
                   });
                   const messageAllowed = canMessageManagerOnContestOffer(row.derivedStatus);
+                  const cooperationReviewAllowed = canRateCooperationOnContestOffer(row.derivedStatus);
+                  const hasReview = hasCooperationReview(row);
+                  const abandonAllowed = canAbandonContestOfferDraft(row.bidStatus);
                   const isDraft = row.derivedStatus === 'draft';
                   const hasPricing = row.netPrice > 0;
 
@@ -271,27 +419,14 @@ export function ContractorContestOffersContent({
                     <TableRow key={row.id}>
                       <TableCell className="max-w-[300px]">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-0.5 min-w-0">
-                            <span className="font-medium truncate min-w-0 leading-snug">
-                              {row.contestTitle}
-                            </span>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Link
-                                    href={`/jobs/${row.tenderId}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
-                                    aria-label="Szczegóły konkursu"
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                  </Link>
-                                </TooltipTrigger>
-                                <TooltipContent>Szczegóły konkursu</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
+                          <Link
+                            href={`/jobs/${row.tenderId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium truncate leading-snug hover:underline block max-w-full text-foreground hover:text-primary"
+                          >
+                            {row.contestTitle}
+                          </Link>
                           <p className="text-sm text-muted-foreground truncate">
                             {row.organizerName}
                           </p>
@@ -330,16 +465,41 @@ export function ContractorContestOffersContent({
                         <ContractorContestOfferStatusBadge status={row.derivedStatus} />
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
                           {isDraft ? (
-                            <Button asChild variant="default" size="sm" className="h-8">
-                              <Link href={`/jobs/${row.tenderId}`}>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-8 shrink-0"
+                              disabled={loadingDraftId === row.id}
+                              onClick={() => void handleContinueDraft(row)}
+                            >
+                              {loadingDraftId === row.id ? (
+                                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                              ) : (
                                 <FilePen className="h-4 w-4 mr-1.5" />
-                                Kontynuuj szkic
-                              </Link>
+                              )}
+                              Kontynuuj szkic
                             </Button>
                           ) : null}
-                          {renderActionsMenu(row, messageAllowed, withdrawAllowed)}
+                          {cooperationReviewAllowed && !hasReview ? (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-8 shrink-0"
+                              onClick={() => setCooperationReviewTarget(row)}
+                            >
+                              <Star className="h-4 w-4 mr-1.5" />
+                              Oceń współpracę
+                            </Button>
+                          ) : null}
+                          {renderActionsMenu(
+                            row,
+                            messageAllowed,
+                            withdrawAllowed,
+                            abandonAllowed,
+                            cooperationReviewAllowed && hasReview,
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -347,9 +507,75 @@ export function ContractorContestOffersContent({
                 })}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={abandonTarget !== null} onOpenChange={(open) => !open && setAbandonTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Odrzucić szkic oferty?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Szkic dla „{abandonTarget?.contestTitle}” zostanie trwale usunięty. Tej operacji
+              nie można cofnąć.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isAbandoning}>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isAbandoning}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleAbandonDraft();
+              }}
+            >
+              {isAbandoning ? 'Usuwanie…' : 'Odrzuć szkic'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {cooperationReviewTarget ? (
+        <CooperationReviewDialog
+          open
+          onOpenChange={(open) => !open && setCooperationReviewTarget(null)}
+          variant="contractor"
+          tenderId={cooperationReviewTarget.tenderId}
+          counterpartyCompanyId={cooperationReviewTarget.organizerCompanyId}
+          counterpartyCompanyName={cooperationReviewTarget.organizerName}
+          isEditing={hasCooperationReview(cooperationReviewTarget)}
+          onSubmitted={() => {
+            setReviewedTenderIds((prev) => new Set(prev).add(cooperationReviewTarget.tenderId));
+          }}
+        />
+      ) : null}
+
+      {continueDraftDialog && user?.id ? (
+        <ContestOfferSubmissionDialog
+          isOpen
+          onClose={() => setContinueDraftDialog(null)}
+          tenderId={continueDraftDialog.tenderId}
+          jobTitle={continueDraftDialog.jobTitle}
+          description={continueDraftDialog.description}
+          category={continueDraftDialog.category}
+          subcategory={continueDraftDialog.subcategory}
+          contestInfo={continueDraftDialog.contestInfo}
+          contractorId={user.id}
+          onSubmitted={() => {
+            setContinueDraftDialog(null);
+            router.refresh();
+          }}
+          onDraftSaved={() => {
+            router.refresh();
+          }}
+          onDraftAbandoned={() => {
+            setContinueDraftDialog(null);
+            router.refresh();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

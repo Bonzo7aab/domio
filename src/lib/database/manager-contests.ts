@@ -8,6 +8,8 @@ import {
   fetchUnansweredContestQuestionCounts,
   fetchUnseenContestQuestionCounts,
 } from './questions';
+import { countsTowardTenderBidsCount } from './tender-bid-count';
+import { fetchReviewedTenderIdsForReviewer } from './reviews';
 
 export interface ManagerContest {
   id: string;
@@ -29,6 +31,8 @@ export interface ManagerContest {
   questionsCount: number;
   /** Published manager comments on contest questions */
   commentsCount: number;
+  /** Manager already submitted cooperation review for selected offer */
+  hasCooperationReview: boolean;
 }
 
 interface TenderContestRow {
@@ -83,6 +87,7 @@ export async function advanceContestsPastSubmissionDeadline(
 export async function fetchManagerContests(
   supabase: SupabaseClient<Database>,
   companyId: string,
+  managerUserId?: string,
 ): Promise<ManagerContest[]> {
   await advanceContestsPastSubmissionDeadline(supabase, companyId);
 
@@ -128,13 +133,19 @@ export async function fetchManagerContests(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bids } = await (supabase as any)
       .from('tender_bids')
-      .select('tender_id, status, company:companies!tender_bids_company_id_fkey (id, name)')
+      .select(
+        'tender_id, status, admin_moderation_status, company:companies!tender_bids_company_id_fkey (id, name)',
+      )
       .in('tender_id', tenderIds);
 
     for (const row of bids || []) {
       const tid = row.tender_id as string;
       const status = row.status as string;
-      if (status === 'submitted' || status === 'under_review' || status === 'shortlisted') {
+      const moderationStatus = row.admin_moderation_status as string | null | undefined;
+      if (
+        countsTowardTenderBidsCount(status) &&
+        moderationStatus !== 'suspended'
+      ) {
         offerCounts[tid] = (offerCounts[tid] ?? 0) + 1;
       }
       if (status === 'accepted') {
@@ -156,6 +167,15 @@ export async function fetchManagerContests(
         ])
       : [{}, {}, {}, {}];
 
+  const reviewedTenderIds =
+    managerUserId && tenderIds.length > 0
+      ? await fetchReviewedTenderIdsForReviewer(
+          supabase,
+          managerUserId,
+          tenderIds.filter((id) => hasSelected[id]),
+        )
+      : new Set<string>();
+
   return contestRows.map((t) => ({
     id: t.id,
     title: t.title,
@@ -172,9 +192,71 @@ export async function fetchManagerContests(
     unansweredQuestionsCount: unansweredCounts[t.id] ?? 0,
     questionsCount: questionCounts[t.id] ?? 0,
     commentsCount: commentCounts[t.id] ?? 0,
+    hasCooperationReview: reviewedTenderIds.has(t.id),
   }));
 }
 
 export function getContestStatusLabel(status: string): string {
   return getContestWorkflowStatusLabel(status);
+}
+
+export async function deleteManagerContestDraft(
+  supabase: SupabaseClient<Database>,
+  params: {
+    tenderId: string;
+    managerId: string;
+    companyId: string;
+  },
+): Promise<{ success: boolean; error?: string }> {
+  const tenderId = params.tenderId.trim();
+  if (!tenderId) {
+    return { success: false, error: 'Nieprawidłowe dane' };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: tender, error: fetchErr } = await (supabase as any)
+    .from('tenders')
+    .select('id, status, manager_id, company_id')
+    .eq('id', tenderId)
+    .maybeSingle();
+
+  if (fetchErr || !tender) {
+    return { success: false, error: 'Nie znaleziono konkursu' };
+  }
+
+  if (tender.manager_id !== params.managerId || tender.company_id !== params.companyId) {
+    return { success: false, error: 'Brak uprawnień' };
+  }
+
+  if (tender.status !== 'draft') {
+    return { success: false, error: 'Tylko szkic konkursu można odrzucić' };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: bidCount, error: countErr } = await (supabase as any)
+    .from('tender_bids')
+    .select('*', { count: 'exact', head: true })
+    .eq('tender_id', tenderId)
+    .neq('status', 'draft')
+    .neq('status', 'cancelled');
+
+  if (countErr) {
+    return { success: false, error: countErr.message || 'Nie udało się sprawdzić ofert' };
+  }
+
+  if ((bidCount ?? 0) > 0) {
+    return { success: false, error: 'Nie można odrzucić szkicu — konkurs ma już złożone oferty' };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: deleteErr } = await (supabase as any)
+    .from('tenders')
+    .delete()
+    .eq('id', tenderId);
+
+  if (deleteErr) {
+    return { success: false, error: deleteErr.message || 'Nie udało się odrzucić szkicu konkursu' };
+  }
+
+  return { success: true };
 }

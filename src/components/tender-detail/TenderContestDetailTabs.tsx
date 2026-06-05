@@ -21,6 +21,8 @@ interface TenderContestDetailTabsProps {
   job: Job & { contestInfo: ContestInfo };
   allowQuestions?: boolean;
   contestStatus?: string;
+  isContestOwner?: boolean;
+  isManager?: boolean;
   onQuestionsCountChange?: (count: number) => void;
 }
 
@@ -38,6 +40,8 @@ export function TenderContestDetailTabs({
   job,
   allowQuestions = true,
   contestStatus,
+  isContestOwner = false,
+  isManager = false,
   onQuestionsCountChange,
 }: TenderContestDetailTabsProps): React.ReactElement {
   const { contestInfo } = job;
@@ -257,6 +261,8 @@ export function TenderContestDetailTabs({
         allowQuestions={allowQuestions}
         submissionDeadline={contestInfo.submissionDeadline}
         contestStatus={contestStatus}
+        isContestOwner={isContestOwner}
+        isManager={isManager}
         onQuestionsCountChange={onQuestionsCountChange}
       />
     </>

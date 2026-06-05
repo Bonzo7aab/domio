@@ -67,10 +67,16 @@ export async function HeaderWithSession() {
     evaluationContext,
   );
 
+  const showOrders = await isFeatureEnabled(
+    FLAGSHIP_FLAG_KEYS.ORDERS,
+    evaluationContext,
+  );
+
   return (
     <Header
       initialUser={initialUser}
       brandTitle={useVestiqoBrand ? 'Vestiqo' : 'Domio'}
+      showOrders={showOrders}
     />
   );
 }

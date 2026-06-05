@@ -12,14 +12,19 @@ const tabs = [
   { id: 'services', label: 'Usługi', href: '/contractor-dashboard/pricing' },
 ];
 
-export function ContractorDashboardNav() {
+interface ContractorDashboardNavProps {
+  showOrders?: boolean;
+}
+
+export function ContractorDashboardNav({ showOrders = false }: ContractorDashboardNavProps) {
   const pathname = usePathname();
+  const visibleTabs = showOrders ? tabs : tabs.filter((tab) => tab.id !== 'orders');
 
   return (
     <nav className="border-b bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex space-x-1 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive =
               pathname === tab.href ||
               (tab.id === 'favorites' &&

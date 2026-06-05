@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import { getJobWorkflowStatusLabel } from '../job-workflow-status';
 import { getTenderWorkflowStatusLabel } from '../tender-workflow-status';
+import { fetchReviewedTenderIdsForReviewer } from './reviews';
 
 export type ManagerSubmissionKind = 'job' | 'tender';
 
@@ -19,6 +20,8 @@ export interface ManagerSubmission {
   canEdit: boolean;
   /** Job/tender has an accepted offer (Wybrana Oferta). */
   hasSelectedOffer: boolean;
+  /** Manager already submitted cooperation review (tender with selected offer only). */
+  hasCooperationReview: boolean;
 }
 
 function jobStatusLabel(status: string): string {
@@ -39,6 +42,7 @@ export function getSubmissionStatusLabel(kind: ManagerSubmissionKind, status: st
 export async function fetchManagerSubmissions(
   supabase: SupabaseClient<Database>,
   companyId: string,
+  managerUserId?: string,
 ): Promise<ManagerSubmission[]> {
   const [jobsRes, tendersRes] = await Promise.all([
     supabase
@@ -121,6 +125,15 @@ export async function fetchManagerSubmissions(
     }
   }
 
+  const reviewedTenderIds =
+    managerUserId && tenderIds.length > 0
+      ? await fetchReviewedTenderIdsForReviewer(
+          supabase,
+          managerUserId,
+          tenderIds.filter((id) => tenderHasSelectedOffer[id]),
+        )
+      : new Set<string>();
+
   const jobs: ManagerSubmission[] = jobRows.map((j) => ({
     id: j.id,
     kind: 'job' as const,
@@ -136,6 +149,7 @@ export async function fetchManagerSubmissions(
         j.status === 'collecting_offers') &&
       (jobOfferCounts[j.id]?.total ?? 0) === 0,
     hasSelectedOffer: jobHasSelectedOffer[j.id] ?? false,
+    hasCooperationReview: false,
   }));
 
   const tenders: ManagerSubmission[] = tenderRows.map((t) => ({
@@ -150,6 +164,7 @@ export async function fetchManagerSubmissions(
     canEdit:
       t.status === 'draft' && (tenderOfferCounts[t.id]?.total ?? 0) === 0,
     hasSelectedOffer: tenderHasSelectedOffer[t.id] ?? false,
+    hasCooperationReview: reviewedTenderIds.has(t.id),
   }));
 
   return [...jobs, ...tenders].sort(

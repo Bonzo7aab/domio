@@ -493,6 +493,73 @@ export async function upsertTenderBidDraft(
   }
 }
 
+export async function deleteTenderBidDraft(
+  supabase: SupabaseClient<Database>,
+  contractorId: string,
+  options: { tenderId?: string; bidId?: string },
+): Promise<{ success: boolean; error: PostgrestError | null }> {
+  try {
+    if (!options.tenderId && !options.bidId) {
+      return {
+        success: false,
+        error: new Error('Nieprawidłowe dane szkicu.') as PostgrestError,
+      };
+    }
+
+    const access = await ensureContractorCanBid(supabase, contractorId);
+    if ('error' in access) {
+      return { success: false, error: access.error };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (supabase as any)
+      .from('tender_bids')
+      .select('id, status, tender_id')
+      .eq('contractor_id', contractorId)
+      .eq('company_id', access.companyId)
+      .eq('status', 'draft');
+
+    if (options.bidId) {
+      query = query.eq('id', options.bidId);
+    } else if (options.tenderId) {
+      query = query.eq('tender_id', options.tenderId);
+    }
+
+    const { data: draft, error: fetchError } = await query.maybeSingle();
+
+    if (fetchError) {
+      return { success: false, error: fetchError as PostgrestError };
+    }
+
+    if (!draft) {
+      return {
+        success: false,
+        error: new Error('Brak szkicu oferty do usunięcia.') as PostgrestError,
+      };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: deleteError } = await (supabase as any)
+      .from('tender_bids')
+      .delete()
+      .eq('id', draft.id)
+      .eq('contractor_id', contractorId)
+      .eq('company_id', access.companyId)
+      .eq('status', 'draft');
+
+    if (deleteError) {
+      return { success: false, error: deleteError as PostgrestError };
+    }
+
+    return { success: true, error: null };
+  } catch (err) {
+    return {
+      success: false,
+      error: (err instanceof Error ? err : new Error(String(err))) as PostgrestError,
+    };
+  }
+}
+
 export async function submitTenderBid(
   supabase: SupabaseClient<Database>,
   tenderId: string,

@@ -20,6 +20,7 @@ export interface CompanyReviewRecord {
   createdAt: string;
   companyId: string;
   jobId: string | null;
+  tenderId: string | null;
 }
 
 export interface AcceptedContractorForJob {
@@ -95,6 +96,36 @@ export async function fetchReviewByReviewerAndJob(
     createdAt: data.created_at,
     companyId: data.company_id,
     jobId: data.job_id,
+    tenderId: null,
+  };
+}
+
+export async function fetchReviewByReviewerAndTender(
+  supabase: SupabaseClient<Database>,
+  reviewerId: string,
+  tenderId: string,
+): Promise<CompanyReviewRecord | null> {
+  const { data, error } = await supabase
+    .from('company_reviews')
+    .select('id, rating, title, comment, image_urls, created_at, company_id, job_id, tender_id')
+    .eq('reviewer_id', reviewerId)
+    .eq('tender_id', tenderId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    rating: data.rating,
+    title: data.title,
+    comment: data.comment,
+    imageUrls: Array.isArray(data.image_urls) ? data.image_urls : [],
+    createdAt: data.created_at,
+    companyId: data.company_id,
+    jobId: data.job_id,
+    tenderId: data.tender_id,
   };
 }
 
@@ -120,10 +151,12 @@ export async function createCompanyReview(
     .eq('company_id', companyId)
     .eq('reviewer_id', reviewerId);
 
-  if (reviewData.jobId) {
+  if (reviewData.tenderId) {
+    existingQuery = existingQuery.eq('tender_id', reviewData.tenderId);
+  } else if (reviewData.jobId) {
     existingQuery = existingQuery.eq('job_id', reviewData.jobId);
   } else {
-    existingQuery = existingQuery.is('job_id', null);
+    existingQuery = existingQuery.is('job_id', null).is('tender_id', null);
   }
 
   const { data: existingReview } = await existingQuery.maybeSingle();
@@ -131,37 +164,109 @@ export async function createCompanyReview(
     return {
       data: null,
       error: new Error(
-        reviewData.jobId
-          ? 'Opinia dla tego zlecenia została już dodana'
-          : 'Opinia dla tej firmy została już dodana',
+        reviewData.tenderId
+          ? 'Opinia o współpracy w tym konkursie została już dodana'
+          : reviewData.jobId
+            ? 'Opinia dla tego zlecenia została już dodana'
+            : 'Opinia dla tej firmy została już dodana',
       ),
     };
   }
 
+  const insertRow: Database['public']['Tables']['company_reviews']['Insert'] = {
+    company_id: companyId,
+    reviewer_id: reviewerId,
+    rating: reviewData.rating,
+    title: reviewData.title?.trim() || null,
+    comment: reviewData.comment.trim(),
+    categories: reviewData.categories ?? null,
+    job_id: reviewData.jobId ?? null,
+    tender_id: reviewData.tenderId ?? null,
+    is_public: true,
+    is_verified: false,
+  };
+
+  if (reviewData.imageUrls && reviewData.imageUrls.length > 0) {
+    insertRow.image_urls = reviewData.imageUrls;
+  }
+
   const { data, error } = await supabase
     .from('company_reviews')
-    .insert({
-      company_id: companyId,
-      reviewer_id: reviewerId,
-      rating: reviewData.rating,
-      title: reviewData.title?.trim() || null,
-      comment: reviewData.comment.trim(),
-      categories: reviewData.categories ?? null,
-      job_id: reviewData.jobId ?? null,
-      tender_id: reviewData.tenderId ?? null,
-      image_urls: reviewData.imageUrls ?? [],
-      is_public: true,
-      is_verified: false,
-    })
+    .insert(insertRow)
     .select('id')
     .single();
 
   if (error) {
+    const message =
+      error.message ||
+      error.details ||
+      error.hint ||
+      'Nie udało się zapisać opinii';
     console.error('Error creating company review:', error);
-    return { data: null, error: new Error('Nie udało się zapisać opinii') };
+    return { data: null, error: new Error(message) };
   }
 
   return { data: { id: data.id }, error: null };
+}
+
+export async function updateCompanyReview(
+  supabase: SupabaseClient<Database>,
+  reviewId: string,
+  reviewerId: string,
+  reviewData: Pick<CompanyReviewInput, 'rating' | 'comment' | 'title'>,
+): Promise<{ error: Error | null }> {
+  if (reviewData.rating < 1 || reviewData.rating > 5) {
+    return { error: new Error('Ocena musi być od 1 do 5') };
+  }
+  if (!reviewData.comment.trim()) {
+    return { error: new Error('Komentarz jest wymagany') };
+  }
+
+  const { error } = await supabase
+    .from('company_reviews')
+    .update({
+      rating: reviewData.rating,
+      comment: reviewData.comment.trim(),
+      title: reviewData.title?.trim() || null,
+    })
+    .eq('id', reviewId)
+    .eq('reviewer_id', reviewerId);
+
+  if (error) {
+    const message =
+      error.message || error.details || error.hint || 'Nie udało się zapisać zmian';
+    console.error('Error updating company review:', error);
+    return { error: new Error(message) };
+  }
+
+  return { error: null };
+}
+
+/**
+ * Tender IDs where the reviewer already submitted a cooperation review.
+ */
+export async function fetchReviewedTenderIdsForReviewer(
+  supabase: SupabaseClient<Database>,
+  reviewerId: string,
+  tenderIds: string[],
+): Promise<Set<string>> {
+  if (tenderIds.length === 0) {
+    return new Set();
+  }
+
+  const { data, error } = await supabase
+    .from('company_reviews')
+    .select('tender_id')
+    .eq('reviewer_id', reviewerId)
+    .in('tender_id', tenderIds);
+
+  if (error || !data) {
+    return new Set();
+  }
+
+  return new Set(
+    data.map((row) => row.tender_id).filter((id): id is string => typeof id === 'string'),
+  );
 }
 
 export async function updateReviewImageUrls(

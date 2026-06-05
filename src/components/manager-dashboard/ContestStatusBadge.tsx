@@ -1,4 +1,4 @@
-import { Lock, Unlock, CheckCircle2, XCircle, FilePenLine } from 'lucide-react';
+import { Unlock, CheckCircle2, XCircle, FilePenLine } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { Badge } from '../ui/badge';
 import { getContestWorkflowStatusLabel } from '../../lib/tender-workflow-status';
@@ -21,8 +21,7 @@ export function ContestStatusBadge({ status }: ContestStatusBadgeProps): ReactEl
 
   if (status === 'active') {
     return (
-      <Badge variant="secondary" className="gap-1 font-normal">
-        <Lock className="h-3 w-3" aria-hidden />
+      <Badge variant="secondary" className="font-normal">
         {label}
       </Badge>
     );

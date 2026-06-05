@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { acceptManagerTenderOffer } from '../../../lib/database/offer-selection';
+import { deleteManagerContestDraft } from '../../../lib/database/manager-contests';
 import { canCancelContest } from '../../../lib/tender-workflow-status';
 
 const KONKURSY_PATH = '/manager-dashboard/konkursy';
@@ -115,4 +116,43 @@ export async function cancelContestAction(
 
   revalidateKonkursy(tenderId.trim());
   return { success: true };
+}
+
+export async function abandonContestDraftAction(
+  tenderId: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenderId?.trim()) {
+    return { success: false, error: 'Nieprawidłowe dane' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: 'Wymagane logowanie' };
+  }
+
+  const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+    supabase,
+    user.id,
+  );
+
+  if (companyError || !company) {
+    return { success: false, error: 'Brak firmy zarządcy' };
+  }
+
+  const result = await deleteManagerContestDraft(supabase, {
+    tenderId: tenderId.trim(),
+    managerId: user.id,
+    companyId: company.id,
+  });
+
+  if (result.success) {
+    revalidateKonkursy(tenderId.trim());
+    revalidatePath('/manager-dashboard/zgloszenia');
+  }
+
+  return result;
 }

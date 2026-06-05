@@ -8,17 +8,22 @@ const tabs = [
   { id: 'overview', label: 'Przegląd', href: '/manager-dashboard/overview' },
   { id: 'konkursy', label: 'Konkursy', href: '/manager-dashboard/konkursy' },
   { id: 'zamowienia', label: 'Zamówienia', href: '/manager-dashboard/zamowienia' },
-  { id: 'ocena', label: 'Ocena Zgłoszeń', href: '/manager-dashboard/ocena-zgloszen' },
+  { id: 'ocena', label: 'Ocena', href: '/manager-dashboard/ocena-zgloszen' },
 ];
 
-export function ManagerDashboardNav() {
+interface ManagerDashboardNavProps {
+  showOrders?: boolean;
+}
+
+export function ManagerDashboardNav({ showOrders = false }: ManagerDashboardNavProps) {
   const pathname = usePathname();
+  const visibleTabs = showOrders ? tabs : tabs.filter((tab) => tab.id !== 'zamowienia');
 
   return (
     <nav className="border-b bg-white">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex space-x-1">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive =
               pathname === tab.href ||
               (tab.id === 'overview' &&

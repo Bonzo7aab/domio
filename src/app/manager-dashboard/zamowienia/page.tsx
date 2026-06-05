@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import type { ReactElement } from 'react';
+import { redirect } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { fetchManagerOrders } from '../../../lib/database/manager-orders';
+import { isOrdersFeatureEnabledForAuthUser } from '../../../lib/flagship/orders-feature';
 import { ManagerZamowieniaContent } from '../../../components/manager-dashboard/ManagerZamowieniaContent';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
@@ -19,6 +21,10 @@ export default async function ManagerZamowieniaPage(): Promise<ReactElement> {
         <p className="text-muted-foreground">Wymagane logowanie.</p>
       </div>
     );
+  }
+
+  if (!(await isOrdersFeatureEnabledForAuthUser(supabase, user))) {
+    redirect('/manager-dashboard/overview');
   }
 
   const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);

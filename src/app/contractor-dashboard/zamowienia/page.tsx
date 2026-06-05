@@ -1,6 +1,8 @@
 import type { ReactElement } from 'react';
+import { redirect } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchContractorOrders } from '../../../lib/database/contractor-orders';
+import { isOrdersFeatureEnabledForAuthUser } from '../../../lib/flagship/orders-feature';
 import { ContractorZamowieniaContent } from '../../../components/contractor-dashboard/ContractorZamowieniaContent';
 
 export default async function ContractorZamowieniaPage(): Promise<ReactElement> {
@@ -15,6 +17,10 @@ export default async function ContractorZamowieniaPage(): Promise<ReactElement> 
         <p className="text-muted-foreground">Wymagane logowanie.</p>
       </div>
     );
+  }
+
+  if (!(await isOrdersFeatureEnabledForAuthUser(supabase, user))) {
+    redirect('/contractor-dashboard/applications');
   }
 
   const orders = await fetchContractorOrders(supabase, user.id);

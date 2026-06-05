@@ -132,3 +132,11 @@ export function isContestCompareReadOnly(status: string): boolean {
 export function canCancelContest(status: string): boolean {
   return status === 'active' || status === 'evaluation';
 }
+
+/** Manager may permanently delete an unpublished contest draft (no submitted offers). */
+export function canAbandonManagerContestDraft(
+  status: string,
+  offersCount: number,
+): boolean {
+  return status === 'draft' && offersCount === 0;
+}

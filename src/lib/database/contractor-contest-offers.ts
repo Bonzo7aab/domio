@@ -5,6 +5,7 @@ import {
   type ContractorContestOfferStatus,
 } from '../contest-offer/contractor-contest-offer-status';
 import { fetchUserPrimaryCompany } from './companies';
+import { fetchReviewedTenderIdsForReviewer } from './reviews';
 import { isContestTender } from '../tender-contest/map-tender-contest-display';
 import {
   computeGrossFromNet,
@@ -17,6 +18,7 @@ export interface ContractorContestOfferRow {
   tenderId: string;
   contestTitle: string;
   organizerName: string;
+  organizerCompanyId: string;
   netPrice: number;
   grossPrice: number;
   vatRate: ContestOfferVatRate;
@@ -26,6 +28,7 @@ export interface ContractorContestOfferRow {
   bidStatus: string;
   tenderStatus: string;
   submittedAt: string;
+  hasCooperationReview: boolean;
 }
 
 function parseOfferDetails(raw: unknown): ContestOfferDetails | null {
@@ -79,7 +82,7 @@ interface BidWithContestTender {
     building_id?: string | null;
     selection_criteria?: unknown;
     formal_requirements?: unknown;
-    companies?: { name?: string } | null;
+    companies?: { id?: string; name?: string } | null;
   } | null;
 }
 
@@ -117,6 +120,7 @@ export async function fetchContractorContestOffers(
         selection_criteria,
         formal_requirements,
         companies (
+          id,
           name
         )
       )
@@ -163,6 +167,7 @@ export async function fetchContractorContestOffers(
       tenderId: bid.tender_id,
       contestTitle: tender.title || 'Bez tytułu',
       organizerName: tender.companies?.name || 'Nieznany organizator',
+      organizerCompanyId: tender.companies?.id || '',
       netPrice: pricing.netPrice,
       grossPrice: pricing.grossPrice,
       vatRate: pricing.vatRate,
@@ -172,7 +177,21 @@ export async function fetchContractorContestOffers(
       bidStatus,
       tenderStatus,
       submittedAt: bid.submitted_at,
+      hasCooperationReview: false,
     });
+  }
+
+  const selectedTenderIds = rows
+    .filter((row) => row.derivedStatus === 'selected')
+    .map((row) => row.tenderId);
+  const reviewedTenderIds = await fetchReviewedTenderIdsForReviewer(
+    supabase,
+    contractorUserId,
+    selectedTenderIds,
+  );
+
+  for (const row of rows) {
+    row.hasCooperationReview = reviewedTenderIds.has(row.tenderId);
   }
 
   return rows;

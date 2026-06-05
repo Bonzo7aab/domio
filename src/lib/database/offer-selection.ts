@@ -461,3 +461,28 @@ export async function fetchAcceptedTenderBid(
   );
   return accepted ?? null;
 }
+
+export interface AcceptedContractorForTender {
+  companyId: string;
+  companyName: string;
+}
+
+/** Accepted contractor company for a contest with a selected offer. */
+export async function fetchAcceptedContractorCompanyForTender(
+  supabase: SupabaseClient<Database>,
+  tenderId: string,
+): Promise<AcceptedContractorForTender | null> {
+  const bid = await fetchAcceptedTenderBid(supabase, tenderId);
+  if (!bid) return null;
+
+  const row = bid as {
+    contractorCompanyId?: string;
+    contractorCompany?: string;
+  };
+
+  const companyId = row.contractorCompanyId?.trim() ?? '';
+  const companyName = row.contractorCompany?.trim() ?? '';
+  if (!companyId || !companyName) return null;
+
+  return { companyId, companyName };
+}

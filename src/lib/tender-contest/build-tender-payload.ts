@@ -278,6 +278,16 @@ export function mapTenderRowToContestForm(
   };
 }
 
+/** Clears schedule fields when duplicating a contest for a new publication round. */
+export function clearContestFormDates(form: TenderContestFormData): TenderContestFormData {
+  return {
+    ...form,
+    submissionDeadline: new Date(Number.NaN),
+    evaluationDeadline: null,
+    completionDate: null,
+  };
+}
+
 export function parseExistingTenderDocuments(
   documents: unknown,
 ): TenderContestDocumentMeta[] {

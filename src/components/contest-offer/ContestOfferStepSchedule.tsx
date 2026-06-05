@@ -58,7 +58,7 @@ export function ContestOfferStepSchedule({
           <div>
             <Label htmlFor="proposedCompletionDate">Oferowany termin wykonania</Label>
             <Input
-              id="proposedCompletionDate"
+              id="contest-offer-proposedCompletionDate"
               type="date"
               value={form.proposedCompletionDate}
               onChange={(e) => onPatch({ proposedCompletionDate: e.target.value })}
@@ -93,6 +93,7 @@ export function ContestOfferStepSchedule({
           {contestInfo.siteVisitType === 'mandatory' ? (
             <div>
               <label
+                id="contest-offer-siteVisitConfirmed"
                 className={cn(
                   'flex items-start gap-2 cursor-pointer rounded-md border p-3 bg-muted/30',
                   fieldErrors.siteVisitConfirmed && 'border-destructive bg-destructive/5',

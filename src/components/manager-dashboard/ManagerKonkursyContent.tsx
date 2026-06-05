@@ -7,12 +7,11 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  BarChart3,
-  ExternalLink,
-  HelpCircle,
-  Lock,
+  CalendarClock,
+  CheckCircle2,
   MoreVertical,
   Pencil,
+  Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -21,15 +20,20 @@ import {
 } from '../../lib/database/manager-contests';
 import {
   CONTEST_STATUS_FILTER_OPTIONS,
+  canAbandonManagerContestDraft,
   canCancelContest,
   canCompareContestOffers,
   isContestCompareReadOnly,
 } from '../../lib/tender-workflow-status';
 import { formatSubmissionDeadlineDisplay, formatCompareLockedTooltip } from '../../lib/contest-submission-deadline';
-import { cancelContestAction } from '../../app/manager-dashboard/konkursy/actions';
+import {
+  abandonContestDraftAction,
+  cancelContestAction,
+} from '../../app/manager-dashboard/konkursy/actions';
 import { ManagerContestOffersDialog } from './ManagerContestOffersDialog';
 import { ManagerContestQuestionsDialog } from './ManagerContestQuestionsDialog';
 import { ManagerContestWinnerDialog } from './ManagerContestWinnerDialog';
+import { CooperationReviewDialog } from '../reviews/CooperationReviewDialog';
 import { ContestStatusBadge } from './ContestStatusBadge';
 import { cn } from '../ui/utils';
 import { Button } from '../ui/button';
@@ -126,9 +130,15 @@ export function ManagerKonkursyContent({
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [cancelTarget, setCancelTarget] = useState<ManagerContest | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [abandonDraftTarget, setAbandonDraftTarget] = useState<ManagerContest | null>(null);
+  const [isAbandoningDraft, setIsAbandoningDraft] = useState(false);
   const [questionsDialog, setQuestionsDialog] = useState<{ id: string; title: string } | null>(
     null,
   );
+  const [cooperationReviewTarget, setCooperationReviewTarget] = useState<ManagerContest | null>(
+    null,
+  );
+  const [reviewedContestIds, setReviewedContestIds] = useState<Set<string>>(() => new Set());
   const [unseenCounts, setUnseenCounts] = useState<Record<string, number>>(() =>
     Object.fromEntries(initialContests.map((c) => [c.id, c.unseenQuestionsCount])),
   );
@@ -178,23 +188,6 @@ export function ManagerKonkursyContent({
   const handleUnansweredCountChange = (contestId: string, count: number): void => {
     setUnansweredCounts((prev) => ({ ...prev, [contestId]: count }));
   };
-
-  function questionsTooltipLabel(contestId: string): string {
-    const unanswered = unansweredCounts[contestId] ?? 0;
-    const unseen = unseenCounts[contestId] ?? 0;
-    if (unanswered === 0) return 'Pytania do konkursu';
-    const unansweredLabel =
-      unanswered === 1
-        ? '1 pytanie bez odpowiedzi'
-        : unanswered < 5
-          ? `${unanswered} pytania bez odpowiedzi`
-          : `${unanswered} pytań bez odpowiedzi`;
-    if (unseen > 0) {
-      const unseenLabel = unseen === 1 ? '1 nowe' : `${unseen} nowych`;
-      return `${unansweredLabel} (${unseenLabel})`;
-    }
-    return unansweredLabel;
-  }
 
   const handleSort = (key: SortKey): void => {
     if (sortKey === key) {
@@ -254,6 +247,24 @@ export function ManagerKonkursyContent({
     router.refresh();
   };
 
+  const confirmAbandonDraft = async (): Promise<void> => {
+    if (!abandonDraftTarget) return;
+    setIsAbandoningDraft(true);
+    try {
+      const result = await abandonContestDraftAction(abandonDraftTarget.id);
+      if (result.success) {
+        toast.success('Szkic konkursu został odrzucony');
+        setContests((prev) => prev.filter((c) => c.id !== abandonDraftTarget.id));
+        setAbandonDraftTarget(null);
+        router.refresh();
+      } else {
+        toast.error(result.error ?? 'Nie udało się odrzucić szkicu konkursu');
+      }
+    } finally {
+      setIsAbandoningDraft(false);
+    }
+  };
+
   const confirmCancel = async (): Promise<void> => {
     if (!cancelTarget) return;
     setCancelling(true);
@@ -271,108 +282,28 @@ export function ManagerKonkursyContent({
     }
   };
 
-  const shouldShowQuestionsButton = (row: ManagerContest): boolean => {
-    const total = row.questionsCount ?? 0;
-    const unanswered = unansweredCounts[row.id] ?? row.unansweredQuestionsCount ?? 0;
-    return total > 0 && unanswered > 0;
-  };
-
-  const renderQuestionsButton = (row: ManagerContest): ReactElement | null => {
-    if (!shouldShowQuestionsButton(row)) {
-      return null;
-    }
-
-    const commentCount = row.commentsCount;
-    const pendingCount = unansweredCounts[row.id] ?? 0;
-    const badgeCount = commentCount > 0 ? commentCount : pendingCount;
-    const unseen = unseenCounts[row.id] ?? 0;
-
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="relative h-8 w-8 shrink-0"
-                onClick={() => openQuestionsDialog(row)}
-                aria-label="Pytania do konkursu"
-              >
-                <HelpCircle className="h-4 w-4" />
-                {badgeCount > 0 ? (
-                  <span
-                    className={cn(
-                      'absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold leading-none',
-                      unseen > 0 || pendingCount > 0
-                        ? 'bg-destructive text-destructive-foreground'
-                        : 'bg-primary text-primary-foreground',
-                    )}
-                    aria-hidden
-                  >
-                    {badgeCount > 99 ? '99+' : badgeCount}
-                  </span>
-                ) : null}
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{questionsTooltipLabel(row.id)}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  };
-
   const renderDraftContinueButton = (row: ManagerContest): ReactElement | null => {
     if (row.status !== 'draft') return null;
 
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Button
-                variant="default"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                asChild
-                aria-label="Kontynuuj tworzenie konkursu"
-              >
-                <Link href={`/post-contest/${row.id}`}>
-                  <Pencil className="h-4 w-4" />
-                </Link>
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>Kontynuuj tworzenie konkursu</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Button variant="default" size="sm" className="h-8 shrink-0" asChild>
+        <Link href={`/post-contest/${row.id}`}>
+          <Pencil className="h-4 w-4 mr-1.5" />
+          Kontynuuj
+        </Link>
+      </Button>
     );
   };
 
-  const renderPrimaryCompareIcon = (row: ManagerContest): ReactElement | null => {
-    if (row.status === 'draft' || row.status === 'cancelled' || row.status === 'awarded') {
-      return null;
-    }
+  const renderStatusCell = (row: ManagerContest): ReactElement => {
+    const badge = <ContestStatusBadge status={row.status} />;
 
-    const canCompare = canCompareContestOffers(row.status);
-
-    if (row.status === 'active' || !canCompare) {
+    if (row.status === 'active') {
       return (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  disabled
-                  aria-label="Porównaj oferty"
-                >
-                  <Lock className="h-4 w-4" aria-hidden />
-                </Button>
-              </span>
+              <span className="inline-flex cursor-default">{badge}</span>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               {formatCompareLockedTooltip(row.submissionDeadline)}
@@ -382,28 +313,68 @@ export function ManagerKonkursyContent({
       );
     }
 
-    const disabled = row.offersCount === 0;
+    return badge;
+  };
+
+  const hasCooperationReview = (row: ManagerContest): boolean =>
+    row.hasCooperationReview || reviewedContestIds.has(row.id);
+
+  const markCooperationReviewSubmitted = (contestId: string): void => {
+    setReviewedContestIds((prev) => new Set(prev).add(contestId));
+    setContests((prev) =>
+      prev.map((c) => (c.id === contestId ? { ...c, hasCooperationReview: true } : c)),
+    );
+  };
+
+  const renderCooperationReviewButton = (row: ManagerContest): ReactElement | null => {
+    if (
+      !row.hasSelectedOffer ||
+      !row.selectedContractorCompanyId ||
+      !row.selectedContractorName ||
+      hasCooperationReview(row)
+    ) {
+      return null;
+    }
 
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Button
-                variant="default"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                disabled={disabled}
-                aria-label="Porównaj oferty"
-                onClick={() => router.push(compareHref(row.id))}
-              >
-                <BarChart3 className="h-4 w-4" />
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>Porównaj oferty</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Button
+        variant="default"
+        size="sm"
+        className="h-8 shrink-0"
+        onClick={() => setCooperationReviewTarget(row)}
+      >
+        <Star className="h-4 w-4 mr-1.5" />
+        Oceń współpracę
+      </Button>
+    );
+  };
+
+  const renderPrimaryEvaluationAction = (row: ManagerContest): ReactElement | null => {
+    if (row.status !== 'evaluation') {
+      return null;
+    }
+
+    if (row.offersCount > 0) {
+      return (
+        <Button
+          variant="default"
+          size="sm"
+          className="h-8 shrink-0"
+          onClick={() => router.push(compareHref(row.id))}
+        >
+          <CheckCircle2 className="h-4 w-4 mr-1.5" />
+          Wybierz
+        </Button>
+      );
+    }
+
+    return (
+      <Button variant="default" size="sm" className="h-8 shrink-0" asChild>
+        <Link href={`/post-contest?duplicateFrom=${row.id}`}>
+          <CalendarClock className="h-4 w-4 mr-1.5" />
+          Nowe terminy
+        </Link>
+      </Button>
     );
   };
 
@@ -415,8 +386,22 @@ export function ManagerKonkursyContent({
         canCompareContestOffers(row.status) ||
         isContestCompareReadOnly(row.status));
 
+    const showQuestions = (row.questionsCount ?? 0) > 0;
+    const unseen = unseenCounts[row.id] ?? 0;
+    const pendingCount = unansweredCounts[row.id] ?? 0;
+
+    const abandonDraftAllowed = canAbandonManagerContestDraft(row.status, row.offersCount);
+    const showCooperationReviewEdit =
+      row.hasSelectedOffer &&
+      Boolean(row.selectedContractorCompanyId) &&
+      Boolean(row.selectedContractorName) &&
+      hasCooperationReview(row);
     const hasMenuItems =
-      canCancelContest(row.status) || showViewResults;
+      abandonDraftAllowed ||
+      canCancelContest(row.status) ||
+      showViewResults ||
+      showQuestions ||
+      showCooperationReviewEdit;
 
     if (!hasMenuItems) {
       return null;
@@ -428,20 +413,46 @@ export function ManagerKonkursyContent({
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 shrink-0"
+            className="relative h-8 w-8 shrink-0"
             aria-label="Więcej akcji"
           >
             <MoreVertical className="h-4 w-4" />
+            {unseen > 0 ? (
+              <span className="absolute top-0.5 right-0.5 flex h-2 w-2" aria-hidden>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive" />
+              </span>
+            ) : null}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          {showViewResults ? (
+          {abandonDraftAllowed ? (
             <DropdownMenuItem
-              disabled={row.offersCount === 0 && !row.hasSelectedOffer}
-              onClick={() => setOffersDialogRow(row)}
+              className="text-destructive focus:text-destructive"
+              onClick={() => setAbandonDraftTarget(row)}
             >
-              Zobacz wyniki
+              Odrzuć szkic
             </DropdownMenuItem>
+          ) : null}
+          {showQuestions ? (
+            <>
+              {abandonDraftAllowed ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuItem onClick={() => openQuestionsDialog(row)}>
+                Pytania do konkursu
+                {pendingCount > 0 ? ` (${pendingCount})` : ''}
+              </DropdownMenuItem>
+            </>
+          ) : null}
+          {showViewResults ? (
+            <>
+              {showQuestions || abandonDraftAllowed ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuItem
+                disabled={row.offersCount === 0 && !row.hasSelectedOffer}
+                onClick={() => setOffersDialogRow(row)}
+              >
+                Zobacz wyniki
+              </DropdownMenuItem>
+            </>
           ) : null}
           {canCancelContest(row.status) ? (
             <>
@@ -451,6 +462,17 @@ export function ManagerKonkursyContent({
                 onClick={() => setCancelTarget(row)}
               >
                 Unieważnij
+              </DropdownMenuItem>
+            </>
+          ) : null}
+          {showCooperationReviewEdit ? (
+            <>
+              {abandonDraftAllowed || showQuestions || showViewResults || canCancelContest(row.status) ? (
+                <DropdownMenuSeparator />
+              ) : null}
+              <DropdownMenuItem onClick={() => setCooperationReviewTarget(row)}>
+                <Star className="h-4 w-4 mr-2" />
+                Ocena współpracy
               </DropdownMenuItem>
             </>
           ) : null}
@@ -555,28 +577,20 @@ export function ManagerKonkursyContent({
                             'bg-primary/5 border-l-4 border-l-primary hover:bg-primary/10',
                         )}
                       >
-                        <TableCell
-                          className={cn('font-medium max-w-[300px]', isPickedRow && 'text-primary')}
-                        >
-                          <div className="flex items-center gap-0.5 min-w-0">
-                            <span className="min-w-0 truncate leading-snug">{row.title}</span>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Link
-                                    href={`/jobs/${row.id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
-                                    aria-label="Otwórz stronę konkursu"
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                  </Link>
-                                </TooltipTrigger>
-                                <TooltipContent>Strona konkursu</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
+                        <TableCell className={cn('max-w-[300px]', isPickedRow && 'text-primary')}>
+                          <Link
+                            href={`/jobs/${row.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(
+                              'font-medium truncate leading-snug hover:underline block max-w-full',
+                              isPickedRow
+                                ? 'text-primary hover:text-primary/80'
+                                : 'text-foreground hover:text-primary',
+                            )}
+                          >
+                            {row.title}
+                          </Link>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px]">
                           {row.locationLabel}
@@ -595,9 +609,7 @@ export function ManagerKonkursyContent({
                             '—'
                           )}
                         </TableCell>
-                        <TableCell>
-                          <ContestStatusBadge status={row.status} />
-                        </TableCell>
+                        <TableCell>{renderStatusCell(row)}</TableCell>
                         <TableCell>
                           <span className="tabular-nums">{row.offersCount}</span>
                           {row.hasSelectedOffer ? (
@@ -616,10 +628,10 @@ export function ManagerKonkursyContent({
                           ) : null}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
                             {renderDraftContinueButton(row)}
-                            {renderPrimaryCompareIcon(row)}
-                            {renderQuestionsButton(row)}
+                            {renderPrimaryEvaluationAction(row)}
+                            {renderCooperationReviewButton(row)}
                             {renderActionsMenu(row)}
                           </div>
                         </TableCell>
@@ -644,6 +656,20 @@ export function ManagerKonkursyContent({
         onUnansweredCountChange={handleUnansweredCountChange}
       />
 
+      {cooperationReviewTarget?.selectedContractorCompanyId &&
+      cooperationReviewTarget.selectedContractorName ? (
+        <CooperationReviewDialog
+          open
+          onOpenChange={(open) => !open && setCooperationReviewTarget(null)}
+          variant="manager"
+          tenderId={cooperationReviewTarget.id}
+          counterpartyCompanyId={cooperationReviewTarget.selectedContractorCompanyId}
+          counterpartyCompanyName={cooperationReviewTarget.selectedContractorName}
+          isEditing={hasCooperationReview(cooperationReviewTarget)}
+          onSubmitted={() => markCooperationReviewSubmitted(cooperationReviewTarget.id)}
+        />
+      ) : null}
+
       <ManagerContestWinnerDialog
         contestId={winnerDialogRow?.id ?? null}
         contestTitle={winnerDialogRow?.title}
@@ -661,6 +687,34 @@ export function ManagerKonkursyContent({
           if (!open) setOffersDialogRow(null);
         }}
       />
+
+      <AlertDialog
+        open={abandonDraftTarget !== null}
+        onOpenChange={(open) => !open && setAbandonDraftTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Odrzucić szkic konkursu?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Szkic „{abandonDraftTarget?.title}” zostanie trwale usunięty. Tej operacji nie można
+              cofnąć.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isAbandoningDraft}>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isAbandoningDraft}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmAbandonDraft();
+              }}
+            >
+              {isAbandoningDraft ? 'Usuwanie…' : 'Odrzuć szkic'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={cancelTarget !== null} onOpenChange={(o) => !o && setCancelTarget(null)}>
         <AlertDialogContent>

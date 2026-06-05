@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { acceptOrderWork, cancelOrder } from '../../../lib/database/order-mutations';
+import {
+  isOrdersFeatureEnabledForAuthUser,
+  ORDERS_FEATURE_DISABLED_ERROR,
+} from '../../../lib/flagship/orders-feature';
 
 const MANAGER_ORDERS_PATH = '/manager-dashboard/zamowienia';
 const CONTRACTOR_ORDERS_PATH = '/contractor-dashboard/zamowienia';
@@ -27,6 +31,10 @@ export async function acceptOrderWorkAction(
 
   if (!user) {
     return { success: false, error: 'Wymagane logowanie' };
+  }
+
+  if (!(await isOrdersFeatureEnabledForAuthUser(supabase, user))) {
+    return { success: false, error: ORDERS_FEATURE_DISABLED_ERROR };
   }
 
   const { data: company, error: companyError } = await fetchUserPrimaryCompany(
@@ -62,6 +70,10 @@ export async function cancelOrderAction(
 
   if (!user) {
     return { success: false, error: 'Wymagane logowanie' };
+  }
+
+  if (!(await isOrdersFeatureEnabledForAuthUser(supabase, user))) {
+    return { success: false, error: ORDERS_FEATURE_DISABLED_ERROR };
   }
 
   const { data: company, error: companyError } = await fetchUserPrimaryCompany(

@@ -83,6 +83,7 @@ const FLAG_DESCRIPTIONS: Record<FlagshipFlagKey, string> = {
   [FLAGSHIP_FLAG_KEYS.ENHANCED_MAP]: 'Nowa wersja mapy z dodatkowymi funkcjami',
   [FLAGSHIP_FLAG_KEYS.ADVANCED_FILTERS]: 'Dodatkowe opcje filtrowania zgłoszeń',
   [FLAGSHIP_FLAG_KEYS.MOBILE_OPTIMIZATIONS]: 'Ulepszenia dla urządzeń mobilnych',
+  [FLAGSHIP_FLAG_KEYS.ORDERS]: 'Moduł zamówień dla zarządców i wykonawców',
 };
 
 export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }) => {

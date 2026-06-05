@@ -50,9 +50,11 @@ interface HeaderProps {
   initialUser?: AuthUser | null;
   /** Set server-side from Flagship `new-tender-system` flag. Defaults to Domio. */
   brandTitle?: string;
+  /** Set server-side from Flagship `orders` flag. Defaults to hidden. */
+  showOrders?: boolean;
 }
 
-export function Header({ initialUser, brandTitle = 'Domio' }: HeaderProps) {
+export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }: HeaderProps) {
   const router = useNavigationWithLoading();
   const pathname = usePathname();
   const { setIsMapExpanded } = useLayoutContext();
@@ -391,14 +393,16 @@ export function Header({ initialUser, brandTitle = 'Domio' }: HeaderProps) {
                                 <span>{verificationMenuLabel(currentUser)}</span>
                               </Button>
                             )}
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                              onClick={handleZamowieniaClick}
-                            >
-                              <Package className="mr-2 h-4 w-4" />
-                              <span>Zamówienia</span>
-                            </Button>
+                            {showOrders ? (
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start"
+                                onClick={handleZamowieniaClick}
+                              >
+                                <Package className="mr-2 h-4 w-4" />
+                                <span>Zamówienia</span>
+                              </Button>
+                            ) : null}
                             <Button
                               variant="ghost"
                               className="w-full justify-start"
@@ -426,14 +430,16 @@ export function Header({ initialUser, brandTitle = 'Domio' }: HeaderProps) {
                               <User className="mr-2 h-4 w-4" />
                               <span>Konto</span>
                             </Button>
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                              onClick={handleZamowieniaClick}
-                            >
-                              <Package className="mr-2 h-4 w-4" />
-                              <span>Zamówienia</span>
-                            </Button>
+                            {showOrders ? (
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start"
+                                onClick={handleZamowieniaClick}
+                              >
+                                <Package className="mr-2 h-4 w-4" />
+                                <span>Zamówienia</span>
+                              </Button>
+                            ) : null}
                             <Button
                               variant="ghost"
                               className="w-full justify-start"
@@ -574,10 +580,12 @@ export function Header({ initialUser, brandTitle = 'Domio' }: HeaderProps) {
                             <span>{verificationMenuLabel(currentUser)}</span>
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={handleZamowieniaClick}>
-                          <Package className="mr-2 h-4 w-4" />
-                          <span>Zamówienia</span>
-                        </DropdownMenuItem>
+                        {showOrders ? (
+                          <DropdownMenuItem onClick={handleZamowieniaClick}>
+                            <Package className="mr-2 h-4 w-4" />
+                            <span>Zamówienia</span>
+                          </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuItem onClick={handleOffersClick}>
                           <Bookmark className="mr-2 h-4 w-4" />
                           <span>Oferty</span>
@@ -594,10 +602,12 @@ export function Header({ initialUser, brandTitle = 'Domio' }: HeaderProps) {
                           <User className="mr-2 h-4 w-4" />
                           <span>Konto</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleZamowieniaClick}>
-                          <Package className="mr-2 h-4 w-4" />
-                          <span>Zamówienia</span>
-                        </DropdownMenuItem>
+                        {showOrders ? (
+                          <DropdownMenuItem onClick={handleZamowieniaClick}>
+                            <Package className="mr-2 h-4 w-4" />
+                            <span>Zamówienia</span>
+                          </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuItem onClick={handleZgloszeniaClick}>
                           <ClipboardList className="mr-2 h-4 w-4" />
                           <span>Konkursy</span>

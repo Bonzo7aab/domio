@@ -67,6 +67,7 @@ export function ContestOfferFormalDocBlock({
   const isAttached = Boolean(displayName);
   const status = getFormalDocStatus(attached, stagedName);
   const fromProfile = attached?.source === 'profile' && !stagedName;
+  const badgeVariant = fieldError ? 'destructive' : STATUS_VARIANT[status];
 
   const handleFileChange = (file: File | undefined): void => {
     if (file) onUpload(file);
@@ -74,6 +75,7 @@ export function ContestOfferFormalDocBlock({
 
   return (
     <div
+      data-contest-offer-formal={doc.requirementKey}
       className={cn(
         'rounded-lg border p-4 space-y-3 transition-colors',
         fieldError && 'border-destructive bg-destructive/5',
@@ -87,7 +89,7 @@ export function ContestOfferFormalDocBlock({
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="font-medium">{doc.label}</div>
-        <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABELS[status]}</Badge>
+        <Badge variant={badgeVariant}>{STATUS_LABELS[status]}</Badge>
       </div>
 
       {isAttached ? (

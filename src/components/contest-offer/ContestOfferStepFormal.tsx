@@ -104,11 +104,11 @@ export function ContestOfferStepFormal({
                   {line}
                 </p>
               ))}
-            <Label htmlFor="referencesText" className="sr-only">
+            <Label htmlFor="contest-offer-referencesText" className="sr-only">
               Wykaz zrealizowanych prac
             </Label>
             <Textarea
-              id="referencesText"
+              id="contest-offer-referencesText"
               rows={5}
               value={form.referencesText}
               onChange={(e) => onPatch({ referencesText: e.target.value })}

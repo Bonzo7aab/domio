@@ -53,9 +53,9 @@ export function ContestOfferStepFinancial({
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="netPrice">Cena netto za całość prac (zł)</Label>
+              <Label htmlFor="contest-offer-netPrice">Cena netto za całość prac (zł)</Label>
               <Input
-                id="netPrice"
+                id="contest-offer-netPrice"
                 type="number"
                 min={0}
                 step="0.01"
@@ -107,6 +107,7 @@ export function ContestOfferStepFinancial({
               onValueChange={(v) => onPatch({ warrantyMonths: v })}
             >
               <SelectTrigger
+                id="contest-offer-warrantyMonths"
                 className={cn('mt-1.5', fieldErrorInputClass(Boolean(fieldErrors.warrantyMonths)))}
                 aria-invalid={Boolean(fieldErrors.warrantyMonths)}
               >
@@ -129,6 +130,7 @@ export function ContestOfferStepFinancial({
               onValueChange={(v) => onPatch({ guaranteeMonths: v })}
             >
               <SelectTrigger
+                id="contest-offer-guaranteeMonths"
                 className={cn('mt-1.5', fieldErrorInputClass(Boolean(fieldErrors.guaranteeMonths)))}
                 aria-invalid={Boolean(fieldErrors.guaranteeMonths)}
               >
@@ -181,6 +183,7 @@ export function ContestOfferStepFinancial({
                 }}
               />
               <Button
+                id="contest-offer-deposit"
                 type="button"
                 variant="outline"
                 className={cn(
@@ -212,7 +215,10 @@ export function ContestOfferStepFinancial({
             <Badge>Wymagane</Badge>
           </CardHeader>
           <CardContent>
-            <label className="flex items-start gap-2 cursor-pointer">
+            <label
+              id="contest-offer-paymentTermsAccepted"
+              className="flex items-start gap-2 cursor-pointer"
+            >
               <Checkbox
                 checked={form.paymentTermsAccepted}
                 onCheckedChange={(v) => onPatch({ paymentTermsAccepted: v === true })}

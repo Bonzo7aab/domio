@@ -11,6 +11,7 @@ import { fetchUserPrimaryCompany } from '../lib/database/companies';
 import { uploadTenderDocuments } from '../lib/storage/tender-documents';
 import {
   buildCreateTenderPayload,
+  clearContestFormDates,
   contestPayloadToUpsertData,
   mapTenderRowToContestForm,
   parseExistingTenderDocuments,
@@ -23,21 +24,25 @@ interface TenderCreationPageProps {
   onBack: () => void;
   backLabel?: string;
   tenderId?: string;
+  /** Copy an existing contest into a new draft; schedule fields are left empty. */
+  duplicateFromId?: string;
 }
 
 export default function TenderCreationPage({
   onBack,
   backLabel,
   tenderId,
+  duplicateFromId,
 }: TenderCreationPageProps): React.ReactElement {
   const { user, session, isLoading } = useUserProfile();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingTender, setIsLoadingTender] = useState(Boolean(tenderId));
+  const [isLoadingTender, setIsLoadingTender] = useState(Boolean(tenderId || duplicateFromId));
   const [initialTender, setInitialTender] = useState<TenderWithCompany | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const isEditMode = Boolean(tenderId);
+  const isDuplicateMode = Boolean(duplicateFromId) && !isEditMode;
 
   useEffect(() => {
     const loginPath = isEditMode
@@ -50,7 +55,9 @@ export default function TenderCreationPage({
 
   useEffect(() => {
     if (!tenderId || !user?.id) {
-      setIsLoadingTender(false);
+      if (!duplicateFromId) {
+        setIsLoadingTender(false);
+      }
       return;
     }
 
@@ -93,17 +100,59 @@ export default function TenderCreationPage({
     };
 
     void load();
-  }, [tenderId, user?.id]);
+  }, [tenderId, duplicateFromId, user?.id]);
+
+  useEffect(() => {
+    if (!duplicateFromId || tenderId || !user?.id) {
+      return;
+    }
+
+    const loadDuplicate = async (): Promise<void> => {
+      setIsLoadingTender(true);
+      setLoadError(null);
+      try {
+        const supabase = createClient();
+        const { data: company, error: companyError } = await fetchUserPrimaryCompany(
+          supabase,
+          user.id,
+        );
+        if (companyError || !company) {
+          setLoadError('Nie znaleziono firmy.');
+          return;
+        }
+
+        const { data: tender, error } = await fetchTenderById(supabase, duplicateFromId);
+        if (error || !tender) {
+          setLoadError('Nie znaleziono konkursu do skopiowania.');
+          return;
+        }
+
+        if (tender.company?.id !== company.id) {
+          setLoadError('Brak dostępu do tego konkursu.');
+          return;
+        }
+
+        setInitialTender(tender);
+      } catch {
+        setLoadError('Nie udało się wczytać danych konkursu.');
+      } finally {
+        setIsLoadingTender(false);
+      }
+    };
+
+    void loadDuplicate();
+  }, [duplicateFromId, tenderId, user?.id]);
 
   const initialForm = useMemo(() => {
     if (!initialTender) return undefined;
     const row = initialTender as unknown as Record<string, unknown>;
-    return mapTenderRowToContestForm(
+    const mapped = mapTenderRowToContestForm(
       row,
       initialTender.category?.name,
       initialTender.subcategory?.name,
     );
-  }, [initialTender]);
+    return isDuplicateMode ? clearContestFormDates(mapped) : mapped;
+  }, [initialTender, isDuplicateMode]);
 
   const existingDocuments = useMemo(
     () => parseExistingTenderDocuments(initialTender?.documents),
@@ -233,11 +282,19 @@ export default function TenderCreationPage({
       <TenderContestPageHeader
         onBack={onBack}
         backLabel={backLabel}
-        title={isEditMode ? 'Kontynuuj konkurs ofert' : undefined}
+        title={
+          isEditMode
+            ? 'Kontynuuj konkurs ofert'
+            : isDuplicateMode
+              ? 'Konkurs z nowymi terminami'
+              : undefined
+        }
         subtitle={
           isEditMode
             ? 'Uzupełnij brakujące pola i zapisz szkic lub opublikuj konkurs.'
-            : undefined
+            : isDuplicateMode
+              ? 'Dane konkursu zostały skopiowane. Uzupełnij terminy i opublikuj nową edycję.'
+              : undefined
         }
       />
 

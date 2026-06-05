@@ -39,7 +39,7 @@ export default async function KonkursyPage(): Promise<ReactElement> {
     );
   }
 
-  const contests = await fetchManagerContests(supabase, company.id);
+  const contests = await fetchManagerContests(supabase, company.id, user.id);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">

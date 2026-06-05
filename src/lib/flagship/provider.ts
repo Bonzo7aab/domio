@@ -17,7 +17,8 @@ export async function initFlagshipProvider(): Promise<void> {
       appId,
       accountId,
       authToken,
-      logging: process.env.NODE_ENV === 'development',
+      // App handles evaluation errors in evaluate.ts; avoid noisy SDK logs for missing flags.
+      logging: false,
     });
     initPromise = OpenFeature.setProviderAndWait(provider).then(() => {
       if (provider.status !== 'READY' && process.env.NODE_ENV === 'development') {

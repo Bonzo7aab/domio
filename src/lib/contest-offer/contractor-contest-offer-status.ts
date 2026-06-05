@@ -121,6 +121,10 @@ export function getContractorContestOfferStatusVariant(
   }
 }
 
+export function canAbandonContestOfferDraft(bidStatus: string): boolean {
+  return bidStatus === 'draft';
+}
+
 export function canWithdrawContestOffer(
   input: ContractorContestOfferStatusInput,
 ): boolean {
@@ -148,6 +152,12 @@ export function canWithdrawContestOffer(
 }
 
 export function canMessageManagerOnContestOffer(
+  derivedStatus: ContractorContestOfferStatus,
+): boolean {
+  return derivedStatus === 'selected';
+}
+
+export function canRateCooperationOnContestOffer(
   derivedStatus: ContractorContestOfferStatus,
 ): boolean {
   return derivedStatus === 'selected';

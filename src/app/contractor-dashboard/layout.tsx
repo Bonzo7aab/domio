@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { createClient } from '../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../lib/database/companies';
 import { fetchContractorById, fetchContractorDashboardStats } from '../../lib/database/contractors';
+import { buildEvaluationContext } from '../../lib/flagship/context';
+import { isOrdersFeatureEnabled } from '../../lib/flagship/orders-feature';
 import { ContractorDashboardHeader } from '../../components/contractor-dashboard/ContractorDashboardHeader';
 import { ContractorDashboardNav } from '../../components/contractor-dashboard/ContractorDashboardNav';
 
@@ -31,7 +33,7 @@ export default async function ContractorDashboardLayout({
   }
 
   // Fetch contractor profile
-  const profile = await fetchContractorById(company.id);
+  const contractorProfile = await fetchContractorById(company.id);
   
   // Fetch stats for header (rating, completed projects)
   let stats = null;
@@ -45,13 +47,28 @@ export default async function ContractorDashboardLayout({
     console.error('Error fetching contractor stats for header:', error);
   }
 
+  const { data: userProfile } = await supabase
+    .from('user_profiles')
+    .select('user_type, platform_role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const showOrders = await isOrdersFeatureEnabled(
+    buildEvaluationContext({
+      id: user.id,
+      email: user.email,
+      userType: userProfile?.user_type,
+      platformRole: userProfile?.platform_role ?? undefined,
+    }),
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <ContractorDashboardHeader 
-        profile={profile}
+        profile={contractorProfile}
         stats={stats}
       />
-      <ContractorDashboardNav />
+      <ContractorDashboardNav showOrders={showOrders} />
       {children}
     </div>
   );

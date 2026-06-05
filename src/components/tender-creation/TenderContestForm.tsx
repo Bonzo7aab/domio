@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { File, FileText, Plus, Save, Send, Trash2, Upload, X } from 'lucide-react';
-import { toast } from 'sonner';
 import type { FileRejection } from 'react-dropzone';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -35,6 +34,18 @@ import {
   createEmptyTenderContestForm,
   selectionCriteriaTotalWeight,
 } from '../../types/tender-contest';
+import {
+  clearTenderContestFieldErrorsForPatch,
+  getTenderContestFormFieldErrors,
+  hasTenderContestFormFieldErrors,
+  scrollToFirstTenderContestError,
+  type TenderContestFormFieldErrors,
+} from '../../lib/tender-contest/contest-form-validation';
+import {
+  ContestOfferFieldError,
+  fieldErrorInputClass,
+} from '../contest-offer/ContestOfferFieldError';
+import { cn } from '../ui/utils';
 
 export interface TenderContestFormProps {
   onSubmit: (
@@ -81,84 +92,6 @@ function minCompletionDateAfterSubmission(submission: Date): string {
   return toDateInputValue(min);
 }
 
-function validateContestFormConsistency(form: TenderContestFormData): string | null {
-  if (
-    form.evaluationDeadline &&
-    form.submissionDeadline &&
-    !Number.isNaN(form.submissionDeadline.getTime()) &&
-    form.evaluationDeadline.getTime() <= form.submissionDeadline.getTime()
-  ) {
-    return 'Rozstrzygnięcie konkursu musi być po dacie zakończenia przyjmowania ofert';
-  }
-  if (
-    (form.siteVisitType === 'optional' || form.siteVisitType === 'mandatory') &&
-    !form.siteVisitNotes.trim()
-  ) {
-    return 'Podaj osobę do kontaktu i terminy wizji lokalnej';
-  }
-  if (
-    form.completionDate &&
-    form.submissionDeadline &&
-    !Number.isNaN(form.submissionDeadline.getTime()) &&
-    isCompletionOnOrBeforeSubmission(form.completionDate, form.submissionDeadline)
-  ) {
-    return 'Termin wykonania musi być po dacie zakończenia przyjmowania ofert';
-  }
-  if (form.depositRequired) {
-    if (form.depositAmount == null || form.depositAmount <= 0) {
-      return 'Podaj kwotę wadium';
-    }
-    if (!form.depositInstructions.trim()) return 'Podaj instrukcję wpłaty wadium';
-  }
-  if (form.paymentTerms.mode === 'custom') {
-    const days = form.paymentTerms.customDays;
-    if (days == null || days < 1) return 'Podaj liczbę dni na płatność faktury';
-  }
-  return null;
-}
-
-function validateContestForm(
-  form: TenderContestFormData,
-  pendingFiles: File[],
-  existingDocs: TenderContestDocumentMeta[],
-  hasBuildings: boolean,
-  status: 'draft' | 'active',
-): string | null {
-  if (form.title.length > 75) return 'Tytuł może mieć maksymalnie 75 znaków';
-
-  const consistencyError = validateContestFormConsistency(form);
-  if (consistencyError) return consistencyError;
-
-  if (status === 'draft') {
-    return null;
-  }
-
-  if (!form.title.trim()) return 'Podaj tytuł konkursu';
-  if (!form.description.trim()) return 'Podaj szczegółowy zakres i uwagi';
-  if (hasBuildings && !form.buildingId) return 'Wybierz nieruchomość';
-  if (!form.category) return 'Wybierz kategorię';
-  if (!form.subcategory) return 'Wybierz podkategorię';
-  if (pendingFiles.length + existingDocs.length < 1) {
-    return 'Dodaj co najmniej jeden plik dokumentacji konkursowej';
-  }
-  if (!form.submissionDeadline || Number.isNaN(form.submissionDeadline.getTime())) {
-    return 'Podaj datę i godzinę zakończenia przyjmowania ofert';
-  }
-  if (!form.evaluationDeadline || Number.isNaN(form.evaluationDeadline.getTime())) {
-    return 'Podaj datę rozstrzygnięcia konkursu';
-  }
-
-  const criteriaItems = form.selectionCriteria.items;
-  if (criteriaItems.length === 0) return 'Dodaj co najmniej jedno kryterium wyboru';
-  for (const item of criteriaItems) {
-    if (!item.name.trim()) return 'Podaj nazwę każdego kryterium wyboru';
-  }
-  const criteriaSum = selectionCriteriaTotalWeight(criteriaItems);
-  if (criteriaSum !== 100) return 'Suma wag kryteriów wyboru musi wynosić 100%';
-
-  return null;
-}
-
 export function TenderContestForm({
   onSubmit,
   isSubmitting = false,
@@ -177,6 +110,8 @@ export function TenderContestForm({
   const [keptDocuments, setKeptDocuments] = useState<TenderContestDocumentMeta[]>(
     () => existingDocuments ?? [],
   );
+  const [fieldErrors, setFieldErrors] = useState<TenderContestFormFieldErrors>({});
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
 
   const groupedBuildingOptions = useMemo(
     () => groupBuildingsForSelection(buildings),
@@ -225,30 +160,50 @@ export function TenderContestForm({
     void load();
   }, [user?.id, supabase]);
 
+  const displayedErrors = showFieldErrors ? fieldErrors : {};
+
   const patchForm = (patch: Partial<TenderContestFormData>): void => {
+    if (showFieldErrors) {
+      setFieldErrors((prev) => clearTenderContestFieldErrorsForPatch(prev, patch));
+    }
     setForm((prev) => ({ ...prev, ...patch }));
   };
 
   const handleFileUpload = (accepted: File[], rejections: FileRejection[]): void => {
     if (rejections.length > 0) {
-      toast.error(rejections[0].errors[0]?.message ?? 'Nieprawidłowy plik');
+      setShowFieldErrors(true);
+      setFieldErrors((prev) => ({
+        ...prev,
+        documents: rejections[0].errors[0]?.message ?? 'Nieprawidłowy plik',
+      }));
       return;
     }
     setPendingFiles((prev) => [...prev, ...accepted].slice(0, 20));
+    if (showFieldErrors) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.documents;
+        return next;
+      });
+    }
   };
 
   const handleSubmit = async (status: 'draft' | 'active'): Promise<void> => {
-    const err = validateContestForm(
+    const errors = getTenderContestFormFieldErrors(
       form,
       pendingFiles,
       keptDocuments,
       buildings.length > 0,
       status,
     );
-    if (err) {
-      toast.error(err);
+    if (hasTenderContestFormFieldErrors(errors)) {
+      setShowFieldErrors(true);
+      setFieldErrors(errors);
+      requestAnimationFrame(() => scrollToFirstTenderContestError(errors));
       return;
     }
+    setShowFieldErrors(false);
+    setFieldErrors({});
     await onSubmit(form, pendingFiles, keptDocuments, status);
   };
 
@@ -256,6 +211,24 @@ export function TenderContestForm({
     id: string,
     patch: Partial<Pick<SelectionCriterionItem, 'name' | 'weight'>>,
   ): void => {
+    if (showFieldErrors) {
+      setFieldErrors((prev) => {
+        const next: TenderContestFormFieldErrors = { ...prev };
+        if ('name' in patch && next.criteriaItems?.[id]) {
+          const items = { ...next.criteriaItems };
+          delete items[id];
+          if (Object.keys(items).length > 0) {
+            next.criteriaItems = items;
+          } else {
+            delete next.criteriaItems;
+          }
+        }
+        if ('weight' in patch) {
+          delete next.selectionCriteria;
+        }
+        return next;
+      });
+    }
     setForm((prev) => ({
       ...prev,
       selectionCriteria: {
@@ -295,9 +268,22 @@ export function TenderContestForm({
     });
   };
 
+  const maybeClearDocumentsError = (): void => {
+    if (!showFieldErrors) return;
+    setFieldErrors((prev) => {
+      if (!prev.documents) return prev;
+      const next = { ...prev };
+      delete next.documents;
+      return next;
+    });
+  };
+
   const handleSubmissionDeadlineChange = (value: string): void => {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return;
+    if (showFieldErrors) {
+      setFieldErrors((prev) => clearTenderContestFieldErrorsForPatch(prev, { submissionDeadline: d }));
+    }
     setForm((prev) => {
       const next: TenderContestFormData = { ...prev, submissionDeadline: d };
       if (
@@ -320,6 +306,7 @@ export function TenderContestForm({
 
   return (
     <form
+      noValidate
       className="space-y-6 pb-28"
       onSubmit={(e) => {
         e.preventDefault();
@@ -342,8 +329,10 @@ export function TenderContestForm({
               value={form.title}
               onChange={(e) => patchForm({ title: e.target.value })}
               placeholder="np. Remont posadzek"
-              className="mt-1"
+              className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.title)))}
+              aria-invalid={Boolean(displayedErrors.title)}
             />
+            <ContestOfferFieldError message={displayedErrors.title} />
             <p className="text-xs text-muted-foreground mt-1">{form.title.length}/75</p>
           </div>
 
@@ -355,8 +344,10 @@ export function TenderContestForm({
               value={form.description}
               onChange={(e) => patchForm({ description: e.target.value })}
               placeholder="Opisz zakres prac, oczekiwania i inne istotne informacje..."
-              className="mt-1"
+              className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.description)))}
+              aria-invalid={Boolean(displayedErrors.description)}
             />
+            <ContestOfferFieldError message={displayedErrors.description} />
           </div>
 
           <div>
@@ -374,7 +365,11 @@ export function TenderContestForm({
                   patchForm({ buildingId: resolvePrimaryBuildingId(v, buildings) })
                 }
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger
+                  id="contest-building"
+                  className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.buildingId)))}
+                  aria-invalid={Boolean(displayedErrors.buildingId)}
+                >
                   <SelectValue placeholder="Wybierz nieruchomość" />
                 </SelectTrigger>
                 <SelectContent>
@@ -386,6 +381,7 @@ export function TenderContestForm({
                 </SelectContent>
               </Select>
             )}
+            <ContestOfferFieldError message={displayedErrors.buildingId} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -396,7 +392,11 @@ export function TenderContestForm({
                 onValueChange={(v) => patchForm({ category: v, subcategory: '' })}
                 disabled={isLoadingMeta}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger
+                  id="contest-category"
+                  className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.category)))}
+                  aria-invalid={Boolean(displayedErrors.category)}
+                >
                   <SelectValue placeholder="Wybierz kategorię" />
                 </SelectTrigger>
                 <SelectContent>
@@ -407,6 +407,7 @@ export function TenderContestForm({
                   ))}
                 </SelectContent>
               </Select>
+              <ContestOfferFieldError message={displayedErrors.category} />
             </div>
             <div>
               <Label>Podkategoria *</Label>
@@ -415,7 +416,11 @@ export function TenderContestForm({
                 onValueChange={(v) => patchForm({ subcategory: v })}
                 disabled={!form.category || isLoadingMeta}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger
+                  id="contest-subcategory"
+                  className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.subcategory)))}
+                  aria-invalid={Boolean(displayedErrors.subcategory)}
+                >
                   <SelectValue placeholder="Wybierz podkategorię" />
                 </SelectTrigger>
                 <SelectContent>
@@ -428,10 +433,11 @@ export function TenderContestForm({
                     ))}
                 </SelectContent>
               </Select>
+              <ContestOfferFieldError message={displayedErrors.subcategory} />
             </div>
           </div>
 
-          <div>
+          <div id="contest-documents">
             <Label className="text-base font-medium">Dokumentacja konkursowa *</Label>
             <Dropzone
               accept={{
@@ -447,7 +453,10 @@ export function TenderContestForm({
               onDrop={handleFileUpload}
               src={pendingFiles}
               disabled={isSubmitting}
-              className="mt-2"
+              className={cn(
+                'mt-2',
+                displayedErrors.documents && 'border-destructive bg-destructive/5',
+              )}
             >
               <DropzoneEmptyState>
                 <div className="flex flex-col items-center py-10">
@@ -473,9 +482,12 @@ export function TenderContestForm({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() =>
-                        setKeptDocuments((prev) => prev.filter((d) => d.id !== doc.id))
-                      }
+                      onClick={() => {
+                        setKeptDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+                        if (pendingFiles.length + keptDocuments.length > 1) {
+                          maybeClearDocumentsError();
+                        }
+                      }}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -499,7 +511,12 @@ export function TenderContestForm({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                      onClick={() => {
+                        setPendingFiles((prev) => prev.filter((_, idx) => idx !== i));
+                        if (pendingFiles.length + keptDocuments.length > 1) {
+                          maybeClearDocumentsError();
+                        }
+                      }}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -507,6 +524,7 @@ export function TenderContestForm({
                 ))}
               </ul>
             )}
+            <ContestOfferFieldError message={displayedErrors.documents} />
           </div>
         </CardContent>
       </Card>
@@ -521,10 +539,12 @@ export function TenderContestForm({
             <Input
               id="submission-deadline"
               type="datetime-local"
-              className="mt-1"
+              className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.submissionDeadline)))}
+              aria-invalid={Boolean(displayedErrors.submissionDeadline)}
               value={toDatetimeLocalValue(form.submissionDeadline)}
               onChange={(e) => handleSubmissionDeadlineChange(e.target.value)}
             />
+            <ContestOfferFieldError message={displayedErrors.submissionDeadline} />
           </div>
 
           <div>
@@ -532,7 +552,8 @@ export function TenderContestForm({
             <Input
               id="evaluation-deadline"
               type="date"
-              className="mt-1"
+              className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.evaluationDeadline)))}
+              aria-invalid={Boolean(displayedErrors.evaluationDeadline)}
               disabled={!hasValidSubmissionDeadline}
               min={minCompletionDateAfterSubmission(form.submissionDeadline)}
               value={toDateInputValue(form.evaluationDeadline)}
@@ -542,11 +563,7 @@ export function TenderContestForm({
                 });
               }}
             />
-            {!hasValidSubmissionDeadline && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Najpierw ustaw datę zakończenia przyjmowania ofert.
-              </p>
-            )}
+            <ContestOfferFieldError message={displayedErrors.evaluationDeadline} />
           </div>
 
           <div>
@@ -554,7 +571,8 @@ export function TenderContestForm({
             <Input
               id="completion-date"
               type="date"
-              className="mt-1"
+              className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.completionDate)))}
+              aria-invalid={Boolean(displayedErrors.completionDate)}
               disabled={!hasValidSubmissionDeadline}
               min={completionMinDate}
               value={toDateInputValue(form.completionDate)}
@@ -564,11 +582,7 @@ export function TenderContestForm({
                 });
               }}
             />
-            {!hasValidSubmissionDeadline && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Najpierw ustaw datę i godzinę zakończenia przyjmowania ofert.
-              </p>
-            )}
+            <ContestOfferFieldError message={displayedErrors.completionDate} />
           </div>
 
           <div className="space-y-3">
@@ -609,11 +623,13 @@ export function TenderContestForm({
               <Textarea
                 id="site-visit-notes"
                 rows={4}
-                className="mt-1"
+                className={cn('mt-1', fieldErrorInputClass(Boolean(displayedErrors.siteVisitNotes)))}
+                aria-invalid={Boolean(displayedErrors.siteVisitNotes)}
                 value={form.siteVisitNotes}
                 onChange={(e) => patchForm({ siteVisitNotes: e.target.value })}
                 placeholder="Wizja lokalna odbędzie się w dniu..."
               />
+              <ContestOfferFieldError message={displayedErrors.siteVisitNotes} />
             </div>
           )}
         </CardContent>
@@ -778,26 +794,36 @@ export function TenderContestForm({
           <CardTitle>Warunki (opcjonalne)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
+          <div id="contest-selection-criteria">
             <Label>Kryteria wyboru wykonawcy</Label>
             <p className="text-xs text-muted-foreground mt-1 mb-3">
               Określ wagę każdego kryterium. Suma musi wynosić 100%.
             </p>
             <div className="space-y-2 max-w-lg">
               {form.selectionCriteria.items.map((item) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <Input
-                    placeholder="Nazwa kryterium"
-                    value={item.name}
-                    onChange={(e) => updateCriterion(item.id, { name: e.target.value })}
-                    className="flex-1"
-                  />
-                  <div className="flex items-center gap-1 shrink-0">
+                <div key={item.id} className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Input
+                      data-criterion-id={item.id}
+                      placeholder="Nazwa kryterium"
+                      value={item.name}
+                      onChange={(e) => updateCriterion(item.id, { name: e.target.value })}
+                      className={cn(
+                        fieldErrorInputClass(Boolean(displayedErrors.criteriaItems?.[item.id])),
+                      )}
+                      aria-invalid={Boolean(displayedErrors.criteriaItems?.[item.id])}
+                    />
+                    <ContestOfferFieldError message={displayedErrors.criteriaItems?.[item.id]} />
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 pt-0.5">
                     <Input
                       type="number"
                       min={0}
                       max={100}
-                      className="w-20"
+                      className={cn(
+                        'w-20',
+                        fieldErrorInputClass(Boolean(displayedErrors.selectionCriteria)),
+                      )}
                       value={item.weight}
                       onChange={(e) =>
                         updateCriterion(item.id, {
@@ -805,6 +831,7 @@ export function TenderContestForm({
                         })
                       }
                       aria-label={`Waga: ${item.name || 'kryterium'}`}
+                      aria-invalid={Boolean(displayedErrors.selectionCriteria)}
                     />
                     <span className="text-sm text-muted-foreground">%</span>
                   </div>
@@ -833,10 +860,14 @@ export function TenderContestForm({
               Dodaj kryterium
             </Button>
             <p
-              className={`text-xs mt-2 ${criteriaWeightSum === 100 ? 'text-muted-foreground' : 'text-destructive'}`}
+              className={cn(
+                'text-xs mt-2',
+                displayedErrors.selectionCriteria ? 'text-destructive' : 'text-muted-foreground',
+              )}
             >
               Suma: {criteriaWeightSum}% (wymagane 100%)
             </p>
+            <ContestOfferFieldError message={displayedErrors.selectionCriteria} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -911,11 +942,16 @@ export function TenderContestForm({
             {form.depositRequired && (
               <div className="space-y-3 pl-4 border-l-2">
                 <div>
-                  <Label>Kwota wadium (zł)</Label>
+                  <Label htmlFor="contest-deposit-amount">Kwota wadium (zł)</Label>
                   <Input
+                    id="contest-deposit-amount"
                     type="number"
                     min={0}
-                    className="mt-1 max-w-xs"
+                    className={cn(
+                      'mt-1 max-w-xs',
+                      fieldErrorInputClass(Boolean(displayedErrors.depositAmount)),
+                    )}
+                    aria-invalid={Boolean(displayedErrors.depositAmount)}
                     value={form.depositAmount ?? ''}
                     onChange={(e) =>
                       patchForm({
@@ -923,15 +959,22 @@ export function TenderContestForm({
                       })
                     }
                   />
+                  <ContestOfferFieldError message={displayedErrors.depositAmount} />
                 </div>
                 <div>
-                  <Label>Instrukcja wpłaty</Label>
+                  <Label htmlFor="contest-deposit-instructions">Instrukcja wpłaty</Label>
                   <Textarea
+                    id="contest-deposit-instructions"
                     rows={3}
-                    className="mt-1"
+                    className={cn(
+                      'mt-1',
+                      fieldErrorInputClass(Boolean(displayedErrors.depositInstructions)),
+                    )}
+                    aria-invalid={Boolean(displayedErrors.depositInstructions)}
                     value={form.depositInstructions}
                     onChange={(e) => patchForm({ depositInstructions: e.target.value })}
                   />
+                  <ContestOfferFieldError message={displayedErrors.depositInstructions} />
                 </div>
               </div>
             )}
@@ -942,13 +985,12 @@ export function TenderContestForm({
             <RadioGroup
               value={form.paymentTerms.mode}
               onValueChange={(v) =>
-                setForm((prev) => ({
-                  ...prev,
+                patchForm({
                   paymentTerms: {
                     mode: v as 'standard_14' | 'custom',
-                    customDays: v === 'custom' ? prev.paymentTerms.customDays ?? 30 : undefined,
+                    customDays: v === 'custom' ? form.paymentTerms.customDays ?? 30 : undefined,
                   },
-                }))
+                })
               }
             >
               <div className="flex items-center space-x-2">
@@ -965,23 +1007,32 @@ export function TenderContestForm({
               </div>
             </RadioGroup>
             {form.paymentTerms.mode === 'custom' && (
-              <div className="flex items-center gap-2 pl-4">
-                <Label className="font-normal">Liczba dni:</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  className="w-24"
-                  value={form.paymentTerms.customDays ?? ''}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      paymentTerms: {
-                        ...prev.paymentTerms,
-                        customDays: Number(e.target.value) || undefined,
-                      },
-                    }))
-                  }
-                />
+              <div className="pl-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="contest-payment-days" className="font-normal">
+                    Liczba dni:
+                  </Label>
+                  <Input
+                    id="contest-payment-days"
+                    type="number"
+                    min={1}
+                    className={cn(
+                      'w-24',
+                      fieldErrorInputClass(Boolean(displayedErrors.paymentTermsCustomDays)),
+                    )}
+                    aria-invalid={Boolean(displayedErrors.paymentTermsCustomDays)}
+                    value={form.paymentTerms.customDays ?? ''}
+                    onChange={(e) =>
+                      patchForm({
+                        paymentTerms: {
+                          ...form.paymentTerms,
+                          customDays: Number(e.target.value) || undefined,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <ContestOfferFieldError message={displayedErrors.paymentTermsCustomDays} />
               </div>
             )}
           </div>

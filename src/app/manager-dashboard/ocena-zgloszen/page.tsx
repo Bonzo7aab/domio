@@ -1,8 +1,11 @@
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
-import { fetchContractorReviews } from '../../../lib/database/contractors';
-import { fetchReviewsWrittenByManagerUser } from '../../../lib/database/manager-reviews';
-import { ManagerRatingsOcenaContent } from '../../../components/manager-dashboard/ManagerRatingsOcenaContent';
+import {
+  fetchContractorRatingSummary,
+  fetchContractorReviews,
+} from '../../../lib/database/contractors';
+import { fetchReviewsWrittenByUser } from '../../../lib/database/reviews';
+import { RatingsContent } from '../../contractor-dashboard/ratings/RatingsContent';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import Link from 'next/link';
@@ -39,14 +42,20 @@ export default async function OcenaZgloszenPage(): Promise<ReactElement> {
     );
   }
 
-  const [written, received] = await Promise.all([
-    fetchReviewsWrittenByManagerUser(supabase, user.id),
+  const [ratingSummary, reviews, writtenReviews] = await Promise.all([
+    fetchContractorRatingSummary(company.id),
     fetchContractorReviews(company.id, 50, 0),
+    fetchReviewsWrittenByUser(supabase, user.id),
   ]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <ManagerRatingsOcenaContent written={written} received={received} />
+      <RatingsContent
+        ratingSummary={ratingSummary}
+        reviews={reviews}
+        writtenReviews={writtenReviews}
+        writtenEmptyDescription="Brak wystawionych ocen. Oceń współpracę po wyborze oferty w sekcji Konkursy."
+      />
     </div>
   );
 }

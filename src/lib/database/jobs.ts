@@ -1263,7 +1263,9 @@ export async function fetchTenders(
       const { data: countsData, error: countsError } = await (supabase as any)
         .from('tender_bids')
         .select('tender_id')
-        .in('tender_id', tenderIds) as { data: TenderBidRow[] | null; error: PostgrestError | null };
+        .in('tender_id', tenderIds)
+        .neq('status', 'draft')
+        .neq('status', 'cancelled') as { data: TenderBidRow[] | null; error: PostgrestError | null };
 
       if (!countsError && countsData) {
         // Count bids per tender
@@ -1554,7 +1556,9 @@ export async function fetchTenderById(
     const { count, error: countsError } = await (supabase as any)
       .from('tender_bids')
       .select('*', { count: 'exact', head: true })
-      .eq('tender_id', id);
+      .eq('tender_id', id)
+      .neq('status', 'draft')
+      .neq('status', 'cancelled');
 
     if (!countsError && count !== null && result.data) {
       (result.data as unknown as { bids_count?: number }).bids_count = count;
@@ -2761,7 +2765,7 @@ export async function fetchTenderBidsByTenderId(
       .neq('admin_moderation_status', 'suspended');
 
     if (options?.submittedOnly) {
-      query = query.neq('status', 'draft');
+      query = query.neq('status', 'draft').neq('status', 'cancelled');
     }
 
     const { data: bids, error } = await query.order('submitted_at', { ascending: false });

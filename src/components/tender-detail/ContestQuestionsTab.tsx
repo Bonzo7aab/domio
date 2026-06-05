@@ -22,22 +22,57 @@ import {
   isContestQuestionsDeadlinePassed,
 } from '../../lib/contest-questions/format-contest-question-label';
 import { ContestQuestionCommentsList } from '../contest-questions/ContestQuestionCommentsList';
+import { ManagerContestQuestionsPanel } from '../manager-dashboard/ManagerContestQuestionsPanel';
 
 interface ContestQuestionsTabProps {
   tenderId: string;
   allowQuestions: boolean;
   submissionDeadline: string;
   contestStatus?: string;
+  isContestOwner?: boolean;
+  isManager?: boolean;
   onQuestionsCountChange?: (count: number) => void;
 }
 
-export function ContestQuestionsTab({
+function ContestQuestionsManagerTab({
+  tenderId,
+  onQuestionsCountChange,
+}: {
+  tenderId: string;
+  onQuestionsCountChange?: (count: number) => void;
+}): React.ReactElement {
+  return (
+    <TabsContent value="contest-qa">
+      <Card>
+        <CardContent className="min-w-0 space-y-6 p-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-primary shrink-0" />
+              Pytania i odpowiedzi do konkursu
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Odpowiadaj na pytania wykonawców — odpowiedzi są widoczne publicznie. Możesz edytować
+              lub usunąć swoje odpowiedzi.
+            </p>
+          </div>
+          <ManagerContestQuestionsPanel
+            contestId={tenderId}
+            onQuestionsChange={onQuestionsCountChange}
+          />
+        </CardContent>
+      </Card>
+    </TabsContent>
+  );
+}
+
+function ContestQuestionsContractorTab({
   tenderId,
   allowQuestions,
   submissionDeadline,
   contestStatus,
+  isManager = false,
   onQuestionsCountChange,
-}: ContestQuestionsTabProps): React.ReactElement {
+}: Omit<ContestQuestionsTabProps, 'isContestOwner'>): React.ReactElement {
   const { user, supabase, isLoading: authLoading } = useUserProfile();
   const [published, setPublished] = useState<ContestQuestionPublished[]>([]);
   const [pending, setPending] = useState<ContestQuestionPending[]>([]);
@@ -48,6 +83,7 @@ export function ContestQuestionsTab({
 
   const deadlinePassed = isContestQuestionsDeadlinePassed(submissionDeadline);
   const canAsk =
+    !isManager &&
     allowQuestions &&
     !deadlinePassed &&
     contestStatus === 'active' &&
@@ -145,9 +181,7 @@ export function ContestQuestionsTab({
             </p>
           </div>
 
-          {loadError ? (
-            <p className="text-sm text-destructive">{loadError}</p>
-          ) : null}
+          {loadError ? <p className="text-sm text-destructive">{loadError}</p> : null}
 
           {loading ? (
             <p className="text-sm text-muted-foreground">Ładowanie pytań...</p>
@@ -155,7 +189,9 @@ export function ContestQuestionsTab({
             <>
               {pending.length > 0 ? (
                 <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-muted-foreground">Twoje oczekujące pytania</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    Twoje oczekujące pytania
+                  </h4>
                   {pending.map((item) => (
                     <div
                       key={item.id}
@@ -225,7 +261,7 @@ export function ContestQuestionsTab({
                 )}
               </Button>
             </div>
-          ) : (
+          ) : !isManager ? (
             <p className="text-sm text-muted-foreground border-t pt-4">
               {!user?.id
                 ? 'Zaloguj się, aby zadać pytanie.'
@@ -237,9 +273,39 @@ export function ContestQuestionsTab({
                       ? 'Pytania można zadawać tylko w trakcie zbierania ofert.'
                       : null}
             </p>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </TabsContent>
+  );
+}
+
+export function ContestQuestionsTab({
+  tenderId,
+  allowQuestions,
+  submissionDeadline,
+  contestStatus,
+  isContestOwner = false,
+  isManager = false,
+  onQuestionsCountChange,
+}: ContestQuestionsTabProps): React.ReactElement {
+  if (isContestOwner) {
+    return (
+      <ContestQuestionsManagerTab
+        tenderId={tenderId}
+        onQuestionsCountChange={onQuestionsCountChange}
+      />
+    );
+  }
+
+  return (
+    <ContestQuestionsContractorTab
+      tenderId={tenderId}
+      allowQuestions={allowQuestions}
+      submissionDeadline={submissionDeadline}
+      contestStatus={contestStatus}
+      isManager={isManager}
+      onQuestionsCountChange={onQuestionsCountChange}
+    />
   );
 }

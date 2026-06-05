@@ -1,10 +1,15 @@
 import 'server-only';
 
 import type { EvaluationContext } from '@openfeature/server-sdk';
+import { ErrorCode } from '@openfeature/server-sdk';
 import { isFlagshipConfigured } from './config';
 import type { FlagshipFlagKey, TestingFeatureFlags } from './keys';
 import { TESTING_FEATURE_FLAG_KEYS } from './keys';
 import { getOpenFeatureClient } from './provider';
+
+function isBenignFlagEvaluationError(errorCode?: ErrorCode): boolean {
+  return errorCode === ErrorCode.FLAG_NOT_FOUND;
+}
 
 export async function getBooleanFlag(
   flagKey: FlagshipFlagKey,
@@ -17,7 +22,22 @@ export async function getBooleanFlag(
 
   try {
     const client = await getOpenFeatureClient();
-    return await client.getBooleanValue(flagKey, defaultValue, context);
+    const details = await client.getBooleanDetails(flagKey, defaultValue, context);
+
+    if (details.reason === 'DISABLED' || isBenignFlagEvaluationError(details.errorCode)) {
+      return defaultValue;
+    }
+
+    if (details.errorCode) {
+      console.error(
+        `[flagship] Failed to evaluate "${flagKey}":`,
+        details.errorCode,
+        details.errorMessage ?? '',
+      );
+      return defaultValue;
+    }
+
+    return details.value;
   } catch (error) {
     console.error(`[flagship] Failed to evaluate "${flagKey}":`, error);
     return defaultValue;
