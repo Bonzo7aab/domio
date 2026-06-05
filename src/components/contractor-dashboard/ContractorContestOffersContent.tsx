@@ -174,7 +174,7 @@ export function ContractorContestOffersContent({
         jobTitle: dbTender.title ?? row.contestTitle,
         description: dbTender.description ?? '',
         category: dbTender.category?.name,
-        subcategory: dbTender.subcategory ?? undefined,
+        subcategory: dbTender.subcategory?.name,
         contestInfo,
       });
     } catch (error) {

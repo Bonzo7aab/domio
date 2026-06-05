@@ -114,7 +114,7 @@ export async function updateBuilding(
   buildingData: BuildingFormData
 ): Promise<{ data: Building | null; error: PostgrestError | null }> {
   try {
-    const updateData: Record<string, unknown> = {
+    const updateData: Database['public']['Tables']['buildings']['Update'] = {
       name: buildingData.name.trim(),
       street_address: buildingData.street_address.trim(),
       city: buildingData.city.trim(),

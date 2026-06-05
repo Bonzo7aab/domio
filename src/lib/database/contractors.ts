@@ -2351,7 +2351,7 @@ export async function updatePortfolioProject(
   projectData: Partial<PortfolioProjectInput>
 ): Promise<{ data: boolean; error: PostgrestError | null }> {
   try {
-    const updateData: Record<string, unknown> = {};
+    const updateData: Database['public']['Tables']['portfolio_projects']['Update'] = {};
     
     if (projectData.title !== undefined) updateData.title = projectData.title;
     if (projectData.description !== undefined) updateData.description = projectData.description || null;
