@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, Play, Check, Search, MessageSquare, FileText, Star, Shield, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Play, Check, Search, MessagesSquare, FileText, Star, Shield, Users } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -107,7 +107,7 @@ export function TutorialPage({ onBack, onComplete }: TutorialPageProps) {
     {
       title: 'Komunikuj się profesjonalnie',
       description: 'Buduj dobre relacje z zarządcami',
-      icon: MessageSquare,
+      icon: MessagesSquare,
       content: (
         <div className="space-y-4">
           <div className="bg-muted/50 p-4 rounded-lg">
@@ -256,7 +256,7 @@ export function TutorialPage({ onBack, onComplete }: TutorialPageProps) {
     {
       title: 'Zarządzaj projektami aktywnie',
       description: 'Monitoruj postępy i komunikuj się z wykonawcami',
-      icon: MessageSquare,
+      icon: MessagesSquare,
       content: (
         <div className="space-y-4">
           <div className="bg-muted/50 p-4 rounded-lg">

@@ -9,8 +9,7 @@ import {
   ExternalLink,
   ArrowLeft,
   Briefcase,
-  Inbox,
-  MessageCircle,
+  MessagesSquare,
   RefreshCw,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -728,7 +727,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
               {sortedConversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-background/50 px-4 py-12 text-center">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-                    <Inbox className="h-7 w-7 text-muted-foreground" aria-hidden />
+                    <MessagesSquare className="h-7 w-7 text-muted-foreground" aria-hidden />
                   </div>
                   <h3 className="text-base font-semibold text-foreground">Brak rozmów</h3>
                   <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-muted-foreground">
@@ -1219,7 +1218,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
             <div className="flex flex-1 flex-col items-center justify-center bg-muted/15 px-6 py-12">
               <div className="flex max-w-md flex-col items-center text-center">
                 <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:h-20 sm:w-20">
-                  <MessageCircle className="h-8 w-8 sm:h-10 sm:w-10" aria-hidden />
+                  <MessagesSquare className="h-8 w-8 sm:h-10 sm:w-10" aria-hidden />
                 </div>
                 <h3 className="text-lg font-semibold text-foreground sm:text-xl">
                   Twoje wiadomości

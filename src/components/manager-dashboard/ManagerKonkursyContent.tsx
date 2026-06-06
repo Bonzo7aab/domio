@@ -7,10 +7,10 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  CalendarClock,
   CheckCircle2,
   MoreVertical,
   Pencil,
+  RotateCw,
   Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -138,6 +138,7 @@ export function ManagerKonkursyContent({
   const [cooperationReviewTarget, setCooperationReviewTarget] = useState<ManagerContest | null>(
     null,
   );
+  const [repeatContestTarget, setRepeatContestTarget] = useState<ManagerContest | null>(null);
   const [reviewedContestIds, setReviewedContestIds] = useState<Set<string>>(() => new Set());
   const [unseenCounts, setUnseenCounts] = useState<Record<string, number>>(() =>
     Object.fromEntries(initialContests.map((c) => [c.id, c.unseenQuestionsCount])),
@@ -350,30 +351,37 @@ export function ManagerKonkursyContent({
   };
 
   const renderPrimaryEvaluationAction = (row: ManagerContest): ReactElement | null => {
-    if (row.status !== 'evaluation') {
+    if (row.status !== 'evaluation' || row.offersCount === 0) {
       return null;
     }
 
-    if (row.offersCount > 0) {
-      return (
-        <Button
-          variant="default"
-          size="sm"
-          className="h-8 shrink-0"
-          onClick={() => router.push(compareHref(row.id))}
-        >
-          <CheckCircle2 className="h-4 w-4 mr-1.5" />
-          Wybierz
-        </Button>
-      );
+    return (
+      <Button
+        variant="default"
+        size="sm"
+        className="h-8 shrink-0"
+        onClick={() => router.push(compareHref(row.id))}
+      >
+        <CheckCircle2 className="h-4 w-4 mr-1.5" />
+        Wybierz
+      </Button>
+    );
+  };
+
+  const renderRepeatContestButton = (row: ManagerContest): ReactElement | null => {
+    if (row.status !== 'evaluation' || row.offersCount > 0) {
+      return null;
     }
 
     return (
-      <Button variant="default" size="sm" className="h-8 shrink-0" asChild>
-        <Link href={`/post-contest?duplicateFrom=${row.id}`}>
-          <CalendarClock className="h-4 w-4 mr-1.5" />
-          Nowe terminy
-        </Link>
+      <Button
+        variant="default"
+        size="sm"
+        className="h-8 shrink-0"
+        onClick={() => setRepeatContestTarget(row)}
+      >
+        <RotateCw className="h-4 w-4 mr-1.5" />
+        Ponów
       </Button>
     );
   };
@@ -514,7 +522,7 @@ export function ManagerKonkursyContent({
           </div>
 
           <div className="rounded-md border overflow-x-auto">
-            <Table>
+            <Table className="table-fixed w-full min-w-[960px]">
               <TableHeader>
                 <TableRow>
                   <SortableHead
@@ -523,6 +531,7 @@ export function ManagerKonkursyContent({
                     activeKey={sortKey}
                     dir={sortDir}
                     onSort={handleSort}
+                    className="w-[22%]"
                   />
                   <SortableHead
                     label="Lokalizacja"
@@ -530,6 +539,7 @@ export function ManagerKonkursyContent({
                     activeKey={sortKey}
                     dir={sortDir}
                     onSort={handleSort}
+                    className="w-[14%]"
                   />
                   <SortableHead
                     label="Termin składania"
@@ -537,6 +547,7 @@ export function ManagerKonkursyContent({
                     activeKey={sortKey}
                     dir={sortDir}
                     onSort={handleSort}
+                    className="w-[13%]"
                   />
                   <SortableHead
                     label="Status konkursu"
@@ -544,6 +555,7 @@ export function ManagerKonkursyContent({
                     activeKey={sortKey}
                     dir={sortDir}
                     onSort={handleSort}
+                    className="w-[18%] min-w-[168px]"
                   />
                   <SortableHead
                     label="Złożone oferty"
@@ -551,8 +563,11 @@ export function ManagerKonkursyContent({
                     activeKey={sortKey}
                     dir={sortDir}
                     onSort={handleSort}
+                    className="w-[9%] min-w-[88px] whitespace-nowrap"
                   />
-                  <TableHead className="text-right">Akcje</TableHead>
+                  <TableHead className="text-right w-[24%] min-w-[220px] whitespace-nowrap">
+                    Akcje
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -577,13 +592,14 @@ export function ManagerKonkursyContent({
                             'bg-primary/5 border-l-4 border-l-primary hover:bg-primary/10',
                         )}
                       >
-                        <TableCell className={cn('max-w-[300px]', isPickedRow && 'text-primary')}>
+                        <TableCell className={cn('max-w-0 truncate', isPickedRow && 'text-primary')}>
                           <Link
                             href={`/jobs/${row.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
+                            title={row.title}
                             className={cn(
-                              'font-medium truncate leading-snug hover:underline block max-w-full',
+                              'font-medium truncate leading-snug hover:underline block',
                               isPickedRow
                                 ? 'text-primary hover:text-primary/80'
                                 : 'text-foreground hover:text-primary',
@@ -592,7 +608,10 @@ export function ManagerKonkursyContent({
                             {row.title}
                           </Link>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[200px]">
+                        <TableCell
+                          className="text-sm text-muted-foreground max-w-0 truncate"
+                          title={row.locationLabel}
+                        >
                           {row.locationLabel}
                         </TableCell>
                         <TableCell className="text-sm whitespace-nowrap">
@@ -609,8 +628,8 @@ export function ManagerKonkursyContent({
                             '—'
                           )}
                         </TableCell>
-                        <TableCell>{renderStatusCell(row)}</TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">{renderStatusCell(row)}</TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <span className="tabular-nums">{row.offersCount}</span>
                           {row.hasSelectedOffer ? (
                             <button
@@ -627,11 +646,12 @@ export function ManagerKonkursyContent({
                             </button>
                           ) : null}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <TableCell className="text-right whitespace-nowrap">
+                          <div className="inline-flex flex-nowrap items-center justify-end gap-1.5">
                             {renderDraftContinueButton(row)}
                             {renderPrimaryEvaluationAction(row)}
                             {renderCooperationReviewButton(row)}
+                            {renderRepeatContestButton(row)}
                             {renderActionsMenu(row)}
                           </div>
                         </TableCell>
@@ -736,6 +756,34 @@ export function ManagerKonkursyContent({
               }}
             >
               {cancelling ? 'Unieważnianie…' : 'Unieważnij konkurs'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={repeatContestTarget !== null}
+        onOpenChange={(open) => !open && setRepeatContestTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ponowić konkurs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Możesz ponownie otworzyć konkurs na podstawie danych z „
+              {repeatContestTarget?.title}”. Formularz zostanie wstępnie wypełniony danymi z tego
+              konkursu — musisz podać nowe terminy (daty składania ofert, pytań i rozstrzygnięcia).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!repeatContestTarget) return;
+                router.push(`/post-contest?duplicateFrom=${repeatContestTarget.id}`);
+                setRepeatContestTarget(null);
+              }}
+            >
+              Kontynuuj
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

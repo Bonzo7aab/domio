@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, Edit, Euro, Eye, MessageSquare, Send, Star } from 'lucide-react';
+import { CheckCircle, Edit, Euro, Eye, MessagesSquare, Send, Star } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -241,7 +241,7 @@ export function DashboardContent({ data }: DashboardContentProps) {
               Edytuj profil firmy
             </Button>
             <Button variant="outline" className="w-full justify-start" onClick={handleMessagesClick}>
-              <MessageSquare className="w-4 h-4 mr-2" />
+              <MessagesSquare className="w-4 h-4 mr-2" />
               Sprawdź wiadomości
             </Button>
           </CardContent>

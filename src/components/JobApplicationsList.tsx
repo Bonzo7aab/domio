@@ -12,7 +12,7 @@ import {
   Eye, 
   CheckCircle, 
   XCircle, 
-  MessageSquare,
+  MessagesSquare,
   Download,
   Star,
   MapPin,
@@ -359,7 +359,7 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                         onClick={() => onStartConversation(application.contractorId, application.id)}
                         className="w-full sm:w-auto"
                       >
-                        <MessageSquare className="h-4 w-4 mr-2" />
+                        <MessagesSquare className="h-4 w-4 mr-2" />
                         Napisz wiadomość
                       </Button>
 

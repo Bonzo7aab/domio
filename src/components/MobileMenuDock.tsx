@@ -8,7 +8,7 @@ import {
   Search, 
   Bookmark,
   Star,
-  MessageCircle, 
+  MessagesSquare, 
   User,
   Briefcase,
   Users,
@@ -116,7 +116,7 @@ export function MobileMenuDock() {
       ? [
           {
             title: 'Wiadomości',
-            icon: <MessageCircle className="size-6" />,
+            icon: <MessagesSquare className="size-6" />,
             href: '/messages',
             onClick: () => {
               router.push('/messages');
@@ -174,7 +174,7 @@ export function MobileMenuDock() {
     },
     {
       title: 'Wiadomości',
-      icon: <MessageCircle className="size-6" />,
+      icon: <MessagesSquare className="size-6" />,
       href: isAuthenticated ? '/messages' : '/user-type-selection',
       isActive: isAuthenticated ? isActive('/messages') : isActive('/user-type-selection'),
       onClick: () => {

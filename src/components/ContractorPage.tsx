@@ -9,7 +9,7 @@ import {
   Eye,
   Loader2,
   MapPin,
-  MessageSquare,
+  MessagesSquare,
   Plus,
   Send,
   Shield,
@@ -1081,7 +1081,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
                     Edytuj profil firmy
                   </Button>
                   <Button variant="outline" className="w-full justify-start" onClick={handleMessagesClick}>
-                    <MessageSquare className="w-4 h-4 mr-2" />
+                    <MessagesSquare className="w-4 h-4 mr-2" />
                     Sprawdź wiadomości
                   </Button>
                 </CardContent>

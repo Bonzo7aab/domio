@@ -1,4 +1,4 @@
-import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, HelpCircle, MessageCircle, Search, ShieldCheck, ShieldX, Star, Trophy, UserCheck, X } from 'lucide-react';
+import { Bell, Bookmark, Calendar, Check, CheckCircle, Clock, Eye, Gavel, HelpCircle, MessagesSquare, Search, ShieldCheck, ShieldX, Star, Trophy, UserCheck, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -452,7 +452,7 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         break;
       }
       case 'message':
-        return <MessageCircle className={`h-4 w-4 ${iconClass}`} />;
+        return <MessagesSquare className={`h-4 w-4 ${iconClass}`} />;
     }
 
     return <Bell className={`h-4 w-4 ${iconClass}`} />;

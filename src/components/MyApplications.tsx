@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import {
   Eye,
   ExternalLink,
-  MessageSquare,
+  MessagesSquare,
   X,
 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -252,7 +252,7 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                                 variant="outline"
                                 onClick={() => onStartConversation(application.id)}
                               >
-                                <MessageSquare className="mr-2 h-3.5 w-3.5" />
+                                <MessagesSquare className="mr-2 h-3.5 w-3.5" />
                                 Wiadomość
                               </Button>
                             )}

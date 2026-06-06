@@ -1990,7 +1990,7 @@ export async function fetchContractorRecentActivities(
             description: `Otrzymałeś nową wiadomość`,
             timestamp: new Date(lastMessage.created_at || conv.last_message_at),
             color: 'bg-blue-500',
-            icon: 'MessageSquare',
+            icon: 'MessagesSquare',
             linkUrl: `/messages?conversation=${conv.id}`
           });
         }

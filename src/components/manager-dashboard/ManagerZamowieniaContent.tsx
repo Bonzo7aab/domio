@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, MessageSquare, PanelTopOpen } from 'lucide-react';
+import { CheckCircle2, MessagesSquare, PanelTopOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ManagerOrderRow } from '../../lib/database/manager-orders';
 import {
@@ -265,7 +265,7 @@ export function ManagerZamowieniaContent({
                                   onClick={() => handleMessage(row)}
                                   aria-label="Wiadomość"
                                 >
-                                  <MessageSquare className="h-4 w-4" />
+                                  <MessagesSquare className="h-4 w-4" />
                                 </Button>
                               </span>
                             </TooltipTrigger>

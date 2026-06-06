@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FilePen, Loader2, MessageSquare, MoreVertical, Star } from 'lucide-react';
+import { FilePen, Loader2, MessagesSquare, MoreVertical, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
@@ -311,7 +311,7 @@ export function ContractorContestOffersContent({
             <>
               {abandonAllowed ? <DropdownMenuSeparator /> : null}
               <DropdownMenuItem onClick={() => void handleMessage(row)}>
-                <MessageSquare className="h-4 w-4 mr-2" />
+                <MessagesSquare className="h-4 w-4 mr-2" />
                 Wiadomość do organizatora
               </DropdownMenuItem>
             </>

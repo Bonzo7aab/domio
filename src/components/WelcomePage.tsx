@@ -7,7 +7,7 @@ import {
   Shield, 
   Star, 
   MapPin, 
-  MessageCircle, 
+  MessagesSquare, 
   FileText, 
   BarChart3, 
   CheckCircle, 
@@ -58,7 +58,7 @@ export function WelcomePage({ onBack, onGetStarted, onTutorial }: WelcomePagePro
       color: 'text-orange-600'
     },
     {
-      icon: MessageCircle,
+      icon: MessagesSquare,
       title: 'Komunikacja z wykonawcami',
       description: 'Bezpośrednia komunikacja z wykonawcami. Zadawaj pytania, negocjuj warunki, koordynuj projekty.',
       color: 'text-blue-500'
@@ -104,7 +104,7 @@ export function WelcomePage({ onBack, onGetStarted, onTutorial }: WelcomePagePro
       color: 'text-blue-500'
     },
     {
-      icon: MessageCircle,
+      icon: MessagesSquare,
       title: 'Komunikacja z zarządcami',
       description: 'Bezpośredni kontakt z klientami. Zadawaj pytania, negocjuj warunki, buduj relacje.',
       color: 'text-indigo-600'

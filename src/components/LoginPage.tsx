@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail, Lock, Loader2, ArrowRight, MapPin, MessageSquare, BadgeCheck } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, MapPin, MessagesSquare, BadgeCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -65,7 +65,7 @@ export function LoginPage() {
             description: 'Filtruj po dzielnicy, kategorii i budżecie na mapie.',
           },
           {
-            icon: MessageSquare,
+            icon: MessagesSquare,
             title: 'Bezpieczna komunikacja',
             description: 'Wiadomości i oferty w jednym panelu konta.',
           },

@@ -2,7 +2,7 @@
 
 import { useState, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, MessageSquare } from 'lucide-react';
+import { Bell, MessagesSquare } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -223,7 +223,7 @@ export function ContractorZamowieniaContent({
                                     onClick={() => handleMessage(row)}
                                     aria-label="Wiadomość"
                                   >
-                                    <MessageSquare className="h-4 w-4" />
+                                    <MessagesSquare className="h-4 w-4" />
                                   </Button>
                                 </span>
                               </TooltipTrigger>

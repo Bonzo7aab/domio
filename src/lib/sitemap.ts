@@ -6,7 +6,7 @@ import {
   LogIn, 
   LogOut, 
   Bookmark, 
-  MessageCircle, 
+  MessagesSquare, 
   Bell, 
   Play, 
   GraduationCap, 
@@ -112,7 +112,7 @@ export const sitemapEntries: SitemapEntry[] = [
     category: "Konto",
     label: "Wiadomości",
     path: "/messages",
-    icon: MessageCircle,
+    icon: MessagesSquare,
     description: "Sprawdź swoje wiadomości",
     keywords: ["wiadomości", "messages", "chat", "komunikacja"],
     requiresAuth: true

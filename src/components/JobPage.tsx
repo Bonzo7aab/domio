@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ContestApplyOfferButton } from './contest/ContestApplyOfferButton';
-import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, AlertTriangle, Image as ImageIcon, FileText, MessageCircle, FileSearch } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, AlertTriangle, Image as ImageIcon, FileText, MessagesSquare, FileSearch } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -840,12 +840,11 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
 
   // Early returns AFTER all hooks
   if (isLoadingJob) {
-    const loadingLabel = isContractorViewer ? 'Ładowanie konkursu...' : 'Ładowanie ogłoszenia...';
     return (
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
-            <h1 className="text-2xl mb-4">{loadingLabel}</h1>
+            <h1 className="text-2xl mb-4">Ładowanie konkursu...</h1>
             <p className="text-muted-foreground mb-6">Proszę czekać</p>
           </div>
         </div>
@@ -1784,7 +1783,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         onClick={() => router.push(`/messages?conversation=${existingConversationId}`)}
                         className="flex items-center gap-2"
                       >
-                        <MessageCircle className="w-4 h-4" />
+                        <MessagesSquare className="w-4 h-4" />
                         <span className="truncate">Wiadomość</span>
                       </Button>
                     ) : (
@@ -1794,7 +1793,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                         className="flex items-center gap-2"
                         disabled={isCheckingConversation}
                       >
-                        <MessageCircle className="w-4 h-4" />
+                        <MessagesSquare className="w-4 h-4" />
                         <span className="truncate">
                           {isCheckingConversation ? 'Sprawdzanie...' : 'Wiadomość'}
                         </span>
