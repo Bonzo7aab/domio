@@ -1104,6 +1104,10 @@ export async function fetchTenders(
         category:job_categories!tenders_category_id_fkey (
           name,
           slug
+        ),
+        subcategory:job_categories!tenders_subcategory_id_fkey (
+          name,
+          slug
         )
       `);
 
@@ -1331,9 +1335,11 @@ export async function fetchJobsAndTenders(
       location: locationData,
       type: 'Konkurs',
       postType: 'tender' as const,
+      status: tender.status,
       salary: `${tender.estimated_value} ${tender.currency}`,
       budget: `${tender.estimated_value} ${tender.currency}`,
       category: tender.category?.name || 'Inne',
+      subcategory: tender.subcategory?.name,
       deadline: tender.submission_deadline,
       urgency: 'medium' as const,
       metrics: {

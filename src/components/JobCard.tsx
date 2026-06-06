@@ -1,14 +1,18 @@
 import React, { useMemo, useCallback } from 'react';
-import { MapPin, Clock, Star, Eye, Gavel, Wrench, Users, Calendar } from 'lucide-react';
+import { MapPin, Clock, Star, Eye, Wrench, Users, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
-import { TenderStatusBadge } from './TenderStatusBadge';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { getDaysRemaining, formatDaysRemaining } from '../utils/tenderHelpers';
 import { useUserProfile } from '../contexts/AuthContext';
 import type { Job } from '../types/job';
 import { ContestApplyOfferButton } from './contest/ContestApplyOfferButton';
+import { ContestJobCard } from './contest/ContestJobCard';
+import {
+  getContestSubmissionDeadline,
+  resolveContestStatus,
+} from '../lib/contest-display';
 
 interface JobCardProps {
   job: Partial<Job> & {
@@ -50,7 +54,7 @@ const JobCard = React.memo(function JobCard({
   isBookmarked = false, 
   onMouseEnter, 
   onMouseLeave, 
-  isHighlighted: _isHighlighted = false,
+  isHighlighted = false,
   onApplyClick,
   isExpired = false,
   hasSubmittedOffer = false,
@@ -79,18 +83,19 @@ const JobCard = React.memo(function JobCard({
   }, [job, onApplyClick]);
 
   const isTender = useMemo(() => job.postType === 'tender', [job.postType]);
+  const contestStatus = useMemo(() => resolveContestStatus(job), [job]);
+  const submissionDeadline = useMemo(() => getContestSubmissionDeadline(job), [job]);
+  const categoryLabel = useMemo(
+    () => (typeof job.category === 'string' ? job.category : job.category?.name || job.type),
+    [job.category, job.type],
+  );
 
   // Calculate days remaining for deadline
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const deadlineDaysRemaining = useMemo(() => {
     try {
-      if (isTender && job.tenderInfo?.submissionDeadline) {
-        const date = new Date(job.tenderInfo.submissionDeadline);
-        if (isNaN(date.getTime())) return null;
-        return getDaysRemaining(date);
-      }
-      if (job.deadline) {
-        const date = new Date(job.deadline);
+      if (submissionDeadline) {
+        const date = new Date(submissionDeadline);
         if (isNaN(date.getTime())) return null;
         return getDaysRemaining(date);
       }
@@ -98,7 +103,7 @@ const JobCard = React.memo(function JobCard({
       console.error('Error calculating days remaining:', error);
     }
     return null;
-  }, [isTender, job.tenderInfo?.submissionDeadline, job.deadline]);
+  }, [submissionDeadline]);
 
   // Check if deadline is ending soon (less than 7 days, including today)
   const isEndingSoon = useMemo(() => {
@@ -124,133 +129,29 @@ const JobCard = React.memo(function JobCard({
   }, [job.deadline]);
 
   if (isTender) {
-
     return (
-      <Card 
-        className={`cursor-pointer hover:shadow-lg transition-shadow w-full max-w-full ${
-          isExpired ? 'bg-gray-50 opacity-60' : 'bg-white'
-        }`}
+      <ContestJobCard
+        job={job}
+        contestStatus={contestStatus}
+        submissionDeadline={submissionDeadline}
+        categoryLabel={categoryLabel}
+        deadlineDaysRemaining={deadlineDaysRemaining}
+        isEndingSoon={isEndingSoon}
+        isExpired={isExpired}
+        isBookmarked={isBookmarked}
+        isHighlighted={isHighlighted}
+        isManager={isManager}
+        isLoggedIn={isLoggedIn}
+        user={user}
+        hasSubmittedOffer={hasSubmittedOffer}
+        hasDraftOffer={hasDraftOffer}
+        isCheckingOffer={isCheckingOffer}
         onClick={onClick}
+        onBookmark={onBookmark}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-      >
-        <CardContent className="p-4 md:p-6">
-          <div className="flex items-start justify-between mb-3 md:mb-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start md:items-center justify-between mb-2 gap-2">
-                <div className="flex items-start md:items-center gap-2 md:gap-3 flex-wrap min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
-                    <Gavel className="w-4 h-4 text-warning flex-shrink-0" />
-                    <h3 className={`font-semibold text-base md:text-lg truncate ${isExpired ? 'text-gray-500' : ''}`}>{job.title}</h3>
-                  </div>
-                  <div className="flex items-center gap-1.5 md:gap-3 flex-wrap">
-                    {isExpired && (
-                      <Badge variant="secondary" className="text-xs">
-                        Wygasłe
-                      </Badge>
-                    )}
-                    {/* Map current phase to valid tender status */}
-                    <TenderStatusBadge status={
-                      job.tenderInfo?.currentPhase?.toLowerCase().includes('ocena') || 
-                      job.tenderInfo?.currentPhase?.toLowerCase().includes('evaluation') ? 'evaluation' :
-                      job.tenderInfo?.currentPhase?.toLowerCase().includes('rozstrzyg') ||
-                      job.tenderInfo?.currentPhase?.toLowerCase().includes('awarded') ? 'awarded' :
-                      job.tenderInfo?.currentPhase?.toLowerCase().includes('anulo') ||
-                      job.tenderInfo?.currentPhase?.toLowerCase().includes('cancel') ? 'cancelled' :
-                      'active'
-                    } />
-                    {job.urgent && (
-                      <Badge variant="destructive" className="text-xs">
-                        Pilne
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                
-                {!isManager && onBookmark ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`text-muted-foreground hover:text-foreground flex-shrink-0 ${isBookmarked ? 'text-primary' : ''}`}
-                        onClick={handleBookmarkClick}
-                      >
-                        <Star className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{bookmarkTooltip}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : null}
-              </div>
-              
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-3">
-                <span className="font-medium">{job.company}</span>
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">
-                    {typeof job.location === 'string' 
-                      ? job.location 
-                      : (job.location && typeof job.location === 'object' && 'city' in job.location)
-                        ? (job.location.sublocality_level_1
-                            ? `${job.location.city || 'Unknown'}, ${job.location.sublocality_level_1}`
-                            : job.location.city || 'Unknown')
-                        : 'Unknown'}
-                  </span>
-                </div>
-                <Badge variant="outline" className="w-fit">
-                  {typeof job.category === 'string' ? job.category : job.category?.name || job.type}
-                </Badge>
-              </div>
-              
-              <p className="text-gray-700 text-xs sm:text-sm mb-3 md:mb-0 line-clamp-2">
-                {job.description}
-              </p>
-
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm sm:justify-between">
-                <div className='flex flex-wrap gap-3 sm:gap-4'>
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-600 font-medium">💰</span>
-                    <span>Wartość: {job.salary}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                    <span>{job.applications ?? job.metrics?.applications ?? 0} ofert</span>
-                  </div>
-                  
-                  {isTender && job.tenderInfo?.submissionDeadline && (
-                    <div className="flex items-center gap-2 text-blue-600 font-medium">
-                      <Calendar className="h-4 w-4 flex-shrink-0" />
-                      <span>
-                        Termin: {new Date(job.tenderInfo.submissionDeadline).toLocaleDateString('pl-PL')}
-                        {isEndingSoon && deadlineDaysRemaining !== null && (
-                          <span className="text-orange-600 ml-1">
-                            ({formatDaysRemaining(deadlineDaysRemaining)} do końca)
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {!isManager && (
-                  <ContestApplyOfferButton
-                    className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
-                    isLoggedIn={isLoggedIn}
-                    user={user}
-                    hasSubmittedOffer={hasSubmittedOffer}
-                    hasDraftOffer={hasDraftOffer}
-                    isCheckingOffer={isCheckingOffer}
-                    onApply={handleApplyClick}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        onApplyClick={handleApplyClick}
+      />
     );
   }
   // Updated job card design for regular jobs with action buttons

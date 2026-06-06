@@ -1,4 +1,5 @@
 import { Job } from "../../types";
+import { getContestMarkerIconSvg } from "./config";
 
 // Cache for InfoWindow content to avoid regenerating for the same job
 const infoWindowContentCache = new Map<string, string>();
@@ -143,15 +144,7 @@ function generateInfoWindowContentInternal(jobData: Job, isSmallMap: boolean): s
           
           <div style="flex: 1; min-width: 0;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
-              ${isTender ? `
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(32 95% 44%)" stroke-width="2">
-                  <path d="M17 10L12 5 7 10M17 19H7a4 4 0 01-4-4V8a4 4 0 014-4h10a4 4 0 014 4v7a4 4 0 01-4 4z"/>
-                </svg>
-              ` : `
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(221 83% 40%)" stroke-width="2">
-                  <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-                </svg>
-              `}
+              ${getContestMarkerIconSvg('hsl(221 83% 40%)', 14)}
               ${urgent ? `
                 <span style="
                   display: inline-flex;
@@ -432,15 +425,7 @@ export function generateMobileDrawerContent(jobData: Job): string {
               ">${safeTitle}</h3>
               
               <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                ${isTender ? `
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(32 95% 44%)" stroke-width="2.5">
-                    <path d="M17 10L12 5 7 10M17 19H7a4 4 0 01-4-4V8a4 4 0 014-4h10a4 4 0 014 4v7a4 4 0 01-4 4z"/>
-                  </svg>
-                ` : `
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(221 83% 40%)" stroke-width="2.5">
-                    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-                  </svg>
-                `}
+                ${getContestMarkerIconSvg('hsl(221 83% 40%)', 20)}
                 ${urgent ? `
                   <span style="
                     display: inline-flex;
@@ -644,15 +629,7 @@ function generateCompactInfoWindow(jobData: Job, escapeHtml: (text: string) => s
       ">
         <!-- Header with badges -->
         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
-          ${isTender ? `
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="hsl(32 95% 44%)" stroke-width="2.5">
-              <path d="M17 10L12 5 7 10M17 19H7a4 4 0 01-4-4V8a4 4 0 014-4h10a4 4 0 014 4v7a4 4 0 01-4 4z"/>
-            </svg>
-          ` : `
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="hsl(221 83% 40%)" stroke-width="2.5">
-              <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-            </svg>
-          `}
+          ${getContestMarkerIconSvg('hsl(221 83% 40%)', 12)}
           ${urgent ? `
             <span style="
               display: inline-flex;

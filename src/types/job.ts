@@ -11,6 +11,9 @@ export interface Job {
   // Core identifiers
   id: string;
   postType: 'job' | 'tender';
+
+  /** Workflow status from DB (contests/tenders: active, evaluation, awarded, …) */
+  status?: string;
   
   // Basic info
   title: string;

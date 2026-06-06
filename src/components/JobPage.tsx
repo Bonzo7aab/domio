@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ContestApplyOfferButton } from './contest/ContestApplyOfferButton';
-import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, AlertTriangle, Image as ImageIcon, FileText, MessageCircle, FileSearch } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -45,6 +45,9 @@ import {
 } from './tender-detail/TenderContestDetailTabs';
 import { ManagerJobStatusSelect } from './manager-dashboard/ManagerJobStatusSelect';
 import { canManagerEditJobFields, getJobWorkflowStatusLabel } from '../lib/job-workflow-status';
+import { getContestWorkflowStatusLabel } from '../lib/tender-workflow-status';
+import { formatContestLocation } from '../lib/contest-display';
+import { ContestStatusBadge } from './manager-dashboard/ContestStatusBadge';
 import { VerificationRequiredApplyDialog } from './VerificationRequiredApplyDialog';
 import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
 import { ContestOfferSubmissionDialog } from './contest-offer/ContestOfferSubmissionDialog';
@@ -116,9 +119,9 @@ function getStatusBadgeVariant(status?: string) {
 }
 
 // Get status label in Polish
-function getStatusLabel(status?: string): string {
-  if (!status) return 'Zbieranie ofert';
-  return getJobWorkflowStatusLabel(status);
+function getStatusLabel(status?: string, isContest = false): string {
+  if (!status) return isContest ? 'Zbieranie ofert' : 'Zbieranie ofert';
+  return isContest ? getContestWorkflowStatusLabel(status) : getJobWorkflowStatusLabel(status);
 }
 
 /**
@@ -1123,14 +1126,19 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3 mb-1.5 sm:mb-2">
+                  {job.contestInfo ? (
+                    <FileSearch className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" aria-hidden />
+                  ) : null}
                   <h1 className="text-lg sm:text-2xl md:text-3xl font-bold break-words">
                     {job.title}
                   </h1>
-                  {job.status && (
+                  {job.contestInfo && job.status ? (
+                    <ContestStatusBadge status={job.status} />
+                  ) : job.status ? (
                     <Badge variant={getStatusBadgeVariant(job.status)} className="shrink-0 text-[10px] sm:text-xs md:text-sm">
-                      {getStatusLabel(job.status)}
+                      {getStatusLabel(job.status, Boolean(job.contestInfo))}
                     </Badge>
-                  )}
+                  ) : null}
                   {job.urgent && (
                     <Badge variant="destructive" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
                       <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
@@ -1143,34 +1151,63 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       Premium
                     </Badge>
                   )}
-                  {job.type === 'Konkurs' && (
-                    <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
-                      <Gavel className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
-                      Konkurs
-                    </Badge>
-                  )}
                 </div>
-                <p className="text-gray-600 mb-1.5 sm:mb-2 md:mb-1 text-xs sm:text-sm md:text-base break-words">
-                  {job.company}
-                </p>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                    <span className="truncate">{formatLocation(job.location)}</span>
-                    {job.address && (
-                      <span className="text-xs text-gray-400">({job.address})</span>
-                    )}
-                  </div>
-                  <div className="flex justify-between items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                      <span>{job.postedTime}</span>
+                {job.contestInfo ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-3 mb-2 text-xs sm:text-sm md:text-base text-gray-600">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-medium">{job.company}</span>
+                        <span className="hidden sm:inline text-gray-300" aria-hidden>|</span>
+                        <span className="text-gray-500">{formatContestLocation(job.location)}</span>
+                      </div>
+                      {job.contestInfo.buildingName ? (
+                        <span className="font-medium text-gray-700 break-words sm:text-right sm:max-w-[45%]">
+                          {job.contestInfo.buildingName}
+                        </span>
+                      ) : null}
                     </div>
-                    <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
-                      {typeof job.category === 'string' ? job.category : job.category?.name || 'Inne'}
-                    </Badge>
-                  </div>
-                </div>
+                    <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-500 mb-2">
+                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" aria-hidden />
+                      <span className="break-words">
+                        {job.contestInfo.buildingAddress?.trim() || formatContestLocation(job.location)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
+                        {typeof job.category === 'string' ? job.category : job.category?.name || 'Inne'}
+                      </Badge>
+                      {job.subcategory ? (
+                        <Badge variant="secondary" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
+                          {job.subcategory}
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-gray-600 mb-1.5 sm:mb-2 md:mb-1 text-xs sm:text-sm md:text-base break-words">
+                      {job.company}
+                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <span className="truncate">{formatLocation(job.location)}</span>
+                        {job.address && (
+                          <span className="text-xs text-gray-400">({job.address})</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                          <span>{job.postedTime}</span>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
+                          {typeof job.category === 'string' ? job.category : job.category?.name || 'Inne'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1279,7 +1316,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
-                    <Gavel className="w-5 h-5" />
+                    <FileSearch className="w-5 h-5" />
                     Kluczowe informacje przetargu
                   </CardTitle>
                 </CardHeader>

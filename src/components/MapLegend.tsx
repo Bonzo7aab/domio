@@ -33,16 +33,10 @@ export const MapLegend: React.FC<MapLegendProps> = ({ initialExpanded = true }) 
 
   const jobTypeItems = [
     {
-      postType: 'job' as const,
-      backgroundColor: markerColors.priority.medium, // Use medium priority as default
-      label: 'Zgłoszenie',
-      description: 'Ikona klucza',
-    },
-    {
       postType: 'tender' as const,
-      backgroundColor: markerColors.priority.medium, // Use medium priority as default
-      label: 'Przetarg',
-      description: 'Ikona młotka',
+      backgroundColor: markerColors.priority.medium,
+      label: 'Konkurs',
+      description: 'Ikona dokumentu',
     },
   ];
 
@@ -99,7 +93,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ initialExpanded = true }) 
           {/* Job Type Icons Section */}
           <div className="space-y-1 md:space-y-2 border-t border-border pt-2">
             <div className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-              Typ zgłoszenia (ikony)
+              Typ konkursu (ikony)
             </div>
             {jobTypeItems.map((item, index) => (
               <JobTypeLegendItem
