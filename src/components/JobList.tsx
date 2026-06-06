@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowUpDown, Heart, Map } from 'lucide-react';
+import { ArrowUpDown, Star, Map } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
 import { Toggle } from './ui/toggle';
@@ -16,8 +16,9 @@ import { isJobExpired } from '../utils/jobHelpers';
 import {
   jobMatchesFilters,
   matchesFavoritesFilter,
-  parseJobBudgetAmount,
   getJobDeadline,
+  getJobOfferCount,
+  getJobCreatedTime,
 } from '../lib/filters/filter-logic';
 import { useFilterContext } from '../contexts/FilterContext';
 import { useUserProfile } from '../contexts/AuthContext';
@@ -187,13 +188,7 @@ export default function JobList({
     sorted.sort((a, b) => {
       switch (sortBy) {
         case 'newest':
-          return (
-            new Date(b.postedTime).getTime() - new Date(a.postedTime).getTime()
-          );
-        case 'budget-high':
-          return parseJobBudgetAmount(b) - parseJobBudgetAmount(a);
-        case 'budget-low':
-          return parseJobBudgetAmount(a) - parseJobBudgetAmount(b);
+          return getJobCreatedTime(b) - getJobCreatedTime(a);
         case 'deadline-soon': {
           const da = getJobDeadline(a)?.getTime() ?? noDeadline(a);
           const db = getJobDeadline(b)?.getTime() ?? noDeadline(b);
@@ -207,6 +202,10 @@ export default function JobList({
           if (db === 0) return -1;
           return db - da;
         }
+        case 'offers-fewest':
+          return getJobOfferCount(a) - getJobOfferCount(b);
+        case 'offers-most':
+          return getJobOfferCount(b) - getJobOfferCount(a);
         default:
           return 0;
       }
@@ -233,16 +232,16 @@ export default function JobList({
               onPressedChange={(pressed) =>
                 onFilterChange((prev) => ({ ...prev, favoritesOnly: pressed }))
               }
-              aria-label="Pokaż tylko ulubione"
+              aria-label="Pokaż tylko zapisane"
               className="gap-1.5 px-3 h-9"
             >
-              <Heart
+              <Star
                 className={cn(
                   'h-4 w-4 shrink-0',
-                  filters.favoritesOnly && 'fill-red-500 text-red-500',
+                  filters.favoritesOnly && 'fill-primary text-primary',
                 )}
               />
-              <span className="text-sm">Ulubione</span>
+              <span className="text-sm">Zapisane</span>
             </Toggle>
           )}
 
@@ -254,11 +253,11 @@ export default function JobList({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="newest">Od najnowszych</SelectItem>
-                <SelectItem value="budget-high">Budżet malejąco</SelectItem>
-                <SelectItem value="budget-low">Budżet rosnąco</SelectItem>
-                <SelectItem value="deadline-soon">Bliski termin</SelectItem>
-                <SelectItem value="deadline-far">Daleki termin</SelectItem>
+                <SelectItem value="newest">Najnowsze konkursy</SelectItem>
+                <SelectItem value="deadline-soon">Najmniej czasu na ofertę</SelectItem>
+                <SelectItem value="deadline-far">Najwięcej czasu na ofertę</SelectItem>
+                <SelectItem value="offers-fewest">Najmniej złożonych ofert</SelectItem>
+                <SelectItem value="offers-most">Najwięcej złożonych ofert</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -306,7 +305,7 @@ export default function JobList({
         <div className="text-center py-8">
           <div className="text-muted-foreground mb-2">
             {filters?.favoritesOnly
-              ? 'Brak ulubionych konkursów pasujących do filtrów'
+              ? 'Brak zapisanych konkursów pasujących do filtrów'
               : 'Brak konkursów pasujących do filtrów'}
           </div>
         </div>

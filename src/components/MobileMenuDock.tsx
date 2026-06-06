@@ -7,7 +7,7 @@ import {
   Home, 
   Search, 
   Bookmark,
-  Heart,
+  Star,
   MessageCircle, 
   User,
   Briefcase,
@@ -59,7 +59,7 @@ export function MobileMenuDock() {
       'Strona główna': '/',
       'Wykonawcy': '/contractors',
       'Zarządcy': '/managers',
-      'Ulubione': '/bookmarked-jobs',
+      'Zapisane': '/bookmarked-jobs',
       'Wiadomości': '/messages',
       'Profil': '/account',
     };
@@ -104,8 +104,8 @@ export function MobileMenuDock() {
       },
     },
     {
-      title: 'Ulubione',
-      icon: <Heart className="size-6" />,
+      title: 'Zapisane',
+      icon: <Star className="size-6" />,
       href: '/bookmarked-jobs',
       onClick: () => {
         router.push('/bookmarked-jobs');

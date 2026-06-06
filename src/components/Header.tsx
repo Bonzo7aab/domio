@@ -4,11 +4,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Search,
   User,
-  MessageCircle,
+  MessagesSquare,
   GraduationCap,
   Play,
   Bookmark,
-  Heart,
+  Star,
   LogOut,
   ClipboardList,
   ChevronDown,
@@ -256,7 +256,7 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
                 onClick={handleMessagingClick}
                 aria-label="Wiadomości"
               >
-                <MessageCircle className="h-5 w-5" />
+                <MessagesSquare className="h-5 w-5" />
               </Button>
             ) : (
               <AuthPromptPopover
@@ -270,7 +270,7 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
                   className="h-9 w-9 text-muted-foreground hover:text-foreground"
                   aria-label="Wiadomości"
                 >
-                  <MessageCircle className="h-5 w-5" />
+                  <MessagesSquare className="h-5 w-5" />
                 </Button>
               </AuthPromptPopover>
             )}
@@ -282,9 +282,9 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
                   size="icon"
                   className="h-9 w-9 text-muted-foreground hover:text-foreground"
                   onClick={handleBookmarkedJobsClick}
-                  aria-label="Ulubione zgłoszenia"
+                  aria-label="Zapisane zgłoszenia"
                 >
-                  <Heart className="h-5 w-5" />
+                  <Star className="h-5 w-5" />
                 </Button>
               ) : (
                 <AuthPromptPopover
@@ -296,9 +296,9 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                    aria-label="Ulubione zgłoszenia"
+                    aria-label="Zapisane zgłoszenia"
                   >
-                    <Heart className="h-5 w-5" />
+                    <Star className="h-5 w-5" />
                   </Button>
                 </AuthPromptPopover>
               ))}
@@ -464,15 +464,15 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
                               className="w-full justify-start"
                               onClick={handleBookmarkedJobsClick}
                             >
-                              <Heart className="mr-2 h-4 w-4" />
-                              <span>Ulubione zgłoszenia</span>
+                              <Star className="mr-2 h-4 w-4" />
+                              <span>Zapisane zgłoszenia</span>
                             </Button>
                             <Button
                               variant="ghost"
                               className="w-full justify-start"
                               onClick={handleMessagingClick}
                             >
-                              <MessageCircle className="mr-2 h-4 w-4" />
+                              <MessagesSquare className="mr-2 h-4 w-4" />
                               <span>Wiadomości</span>
                             </Button>
 
@@ -626,11 +626,11 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
                         </DropdownMenuItem>
 
                         <DropdownMenuItem onClick={handleBookmarkedJobsClick}>
-                          <Heart className="mr-2 h-4 w-4" />
-                          <span>Ulubione zgłoszenia</span>
+                          <Star className="mr-2 h-4 w-4" />
+                          <span>Zapisane zgłoszenia</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleMessagingClick}>
-                          <MessageCircle className="mr-2 h-4 w-4" />
+                          <MessagesSquare className="mr-2 h-4 w-4" />
                           <span>Wiadomości</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />

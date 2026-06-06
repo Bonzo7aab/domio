@@ -4,27 +4,28 @@ export const DEFAULT_POST_TYPES = ['tender'] as const;
 
 export const WARSAW_CITY = 'Warszawa';
 
+/** Submission deadline windows — time remaining until offer deadline. */
 export type DeadlineFilterKey =
-  | 'today'
-  | 'within-week'
-  | 'within-month'
-  | 'within-3-months'
-  | 'within-6-months'
-  | 'within-year';
+  | 'within-48h'
+  | 'within-7-days'
+  | 'within-14-days'
+  | 'over-14-days';
 
 export interface FilterState {
   categories: string[];
   subcategories: string[];
   sublocalities: string[];
-  budgetMin?: number;
-  budgetMax?: number;
   searchQuery?: string;
-  /** Termin realizacji — deadline window filters */
+  /** Zakończenie przyjmowania ofert — deadline window filters */
   deadline: DeadlineFilterKey[];
   /** Public browse shows contests only (`tender` rows). Kept for URL backward compatibility. */
   postTypes: string[];
   /** Show only locally bookmarked listings. */
   favoritesOnly: boolean;
+  /** Kryteria formalne — show contests without deposit (wadium). */
+  noDeposit: boolean;
+  /** Kryteria formalne — show contests without required references. */
+  noReferencesRequired: boolean;
 }
 
 export const defaultFilters: FilterState = {
@@ -35,6 +36,8 @@ export const defaultFilters: FilterState = {
   deadline: [],
   postTypes: [...DEFAULT_POST_TYPES],
   favoritesOnly: false,
+  noDeposit: false,
+  noReferencesRequired: false,
 };
 
 export function isDefaultPostTypes(postTypes: string[]): boolean {

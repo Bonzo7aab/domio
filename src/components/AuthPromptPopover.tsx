@@ -98,6 +98,6 @@ export const AUTH_PROMPT_MESSAGES = {
 } as const;
 
 export const AUTH_PROMPT_FAVORITES = {
-  title: 'Ulubione zgłoszenia',
-  description: 'Zaloguj się lub załóż konto, aby zapisywać zgłoszenia w ulubionych.',
+  title: 'Zapisane zgłoszenia',
+  description: 'Zaloguj się lub załóż konto, aby zapisywać zgłoszenia do przejrzenia później.',
 } as const;

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ArrowLeft, Heart, Search } from 'lucide-react';
+import { ArrowLeft, Star, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -79,7 +79,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
     (jobId: string, jobTitle: string) => {
       void removeBookmark(jobId);
       loadBookmarks();
-      toast.success(`Usunięto z ulubionych: ${jobTitle}`);
+      toast.success(`Usunięto z zapisanych: ${jobTitle}`);
     },
     [loadBookmarks],
   );
@@ -112,11 +112,11 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
                   Powrót
                 </Button>
                 <div>
-                  <h1 className="text-xl font-semibold">Ulubione konkursy</h1>
+                  <h1 className="text-xl font-semibold">Zapisane konkursy</h1>
                   <p className="text-sm text-muted-foreground">{countLabel}</p>
                 </div>
               </div>
-              <Heart className="w-6 h-6 text-primary fill-primary" aria-hidden />
+              <Star className="w-6 h-6 text-primary fill-primary" aria-hidden />
             </div>
           </div>
         </div>
@@ -131,7 +131,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
-              placeholder="Szukaj w ulubionych konkursach…"
+              placeholder="Szukaj w zapisanych konkursach…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -149,12 +149,12 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
           </div>
         ) : filteredBookmarks.length === 0 ? (
           <div className="text-center py-12">
-            <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Brak ulubionych konkursów</h3>
+            <Star className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Brak zapisanych konkursów</h3>
             <p className="text-muted-foreground mb-6">
-              Nie masz jeszcze żadnych ulubionych konkursów.
+              Nie masz jeszcze żadnych zapisanych konkursów.
               <br />
-              Dodaj serce przy konkursie na liście, aby zapisać go tutaj.
+              Kliknij gwiazdkę przy konkursie na liście, aby zapisać go tutaj.
             </p>
             <Button onClick={onBack}>Przeglądaj konkursy</Button>
           </div>

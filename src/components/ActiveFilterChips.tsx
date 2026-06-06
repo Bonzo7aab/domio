@@ -70,30 +70,30 @@ export function ActiveFilterChips({
     });
   });
 
-  if (filters.budgetMin != null) {
-    chips.push({
-      label: `Budżet min: ${filters.budgetMin} PLN`,
-      value: 'budget-min',
-      onRemove: () =>
-        onFilterChange((prev) => ({ ...prev, budgetMin: undefined })),
-    });
-  }
-
-  if (filters.budgetMax != null) {
-    chips.push({
-      label: `Budżet max: ${filters.budgetMax} PLN`,
-      value: 'budget-max',
-      onRemove: () =>
-        onFilterChange((prev) => ({ ...prev, budgetMax: undefined })),
-    });
-  }
-
   if (filters.favoritesOnly) {
     chips.push({
-      label: 'Ulubione',
+      label: 'Zapisane',
       value: 'favorites',
       onRemove: () =>
         onFilterChange((prev) => ({ ...prev, favoritesOnly: false })),
+    });
+  }
+
+  if (filters.noDeposit) {
+    chips.push({
+      label: 'Bez wadium',
+      value: 'no-deposit',
+      onRemove: () =>
+        onFilterChange((prev) => ({ ...prev, noDeposit: false })),
+    });
+  }
+
+  if (filters.noReferencesRequired) {
+    chips.push({
+      label: 'Bez wymaganych referencji',
+      value: 'no-references',
+      onRemove: () =>
+        onFilterChange((prev) => ({ ...prev, noReferencesRequired: false })),
     });
   }
 

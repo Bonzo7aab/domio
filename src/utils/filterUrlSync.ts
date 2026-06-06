@@ -1,6 +1,6 @@
-import type { FilterState, DeadlineFilterKey } from '../lib/filters/filter-state';
+import type { FilterState } from '../lib/filters/filter-state';
 import { defaultFilters, isDefaultPostTypes } from '../lib/filters/filter-state';
-import { migrateDateAddedToDeadline } from '../lib/filters/filter-logic';
+import { migrateLegacyDeadlineKeys } from '../lib/filters/filter-logic';
 
 export type { FilterState } from '../lib/filters/filter-state';
 export { defaultFilters } from '../lib/filters/filter-state';
@@ -20,12 +20,6 @@ export function filtersToSearchParams(filters: FilterState): URLSearchParams {
   if (filters.sublocalities.length > 0) {
     params.set('sublocalities', filters.sublocalities.join(','));
   }
-  if (filters.budgetMin !== undefined && filters.budgetMin !== null) {
-    params.set('budgetMin', filters.budgetMin.toString());
-  }
-  if (filters.budgetMax !== undefined && filters.budgetMax !== null) {
-    params.set('budgetMax', filters.budgetMax.toString());
-  }
   if (filters.searchQuery?.trim()) {
     params.set('search', filters.searchQuery.trim());
   }
@@ -37,6 +31,12 @@ export function filtersToSearchParams(filters: FilterState): URLSearchParams {
   }
   if (filters.favoritesOnly) {
     params.set('favorites', '1');
+  }
+  if (filters.noDeposit) {
+    params.set('noDeposit', '1');
+  }
+  if (filters.noReferencesRequired) {
+    params.set('noReferences', '1');
   }
   return params;
 }
@@ -62,18 +62,6 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
     filters.sublocalities = sublocalities.split(',').filter(Boolean);
   }
 
-  const budgetMin = searchParams.get('budgetMin');
-  if (budgetMin) {
-    const parsed = parseFloat(budgetMin);
-    if (!isNaN(parsed)) filters.budgetMin = parsed;
-  }
-
-  const budgetMax = searchParams.get('budgetMax');
-  if (budgetMax) {
-    const parsed = parseFloat(budgetMax);
-    if (!isNaN(parsed)) filters.budgetMax = parsed;
-  }
-
   const search = searchParams.get('search');
   if (search) {
     filters.searchQuery = search.trim();
@@ -81,12 +69,14 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
 
   const deadline = searchParams.get('deadline');
   if (deadline) {
-    filters.deadline = deadline.split(',').filter(Boolean) as DeadlineFilterKey[];
+    filters.deadline = migrateLegacyDeadlineKeys(
+      deadline.split(',').filter(Boolean),
+    );
   } else {
     const dateAdded = searchParams.get('dateAdded');
     if (dateAdded) {
-      filters.deadline = migrateDateAddedToDeadline(
-        dateAdded.split(',').filter(Boolean)
+      filters.deadline = migrateLegacyDeadlineKeys(
+        dateAdded.split(',').filter(Boolean),
       );
     }
   }
@@ -99,6 +89,16 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
   const favorites = searchParams.get('favorites');
   if (favorites === '1' || favorites === 'true') {
     filters.favoritesOnly = true;
+  }
+
+  const noDeposit = searchParams.get('noDeposit');
+  if (noDeposit === '1' || noDeposit === 'true') {
+    filters.noDeposit = true;
+  }
+
+  const noReferences = searchParams.get('noReferences');
+  if (noReferences === '1' || noReferences === 'true') {
+    filters.noReferencesRequired = true;
   }
 
   return filters;
@@ -114,11 +114,11 @@ export function hasActiveFilters(filters: FilterState): boolean {
     filters.categories.length > 0 ||
     filters.subcategories.length > 0 ||
     filters.sublocalities.length > 0 ||
-    filters.budgetMin != null ||
-    filters.budgetMax != null ||
     (filters.searchQuery && filters.searchQuery.trim()) ||
     filters.deadline.length > 0 ||
     !isDefaultPostTypes(filters.postTypes) ||
-    filters.favoritesOnly
+    filters.favoritesOnly ||
+    filters.noDeposit ||
+    filters.noReferencesRequired
   );
 }

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ContestApplyOfferButton } from './contest/ContestApplyOfferButton';
-import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Heart, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Building, Star, Award, CheckCircle, AlertCircle, Gavel, AlertTriangle, Image as ImageIcon, FileText, MessageCircle } from 'lucide-react';
 import { ImageZoom } from './ui/image-zoom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -1063,7 +1063,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           ? { ...prev, bookmarks_count: Math.max(0, currentCount - 1) }
           : prev,
       );
-      toast.success('Usunięto z ulubionych');
+      toast.success('Usunięto z zapisanych');
     } else {
       const bookmarkData = {
         id: job.id,
@@ -1084,7 +1084,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       setJobData((prev) =>
         prev ? { ...prev, bookmarks_count: currentCount + 1 } : prev,
       );
-      toast.success('Dodano do ulubionych');
+      toast.success('Dodano do zapisanych');
     }
   };
 
@@ -1735,9 +1735,9 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                       onClick={handleBookmark}
                       className="flex items-center gap-2"
                     >
-                      <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
+                      <Star className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
                       <span className="truncate">
-                        {isBookmarked ? 'W ulubionych' : 'Dodaj do ulubionych'}
+                        {isBookmarked ? 'W zapisanych' : 'Dodaj do zapisanych'}
                       </span>
                     </Button>
                     
@@ -1815,7 +1815,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   <span className="font-semibold">{job.applications || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Ulubione</span>
+                  <span className="text-sm text-muted-foreground">Zapisane</span>
                   <span className="font-semibold">{job.bookmarks_count || 0}</span>
                 </div>
               </CardContent>

@@ -101,11 +101,11 @@ export const sitemapEntries: SitemapEntry[] = [
   },
   {
     category: "Konto",
-    label: "Ulubione Zgłoszenia",
+    label: "Zapisane Zgłoszenia",
     path: "/bookmarked-jobs",
     icon: Bookmark,
-    description: "Przeglądaj ulubione zgłoszenia",
-    keywords: ["ulubione", "favorites", "bookmark", "zgłoszenia"],
+    description: "Przeglądaj zapisane zgłoszenia",
+    keywords: ["zapisane", "saved", "bookmark", "zgłoszenia"],
     requiresAuth: true
   },
   {

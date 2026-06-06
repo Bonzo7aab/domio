@@ -19,6 +19,7 @@ import { defaultFilters, WARSAW_CITY } from '../lib/filters/filter-state';
 import { extractCity, extractSublocality } from '../utils/locationMapping';
 import {
   getDeadlineFilterCounts,
+  getFormalCriteriaCounts,
   getWarsawDistrictsForFilters,
 } from '../lib/filters/filter-logic';
 import { DEADLINE_FILTER_OPTIONS } from '../lib/filters/deadline-labels';
@@ -26,7 +27,7 @@ import { cn } from './ui/utils';
 
 export type { FilterState } from '../lib/filters/filter-state';
 
-const EXPANDED_SECTIONS = ['categories', 'location', 'deadline', 'budget'] as const;
+const EXPANDED_SECTIONS = ['categories', 'location', 'deadline', 'formal'] as const;
 
 function filterOptionLabelClass(count: number, isSelected: boolean, size: 'sm' | 'xs' = 'sm'): string {
   return cn(
@@ -105,10 +106,6 @@ export default function JobFilters({
   ]);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [local, setLocal] = useState<FilterState>(initialFilters ?? defaultFilters);
-  const [budgetMinStr, setBudgetMinStr] = useState(() =>
-    initialFilters?.budgetMin != null ? String(initialFilters.budgetMin) : '',
-  );
-  const [budgetMaxStr, setBudgetMaxStr] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUpdatingFromSelfRef = useRef(false);
   const previousEmittedRef = useRef<string>('');
@@ -119,12 +116,6 @@ export default function JobFilters({
   useEffect(() => {
     if (initialFilters && !isUpdatingFromSelfRef.current) {
       setLocal(initialFilters);
-      if (initialFilters.budgetMin != null) {
-        setBudgetMinStr(String(initialFilters.budgetMin));
-      }
-      if (initialFilters.budgetMax != null) {
-        setBudgetMaxStr(String(initialFilters.budgetMax));
-      }
     }
     isUpdatingFromSelfRef.current = false;
   }, [initialFilters]);
@@ -176,17 +167,11 @@ export default function JobFilters({
   }, [jobs, warsawDistricts]);
 
   const deadlineCounts = useMemo(() => getDeadlineFilterCounts(jobs), [jobs]);
+  const formalCounts = useMemo(() => getFormalCriteriaCounts(jobs), [jobs]);
 
   useEffect(() => {
-    const budgetMin =
-      budgetMinStr.trim() !== '' ? parseFloat(budgetMinStr) : undefined;
-    const budgetMax =
-      budgetMaxStr.trim() !== '' ? parseFloat(budgetMaxStr) : undefined;
-
     const next: FilterState = {
       ...local,
-      budgetMin: budgetMin != null && !isNaN(budgetMin) ? budgetMin : undefined,
-      budgetMax: budgetMax != null && !isNaN(budgetMax) ? budgetMax : undefined,
       postTypes: defaultFilters.postTypes,
     };
 
@@ -196,7 +181,7 @@ export default function JobFilters({
       isUpdatingFromSelfRef.current = true;
       onFilterChange(next);
     }
-  }, [local, budgetMinStr, budgetMaxStr, onFilterChange]);
+  }, [local, onFilterChange]);
 
   const patch = (partial: Partial<FilterState>) => {
     setLocal((prev) => ({ ...prev, ...partial }));
@@ -275,7 +260,7 @@ export default function JobFilters({
 
         <div
           ref={scrollContainerRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-32 scroll-pb-32"
         >
           {/* Categories — always expanded at first level; subs on chevron */}
           <Collapsible
@@ -429,14 +414,14 @@ export default function JobFilters({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Termin realizacji */}
+          {/* Zakończenie przyjmowania ofert */}
           <Collapsible
             open={expandedFilterSections.includes('deadline')}
             onOpenChange={() => toggleSection('deadline')}
             className="mb-4"
           >
             <SectionTrigger
-              title="Termin realizacji"
+              title="Zakończenie przyjmowania ofert"
               open={expandedFilterSections.includes('deadline')}
             />
             <CollapsibleContent className="mt-3 pl-2">
@@ -480,42 +465,62 @@ export default function JobFilters({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Budget — range only */}
+          {/* Kryteria formalne */}
           <Collapsible
-            open={expandedFilterSections.includes('budget')}
-            onOpenChange={() => toggleSection('budget')}
+            open={expandedFilterSections.includes('formal')}
+            onOpenChange={() => toggleSection('formal')}
             className="mb-4"
           >
-            <SectionTrigger title="Budżet" open={expandedFilterSections.includes('budget')} />
+            <SectionTrigger
+              title="Kryteria formalne"
+              open={expandedFilterSections.includes('formal')}
+            />
             <CollapsibleContent className="mt-3 pl-2">
-              <div className="flex gap-2">
-                <div className="flex-1 flex flex-col space-y-1">
-                  <Label htmlFor="budget-min-input" className="text-xs text-gray-700">
-                    Budżet min (PLN)
-                  </Label>
-                  <input
-                    id="budget-min-input"
-                    type="number"
-                    value={budgetMinStr}
-                    onChange={(e) => setBudgetMinStr(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
-                    placeholder="0"
-                    min="0"
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <CustomCheckbox
+                    id="formal-no-deposit"
+                    checked={local.noDeposit}
+                    onCheckedChange={(checked) => patch({ noDeposit: checked })}
                   />
+                  <Label
+                    htmlFor="formal-no-deposit"
+                    className={filterOptionLabelClass(
+                      formalCounts.noDeposit,
+                      local.noDeposit,
+                    )}
+                  >
+                    Bez wadium{' '}
+                    <span className={filterCountClass(formalCounts.noDeposit, local.noDeposit)}>
+                      ({formalCounts.noDeposit})
+                    </span>
+                  </Label>
                 </div>
-                <div className="flex-1 flex flex-col space-y-1">
-                  <Label htmlFor="budget-max-input" className="text-xs text-gray-700">
-                    Budżet max (PLN)
-                  </Label>
-                  <input
-                    id="budget-max-input"
-                    type="number"
-                    value={budgetMaxStr}
-                    onChange={(e) => setBudgetMaxStr(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
-                    placeholder="0"
-                    min="0"
+                <div className="flex items-center space-x-2">
+                  <CustomCheckbox
+                    id="formal-no-references"
+                    checked={local.noReferencesRequired}
+                    onCheckedChange={(checked) =>
+                      patch({ noReferencesRequired: checked })
+                    }
                   />
+                  <Label
+                    htmlFor="formal-no-references"
+                    className={filterOptionLabelClass(
+                      formalCounts.noReferencesRequired,
+                      local.noReferencesRequired,
+                    )}
+                  >
+                    Bez wymaganych referencji{' '}
+                    <span
+                      className={filterCountClass(
+                        formalCounts.noReferencesRequired,
+                        local.noReferencesRequired,
+                      )}
+                    >
+                      ({formalCounts.noReferencesRequired})
+                    </span>
+                  </Label>
                 </div>
               </div>
             </CollapsibleContent>

@@ -25,81 +25,83 @@ export function getJobDeadline(job: Job): Date | null {
   return null;
 }
 
-export function parseJobBudgetAmount(job: Job): number {
-  const budgetMin = job.budget?.min ?? null;
-  const budgetMax = job.budget?.max ?? null;
-  if (budgetMax != null) return Number(budgetMax);
-  if (budgetMin != null) return Number(budgetMin);
-  const raw = ('budget_max' in job ? job.budget_max : undefined) as number | undefined;
-  if (raw != null) return Number(raw);
-  const minRaw = ('budget_min' in job ? job.budget_min : undefined) as number | undefined;
-  if (minRaw != null) return Number(minRaw);
-  const match = (job.salary || '').match(/\d+/);
-  return match ? parseInt(match[0], 10) : 0;
+export function getJobOfferCount(job: Job): number {
+  return job.applications ?? job.metrics?.applications ?? 0;
 }
 
-function startOfDay(d: Date): Date {
-  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  x.setHours(0, 0, 0, 0);
-  return x;
+export function getJobCreatedTime(job: Job): number {
+  const createdAt = (job as Job & { created_at?: string }).created_at;
+  if (createdAt) {
+    const t = new Date(createdAt).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const fromPosted = new Date(job.postedTime).getTime();
+  return isNaN(fromPosted) ? 0 : fromPosted;
+}
+
+export function jobRequiresDeposit(job: Job): boolean {
+  if (job.contestInfo) return job.contestInfo.depositRequired;
+  const wadium = job.tenderInfo?.wadium?.trim().toLowerCase();
+  if (!wadium || wadium === '0 pln' || wadium === 'brak' || wadium === '0') return false;
+  return true;
+}
+
+export function jobRequiresReferences(job: Job): boolean {
+  return Boolean(job.contestInfo?.formalRequirements?.references);
+}
+
+function hoursUntilDeadline(deadline: Date, now: Date): number {
+  return (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
 }
 
 export function matchesDeadlineFilter(deadline: Date, filter: DeadlineFilterKey): boolean {
   const now = new Date();
-  const today = startOfDay(now);
-  const deadlineDay = startOfDay(deadline);
+  if (deadline.getTime() <= now.getTime()) return false;
+
+  const hoursLeft = hoursUntilDeadline(deadline, now);
+  const daysLeft = hoursLeft / 24;
 
   switch (filter) {
-    case 'today':
-      return deadlineDay.getTime() === today.getTime();
-    case 'within-week': {
-      const end = new Date(today);
-      end.setDate(end.getDate() + 7);
-      return deadline >= today && deadline <= end;
-    }
-    case 'within-month': {
-      const end = new Date(today);
-      end.setDate(end.getDate() + 30);
-      return deadline >= today && deadline <= end;
-    }
-    case 'within-3-months': {
-      const end = new Date(today);
-      end.setDate(end.getDate() + 90);
-      return deadline >= today && deadline <= end;
-    }
-    case 'within-6-months': {
-      const end = new Date(today);
-      end.setDate(end.getDate() + 180);
-      return deadline >= today && deadline <= end;
-    }
-    case 'within-year': {
-      const end = new Date(today);
-      end.setDate(end.getDate() + 365);
-      return deadline >= today && deadline <= end;
-    }
+    case 'within-48h':
+      return hoursLeft <= 48;
+    case 'within-7-days':
+      return daysLeft <= 7;
+    case 'within-14-days':
+      return daysLeft <= 14;
+    case 'over-14-days':
+      return daysLeft > 14;
     default:
       return false;
   }
 }
 
-/** Map legacy URL dateAdded keys to deadline keys */
-export function migrateDateAddedToDeadline(values: string[]): DeadlineFilterKey[] {
+/** Map legacy URL deadline keys to current submission-window keys. */
+export function migrateLegacyDeadlineKeys(values: string[]): DeadlineFilterKey[] {
   const map: Record<string, DeadlineFilterKey> = {
-    today: 'today',
-    'last-week': 'within-week',
-    'last-month': 'within-month',
-    'last-3-months': 'within-3-months',
-    'last-6-months': 'within-6-months',
-    'last-year': 'within-year',
-    'within-week': 'within-week',
-    'within-month': 'within-month',
-    'within-3-months': 'within-3-months',
-    'within-6-months': 'within-6-months',
-    'within-year': 'within-year',
+    today: 'within-48h',
+    'within-week': 'within-7-days',
+    'within-month': 'within-14-days',
+    'within-3-months': 'over-14-days',
+    'within-6-months': 'over-14-days',
+    'within-year': 'over-14-days',
+    'last-week': 'within-7-days',
+    'last-month': 'within-14-days',
+    'last-3-months': 'over-14-days',
+    'last-6-months': 'over-14-days',
+    'last-year': 'over-14-days',
+    'within-48h': 'within-48h',
+    'within-7-days': 'within-7-days',
+    'within-14-days': 'within-14-days',
+    'over-14-days': 'over-14-days',
   };
   return values
     .map((v) => map[v])
     .filter((v): v is DeadlineFilterKey => Boolean(v));
+}
+
+/** @deprecated Use migrateLegacyDeadlineKeys */
+export function migrateDateAddedToDeadline(values: string[]): DeadlineFilterKey[] {
+  return migrateLegacyDeadlineKeys(values);
 }
 
 export function matchesFavoritesFilter(
@@ -141,16 +143,6 @@ export function jobMatchesFilters(job: Job, filters: FilterState): boolean {
     if (!matches) return false;
   }
 
-  if (filters.budgetMin != null) {
-    const amount = parseJobBudgetAmount(job);
-    if (amount > 0 && amount < filters.budgetMin) return false;
-  }
-
-  if (filters.budgetMax != null) {
-    const amount = parseJobBudgetAmount(job);
-    if (amount > 0 && amount > filters.budgetMax) return false;
-  }
-
   if (filters.searchQuery?.trim()) {
     const term = filters.searchQuery.toLowerCase().trim();
     if (!(job.title || '').toLowerCase().includes(term)) return false;
@@ -165,6 +157,10 @@ export function jobMatchesFilters(job: Job, filters: FilterState): boolean {
     if (!matchesAny) return false;
   }
 
+  if (filters.noDeposit && jobRequiresDeposit(job)) return false;
+
+  if (filters.noReferencesRequired && jobRequiresReferences(job)) return false;
+
   return true;
 }
 
@@ -176,12 +172,10 @@ export function getWarsawDistrictsForFilters(): string[] {
 export function getDeadlineFilterCounts(jobs: Job[]): Record<DeadlineFilterKey, number> {
   const counts = {} as Record<DeadlineFilterKey, number>;
   const keys: DeadlineFilterKey[] = [
-    'today',
-    'within-week',
-    'within-month',
-    'within-3-months',
-    'within-6-months',
-    'within-year',
+    'within-48h',
+    'within-7-days',
+    'within-14-days',
+    'over-14-days',
   ];
   for (const key of keys) {
     counts[key] = 0;
@@ -196,6 +190,19 @@ export function getDeadlineFilterCounts(jobs: Job[]): Record<DeadlineFilterKey, 
     }
   }
   return counts;
+}
+
+export function getFormalCriteriaCounts(jobs: Job[]): {
+  noDeposit: number;
+  noReferencesRequired: number;
+} {
+  let noDeposit = 0;
+  let noReferencesRequired = 0;
+  for (const job of jobs) {
+    if (!jobRequiresDeposit(job)) noDeposit += 1;
+    if (!jobRequiresReferences(job)) noReferencesRequired += 1;
+  }
+  return { noDeposit, noReferencesRequired };
 }
 
 /** @deprecated Prefer getWarsawDistrictsForFilters — kept for job-derived district sets. */

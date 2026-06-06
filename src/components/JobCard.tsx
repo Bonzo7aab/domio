@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import { MapPin, Clock, Heart, Eye, Gavel, Wrench, Users, Calendar } from 'lucide-react';
+import { MapPin, Clock, Star, Eye, Gavel, Wrench, Users, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
@@ -65,6 +65,8 @@ const JobCard = React.memo(function JobCard({
     e.stopPropagation();
     onBookmark?.(job.id);
   }, [job.id, onBookmark]);
+
+  const bookmarkTooltip = isBookmarked ? 'Usuń z zapisanych' : 'Dodaj do zapisanych';
 
   const handleApplyClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -166,14 +168,21 @@ const JobCard = React.memo(function JobCard({
                 </div>
                 
                 {!isManager && onBookmark ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`text-muted-foreground hover:text-foreground flex-shrink-0 ${isBookmarked ? 'text-primary' : ''}`}
-                    onClick={handleBookmarkClick}
-                  >
-                    <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`text-muted-foreground hover:text-foreground flex-shrink-0 ${isBookmarked ? 'text-primary' : ''}`}
+                        onClick={handleBookmarkClick}
+                      >
+                        <Star className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{bookmarkTooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 ) : null}
               </div>
               
@@ -305,12 +314,12 @@ const JobCard = React.memo(function JobCard({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 cursor-default">
-                              <Heart className="w-3.5 h-3.5" />
+                              <Star className="w-3.5 h-3.5" />
                               <span>{job.bookmarks_count}</span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Ulubione</p>
+                            <p>Zapisane</p>
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -318,14 +327,21 @@ const JobCard = React.memo(function JobCard({
                   )}
                 </div>
                 {!isManager && onBookmark ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
-                    onClick={handleBookmarkClick}
-                  >
-                    <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
+                        onClick={handleBookmarkClick}
+                      >
+                        <Star className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{bookmarkTooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 ) : null}
               </div>
             </div>
@@ -385,12 +401,12 @@ const JobCard = React.memo(function JobCard({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 cursor-default">
-                              <Heart className="w-3.5 h-3.5" />
+                              <Star className="w-3.5 h-3.5" />
                               <span>{job.bookmarks_count}</span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Ulubione</p>
+                            <p>Zapisane</p>
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -398,14 +414,21 @@ const JobCard = React.memo(function JobCard({
                   )}
                 </div>
                 {!isManager && onBookmark ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
-                    onClick={handleBookmarkClick}
-                  >
-                    <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`text-muted-foreground hover:text-foreground ${isBookmarked ? 'text-primary' : ''}`}
+                        onClick={handleBookmarkClick}
+                      >
+                        <Star className={`w-4 h-4 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{bookmarkTooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 ) : null}
               </div>
             </div>
