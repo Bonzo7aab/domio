@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Clock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { notifyContestBidStatusChanged } from '../../utils/contestBidStatusEvents';
 import {
   Dialog,
   DialogContent,
@@ -264,6 +265,7 @@ export function ContestOfferSubmissionDialog({
       }
       toast.success('Szkic oferty został zapisany');
       setHasExistingDraft(true);
+      notifyContestBidStatusChanged({ tenderId, status: 'draft' });
       onDraftSaved?.();
     } finally {
       setIsSavingDraft(false);
@@ -283,6 +285,7 @@ export function ContestOfferSubmissionDialog({
       }
       toast.success('Szkic oferty został odrzucony');
       setShowAbandonDialog(false);
+      notifyContestBidStatusChanged({ tenderId, status: 'none' });
       onDraftAbandoned?.();
       onClose();
     } finally {
@@ -315,7 +318,13 @@ export function ContestOfferSubmissionDialog({
         toast.error(error.message);
         return;
       }
-      toast.success('Oferta została wysłana do sejfu');
+      toast.success('Oferta wysłana', {
+        classNames: {
+          toast: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+          title: 'text-emerald-800',
+        },
+      });
+      notifyContestBidStatusChanged({ tenderId, status: 'submitted' });
       onSubmitted?.();
       onClose();
     } finally {

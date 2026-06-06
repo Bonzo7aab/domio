@@ -196,28 +196,26 @@ export function UserAccountPageClient({
                     </span>
                   </div>
                   {user.userType === 'contractor' && (
-                    <div className="flex items-center gap-1">
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 font-medium rounded-full border px-2 py-0.5 text-xs',
+                        verificationStatusBadgeClass(verificationStatus.state),
+                      )}
+                    >
                       {verificationStatus.state === 'approved' && (
-                        <ShieldCheck className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-success" />
+                        <ShieldCheck className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                       )}
                       {verificationStatus.state === 'pending' && (
-                        <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-amber-600" />
+                        <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                       )}
                       {verificationStatus.state === 'rejected' && (
-                        <ShieldX className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0 text-destructive" />
+                        <ShieldX className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                       )}
                       {verificationStatus.state === 'unsubmitted' && (
                         <VerificationAttentionIcon className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
                       )}
-                      <span
-                        className={cn(
-                          'font-medium rounded-full border px-2 py-0.5 text-xs',
-                          verificationStatusBadgeClass(verificationStatus.state),
-                        )}
-                      >
-                        {verificationStatusLabel(verificationStatus.state)}
-                      </span>
-                    </div>
+                      {verificationStatusLabel(verificationStatus.state)}
+                    </span>
                   )}
                 </div>
               </div>

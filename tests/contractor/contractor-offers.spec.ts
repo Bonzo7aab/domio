@@ -1017,7 +1017,7 @@ test.describe('Contractor Making Offers', () => {
         await dialog.getByRole('button', { name: /wyślij ofertę do sejfu/i }).click();
 
         await expect(
-          page.locator('[data-sonner-toast]').filter({ hasText: /oferta została wysłana do sejfu/i }).first(),
+          page.locator('[data-sonner-toast]').filter({ hasText: /oferta wysłana/i }).first(),
         ).toBeVisible({ timeout: 20000 });
       } finally {
         await cleanupTestData(testData.jobIds, testData.tenderIds, testData.companyIds, testData.userEmails);

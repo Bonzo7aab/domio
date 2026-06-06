@@ -160,6 +160,10 @@ function resolveDocHighlightStatus(
   if (existing) {
     const review = reviewByKey[existing.key] ?? null;
     const state = deriveDocumentReviewState(existing, review);
+    // Optional documents are not part of verification acceptance — no status badge when approved.
+    if (!doc.required && state === 'approved') {
+      return null;
+    }
     if (state === 'approved' || state === 'rejected' || state === 'stale') {
       return state;
     }
@@ -210,14 +214,10 @@ function VerificationStateBanner({ status, onAction }: StateBannerProps) {
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div className="space-y-1">
-              <Badge className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
-                Zaakceptowano
-              </Badge>
               <h3 className="text-xl font-semibold text-emerald-700">Konto zweryfikowane</h3>
               <p className="text-sm text-muted-foreground">
-                Twoja firma została zweryfikowana przez administratora. Otrzymujesz oznaczenie
-                &quot;Zweryfikowany&quot; w profilu publicznym oraz lepszą widoczność w wynikach
-                wyszukiwania.
+                Twoja firma została zweryfikowana przez administratora, otrzymujesz oznaczenie
+                &quot;Zweryfikowany&quot;
               </p>
             </div>
           </div>
@@ -324,6 +324,45 @@ interface DocumentsCollapsibleSectionProps {
   required?: boolean;
   highlightStatus?: DocHighlightStatus | null;
   children: React.ReactNode;
+}
+
+interface DocumentsSectionGroupProps {
+  heading: string;
+  description?: string;
+  variant?: 'required' | 'optional';
+  children: React.ReactNode;
+}
+
+function DocumentsSectionGroup({
+  heading,
+  description,
+  variant = 'required',
+  children,
+}: DocumentsSectionGroupProps) {
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <div
+        className={cn(
+          'border-b px-4 py-4 sm:px-6',
+          variant === 'required' ? 'bg-primary/5' : 'bg-muted/30',
+        )}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">{heading}</h3>
+          <Badge
+            variant={variant === 'required' ? 'secondary' : 'outline'}
+            className="text-[10px] font-medium uppercase"
+          >
+            {variant === 'required' ? 'Wymagane' : 'Opcjonalne'}
+          </Badge>
+        </div>
+        {description ? (
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+      <div>{children}</div>
+    </div>
+  );
 }
 
 function DocumentsCollapsibleSection({
@@ -1037,7 +1076,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
         id={doc.type === 'insurance' && isContractor && !hideHeader ? 'oc-policy' : undefined}
         className={cn(
           reviewState === 'rejected' && 'bg-destructive/[0.03]',
-          reviewState === 'approved' && existing && 'bg-emerald-500/[0.03]',
+          reviewState === 'approved' && existing && doc.required && 'bg-emerald-500/[0.03]',
         )}
       >
         {hideHeader ? (
@@ -1294,8 +1333,10 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {status === 'approved' && embedded
-                          ? 'Konto jest zweryfikowane. Możesz uzupełniać opcjonalne dokumenty (referencje, certyfikaty) i aktualizować zaświadczenia.'
-                          : 'Zweryfikowane konto buduje zaufanie i poprawia widoczność w wynikach. Weryfikacja jest bezpłatna i trwa zwykle 1–3 dni robocze.'}
+                          ? 'Konto jest zweryfikowane. Uzupełnij wymagane zaświadczenia w pierwszej sekcji oraz opcjonalne dokumenty w drugiej.'
+                          : useContractorDocumentSections
+                            ? 'Uzupełnij dokumenty wymagane do weryfikacji, a następnie — opcjonalnie — certyfikaty i referencje. Weryfikacja jest bezpłatna i trwa zwykle 1–3 dni robocze.'
+                            : 'Zweryfikowane konto buduje zaufanie i poprawia widoczność w wynikach. Weryfikacja jest bezpłatna i trwa zwykle 1–3 dni robocze.'}
                       </p>
                       {existingDocuments.length > 0 && !(status === 'approved' && embedded) && (
                         <p className="mt-2 text-xs text-muted-foreground">
@@ -1355,121 +1396,129 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 
               <div
                 className={cn(
-                  useContractorDocumentSections && 'overflow-hidden rounded-lg border',
+                  useContractorDocumentSections && 'space-y-6',
                 )}
               >
                 {useContractorDocumentSections && userId ? (
                   <>
-                    {documents
-                      .filter(doc => doc.type === 'company_registration')
-                      .map(doc => (
-                        <DocumentsCollapsibleSection
-                          key={doc.type}
-                          heading={doc.name}
-                          description={doc.description}
-                          required
-                          highlightStatus={getDocHighlightStatus(doc)}
-                        >
-                          {renderContractorDocumentRow(doc, {
-                            nestedInSectionShell: true,
-                            hideHeader: true,
-                          })}
-                        </DocumentsCollapsibleSection>
-                      ))}
-                    <DocumentsCollapsibleSection
-                      eyebrow="Sekcja A"
-                      heading="Polisa OC (odpowiedzialność cywilna)"
-                      id="oc-policy"
-                      required
-                      highlightStatus={getDocHighlightStatus(
-                        documents.find(d => d.type === 'insurance') ?? {
-                          type: 'insurance',
-                          required: true,
-                        },
-                      )}
+                    <DocumentsSectionGroup
+                      variant="required"
+                      heading="Dokumenty wymagane do weryfikacji"
+                      description="KRS/CEIDG, polisa OC i zaświadczenia urzędowe — potrzebne do zatwierdzenia konta."
                     >
-                      {visibleDocuments
-                        .filter(doc => doc.type === 'insurance')
-                        .map(doc =>
-                          renderContractorDocumentRow(doc, {
-                            nestedInSectionShell: true,
-                            hideHeader: true,
-                          }),
+                      {documents
+                        .filter(doc => doc.type === 'company_registration')
+                        .map(doc => (
+                          <DocumentsCollapsibleSection
+                            key={doc.type}
+                            heading={doc.name}
+                            description={doc.description}
+                            required
+                            highlightStatus={getDocHighlightStatus(doc)}
+                          >
+                            {renderContractorDocumentRow(doc, {
+                              nestedInSectionShell: true,
+                              hideHeader: true,
+                            })}
+                          </DocumentsCollapsibleSection>
+                        ))}
+                      <DocumentsCollapsibleSection
+                        heading="Polisa OC (odpowiedzialność cywilna)"
+                        id="oc-policy"
+                        required
+                        highlightStatus={getDocHighlightStatus(
+                          documents.find(d => d.type === 'insurance') ?? {
+                            type: 'insurance',
+                            required: true,
+                          },
                         )}
-                    </DocumentsCollapsibleSection>
-                    <DocumentsCollapsibleSection
-                      eyebrow="Sekcja B"
-                      heading="Zaświadczenia urzędowe: ZUS i US"
-                      description="Zarządcy wymagają dokumentów nie starszych niż 3 miesiące."
+                      >
+                        {visibleDocuments
+                          .filter(doc => doc.type === 'insurance')
+                          .map(doc =>
+                            renderContractorDocumentRow(doc, {
+                              nestedInSectionShell: true,
+                              hideHeader: true,
+                            }),
+                          )}
+                      </DocumentsCollapsibleSection>
+                      <DocumentsCollapsibleSection
+                        heading="Zaświadczenia urzędowe: ZUS i US"
+                        description="Zarządcy wymagają dokumentów nie starszych niż 3 miesiące."
+                      >
+                        <ContractorOfficialCertificatesSettings userId={userId} />
+                      </DocumentsCollapsibleSection>
+                    </DocumentsSectionGroup>
+                    <DocumentsSectionGroup
+                      variant="optional"
+                      heading="Dokumenty opcjonalne"
+                      description="Certyfikaty, referencje i dodatkowe załączniki — zwiększają wiarygodność, ale nie blokują weryfikacji konta."
                     >
-                      <ContractorOfficialCertificatesSettings userId={userId} />
-                    </DocumentsCollapsibleSection>
-                    <DocumentsCollapsibleSection
-                      eyebrow="Sekcja C"
-                      heading="Certyfikaty i zadeklarowane uprawnienia"
-                      highlightStatus={getDocHighlightStatus(
-                        documents.find(d => d.type === 'certifications') ?? {
-                          type: 'certifications',
-                          required: false,
-                        },
-                      )}
-                    >
-                      {visibleDocuments
-                        .filter(doc => doc.type === 'certifications')
-                        .map(doc =>
-                          renderContractorDocumentRow(doc, {
-                            nestedInSectionShell: true,
-                            hideHeader: true,
-                          }),
+                      <DocumentsCollapsibleSection
+                        heading="Certyfikaty i zadeklarowane uprawnienia"
+                        highlightStatus={getDocHighlightStatus(
+                          documents.find(d => d.type === 'certifications') ?? {
+                            type: 'certifications',
+                            required: false,
+                          },
                         )}
-                      <div className="mt-6 space-y-3 border-t border-border pt-5">
-                        <div>
-                          <h4 className="text-sm font-semibold text-foreground">
-                            Typy uprawnień w profilu
-                          </h4>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Zaznacz kategorie zgodne z dokumentami i zapisz listę — ułatwia to
-                            weryfikację.
-                          </p>
+                      >
+                        {visibleDocuments
+                          .filter(doc => doc.type === 'certifications')
+                          .map(doc =>
+                            renderContractorDocumentRow(doc, {
+                              nestedInSectionShell: true,
+                              hideHeader: true,
+                            }),
+                          )}
+                        <div className="mt-6 space-y-3 border-t border-border pt-5">
+                          <div>
+                            <h4 className="text-sm font-semibold text-foreground">
+                              Typy uprawnień w profilu
+                            </h4>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Zaznacz kategorie zgodne z dokumentami i zapisz listę — ułatwia to
+                              weryfikację.
+                            </p>
+                          </div>
+                          <ContractorProfessionalQualificationsChecklist userId={userId} />
                         </div>
-                        <ContractorProfessionalQualificationsChecklist userId={userId} />
-                      </div>
-                    </DocumentsCollapsibleSection>
-                    <DocumentsCollapsibleSection
-                      eyebrow="Sekcja D"
-                      heading="Referencje i dodatkowy skan kwalifikacji"
-                      highlightStatus={getDocHighlightStatus(
-                        documents.find(d => d.type === 'references') ?? {
-                          type: 'references',
-                          required: false,
-                        },
-                      )}
-                    >
-                      {visibleDocuments
-                        .filter(doc => doc.type === 'references')
-                        .map(doc =>
-                          renderContractorDocumentRow(doc, {
-                            nestedInSectionShell: true,
-                            hideHeader: true,
-                          }),
+                      </DocumentsCollapsibleSection>
+                      <DocumentsCollapsibleSection
+                        heading="Referencje i dodatkowy skan kwalifikacji"
+                        highlightStatus={getDocHighlightStatus(
+                          documents.find(d => d.type === 'references') ?? {
+                            type: 'references',
+                            required: false,
+                          },
                         )}
-                      <div className="mt-6 space-y-3 border-t border-border pt-5">
-                        <div>
-                          <h4 className="text-sm font-semibold text-foreground">
-                            Skan certyfikatu lub licencji (opcjonalnie)
-                          </h4>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Osobny plik uzupełniający certyfikaty z części C — np. skan licencji
-                            branżowej.
-                          </p>
+                      >
+                        {visibleDocuments
+                          .filter(doc => doc.type === 'references')
+                          .map(doc =>
+                            renderContractorDocumentRow(doc, {
+                              nestedInSectionShell: true,
+                              hideHeader: true,
+                            }),
+                          )}
+                        <div className="mt-6 space-y-3 border-t border-border pt-5">
+                          <div>
+                            <h4 className="text-sm font-semibold text-foreground">
+                              Skan certyfikatu lub licencji (opcjonalnie)
+                            </h4>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Osobny plik uzupełniający certyfikaty powyżej — np. skan licencji
+                              branżowej.
+                            </p>
+                          </div>
+                          <ContractorProfessionalQualificationsSettings
+                            userId={userId}
+                            variant="section"
+                            hideSectionChrome
+                          />
                         </div>
-                        <ContractorProfessionalQualificationsSettings
-                          userId={userId}
-                          variant="section"
-                          hideSectionChrome
-                        />
-                      </div>
-                    </DocumentsCollapsibleSection>
+                      </DocumentsCollapsibleSection>
+                    </DocumentsSectionGroup>
                   </>
                 ) : (
                   visibleDocuments.map(doc => (
