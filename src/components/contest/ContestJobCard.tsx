@@ -4,7 +4,6 @@ import React from 'react';
 import {
   Building2,
   CalendarClock,
-  ChevronRight,
   FileSearch,
   MapPin,
   Star,
@@ -64,43 +63,25 @@ function InlineSep(): React.ReactElement {
   return <span className="text-border shrink-0 select-none" aria-hidden>·</span>;
 }
 
-function CategoryPath({
-  category,
-  subcategory,
-}: {
-  category: string;
-  subcategory?: string;
-}): React.ReactElement {
+function SubcategoryLabel({ subcategory }: { subcategory?: string }): React.ReactElement | null {
   if (!subcategory) {
-    return (
-      <p className="w-fit max-w-full text-xs font-medium text-muted-foreground">{category}</p>
-    );
+    return null;
   }
 
   return (
-    <div
-      className="inline-flex w-fit max-w-full self-start items-stretch overflow-hidden rounded-md border border-border/70 bg-muted/40 text-xs"
-      aria-label={`${category}, ${subcategory}`}
-    >
-      <span className="flex items-center px-2 py-1 font-medium text-foreground whitespace-nowrap">
-        {category}
-      </span>
-      <span className="flex w-px shrink-0 self-stretch bg-border/80" aria-hidden />
-      <span className="flex items-center gap-0.5 px-2 py-1 text-muted-foreground min-w-0 max-w-[14rem]">
-        <ChevronRight className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
-        <span className="truncate">{subcategory}</span>
-      </span>
-    </div>
+    <p className="w-fit max-w-full truncate text-xs font-medium text-muted-foreground">
+      {subcategory}
+    </p>
   );
 }
 
-const FOOTER_ACTION_MIN_H = 'min-h-[3.25rem]';
+const FOOTER_APPLY_BUTTON_CLASS =
+  'h-8 px-3 text-xs font-medium w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground';
 
 export function ContestJobCard({
   job,
   contestStatus,
   submissionDeadline,
-  categoryLabel,
   deadlineDaysRemaining,
   isEndingSoon,
   isExpired = false,
@@ -142,7 +123,7 @@ export function ContestJobCard({
     >
       <CardContent className="p-4 md:p-4 space-y-3">
         {/* Icon + title/status + categories */}
-        <div className="flex items-stretch gap-3">
+        <div className="mb-6 flex items-stretch gap-3">
           <div
             className="flex w-11 shrink-0 items-center justify-center self-stretch rounded-lg bg-primary/10 text-primary"
             aria-hidden
@@ -197,7 +178,7 @@ export function ContestJobCard({
               ) : null}
             </div>
 
-            <CategoryPath category={categoryLabel} subcategory={job.subcategory} />
+            <SubcategoryLabel subcategory={job.subcategory} />
           </div>
         </div>
 
@@ -219,30 +200,24 @@ export function ContestJobCard({
 
         {/* Location */}
         <div className="flex items-center gap-1.5 min-w-0 text-xs text-muted-foreground">
-          <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+          <MapPin className="h-4 w-4 shrink-0" aria-hidden />
           <span className="truncate">{locationLabel}</span>
         </div>
 
         {/* Deadline (with offer count) + apply CTA */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-between pt-1">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between pt-1">
           {submissionDeadline ? (
-            <div
-              className={cn(
-                'flex min-w-0 flex-1 items-center justify-between gap-4 rounded-lg border px-3 py-2.5',
-                FOOTER_ACTION_MIN_H,
-                isEndingSoon ? 'border-orange-200 bg-orange-50/80' : 'border-border bg-muted/30',
-              )}
-            >
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-2.5">
                 <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                 <div className="min-w-0">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground leading-none">
-                    Koniec ofert
+                    Zakończenie zbierania ofert
                   </p>
-                  <p className={cn('mt-1 text-xs font-semibold', isEndingSoon && 'text-orange-900')}>
+                  <p className={cn('mt-1 text-xs font-semibold', isEndingSoon && 'text-orange-700')}>
                     {formatContestSubmissionDeadline(submissionDeadline)}
                     {isEndingSoon && deadlineDaysRemaining !== null ? (
-                      <span className="ml-1 font-normal text-orange-700">
+                      <span className="ml-1 font-normal text-orange-600">
                         ({formatDaysRemaining(deadlineDaysRemaining)})
                       </span>
                     ) : null}
@@ -250,7 +225,7 @@ export function ContestJobCard({
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-1.5 border-l border-border/80 pl-3 text-xs">
+              <div className="flex shrink-0 items-center gap-1.5 text-xs">
                 <Users className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="font-semibold tabular-nums whitespace-nowrap">{offerCount}</span>
                 <span className="text-muted-foreground whitespace-nowrap">ofert</span>
@@ -266,19 +241,12 @@ export function ContestJobCard({
 
           {!isManager && onApplyClick ? (
             <div
-              className={cn(
-                'flex shrink-0 sm:ml-3 sm:self-stretch',
-                FOOTER_ACTION_MIN_H,
-                '[&>div]:flex [&>div]:h-full [&>div]:w-full sm:[&>div]:w-auto',
-              )}
+              className="flex shrink-0 sm:ml-3"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
               <ContestApplyOfferButton
-                className={cn(
-                  'h-full w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-4',
-                  FOOTER_ACTION_MIN_H,
-                )}
+                className={FOOTER_APPLY_BUTTON_CLASS}
                 size="sm"
                 isLoggedIn={isLoggedIn}
                 user={user}

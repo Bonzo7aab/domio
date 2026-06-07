@@ -54,6 +54,7 @@ export default async function OcenaZgloszenPage(): Promise<ReactElement> {
         ratingSummary={ratingSummary}
         reviews={reviews}
         writtenReviews={writtenReviews}
+        cooperationReviewVariant="manager"
         writtenEmptyDescription="Brak wystawionych ocen. Oceń współpracę po wyborze oferty w sekcji Konkursy."
       />
     </div>

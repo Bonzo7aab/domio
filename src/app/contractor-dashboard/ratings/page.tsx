@@ -69,6 +69,7 @@ async function RatingsDataFetcher() {
       ratingSummary={ratingsData.ratingSummary}
       reviews={ratingsData.reviews}
       writtenReviews={ratingsData.writtenReviews}
+      cooperationReviewVariant="contractor"
     />
   );
 }

@@ -12,6 +12,8 @@ import {
   type CooperationReviewVariant,
 } from './CooperationReviewPanel';
 
+export type { CooperationReviewVariant };
+
 interface CooperationReviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -21,7 +23,7 @@ interface CooperationReviewDialogProps {
   counterpartyCompanyName: string;
   /** When true, dialog title is "Ocena współpracy" (edit existing review). */
   isEditing?: boolean;
-  onSubmitted?: () => void;
+  onSubmitted?: (updated: { rating: number; comment: string }) => void;
 }
 
 export function CooperationReviewDialog({
@@ -45,8 +47,8 @@ export function CooperationReviewDialog({
           tenderId={tenderId}
           counterpartyCompanyId={counterpartyCompanyId}
           counterpartyCompanyName={counterpartyCompanyName}
-          onSubmitted={() => {
-            onSubmitted?.();
+          onSubmitted={(updated) => {
+            onSubmitted?.(updated);
             onOpenChange(false);
           }}
         />

@@ -59,7 +59,7 @@ export function ContestApplyOfferButton({
         type="button"
         variant="secondary"
         size={size}
-        className={cn(className, 'group min-w-[9.5rem]')}
+        className={cn('group', className)}
       >
         <Link
           href={CONTRACTOR_OFFERS_PAGE_HREF}

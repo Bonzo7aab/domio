@@ -28,7 +28,7 @@ interface CooperationReviewPanelProps {
   tenderId: string;
   counterpartyCompanyId: string;
   counterpartyCompanyName: string;
-  onSubmitted?: () => void;
+  onSubmitted?: (updated: { rating: number; comment: string }) => void;
 }
 
 export function CooperationReviewPanel({
@@ -119,7 +119,7 @@ export function CooperationReviewPanel({
       }
 
       await loadExisting();
-      onSubmitted?.();
+      onSubmitted?.({ rating, comment: comment.trim() });
     } catch {
       toast.error('Wystąpił błąd podczas zapisywania oceny');
     } finally {

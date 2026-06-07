@@ -293,7 +293,9 @@ export interface WrittenReviewListItem {
   imageUrls: string[];
   createdAt: string;
   counterpartyName: string;
+  counterpartyCompanyId: string;
   jobId: string | null;
+  tenderId: string | null;
 }
 
 export async function fetchReviewsWrittenByUser(
@@ -311,6 +313,8 @@ export async function fetchReviewsWrittenByUser(
       image_urls,
       created_at,
       job_id,
+      tender_id,
+      company_id,
       companies!company_reviews_company_id_fkey ( name )
     `,
     )
@@ -331,7 +335,9 @@ export async function fetchReviewsWrittenByUser(
       imageUrls: Array.isArray(row.image_urls) ? row.image_urls : [],
       createdAt: row.created_at,
       counterpartyName: company?.name || 'Firma',
+      counterpartyCompanyId: row.company_id,
       jobId: row.job_id,
+      tenderId: row.tender_id,
     };
   });
 }

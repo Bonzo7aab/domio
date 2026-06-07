@@ -10,7 +10,9 @@ export interface ManagerReviewListItem {
   imageUrls: string[];
   createdAt: string;
   counterpartyName: string;
+  counterpartyCompanyId: string;
   jobId: string | null;
+  tenderId: string | null;
 }
 
 function mapWrittenReview(row: WrittenReviewListItem): ManagerReviewListItem {
@@ -22,7 +24,9 @@ function mapWrittenReview(row: WrittenReviewListItem): ManagerReviewListItem {
     imageUrls: row.imageUrls,
     createdAt: row.createdAt,
     counterpartyName: row.counterpartyName,
+    counterpartyCompanyId: row.counterpartyCompanyId,
     jobId: row.jobId,
+    tenderId: row.tenderId,
   };
 }
 
