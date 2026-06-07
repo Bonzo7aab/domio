@@ -9,15 +9,16 @@ import type {
   ResolvedContractorDocument,
 } from '../../types/contest-offer';
 import type { ContestOfferFieldErrors } from '../../lib/database/contest-offers';
-import { countFormalRequirementsProgress } from '../../lib/database/contest-offers';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { cn } from '../ui/utils';
 import { ContestOfferFormalDocBlock } from './ContestOfferFormalDocBlock';
-import { ContestOfferFieldError, fieldErrorInputClass } from './ContestOfferFieldError';
+import {
+  ContestOfferFieldError,
+  ContestOfferOptionalLabel,
+  ContestOfferRequiredLabel,
+  fieldErrorInputClass,
+} from './ContestOfferFieldError';
 
 interface ContestOfferStepFormalProps {
   form: ContestOfferFormData;
@@ -45,34 +46,9 @@ export function ContestOfferStepFormal({
   onRemoveExtra,
 }: ContestOfferStepFormalProps): ReactElement {
   const otherFileRef = useRef<HTMLInputElement>(null);
-  const { completed, total } = countFormalRequirementsProgress(form, contestInfo);
-  const allComplete = total > 0 && completed === total;
 
   return (
-    <div className="space-y-4">
-      {total > 0 ? (
-        <div
-          className={cn(
-            'rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2',
-            allComplete
-              ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-950/20'
-              : 'border-amber-200 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20',
-          )}
-        >
-          <p className="text-sm font-medium">
-            Dokumenty formalne: {completed} z {total} gotowych
-          </p>
-          <Badge variant={allComplete ? 'default' : 'secondary'}>
-            {allComplete ? 'Komplet' : 'Do uzupełnienia'}
-          </Badge>
-        </div>
-      ) : null}
-
-      <p className="text-sm text-muted-foreground">
-        Wymagane dokumenty uzupełniają się automatycznie z profilu, jeśli są dostępne. Możesz je
-        usunąć, zastąpić lub wgrać brakujące pliki.
-      </p>
-
+    <div className="space-y-6">
       {resolvedDocs
         .filter((doc) => doc.requirementKey !== 'references')
         .map((doc) => (
@@ -89,67 +65,51 @@ export function ContestOfferStepFormal({
         ))}
 
       {contestInfo.formalRequirements.references ? (
-        <Card
-          className={cn(fieldErrors.referencesText && 'border-destructive bg-destructive/5')}
-        >
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-base">Referencje</CardTitle>
-            <Badge>Wymagane</Badge>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {contestInfo.formalRequirementLines
-              .filter((l) => l.toLowerCase().includes('referenc'))
-              .map((line) => (
-                <p key={line} className="text-xs text-muted-foreground">
-                  {line}
-                </p>
-              ))}
-            <Label htmlFor="contest-offer-referencesText" className="sr-only">
-              Wykaz zrealizowanych prac
-            </Label>
-            <Textarea
-              id="contest-offer-referencesText"
-              rows={5}
-              value={form.referencesText}
-              onChange={(e) => onPatch({ referencesText: e.target.value })}
-              placeholder="Opisz zrealizowane projekty, zakres prac, lokalizację…"
-              className={fieldErrorInputClass(Boolean(fieldErrors.referencesText))}
-              aria-invalid={Boolean(fieldErrors.referencesText)}
-            />
-            <ContestOfferFieldError message={fieldErrors.referencesText} />
-          </CardContent>
-        </Card>
+        <div>
+          <ContestOfferRequiredLabel htmlFor="contest-offer-referencesText">
+            Referencje — wykaz zrealizowanych prac
+          </ContestOfferRequiredLabel>
+          <Textarea
+            id="contest-offer-referencesText"
+            rows={5}
+            value={form.referencesText}
+            onChange={(e) => onPatch({ referencesText: e.target.value })}
+            placeholder="Opisz zrealizowane projekty, zakres prac, lokalizację…"
+            className={cn('mt-1.5', fieldErrorInputClass(Boolean(fieldErrors.referencesText)))}
+            aria-invalid={Boolean(fieldErrors.referencesText)}
+          />
+          <ContestOfferFieldError message={fieldErrors.referencesText} />
+        </div>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Inne załączniki</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">Opcjonalne dodatkowe pliki do oferty.</p>
-          {form.extraAttachments.length > 0 ? (
+      <div>
+        <ContestOfferOptionalLabel>Inne załączniki</ContestOfferOptionalLabel>
+        <div className="mt-3 space-y-3">
+          {form.extraAttachments.filter((a) => a.requirementKey !== 'deposit').length > 0 ? (
             <ul className="space-y-2">
-              {form.extraAttachments.map((att) => (
-                <li
-                  key={att.id}
-                  className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <FileText className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{att.name}</span>
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 h-8 w-8"
-                    aria-label={`Usuń ${att.name}`}
-                    onClick={() => onRemoveExtra(att.id)}
+              {form.extraAttachments
+                .filter((a) => a.requirementKey !== 'deposit')
+                .map((att) => (
+                  <li
+                    key={att.id}
+                    className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
+                    <span className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{att.name}</span>
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-8 w-8"
+                      aria-label={`Usuń ${att.name}`}
+                      onClick={() => onRemoveExtra(att.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </li>
+                ))}
             </ul>
           ) : null}
           {form.stagedFiles.other?.[0] ? (
@@ -177,8 +137,8 @@ export function ContestOfferStepFormal({
             <Upload className="h-4 w-4" />
             Dodaj załącznik
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

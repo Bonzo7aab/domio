@@ -63,13 +63,14 @@ import {
 } from '../../lib/contest-offer/resolve-contractor-documents';
 import { resolveContractorDocuments } from '../../lib/contest-offer/resolve-contractor-documents-actions';
 import { ContestOfferWizardStepper } from './ContestOfferWizardStepper';
-import { ContestOfferStepOverview } from './ContestOfferStepOverview';
+import { ContestOfferContextPanel } from './ContestOfferContextPanel';
+import { ContestOfferStepBasic } from './ContestOfferStepBasic';
 import { ContestOfferStepSchedule } from './ContestOfferStepSchedule';
 import { ContestOfferStepFormal } from './ContestOfferStepFormal';
 import { ContestOfferStepFinancial } from './ContestOfferStepFinancial';
 
 const STEP_LABELS = [
-  'Informacje',
+  'Informacje podstawowe',
   'Harmonogram',
   'Wymogi',
   'Warunki',
@@ -431,7 +432,7 @@ export function ContestOfferSubmissionDialog({
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
             <span>
-              Czas na złożenie:{' '}
+              Czas na złożenie oferty:{' '}
               <span className="font-medium text-foreground">
                 {contestCountdownLabel(contestInfo.submissionDeadline)}
               </span>
@@ -442,9 +443,18 @@ export function ContestOfferSubmissionDialog({
             totalSteps={totalSteps}
             labels={STEP_LABELS}
           />
+          {!isLoading ? (
+            <ContestOfferContextPanel
+              currentStep={currentStep}
+              description={description}
+              category={category}
+              subcategory={subcategory}
+              contestInfo={contestInfo}
+            />
+          ) : null}
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -452,11 +462,10 @@ export function ContestOfferSubmissionDialog({
           ) : (
             <>
               {currentStep === 1 && (
-                <ContestOfferStepOverview
-                  description={description}
-                  category={category}
-                  subcategory={subcategory}
-                  contestInfo={contestInfo}
+                <ContestOfferStepBasic
+                  form={form}
+                  onStageFile={(file) => stageFile('other', file)}
+                  onRemoveExtra={removeExtraAttachment}
                 />
               )}
               {currentStep === 2 && (

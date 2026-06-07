@@ -1,6 +1,7 @@
 'use client';
 
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
+import { Label } from '../ui/label';
 import { cn } from '../ui/utils';
 
 interface ContestOfferFieldErrorProps {
@@ -23,4 +24,44 @@ export function ContestOfferFieldError({
 
 export function fieldErrorInputClass(hasError: boolean): string {
   return hasError ? 'border-destructive focus-visible:ring-destructive/30' : '';
+}
+
+interface ContestOfferRequiredLabelProps {
+  htmlFor?: string;
+  children: ReactNode;
+  className?: string;
+}
+
+export function ContestOfferRequiredLabel({
+  htmlFor,
+  children,
+  className,
+}: ContestOfferRequiredLabelProps): ReactElement {
+  return (
+    <Label htmlFor={htmlFor} className={cn('text-sm font-semibold text-foreground', className)}>
+      {children}
+      <span className="ml-1 text-destructive" aria-hidden="true">
+        *
+      </span>
+    </Label>
+  );
+}
+
+interface ContestOfferOptionalLabelProps {
+  htmlFor?: string;
+  children: ReactNode;
+  className?: string;
+}
+
+export function ContestOfferOptionalLabel({
+  htmlFor,
+  children,
+  className,
+}: ContestOfferOptionalLabelProps): ReactElement {
+  return (
+    <Label htmlFor={htmlFor} className={cn('text-sm font-medium text-foreground', className)}>
+      {children}
+      <span className="ml-1.5 text-xs font-normal text-muted-foreground">(opcjonalnie)</span>
+    </Label>
+  );
 }
