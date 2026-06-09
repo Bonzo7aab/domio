@@ -27,7 +27,7 @@ const nextConfig = {
       { source: '/contractor-dashboard/projects/:path*', destination: '/panel-wykonawcy/projekty/:path*' },
       { source: '/contractor-dashboard/projects', destination: '/panel-wykonawcy/projekty' },
       { source: '/auth/update-password', destination: '/auth/aktualizacja-hasla' },
-    ] as const;
+    ];
 
     const polishRouteRedirects = [
       ['account', 'konto'],
@@ -57,7 +57,7 @@ const nextConfig = {
       ['verification', 'weryfikacja'],
       ['welcome', 'powitanie'],
       ['contest-questions', 'pytania-konkursu'],
-    ] as const;
+    ];
 
     return [
       {
