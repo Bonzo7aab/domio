@@ -4,10 +4,12 @@ import { createTestUser, deleteTestUser } from './auth-helpers';
 import { createTestCompany } from './offer-helpers';
 import { upsertUserCompany } from '../../src/lib/database/companies';
 import { TEST_USER_PREFIX } from '../config/constants';
+import { resolveSupabaseEnvForApp } from './supabase-env';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const POOL_FILE_PATH = path.join(__dirname, '..', '.test-user-pool.json');
+const POOL_SIZE = 3;
 
 export interface PoolUser {
   email: string;
@@ -22,14 +24,8 @@ export interface UserPool {
   managers: PoolUser[];
 }
 
-/**
- * Creates a Supabase admin client for test data management
- */
 function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey =
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url: supabaseUrl, serviceRoleKey } = resolveSupabaseEnvForApp();
 
   if (!supabaseUrl) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
@@ -47,21 +43,10 @@ function createAdminClient() {
   });
 }
 
-/**
- * Saves the user pool to a JSON file
- */
 function savePool(pool: UserPool): void {
-  try {
-    fs.writeFileSync(POOL_FILE_PATH, JSON.stringify(pool, null, 2), 'utf-8');
-  } catch (error) {
-    console.error('Error saving user pool:', error);
-    throw error;
-  }
+  fs.writeFileSync(POOL_FILE_PATH, JSON.stringify(pool, null, 2), 'utf-8');
 }
 
-/**
- * Loads the user pool from a JSON file
- */
 export function loadPool(): UserPool | null {
   try {
     if (!fs.existsSync(POOL_FILE_PATH)) {
@@ -70,142 +55,228 @@ export function loadPool(): UserPool | null {
     const content = fs.readFileSync(POOL_FILE_PATH, 'utf-8');
     return JSON.parse(content) as UserPool;
   } catch (error) {
-    console.error('Error loading user pool:', error);
+    console.warn('Error loading user pool:', error);
     return null;
   }
 }
 
-/**
- * Initializes the test user pool with contractors and managers
- */
-export async function initializePool(): Promise<UserPool> {
-  // Clean up any existing pool users first
-  await cleanupPool();
-
-  const pool: UserPool = {
-    contractors: [],
-    managers: [],
-  };
-
-  // Create 3 contractor users with companies
-  for (let i = 1; i <= 3; i++) {
-    const email = `${TEST_USER_PREFIX}pool-contractor-${i}@example.com`;
-    const password = 'TestPassword123!';
-
-    try {
-      const user = await createTestUser(email, password, 'contractor', {
-        firstName: `Pool`,
-        lastName: `Contractor ${i}`,
-      });
-
-      const company = await createTestCompany(user.id, {
-        name: `Pool Contractor Company ${i}`,
-      });
-
-      pool.contractors.push({
-        email,
-        password,
-        userId: user.id,
-        companyId: company.id,
-        userType: 'contractor',
-      });
-
-      console.log(`✓ Created pool contractor ${i}: ${email}`);
-    } catch (error) {
-      console.error(`Error creating pool contractor ${i}:`, error);
-      throw error;
-    }
-  }
-
-  // Create 3 manager users with companies
-  for (let i = 1; i <= 3; i++) {
-    const email = `${TEST_USER_PREFIX}pool-manager-${i}@example.com`;
-    const password = 'TestPassword123!';
-
-    try {
-      const user = await createTestUser(email, password, 'manager', {
-        firstName: `Pool`,
-        lastName: `Manager ${i}`,
-      });
-
-      const adminClient = createAdminClient();
-
-      // Create company for manager using upsertUserCompany
-      const { data: company, error: companyError } = await upsertUserCompany(adminClient, user.id, {
-        name: `Pool Manager Company ${i}`,
-        type: 'spółdzielnia',
-        city: 'Warszawa',
-        address: `ul. Pool Manager ${i}`,
-        phone: '+48123456789',
-        email: `pool-manager-company-${i}@example.com`,
-      });
-
-      if (companyError || !company || !company.id) {
-        await deleteTestUser(email);
-        throw new Error(`Failed to create manager company: ${companyError?.message || 'Company was not created'}`);
-      }
-
-      // Verify company actually exists in database
-      const { data: verifyCompany, error: verifyError } = await adminClient
-        .from('companies')
-        .select('id')
-        .eq('id', company.id)
-        .single();
-
-      if (verifyError || !verifyCompany) {
-        await deleteTestUser(email);
-        throw new Error(`Manager company was created but could not be verified: ${verifyError?.message || 'Company not found'}`);
-      }
-
-      pool.managers.push({
-        email,
-        password,
-        userId: user.id,
-        companyId: company.id,
-        userType: 'manager',
-      });
-
-      console.log(`✓ Created pool manager ${i}: ${email}`);
-    } catch (error) {
-      console.error(`Error creating pool manager ${i}:`, error);
-      throw error;
-    }
-  }
-
-  // Save pool to file
-  savePool(pool);
-  console.log(`✓ User pool initialized with ${pool.contractors.length} contractors and ${pool.managers.length} managers`);
-
-  return pool;
+function isAlreadyRegisteredError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes('already been registered')
+  );
 }
 
-/**
- * Verifies that a pool user's company exists in the database
- */
+async function resolveExistingPoolUser(
+  email: string,
+  password: string,
+  userType: 'contractor' | 'manager',
+): Promise<PoolUser> {
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient.auth.signInWithPassword({ email, password });
+
+  if (error || !data.user) {
+    throw new Error(`Failed to resolve existing pool user ${email}: ${error?.message ?? 'No user'}`);
+  }
+
+  const { data: relation } = await adminClient
+    .from('user_companies')
+    .select('company_id')
+    .eq('user_id', data.user.id)
+    .eq('is_primary', true)
+    .maybeSingle();
+
+  return {
+    email,
+    password,
+    userId: data.user.id,
+    companyId: relation?.company_id ?? undefined,
+    userType,
+  };
+}
+
 async function verifyPoolUserCompany(poolUser: PoolUser): Promise<boolean> {
   if (!poolUser.companyId) {
     return false;
   }
 
-  try {
-    const adminClient = createAdminClient();
-    const { data, error } = await adminClient
-      .from('companies')
-      .select('id')
-      .eq('id', poolUser.companyId)
-      .single();
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient
+    .from('companies')
+    .select('id')
+    .eq('id', poolUser.companyId)
+    .single();
 
-    return !error && !!data;
-  } catch {
+  return !error && !!data;
+}
+
+async function verifyPoolUserCredentials(poolUser: PoolUser): Promise<boolean> {
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.signInWithPassword({
+    email: poolUser.email,
+    password: poolUser.password,
+  });
+  return !error;
+}
+
+async function isPoolHealthy(pool: UserPool): Promise<boolean> {
+  if (pool.contractors.length < POOL_SIZE || pool.managers.length < POOL_SIZE) {
     return false;
+  }
+
+  for (const user of [...pool.contractors, ...pool.managers]) {
+    if (!(await verifyPoolUserCredentials(user))) {
+      return false;
+    }
+    if (!(await verifyPoolUserCompany(user))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function createPoolContractor(index: number): Promise<PoolUser> {
+  const email = `${TEST_USER_PREFIX}pool-contractor-${index}@example.com`;
+  const password = 'TestPassword123!';
+
+  try {
+    const user = await createTestUser(email, password, 'contractor', {
+      firstName: 'Pool',
+      lastName: `Contractor ${index}`,
+    });
+    const company = await createTestCompany(user.id, {
+      name: `Pool Contractor Company ${index}`,
+    });
+
+    return {
+      email,
+      password,
+      userId: user.id,
+      companyId: company.id,
+      userType: 'contractor',
+    };
+  } catch (error) {
+    if (!isAlreadyRegisteredError(error)) {
+      throw error;
+    }
+
+    const existing = await resolveExistingPoolUser(email, password, 'contractor');
+    if (!existing.companyId) {
+      const company = await createTestCompany(existing.userId, {
+        name: `Pool Contractor Company ${index}`,
+      });
+      existing.companyId = company.id;
+    }
+    return existing;
+  }
+}
+
+async function createPoolManager(index: number): Promise<PoolUser> {
+  const email = `${TEST_USER_PREFIX}pool-manager-${index}@example.com`;
+  const password = 'TestPassword123!';
+
+  try {
+    const user = await createTestUser(email, password, 'manager', {
+      firstName: 'Pool',
+      lastName: `Manager ${index}`,
+    });
+
+    const adminClient = createAdminClient();
+    const { data: company, error: companyError } = await upsertUserCompany(adminClient, user.id, {
+      name: `Pool Manager Company ${index}`,
+      type: 'spółdzielnia',
+      city: 'Warszawa',
+      address: `ul. Pool Manager ${index}`,
+      phone: '+48123456789',
+      email: `pool-manager-company-${index}@example.com`,
+    });
+
+    if (companyError || !company?.id) {
+      await deleteTestUser(email).catch(() => undefined);
+      throw new Error(`Failed to create manager company: ${companyError?.message ?? 'Unknown error'}`);
+    }
+
+    return {
+      email,
+      password,
+      userId: user.id,
+      companyId: company.id,
+      userType: 'manager',
+    };
+  } catch (error) {
+    if (!isAlreadyRegisteredError(error)) {
+      throw error;
+    }
+
+    const existing = await resolveExistingPoolUser(email, password, 'manager');
+    if (!existing.companyId) {
+      const adminClient = createAdminClient();
+      const { data: company, error: companyError } = await upsertUserCompany(
+        adminClient,
+        existing.userId,
+        {
+          name: `Pool Manager Company ${index}`,
+          type: 'spółdzielnia',
+          city: 'Warszawa',
+          address: `ul. Pool Manager ${index}`,
+          phone: '+48123456789',
+          email: `pool-manager-company-${index}@example.com`,
+        },
+      );
+
+      if (companyError || !company?.id) {
+        throw new Error(`Failed to ensure manager company: ${companyError?.message ?? 'Unknown error'}`);
+      }
+
+      existing.companyId = company.id;
+    }
+
+    return existing;
   }
 }
 
 /**
- * Gets a contractor from the pool (round-robin selection)
- * Validates that the company exists before returning
- * Throws error if company is invalid (pool needs reinitialization)
+ * Reuses a healthy on-disk pool or creates/recovers pool users without destructive cleanup.
  */
+export async function ensurePool(): Promise<UserPool | null> {
+  const existing = loadPool();
+  if (existing && (await isPoolHealthy(existing))) {
+    console.log('✓ Reusing existing test user pool');
+    return existing;
+  }
+
+  const pool: UserPool = { contractors: [], managers: [] };
+
+  for (let i = 1; i <= POOL_SIZE; i++) {
+    const contractor = await createPoolContractor(i);
+    pool.contractors.push(contractor);
+    console.log(`✓ Pool contractor ${i} ready: ${contractor.email}`);
+  }
+
+  for (let i = 1; i <= POOL_SIZE; i++) {
+    const manager = await createPoolManager(i);
+    pool.managers.push(manager);
+    console.log(`✓ Pool manager ${i} ready: ${manager.email}`);
+  }
+
+  savePool(pool);
+  console.log(
+    `✓ User pool ready with ${pool.contractors.length} contractors and ${pool.managers.length} managers`,
+  );
+
+  return pool;
+}
+
+/** @deprecated Use ensurePool() — kept for backwards compatibility */
+export async function initializePool(): Promise<UserPool> {
+  const pool = await ensurePool();
+  if (!pool) {
+    throw new Error('Failed to initialize user pool');
+  }
+  return pool;
+}
+
 export async function getPoolContractor(index?: number): Promise<PoolUser | null> {
   const pool = loadPool();
   if (!pool || pool.contractors.length === 0) {
@@ -215,24 +286,16 @@ export async function getPoolContractor(index?: number): Promise<PoolUser | null
   const idx = index !== undefined ? index % pool.contractors.length : 0;
   const contractor = pool.contractors[idx];
 
-  // Verify company exists
   const isValid = await verifyPoolUserCompany(contractor);
   if (!isValid) {
     throw new Error(
-      `Pool contractor ${contractor.email} has invalid company_id (${contractor.companyId}). ` +
-      `The pool needs to be reinitialized. This usually means companies were deleted. ` +
-      `Run global setup again or check database state.`
+      `Pool contractor ${contractor.email} has invalid company_id (${contractor.companyId}). Re-run global setup.`,
     );
   }
 
   return contractor;
 }
 
-/**
- * Gets a manager from the pool (round-robin selection)
- * Validates that the company exists before returning
- * Throws error if company is invalid (pool needs reinitialization)
- */
 export async function getPoolManager(index?: number): Promise<PoolUser | null> {
   const pool = loadPool();
   if (!pool || pool.managers.length === 0) {
@@ -242,22 +305,16 @@ export async function getPoolManager(index?: number): Promise<PoolUser | null> {
   const idx = index !== undefined ? index % pool.managers.length : 0;
   const manager = pool.managers[idx];
 
-  // Verify company exists
   const isValid = await verifyPoolUserCompany(manager);
   if (!isValid) {
     throw new Error(
-      `Pool manager ${manager.email} has invalid company_id (${manager.companyId}). ` +
-      `The pool needs to be reinitialized. This usually means companies were deleted. ` +
-      `Run global setup again or check database state.`
+      `Pool manager ${manager.email} has invalid company_id (${manager.companyId}). Re-run global setup.`,
     );
   }
 
   return manager;
 }
 
-/**
- * Cleans up all pool users
- */
 export async function cleanupPool(): Promise<void> {
   const pool = loadPool();
   if (!pool) {
@@ -265,52 +322,27 @@ export async function cleanupPool(): Promise<void> {
   }
 
   const adminClient = createAdminClient();
-
-  // Delete all pool users and their companies
   const allUsers = [...pool.contractors, ...pool.managers];
+
   for (const user of allUsers) {
     try {
-      // Delete user-company relations first
       if (user.companyId) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (adminClient as any)
-            .from('user_companies')
-            .delete()
-            .eq('company_id', user.companyId);
-        } catch {
-          // Ignore errors if relation doesn't exist
-        }
+        await adminClient.from('user_companies').delete().eq('company_id', user.companyId);
       }
 
-      // Delete the user (this may cascade delete some relations)
       await deleteTestUser(user.email);
 
-      // Delete the company if it exists
       if (user.companyId) {
-        try {
-          await adminClient
-            .from('companies')
-            .delete()
-            .eq('id', user.companyId);
-        } catch {
-          // Ignore errors if company doesn't exist
-        }
+        await adminClient.from('companies').delete().eq('id', user.companyId);
       }
     } catch (error) {
-      console.error(`Error deleting pool user ${user.email}:`, error);
+      console.warn(`Error deleting pool user ${user.email} (non-critical):`, error);
     }
   }
 
-  // Delete pool file
-  try {
-    if (fs.existsSync(POOL_FILE_PATH)) {
-      fs.unlinkSync(POOL_FILE_PATH);
-    }
-  } catch (error) {
-    console.error('Error deleting pool file:', error);
+  if (fs.existsSync(POOL_FILE_PATH)) {
+    fs.unlinkSync(POOL_FILE_PATH);
   }
 
   console.log(`✓ Cleaned up ${allUsers.length} pool users`);
 }
-

@@ -25,6 +25,18 @@ export const TEST_USERS = {
   },
 };
 
+// Pre-seeded manager for E2E flows (override via env in CI/other environments)
+export const SEEDED_MANAGER = {
+  email: process.env.E2E_SEEDED_MANAGER_EMAIL ?? 'zarzadca3@openpro.pl',
+  password: process.env.E2E_SEEDED_MANAGER_PASSWORD ?? 'Test1!',
+};
+
+// Pre-seeded contractor for verification E2E flows
+export const SEEDED_CONTRACTOR = {
+  email: process.env.E2E_SEEDED_CONTRACTOR_EMAIL ?? 'wykonawca3@openpro.pl',
+  password: process.env.E2E_SEEDED_CONTRACTOR_PASSWORD ?? 'Test1!',
+};
+
 // Route paths
 export const ROUTES = {
   home: '/',
@@ -38,6 +50,10 @@ export const ROUTES = {
   account: '/account',
   postJob: '/post-job',
   tenderCreation: '/tender-creation',
+  postContest: '/post-contest',
+  managerKonkursy: '/manager-dashboard/konkursy',
+  contractorVerificationDocuments: '/account?tab=documents',
+  adminVerification: '/admin/verification',
 } as const;
 
 // Test timeouts (in milliseconds)

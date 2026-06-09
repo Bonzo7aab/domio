@@ -1,30 +1,29 @@
 import { chromium, FullConfig } from '@playwright/test';
 import { cleanupTestUsers } from '../helpers/auth-helpers';
-import { initializePool, cleanupPool } from '../helpers/test-user-pool';
+import { ensurePool, cleanupPool } from '../helpers/test-user-pool';
+import {
+  isLocalSupabaseUrl,
+  resolveSupabaseEnvForApp,
+  shouldSkipPoolUsers,
+  shouldUseLocalSupabaseForE2E,
+} from '../helpers/supabase-env';
 
 async function globalSetup(config: FullConfig) {
   console.log('Running global setup...');
 
-  // Verify Supabase connection
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey =
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url: supabaseUrl, serviceRoleKey } = resolveSupabaseEnvForApp();
 
   if (!supabaseUrl) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
   }
 
-  // Detect if using local Supabase
-  const isLocal = supabaseUrl?.includes('localhost') || 
-                  supabaseUrl?.includes('127.0.0.1') ||
-                  supabaseUrl?.includes(':54321');
+  const isLocal = shouldUseLocalSupabaseForE2E() && isLocalSupabaseUrl(supabaseUrl);
   
   if (isLocal) {
     console.log('✓ Using local Supabase instance (isolated test database)');
     console.log('  This is safe - no risk to production data!');
   } else {
-    console.warn('⚠️  Using remote Supabase instance');
+    console.log('✓ Using app Supabase from .env.local (seeded-user E2E)');
     console.warn('  Ensure this is a TEST project, not production!');
     
     // Safety check: warn if it looks like production
@@ -38,32 +37,30 @@ async function globalSetup(config: FullConfig) {
     console.warn('Warning: SUPABASE_SERVICE_ROLE_KEY not set. Test user cleanup may not work.');
   }
 
-  // Clean up any leftover test users and pool users from previous runs
-  if (serviceRoleKey) {
+  const skipPool = shouldSkipPoolUsers();
+
+  if (skipPool) {
+    console.log('✓ Skipping test user pool (seeded-user E2E — pool not required)');
+  } else if (serviceRoleKey) {
+    // Best-effort cleanup; auth admin listUsers may fail on some cloud key configs.
     try {
       await cleanupPool();
       await cleanupTestUsers();
     } catch (error) {
-      console.warn('Failed to cleanup test users during setup:', error);
-      // Don't fail setup if cleanup fails - tests can still run
+      console.warn('Failed to cleanup test users during setup (non-critical):', error);
     }
-  }
 
-  // Initialize test user pool (deprecated - kept for backward compatibility)
-  // Note: New tests should use createUniqueTestUsers() instead for better isolation
-  if (serviceRoleKey) {
     try {
-      await initializePool();
-      console.warn('⚠️  Pool users initialized (deprecated).');
-      console.warn('  Consider migrating tests to use createUniqueTestUsers() for better test isolation.');
+      const pool = await ensurePool();
+      if (pool) {
+        console.warn('⚠️  Pool users ready (deprecated). Prefer createUniqueTestUsers() for new tests.');
+      }
     } catch (error) {
-      console.error('Failed to initialize test user pool:', error);
-      // Don't fail setup - pool users are optional and deprecated
-      console.warn('  Continuing without pool users. Tests using createUniqueTestUsers() will still work.');
+      console.warn('Failed to ensure test user pool (non-critical):', error);
+      console.warn('  Continuing without pool users.');
     }
   } else {
     console.warn('Warning: Cannot initialize test user pool without SUPABASE_SERVICE_ROLE_KEY');
-    console.warn('  Tests using createUniqueTestUsers() will still work.');
   }
 
   // Verify the app is accessible

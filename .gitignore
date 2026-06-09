@@ -41,3 +41,4 @@ playwright/.cache/
 
 # Test user pool
 tests/.test-user-pool.json
+tests/fixtures/.generated/

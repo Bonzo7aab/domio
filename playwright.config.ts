@@ -1,11 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 import path from 'path';
+import {
+  applyResolvedSupabaseEnvToProcess,
+  getWebServerSupabaseEnv,
+} from './tests/helpers/supabase-env';
 
 // Load environment variables from .env.local or .env.test
 dotenv.config({ path: path.resolve(__dirname, '.env.test.local') });
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+// `.env.test.local` is loaded first; without this, admin/setup code keeps localhost :54321.
+applyResolvedSupabaseEnvToProcess();
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -71,6 +78,10 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
+    env: {
+      ...process.env,
+      ...getWebServerSupabaseEnv(),
+    },
   },
 
   /* Global setup and teardown */

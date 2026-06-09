@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/types/database';
 import { createTestUser, deleteTestUser } from './auth-helpers';
+import { resolveSupabaseEnvForApp } from './supabase-env';
 import { TEST_USER_PREFIX } from '../config/constants';
 import { createJob } from '../../src/lib/database/jobs';
 import { createTender } from '../../src/lib/database/jobs';
@@ -11,10 +12,7 @@ import { getPoolContractor, getPoolManager, loadPool } from './test-user-pool';
  * Creates a Supabase admin client for test data management
  */
 function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey =
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url: supabaseUrl, serviceRoleKey } = resolveSupabaseEnvForApp();
 
   if (!supabaseUrl) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');

@@ -1,13 +1,12 @@
 import { FullConfig } from '@playwright/test';
 import { cleanupTestUsers } from '../helpers/auth-helpers';
 import { cleanupPool } from '../helpers/test-user-pool';
+import { resolveSupabaseEnvForApp } from '../helpers/supabase-env';
 
 async function globalTeardown(_config: FullConfig) {
   console.log('Running global teardown...');
 
-  const serviceRoleKey =
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { serviceRoleKey } = resolveSupabaseEnvForApp();
 
   if (serviceRoleKey) {
     try {

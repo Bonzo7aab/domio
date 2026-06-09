@@ -2,15 +2,13 @@ import { Page, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/types/database';
 import { TEST_USER_PREFIX } from '../config/constants';
+import { resolveSupabaseEnvForApp } from './supabase-env';
 
 /**
  * Creates a Supabase admin client for test data management
  */
 function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey =
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url: supabaseUrl, serviceRoleKey } = resolveSupabaseEnvForApp();
 
   if (!supabaseUrl) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
@@ -117,7 +115,7 @@ export async function cleanupTestUsers() {
     const { data: users, error: findError } = await adminClient.auth.admin.listUsers();
 
     if (findError || !users?.users) {
-      console.error('Error listing users for cleanup:', findError);
+      console.warn('Skipping test user cleanup — auth admin listUsers unavailable:', findError?.message);
       return;
     }
 
@@ -227,6 +225,25 @@ export async function getAuthState(page: Page): Promise<boolean> {
     );
   });
   return !!authCookie;
+}
+
+/**
+ * Dismisses the cookie consent banner if visible (blocks fixed footer actions).
+ */
+export async function dismissCookieConsentIfVisible(page: Page): Promise<void> {
+  const acceptButton = page.getByRole('button', { name: /akceptuję wszystkie/i });
+  if (await acceptButton.isVisible().catch(() => false)) {
+    await acceptButton.click();
+  }
+}
+
+/**
+ * Prevents cookie consent banner from appearing during E2E flows.
+ */
+export async function seedCookieConsentAccepted(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    localStorage.setItem('cookie-consent', 'accepted');
+  });
 }
 
 /**
