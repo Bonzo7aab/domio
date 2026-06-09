@@ -1003,7 +1003,7 @@ export const MessagingSystem: React.FC<MessagingSystemProps> = ({
                             variant="outline"
                             size="sm"
                             className="w-full shrink-0 sm:w-auto"
-                            onClick={() => router.push(`/zlecenia/${currentConversation.jobId}`)}
+                            onClick={() => router.push(`/konkurs/${currentConversation.jobId}`)}
                           >
                             <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                             Zobacz zgłoszenie

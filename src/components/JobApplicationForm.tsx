@@ -269,7 +269,7 @@ export const JobApplicationForm: React.FC<JobApplicationFormProps> = ({
                     )}
                     {estimatedBudget && (
                       <p className="text-gray-500 text-sm mt-1">
-                        Budżet zleceniodawcy: {estimatedBudget}
+                        Budżet organizatora: {estimatedBudget}
                       </p>
                     )}
                   </div>

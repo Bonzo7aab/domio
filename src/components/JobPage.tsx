@@ -775,7 +775,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     if (isCheckingBid) return;
 
     if (!hasDraftBid) {
-      router.replace(`/zlecenia/${jobId}`, { scroll: false });
+      router.replace(`/konkurs/${jobId}`, { scroll: false });
       return;
     }
 
@@ -818,7 +818,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       }
 
       setShowContestOfferForm(true);
-      router.replace(`/zlecenia/${jobId}`, { scroll: false });
+      router.replace(`/konkurs/${jobId}`, { scroll: false });
     };
 
     void openDraftOffer();

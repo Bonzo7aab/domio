@@ -408,12 +408,12 @@ export const JobApplicationsList: React.FC<JobApplicationsListProps> = ({
                             }}
                           >
                             <Star className="h-4 w-4 mr-2" />
-                            Oceń Zlecenie
+                            Oceń Konkurs
                           </Button>
                         )}
                         {application.status === 'accepted' && !canRateService && (
                           <span className="text-xs text-muted-foreground self-center">
-                            Ocena zlecenia po ukończeniu zgłoszenia
+                            Ocena konkursu po ukończeniu zgłoszenia
                           </span>
                         )}
                       </div>

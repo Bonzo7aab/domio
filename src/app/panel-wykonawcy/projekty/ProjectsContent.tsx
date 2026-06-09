@@ -185,7 +185,7 @@ export function ProjectsContent({ platformProjects: initialPlatformProjects, por
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => router.push(`/zlecenia/${project.jobId}`)}
+                            onClick={() => router.push(`/konkurs/${project.jobId}`)}
                           >
                             Zobacz szczegóły
                           </Button>

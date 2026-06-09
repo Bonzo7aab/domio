@@ -48,7 +48,6 @@ export async function updateSession(request: NextRequest) {
     '/panel-wykonawcy',
     '/panel-zarzadcy',
     '/konto',
-    '/dodaj-zlecenie',
     '/dodaj-konkurs',
     '/dodaj-przetarg',
     '/tworzenie-przetargu',

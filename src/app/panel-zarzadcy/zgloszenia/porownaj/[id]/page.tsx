@@ -12,7 +12,7 @@ export default async function LegacyPorownajPage({
   const { id } = await params;
   const { typ } = await searchParams;
   if (typ === 'zgłoszenie') {
-    redirect(`/panel-zarzadcy/zlecenia/${id}/applications`);
+    redirect(`/panel-zarzadcy/konkursy/${id}/aplikacje`);
   }
   redirect(`/panel-zarzadcy/konkursy/porownaj/${id}`);
 }

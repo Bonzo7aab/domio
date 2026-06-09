@@ -77,6 +77,8 @@ export function FilterProvider({
         ...defaultFilters,
         ...urlFilters,
         postTypes: defaultFilters.postTypes,
+        cities: urlFilters.cities ?? defaultFilters.cities,
+        sublocalities: [],
         deadline: urlFilters.deadline ?? defaultFilters.deadline,
       };
 
@@ -100,6 +102,8 @@ export function FilterProvider({
       ...defaultFilters,
       ...urlFilters,
       postTypes: defaultFilters.postTypes,
+      cities: urlFilters.cities ?? defaultFilters.cities,
+      sublocalities: [],
       deadline: urlFilters.deadline ?? defaultFilters.deadline,
     };
 

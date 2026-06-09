@@ -14,6 +14,9 @@ export type DeadlineFilterKey =
 export interface FilterState {
   categories: string[];
   subcategories: string[];
+  /** Selected cities — homepage defaults to Warszawa only (OPD-90). */
+  cities: string[];
+  /** @deprecated District filters removed (OPD-90); kept for URL backward compatibility. */
   sublocalities: string[];
   searchQuery?: string;
   /** Zakończenie przyjmowania ofert — deadline window filters */
@@ -31,6 +34,7 @@ export interface FilterState {
 export const defaultFilters: FilterState = {
   categories: [],
   subcategories: [],
+  cities: [WARSAW_CITY],
   sublocalities: [],
   searchQuery: '',
   deadline: [],
@@ -42,4 +46,8 @@ export const defaultFilters: FilterState = {
 
 export function isDefaultPostTypes(postTypes: string[]): boolean {
   return postTypes.length === 1 && postTypes.includes('tender');
+}
+
+export function isDefaultCities(cities: string[]): boolean {
+  return cities.length === 1 && cities[0] === WARSAW_CITY;
 }

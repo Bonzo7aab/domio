@@ -700,7 +700,7 @@ export async function submitQuestion(
       const isContestQa = !isJob && meta.isContest;
       const actionUrl = isContestQa
         ? `/panel-zarzadcy/konkursy?contestId=${jobId}&tab=questions`
-        : `/zlecenia/${jobId}`;
+        : `/konkurs/${jobId}`;
 
       const notificationType = isContestQa ? 'contest_question' : 'new_message';
       const notificationTitle = isContestQa

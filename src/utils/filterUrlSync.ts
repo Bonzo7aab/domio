@@ -1,5 +1,5 @@
 import type { FilterState } from '../lib/filters/filter-state';
-import { defaultFilters, isDefaultPostTypes } from '../lib/filters/filter-state';
+import { defaultFilters, isDefaultCities, isDefaultPostTypes } from '../lib/filters/filter-state';
 import { migrateLegacyDeadlineKeys } from '../lib/filters/filter-logic';
 
 export type { FilterState } from '../lib/filters/filter-state';
@@ -17,8 +17,8 @@ export function filtersToSearchParams(filters: FilterState): URLSearchParams {
   if (filters.subcategories.length > 0) {
     params.set('subcategories', filters.subcategories.join(','));
   }
-  if (filters.sublocalities.length > 0) {
-    params.set('sublocalities', filters.sublocalities.join(','));
+  if (filters.cities.length > 0 && !isDefaultCities(filters.cities)) {
+    params.set('cities', filters.cities.join(','));
   }
   if (filters.searchQuery?.trim()) {
     params.set('search', filters.searchQuery.trim());
@@ -57,9 +57,9 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
     filters.subcategories = subcategories.split(',').filter(Boolean);
   }
 
-  const sublocalities = searchParams.get('sublocalities');
-  if (sublocalities) {
-    filters.sublocalities = sublocalities.split(',').filter(Boolean);
+  const cities = searchParams.get('cities');
+  if (cities) {
+    filters.cities = cities.split(',').filter(Boolean);
   }
 
   const search = searchParams.get('search');
@@ -113,7 +113,7 @@ export function hasActiveFilters(filters: FilterState): boolean {
   return !!(
     filters.categories.length > 0 ||
     filters.subcategories.length > 0 ||
-    filters.sublocalities.length > 0 ||
+    (filters.cities.length > 0 && !isDefaultCities(filters.cities)) ||
     (filters.searchQuery && filters.searchQuery.trim()) ||
     filters.deadline.length > 0 ||
     !isDefaultPostTypes(filters.postTypes) ||

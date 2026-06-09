@@ -464,7 +464,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   };
 
   const handleJobView = (jobId: string) => {
-    router.push(`/zlecenia/${jobId}`);
+    router.push(`/konkurs/${jobId}`);
   };
 
   const handleStartConversation = async (applicationId: string) => {
@@ -495,7 +495,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
       }
 
       if (!managerId) {
-        toast.error('Nie można znaleźć zleceniodawcy');
+        toast.error('Nie można znaleźć organizatora');
         return;
       }
 
@@ -1227,7 +1227,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              onClick={() => router.push(`/zlecenia/${project.jobId}`)}
+                              onClick={() => router.push(`/konkurs/${project.jobId}`)}
                             >
                               Zobacz szczegóły
                             </Button>

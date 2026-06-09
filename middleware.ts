@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 /**
  * First path segment for routes defined under `src/app`.
  * Anything else (e.g. /foo-bar) is redirected to `/` after session refresh.
- * Invalid dynamic IDs (e.g. /zlecenia/…) are handled by `src/app/not-found.tsx`.
+ * Invalid dynamic IDs (e.g. /konkurs/…) are handled by `src/app/not-found.tsx`.
  */
 const ALLOWED_FIRST_SEGMENTS = new Set<string>([
   'administracja',
@@ -29,13 +29,13 @@ const ALLOWED_FIRST_SEGMENTS = new Set<string>([
   'wdrozenie',
   'weryfikacja',
   'wiadomosci',
+  'wybor-typu-konkursu',
   'wybor-typu-konta',
-  'wybor-typu-zlecenia',
   'wykonawcy',
   'zapisane-zgloszenia',
   'zapomniane-haslo',
   'zarzadcy',
-  'zlecenia',
+  'konkurs',
 ])
 
 function isKnownAppRoute(pathname: string): boolean {

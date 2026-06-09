@@ -167,7 +167,7 @@ export async function createCompanyReview(
         reviewData.tenderId
           ? 'Opinia o współpracy w tym konkursie została już dodana'
           : reviewData.jobId
-            ? 'Opinia dla tego zlecenia została już dodana'
+            ? 'Opinia dla tego konkursy została już dodana'
             : 'Opinia dla tej firmy została już dodana',
       ),
     };

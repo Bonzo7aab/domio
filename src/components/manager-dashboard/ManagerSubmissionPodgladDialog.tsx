@@ -41,7 +41,7 @@ interface ManagerSubmissionPodgladDialogProps {
   onOpenChange: (open: boolean) => void;
   onJobStatusUpdated?: (status: string) => void;
   /** Open this tab when the dialog mounts (e.g. after selecting an offer). */
-  initialTab?: 'details' | 'selected-offer' | 'rate-zlecenie';
+  initialTab?: 'details' | 'selected-offer' | 'rate-konkurs' | 'rate-zlecenie';
 }
 
 export function ManagerSubmissionPodgladDialog({
@@ -77,8 +77,8 @@ export function ManagerSubmissionPodgladDialog({
     setActiveTab(
       initialTab === 'selected-offer'
         ? 'selected-offer'
-        : initialTab === 'rate-zlecenie'
-          ? 'rate-zlecenie'
+        : initialTab === 'rate-konkurs' || initialTab === 'rate-zlecenie'
+          ? 'rate-konkurs'
           : 'details',
     );
 
@@ -154,8 +154,8 @@ export function ManagerSubmissionPodgladDialog({
               {hasSelectedOffer ? (
                 <TabsTrigger value="selected-offer">Wybrana Oferta</TabsTrigger>
               ) : null}
-              <TabsTrigger value="rate-zlecenie" disabled={job.status !== 'completed' || !acceptedContractor}>
-                Oceń Zlecenie
+              <TabsTrigger value="rate-konkurs" disabled={job.status !== 'completed' || !acceptedContractor}>
+                Oceń Konkurs
               </TabsTrigger>
             </TabsList>
 
@@ -285,14 +285,14 @@ export function ManagerSubmissionPodgladDialog({
               )}
             </TabsContent>
 
-            <TabsContent value="rate-zlecenie" className="mt-0">
+            <TabsContent value="rate-konkurs" className="mt-0">
               {job.status !== 'completed' ? (
                 <p className="text-muted-foreground py-4">
-                  Ocena zlecenia będzie dostępna po oznaczeniu zgłoszenia jako ukończone.
+                  Ocena konkursu będzie dostępna po oznaczeniu zgłoszenia jako ukończone.
                 </p>
               ) : !acceptedContractor ? (
                 <p className="text-muted-foreground py-4">
-                  Brak zaakceptowanego wykonawcy — nie można wystawić oceny zlecenia.
+                  Brak zaakceptowanego wykonawcy — nie można wystawić oceny konkursy.
                 </p>
               ) : (
                 <ServiceReviewPanel

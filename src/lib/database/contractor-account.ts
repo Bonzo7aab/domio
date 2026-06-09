@@ -119,8 +119,8 @@ const normalizeServiceArea = (value: unknown): ContractorServiceAreaSettings => 
   return {
     voivodeship,
     scope,
-    cities: cities.length > 0 ? cities : DEFAULT_SERVICE_AREA.cities,
-    districts: districts.length > 0 ? districts : DEFAULT_SERVICE_AREA.districts,
+    cities,
+    districts,
   };
 };
 

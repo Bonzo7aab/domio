@@ -130,7 +130,7 @@ test.describe('Route Protection', () => {
   });
 
   test('should redirect to login when accessing post-job without auth', async ({ page, browserName }) => {
-    await page.goto(ROUTES.postJob, { waitUntil: 'domcontentloaded' });
+    await page.goto(ROUTES.postContest, { waitUntil: 'domcontentloaded' });
     
     // Should redirect to login (middleware redirect, may take a moment)
     // Firefox may need more time for redirects
@@ -148,7 +148,7 @@ test.describe('Route Protection', () => {
     // Should preserve redirectTo parameter
     const url = new URL(page.url());
     const redirectTo = url.searchParams.get('redirectTo');
-    expect(redirectTo).toBe(ROUTES.postJob);
+    expect(redirectTo).toBe(ROUTES.postContest);
   });
 
   test('should redirect to login when accessing tender-creation without auth', async ({ page, browserName }) => {

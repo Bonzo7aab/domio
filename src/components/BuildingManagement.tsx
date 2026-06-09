@@ -34,6 +34,7 @@ import {
 import { createClient } from '../lib/supabase/client';
 import { fetchCompanyBuildings, createBuilding, updateBuilding, deleteBuilding } from '../lib/database/buildings';
 import { uploadBuildingImages } from '../lib/storage/building-images';
+import { lookupCityByPostalCode } from '../lib/postal-code/lookup-city';
 import type { Building, BuildingFormData } from '../types/building';
 import { filterBuildings } from '../lib/buildings/grouping';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
@@ -69,6 +70,7 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [isLookingUpCity, setIsLookingUpCity] = useState(false);
 
   const filteredBuildings = useMemo(
     () =>
@@ -181,6 +183,29 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
       [field]: value
     }));
   };
+
+  useEffect(() => {
+    const postalCode = formData.postal_code.replace(/\s/g, '').trim();
+    if (!/^\d{2}-\d{3}$/.test(postalCode)) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      setIsLookingUpCity(true);
+      try {
+        const city = await lookupCityByPostalCode(postalCode);
+        if (city) {
+          setFormData((prev) =>
+            prev.city === city ? prev : { ...prev, city },
+          );
+        }
+      } finally {
+        setIsLookingUpCity(false);
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [formData.postal_code]);
 
   const handleDrop = (acceptedFiles: File[], fileRejections: FileRejection[]) => {
     if (fileRejections.length > 0) {
@@ -738,6 +763,16 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
               </div>
 
               <div className="col-span-2 md:col-span-1 space-y-2">
+                <Label htmlFor="postalCode">Kod pocztowy</Label>
+                <Input
+                  id="postalCode"
+                  value={formData.postal_code}
+                  onChange={(e) => handleFormChange('postal_code', e.target.value)}
+                  placeholder="00-000"
+                />
+              </div>
+
+              <div className="col-span-2 md:col-span-1 space-y-2">
                 <Label htmlFor="city">Miasto *</Label>
                 <Input
                   id="city"
@@ -746,16 +781,9 @@ export function BuildingManagement({ companyId }: BuildingManagementProps) {
                   placeholder="Warszawa"
                   required
                 />
-              </div>
-
-              <div className="col-span-2 md:col-span-1 space-y-2">
-                <Label htmlFor="postalCode">Kod pocztowy</Label>
-                <Input
-                  id="postalCode"
-                  value={formData.postal_code}
-                  onChange={(e) => handleFormChange('postal_code', e.target.value)}
-                  placeholder="00-000"
-                />
+                {isLookingUpCity && (
+                  <p className="text-xs text-muted-foreground">Uzupełnianie miasta…</p>
+                )}
               </div>
 
               <div className="col-span-2 md:col-span-1 space-y-2">

@@ -81,7 +81,7 @@ export const mockNotifications: Notification[] = [
       jobTitle: 'Malowanie klatek schodowych'
     },
     priority: 'low',
-    actionUrl: '/manager/zlecenia'
+    actionUrl: '/panel-zarzadcy/konkursy'
   },
   {
     id: 'notif-6',

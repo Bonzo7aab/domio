@@ -420,7 +420,7 @@ export function ContractorContestOffersContent({
                       <TableCell className="max-w-[300px]">
                         <div className="min-w-0">
                           <Link
-                            href={`/zlecenia/${row.tenderId}`}
+                            href={`/konkurs/${row.tenderId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="font-medium truncate leading-snug hover:underline block max-w-full text-foreground hover:text-primary"

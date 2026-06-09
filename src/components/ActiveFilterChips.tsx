@@ -11,13 +11,11 @@ import { getDeadlineFilterLabel } from '../lib/filters/deadline-labels';
 interface ActiveFilterChipsProps {
   filters: FilterState;
   onFilterChange: (filters: FilterState | ((prev: FilterState) => FilterState)) => void;
-  primaryLocation?: string;
 }
 
 export function ActiveFilterChips({
   filters,
   onFilterChange,
-  primaryLocation,
 }: ActiveFilterChipsProps) {
   const chips: Array<{ label: string; value: string; onRemove: () => void }> = [];
 
@@ -41,19 +39,6 @@ export function ActiveFilterChips({
         onFilterChange((prev) => ({
           ...prev,
           subcategories: prev.subcategories.filter((s) => s !== sub),
-        })),
-    });
-  });
-
-  filters.sublocalities.forEach((key) => {
-    const [, district] = key.split(':');
-    chips.push({
-      label: district || key,
-      value: `loc-${key}`,
-      onRemove: () =>
-        onFilterChange((prev) => ({
-          ...prev,
-          sublocalities: prev.sublocalities.filter((s) => s !== key),
         })),
     });
   });
@@ -106,8 +91,7 @@ export function ActiveFilterChips({
     });
   }
 
-  const showLocationBadge =
-    primaryLocation && primaryLocation !== 'Polska' && primaryLocation !== WARSAW_CITY;
+  const showLocationBadge = filters.cities.includes(WARSAW_CITY);
 
   if (chips.length === 0 && !showLocationBadge) {
     return null;
@@ -116,7 +100,7 @@ export function ActiveFilterChips({
   const clearAll = () => onFilterChange(defaultFilters);
 
   return (
-    <div className="mb-4">
+    <div className="mb-3">
       <div className="flex items-center justify-between mb-2">
         <Label className="text-xs font-semibold text-gray-700">Aktywne filtry</Label>
         <button
@@ -135,7 +119,7 @@ export function ActiveFilterChips({
             className="text-xs px-2 py-1 bg-gray-50 border border-gray-200 text-gray-700"
           >
             <MapPin className="w-3 h-3 text-gray-600 mr-1 inline" />
-            {primaryLocation}
+            {WARSAW_CITY}
           </Badge>
         )}
         {chips.map((chip) => (

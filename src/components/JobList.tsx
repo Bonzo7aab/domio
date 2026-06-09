@@ -5,7 +5,6 @@ import { Switch } from './ui/switch';
 import { Toggle } from './ui/toggle';
 import { Label } from './ui/label';
 import JobCard from './JobCard';
-import { ActiveFilterChips } from './ActiveFilterChips';
 import type { FilterState } from '../lib/filters/filter-state';
 import { getBookmarkedJobs, addBookmark, removeBookmark } from '../utils/bookmarkStorage';
 import {
@@ -20,7 +19,6 @@ import {
   getJobOfferCount,
   getJobCreatedTime,
 } from '../lib/filters/filter-logic';
-import { useFilterContext } from '../contexts/FilterContext';
 import { useUserProfile } from '../contexts/AuthContext';
 import { useContractorContestBidStatus } from '../hooks/useContractorContestBidStatus';
 import type { Job } from '../types/job';
@@ -47,7 +45,6 @@ export default function JobList({
   isLoadingJobs = false,
   onApplyClick,
 }: JobListProps) {
-  const { primaryLocation } = useFilterContext();
   const { user } = useUserProfile();
   const isManager = user?.userType === 'manager';
   const { submittedIds, draftIds, isLoading: isLoadingBidStatus } =
@@ -215,15 +212,13 @@ export default function JobList({
 
 
   return (
-    <div className="flex-1 p-2 sm:p-4 max-w-full overflow-x-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-        <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-bold">
-            Dostępne konkursy: {sortedJobs.length}
-          </h2>
-        </div>
+    <div className="flex-1 p-2 sm:p-3 lg:px-2 lg:py-3 max-w-full overflow-x-hidden">
+      <div className="mb-2 flex h-8 items-center justify-between gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <h2 className="shrink-0 text-base font-bold whitespace-nowrap sm:text-lg">
+          Konkursy: {sortedJobs.length}
+        </h2>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           {filters && onFilterChange && !isManager && (
             <Toggle
               variant="outline"
@@ -233,7 +228,7 @@ export default function JobList({
                 onFilterChange((prev) => ({ ...prev, favoritesOnly: pressed }))
               }
               aria-label="Pokaż tylko zapisane"
-              className="gap-1.5 px-3 h-9"
+              className="h-8 gap-1.5 px-2.5"
             >
               <Star
                 className={cn(
@@ -241,32 +236,15 @@ export default function JobList({
                   filters.favoritesOnly && 'fill-primary text-primary',
                 )}
               />
-              <span className="text-sm">Zapisane</span>
+              <span className="text-sm whitespace-nowrap">Zapisane</span>
             </Toggle>
           )}
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:inline">Sortuj:</span>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-52">
-                <ArrowUpDown className="w-4 h-4 mr-2 shrink-0" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Najnowsze konkursy</SelectItem>
-                <SelectItem value="deadline-soon">Najmniej czasu na ofertę</SelectItem>
-                <SelectItem value="deadline-far">Najwięcej czasu na ofertę</SelectItem>
-                <SelectItem value="offers-fewest">Najmniej złożonych ofert</SelectItem>
-                <SelectItem value="offers-most">Najwięcej złożonych ofert</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {onToggleMap && (
-            <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-1.5">
-              <Map className="w-4 h-4 text-muted-foreground shrink-0" />
-              <Label htmlFor="map-toggle" className="text-sm cursor-pointer whitespace-nowrap">
-                {isMapVisible ? 'Wróć do listy' : 'Zobacz mapę'}
+            <div className="flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5">
+              <Map className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <Label htmlFor="map-toggle" className="cursor-pointer text-sm whitespace-nowrap">
+                {isMapVisible ? 'Lista' : 'Mapa'}
               </Label>
               <Switch
                 id="map-toggle"
@@ -275,16 +253,22 @@ export default function JobList({
               />
             </div>
           )}
+
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-8 w-[9.5rem] sm:w-52">
+              <ArrowUpDown className="mr-1.5 h-4 w-4 shrink-0" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Najnowsze konkursy</SelectItem>
+              <SelectItem value="deadline-soon">Najmniej czasu na ofertę</SelectItem>
+              <SelectItem value="deadline-far">Najwięcej czasu na ofertę</SelectItem>
+              <SelectItem value="offers-fewest">Najmniej złożonych ofert</SelectItem>
+              <SelectItem value="offers-most">Najwięcej złożonych ofert</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
-
-      {filters && onFilterChange && (
-        <ActiveFilterChips
-          filters={filters}
-          onFilterChange={onFilterChange}
-          primaryLocation={primaryLocation}
-        />
-      )}
 
       {isLoadingJobs && sortedJobs.length === 0 && (
         <div className="text-center py-8">

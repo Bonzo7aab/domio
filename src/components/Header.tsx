@@ -153,7 +153,7 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
   }
 
   const handleJobSelect = (jobId: string) => {
-    router.push(`/zlecenia/${jobId}`)
+    router.push(`/konkurs/${jobId}`)
   }
 
 

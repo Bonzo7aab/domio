@@ -1,8 +1,61 @@
 import type { Job } from '../../types/job';
 import { WARSAW_DISTRICTS } from '../config/warsawDistricts';
 import { extractCity, extractSublocality } from '../../utils/locationMapping';
+import { isJobExpired } from '../../utils/jobHelpers';
 import type { DeadlineFilterKey, FilterState } from './filter-state';
 import { WARSAW_CITY } from './filter-state';
+
+export type FilterCountDimension =
+  | 'categories'
+  | 'subcategories'
+  | 'cities'
+  | 'deadline'
+  | 'formal'
+  | 'searchQuery';
+
+export function filtersForCountDimension(
+  filters: FilterState,
+  dimension: FilterCountDimension,
+): FilterState {
+  switch (dimension) {
+    case 'categories':
+      return { ...filters, categories: [], subcategories: [] };
+    case 'subcategories':
+      return { ...filters, subcategories: [] };
+    case 'cities':
+      return { ...filters, cities: [] };
+    case 'deadline':
+      return { ...filters, deadline: [] };
+    case 'formal':
+      return { ...filters, noDeposit: false, noReferencesRequired: false };
+    case 'searchQuery':
+      return { ...filters, searchQuery: '' };
+  }
+}
+
+/** Jobs eligible for sidebar counts — mirrors JobList filtering (incl. expiry). */
+export function getListEligibleJobs(
+  jobs: Job[],
+  filters: FilterState,
+  bookmarkedIds?: ReadonlySet<string>,
+  omitDimension?: FilterCountDimension,
+): Job[] {
+  const effective = omitDimension
+    ? filtersForCountDimension(filters, omitDimension)
+    : filters;
+
+  return jobs.filter((job) => {
+    if (isJobExpired(job)) return false;
+    if (
+      effective.favoritesOnly &&
+      bookmarkedIds &&
+      !matchesFavoritesFilter(job.id, true, bookmarkedIds)
+    ) {
+      return false;
+    }
+    return jobMatchesFilters(job, effective);
+  });
+}
 
 export function getJobDeadline(job: Job): Date | null {
   if (job.deadline) {
@@ -133,19 +186,22 @@ export function jobMatchesFilters(job: Job, filters: FilterState): boolean {
     }
   }
 
-  if (filters.sublocalities.length > 0) {
+  if (filters.cities.length > 0) {
     const jobCity = extractCity(job.location);
-    const jobSublocality = extractSublocality(job.location);
-    const matches = filters.sublocalities.some((key) => {
-      const [filterCity, filterSublocality] = key.split(':');
-      return jobCity === filterCity && jobSublocality === filterSublocality;
-    });
-    if (!matches) return false;
+    if (!filters.cities.includes(jobCity)) return false;
   }
 
   if (filters.searchQuery?.trim()) {
     const term = filters.searchQuery.toLowerCase().trim();
-    if (!(job.title || '').toLowerCase().includes(term)) return false;
+    const categoryName =
+      typeof job.category === 'string'
+        ? job.category
+        : job.category?.name || '';
+    const matchesSearch =
+      (job.title || '').toLowerCase().includes(term) ||
+      (job.subcategory || '').toLowerCase().includes(term) ||
+      categoryName.toLowerCase().includes(term);
+    if (!matchesSearch) return false;
   }
 
   if (filters.deadline.length > 0) {

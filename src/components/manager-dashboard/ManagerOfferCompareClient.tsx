@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowDown, ArrowLeft, ArrowUp, Lock, Phone, Mail } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Lock, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '../../lib/supabase/client';
 import {
@@ -41,11 +41,11 @@ import { acceptTenderOfferAction as acceptContestOfferAction } from '../../app/p
 import type { ContestOfferDetails } from '../../types/contest-offer';
 import { computeGrossFromNet } from '../../types/contest-offer';
 import type { ContestOfferVatRate } from '../../types/contest-offer';
-import {
-  getContestWorkflowStatusLabel,
-  isContestCompareReadOnly,
-} from '../../lib/tender-workflow-status';
+import { isContestCompareReadOnly } from '../../lib/tender-workflow-status';
+import { formatContestLocationLabel } from '../../lib/database/manager-contests';
+import type { JobLocation } from '../../lib/database/jobs';
 import { formatCompareLockedTooltip } from '../../lib/contest-submission-deadline';
+import { ContestOfferDetailView } from './ContestOfferDetailView';
 import {
   Table,
   TableBody,
@@ -54,6 +54,7 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table';
+import { cn } from '../ui/utils';
 
 function grossFromVat(net: number, vatPercent: number): number {
   return Math.round(net * (1 + vatPercent / 100));
@@ -114,28 +115,6 @@ function bruttoFromBid(bid: TenderBidLike): number {
   return computeGrossFromNet(net, rate);
 }
 
-function collectContestDocuments(bid: TenderBidLike): Array<{ name: string; url?: string }> {
-  const details = bid.offerDetails as ContestOfferDetails | null | undefined;
-  const docs: Array<{ name: string; url?: string }> = [];
-  if (details?.formalAttachments) {
-    for (const ref of Object.values(details.formalAttachments)) {
-      if (ref?.name) docs.push({ name: ref.name, url: ref.url });
-    }
-  }
-  if (details?.extraAttachments) {
-    for (const ref of details.extraAttachments) {
-      if (ref?.name) docs.push({ name: ref.name, url: ref.url });
-    }
-  }
-  if (docs.length === 0 && bid.attachments?.length) {
-    for (const raw of bid.attachments) {
-      const name = String((raw as { name?: string }).name ?? 'Plik');
-      docs.push({ name });
-    }
-  }
-  return docs;
-}
-
 interface ManagerOfferCompareClientProps {
   submissionId: string;
   kind: CompareKind;
@@ -148,6 +127,20 @@ function formatMoney(amount: number): string {
     currency: 'PLN',
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function formatJobLocationLabel(job: {
+  address?: string | null;
+  location: JobLocation | string;
+}): string {
+  if (job.address?.trim()) return job.address.trim();
+  const loc = job.location;
+  if (typeof loc === 'string' && loc.trim()) return loc.trim();
+  if (loc && typeof loc === 'object') {
+    const parts = [loc.city, loc.sublocality_level_1].filter(Boolean);
+    if (parts.length) return parts.join(', ');
+  }
+  return '—';
 }
 
 function formatDate(d: Date | string | undefined): string {
@@ -204,7 +197,9 @@ function SortableTh({ label, sortKey, sort, onSort }: SortableThProps): React.Re
           ) : (
             <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
           )
-        ) : null}
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+        )}
       </button>
     </TableHead>
   );
@@ -217,6 +212,7 @@ export function ManagerOfferCompareClient({
 }: ManagerOfferCompareClientProps): React.ReactElement {
   const router = useRouter();
   const [title, setTitle] = useState<string>('');
+  const [locationLabel, setLocationLabel] = useState<string>('');
   const [tenderStatus, setTenderStatus] = useState<string | null>(null);
   const [submissionDeadline, setSubmissionDeadline] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -225,9 +221,9 @@ export function ManagerOfferCompareClient({
   const [profiles, setProfiles] = useState<Record<string, ContractorProfile | null>>({});
   const [detailApp, setDetailApp] = useState<Application | null>(null);
   const [detailBid, setDetailBid] = useState<TenderBidLike | null>(null);
-  const [contactOpen, setContactOpen] = useState(false);
-  const [contactProfile, setContactProfile] = useState<ContractorProfile | null>(null);
+  const [showContactDetails, setShowContactDetails] = useState(false);
   const [confirmSelectOpen, setConfirmSelectOpen] = useState(false);
+  const [pendingSelectBid, setPendingSelectBid] = useState<TenderBidLike | null>(null);
   const [selectingOffer, setSelectingOffer] = useState(false);
 
   const [sort, setSort] = useState<CompareSortState>({ key: 'net', dir: 'asc' });
@@ -350,9 +346,11 @@ export function ManagerOfferCompareClient({
           if (jobErr || !job) {
             toast.error('Nie udało się wczytać zgłoszenia');
             setTitle('');
+            setLocationLabel('');
             setJobApps([]);
           } else {
             setTitle(job.title);
+            setLocationLabel(formatJobLocationLabel(job));
             setJobApps(apps || []);
             await loadProfiles((apps || []).map((a) => a.contractorCompanyId || ''));
           }
@@ -370,10 +368,12 @@ export function ManagerOfferCompareClient({
           if (tErr || !tender) {
             toast.error('Nie udało się wczytać przetargu');
             setTitle('');
+            setLocationLabel('');
             setTenderBids([]);
             setTenderStatus(null);
           } else {
             setTitle(tender.title);
+            setLocationLabel(formatContestLocationLabel(tender));
             setTenderStatus(tender.status);
             setSubmissionDeadline(tender.submission_deadline ?? null);
             if (contestMode && tender.status === 'active') {
@@ -418,23 +418,24 @@ export function ManagerOfferCompareClient({
     return `✅ OC: ${sum}`;
   };
 
-  const openContact = (companyId: string | undefined): void => {
-    const p = profileForCompany(companyId);
-    setContactProfile(p);
-    setContactOpen(true);
-  };
-
   const openDetailFromApp = (app: Application): void => {
     setDetailApp(app);
     setDetailBid(null);
+    setShowContactDetails(false);
   };
 
   const openDetailFromBid = (bid: TenderBidLike): void => {
     setDetailBid(bid);
     setDetailApp(null);
+    setShowContactDetails(false);
   };
 
   const openConfirmSelect = (): void => {
+    setConfirmSelectOpen(true);
+  };
+
+  const openConfirmSelectBid = (bid: TenderBidLike): void => {
+    setPendingSelectBid(bid);
     setConfirmSelectOpen(true);
   };
 
@@ -457,10 +458,15 @@ export function ManagerOfferCompareClient({
           toast.error(result.error || 'Nie udało się wybrać oferty');
           return;
         }
-      } else if (kind === 'tender' && detailBid) {
+      } else if (kind === 'tender') {
+        const bidToSelect = pendingSelectBid ?? detailBid;
+        if (!bidToSelect) {
+          toast.error('Brak wybranej oferty');
+          return;
+        }
         const result = contestMode
-          ? await acceptContestOfferAction(submissionId, detailBid.id)
-          : await acceptTenderOfferAction(submissionId, detailBid.id);
+          ? await acceptContestOfferAction(submissionId, bidToSelect.id)
+          : await acceptTenderOfferAction(submissionId, bidToSelect.id);
         if (!result.success) {
           toast.error(result.error || 'Nie udało się wybrać oferty');
           return;
@@ -471,6 +477,7 @@ export function ManagerOfferCompareClient({
       }
 
       setConfirmSelectOpen(false);
+      setPendingSelectBid(null);
       setDetailApp(null);
       setDetailBid(null);
       toast.success('Oferta została wybrana');
@@ -500,20 +507,20 @@ export function ManagerOfferCompareClient({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 py-8">
-      <Button variant="outline" onClick={() => router.push(backHref)} className="gap-2">
-        <ArrowLeft className="h-4 w-4" />
-        {contestMode ? 'Powrót do konkursów' : 'Powrót do listy zgłoszeń'}
-      </Button>
-
-      <div>
-        <h1 className="text-2xl font-bold">Porównanie ofert</h1>
-        <p className="text-muted-foreground mt-1">{title}</p>
-        {contestMode && tenderStatus ? (
-          <p className="text-sm mt-1">
-            Status: {getContestWorkflowStatusLabel(tenderStatus)}
-            {compareReadOnly ? ' — widok archiwalny' : ''}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold">Porównanie ofert</h1>
+          <Button variant="outline" onClick={() => router.push(backHref)} className="gap-2 shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+            {contestMode ? 'Powrót do konkursów' : 'Powrót do listy zgłoszeń'}
+          </Button>
+        </div>
+        <div>
+          <p className="text-muted-foreground">{title}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Lokalizacja: {locationLabel || '—'}
           </p>
-        ) : null}
+        </div>
       </div>
 
       {contestMode && tenderStatus === 'active' ? (
@@ -592,15 +599,16 @@ export function ManagerOfferCompareClient({
                   <SortableTh label="Cena netto" sortKey="net" sort={sort} onSort={toggleSort} />
                   <TableHead>VAT</TableHead>
                   <SortableTh label="Cena brutto" sortKey="brutto" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Termin rozpoczęcia" sortKey="start" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Czas realizacji" sortKey="duration" sort={sort} onSort={toggleSort} />
                   <SortableTh label="Gwarancja" sortKey="guarantee" sort={sort} onSort={toggleSort} />
-                  <TableHead>Dokumenty wykonawcy</TableHead>
                   <TableHead className="text-right">Akcja</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {tenderBids.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                       Brak złożonych ofert do porównania.
                     </TableCell>
                   </TableRow>
@@ -611,7 +619,11 @@ export function ManagerOfferCompareClient({
                     const warranty =
                       bid.warrantyMonths ?? bid.guaranteePeriod ?? null;
                     const reviews = bid.contractorReviewsCount ?? 0;
-                    const docs = collectContestDocuments(bid);
+                    const days = bid.proposedTimeline;
+                    const durationLabel =
+                      days != null && days > 0
+                        ? `${days} ${days === 1 ? 'dzień' : 'dni'}`
+                        : '—';
                     const isWinner = bid.status === 'accepted';
                     return (
                       <TableRow key={bid.id} className={isWinner ? 'bg-primary/5' : undefined}>
@@ -625,42 +637,17 @@ export function ManagerOfferCompareClient({
                         <TableCell>{formatMoney(net)}</TableCell>
                         <TableCell>{vatLabelFromBid(bid)}</TableCell>
                         <TableCell className="font-semibold">{formatMoney(brutto)}</TableCell>
+                        <TableCell>{formatDate(bid.proposedStartDate)}</TableCell>
+                        <TableCell>{durationLabel}</TableCell>
                         <TableCell>
                           {warranty != null ? `${warranty} msc` : '—'}
-                        </TableCell>
-                        <TableCell className="text-sm max-w-[200px]">
-                          {docs.length === 0 ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <ul className="space-y-0.5">
-                              {docs.slice(0, 3).map((doc) => (
-                                <li key={doc.name}>
-                                  {doc.url ? (
-                                    <a
-                                      href={doc.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline"
-                                    >
-                                      {doc.name}
-                                    </a>
-                                  ) : (
-                                    doc.name
-                                  )}
-                                </li>
-                              ))}
-                              {docs.length > 3 ? (
-                                <li className="text-muted-foreground">+{docs.length - 3} więcej</li>
-                              ) : null}
-                            </ul>
-                          )}
                         </TableCell>
                         <TableCell className="text-right space-x-2">
                           <Button size="sm" variant="outline" onClick={() => openDetailFromBid(bid)}>
                             Szczegóły
                           </Button>
                           {canSelectWinner && !isWinner ? (
-                            <Button size="sm" onClick={() => openDetailFromBid(bid)}>
+                            <Button size="sm" onClick={() => openConfirmSelectBid(bid)}>
                               Wybierz ofertę
                             </Button>
                           ) : null}
@@ -741,19 +728,40 @@ export function ManagerOfferCompareClient({
           if (!o) {
             setDetailApp(null);
             setDetailBid(null);
+            setShowContactDetails(false);
           }
         }}
       >
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent
+          className={
+            contestMode && detailBid
+              ? 'max-w-2xl max-h-[90vh] overflow-y-auto gap-0 p-0'
+              : 'max-w-lg max-h-[90vh] overflow-y-auto'
+          }
+        >
+          <DialogHeader className={contestMode && detailBid ? 'px-6 pt-6 pb-0' : undefined}>
             <DialogTitle>
-              Szczegóły oferty:{' '}
-              {detailApp?.contractorCompany || detailBid?.contractorCompany}
+              {contestMode && detailBid ? 'Szczegóły oferty' : `Szczegóły oferty: ${detailApp?.contractorCompany || detailBid?.contractorCompany}`}
             </DialogTitle>
-            <DialogDescription>Podsumowanie finansowe i dane wykonawcy</DialogDescription>
+            <DialogDescription>
+              {contestMode && detailBid
+                ? 'Pełna treść oferty złożonej przez wykonawcę'
+                : 'Podsumowanie finansowe i dane wykonawcy'}
+            </DialogDescription>
           </DialogHeader>
           {(detailApp || detailBid) && (
-            <div className="space-y-4 text-sm">
+            <div className={cn('space-y-4 text-sm', contestMode && detailBid && 'px-6 pb-6 pt-4')}>
+              {contestMode && detailBid ? (
+                <ContestOfferDetailView
+                  bid={detailBid}
+                  formatMoney={formatMoney}
+                  formatDate={formatDate}
+                  netFromBid={netFromBid}
+                  bruttoFromBid={bruttoFromBid}
+                  vatLabelFromBid={vatLabelFromBid}
+                />
+              ) : (
+                <>
               <Card>
                 <CardHeader className="py-3">
                   <CardTitle className="text-base">Podsumowanie</CardTitle>
@@ -845,6 +853,8 @@ export function ManagerOfferCompareClient({
                   )}
                 </ul>
               </div>
+                </>
+              )}
 
               {detailProfile && (
                 <div>
@@ -882,8 +892,32 @@ export function ManagerOfferCompareClient({
                 </div>
               )}
 
+              {showContactDetails ? (
+                <section className="rounded-xl border bg-muted/30 p-4">
+                  <h4 className="mb-3 text-sm font-semibold">Kontakt do wykonawcy</h4>
+                  {detailProfile ? (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <span>{detailProfile.contactInfo?.phone || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <span>{detailProfile.contactInfo?.email || '—'}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Brak danych kontaktowych w profilu wykonawcy.
+                    </p>
+                  )}
+                </section>
+              ) : null}
+
               <div className="flex flex-col gap-2 sm:flex-row pt-2">
-                {(kind === 'job' || !compareReadOnly) && (kind !== 'tender' || canSelectWinner || !contestMode) ? (
+                {(kind === 'job' || !compareReadOnly) &&
+                (kind !== 'tender' || canSelectWinner || !contestMode) &&
+                !(contestMode && detailBid) ? (
                 <Button className="flex-1" onClick={openConfirmSelect}>
                   Wybierz tę ofertę
                 </Button>
@@ -891,11 +925,9 @@ export function ManagerOfferCompareClient({
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() =>
-                    openContact(detailApp?.contractorCompanyId || detailBid?.contractorCompanyId)
-                  }
+                  onClick={() => setShowContactDetails((prev) => !prev)}
                 >
-                  Zapytaj o szczegóły
+                  {showContactDetails ? 'Ukryj dane kontaktowe' : 'Zapytaj o szczegóły'}
                 </Button>
               </div>
             </div>
@@ -903,13 +935,32 @@ export function ManagerOfferCompareClient({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={confirmSelectOpen} onOpenChange={setConfirmSelectOpen}>
+      <AlertDialog
+        open={confirmSelectOpen}
+        onOpenChange={(open) => {
+          setConfirmSelectOpen(open);
+          if (!open) setPendingSelectBid(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Czy na pewno chcesz wybrać tę ofertę?</AlertDialogTitle>
             <AlertDialogDescription>
-              Po potwierdzeniu pozostałe oferty zostaną odrzucone, a Ty zobaczysz pełne dane
-              kontaktowe wykonawcy na stronie zgłoszenia.
+              {pendingSelectBid || detailBid ? (
+                <>
+                  Wykonawca:{' '}
+                  <strong>
+                    {(pendingSelectBid ?? detailBid)?.contractorCompany}
+                  </strong>
+                  . Po potwierdzeniu pozostałe oferty zostaną odrzucone, a Ty zobaczysz pełne
+                  dane kontaktowe wykonawcy.
+                </>
+              ) : (
+                <>
+                  Po potwierdzeniu pozostałe oferty zostaną odrzucone, a Ty zobaczysz pełne dane
+                  kontaktowe wykonawcy na stronie zgłoszenia.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -920,28 +971,6 @@ export function ManagerOfferCompareClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={contactOpen} onOpenChange={setContactOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Kontakt do wykonawcy</DialogTitle>
-            <DialogDescription>Skorzystaj z danych firmy lub wiadomości w portalu.</DialogDescription>
-          </DialogHeader>
-          {contactProfile && (
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{contactProfile.contactInfo?.phone || '—'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{contactProfile.contactInfo?.email || '—'}</span>
-              </div>
-            </div>
-          )}
-          {!contactProfile && <p className="text-sm text-muted-foreground">Brak danych kontaktowych w profilu.</p>}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

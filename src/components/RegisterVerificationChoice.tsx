@@ -96,7 +96,7 @@ export function RegisterVerificationChoice() {
                 <div className="min-w-0 flex-1">
                   <h2 className="font-semibold text-slate-900">Zrobię to później</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Przeglądaj zlecenia już teraz. Dokumenty uzupełnisz w menu konta pod pozycją
+                    Przeglądaj konkursy już teraz. Dokumenty uzupełnisz w menu konta pod pozycją
                     „Dokończ weryfikację”.
                   </p>
                   <Button

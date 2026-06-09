@@ -52,7 +52,14 @@ interface TenderContestRow {
   } | null;
 }
 
-function formatLocationLabel(row: TenderContestRow): string {
+export function formatContestLocationLabel(row: {
+  address?: string | null;
+  building?: {
+    name?: string | null;
+    street_address?: string | null;
+    city?: string | null;
+  } | null;
+}): string {
   const building = row.building;
   if (building?.street_address || building?.city) {
     const parts = [building.street_address, building.city].filter(Boolean);
@@ -179,7 +186,7 @@ export async function fetchManagerContests(
   return contestRows.map((t) => ({
     id: t.id,
     title: t.title,
-    locationLabel: formatLocationLabel(t),
+    locationLabel: formatContestLocationLabel(t),
     submissionDeadline: t.submission_deadline,
     status: t.status,
     offersCount: offerCounts[t.id] ?? 0,

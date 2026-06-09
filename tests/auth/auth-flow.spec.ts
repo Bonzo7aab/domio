@@ -168,7 +168,7 @@ test.describe('End-to-End Authentication Flows', () => {
       const protectedRoutes = [
         ROUTES.account,
         ROUTES.contractorDashboard,
-        ROUTES.postJob,
+        ROUTES.postContest,
       ];
 
       for (const route of protectedRoutes) {

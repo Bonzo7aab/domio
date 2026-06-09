@@ -9,7 +9,7 @@ export default function BookmarkedJobs() {
   return (
     <BookmarkedJobsPage 
       onBack={() => router.push('/')}
-      onJobSelect={(jobId: string) => router.push(`/zlecenia/${jobId}`)}
+      onJobSelect={(jobId: string) => router.push(`/konkurs/${jobId}`)}
     />
   );
 }

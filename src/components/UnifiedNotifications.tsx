@@ -361,7 +361,7 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         } else if (onTenderSelect && contestNotif.contestId) {
           onTenderSelect(contestNotif.contestId);
         } else if (contestNotif.contestId) {
-          router.push(`/zlecenia/${contestNotif.contestId}`);
+          router.push(`/konkurs/${contestNotif.contestId}`);
         }
         break;
       }

@@ -22,7 +22,6 @@ import {
   CONTEST_STATUS_FILTER_OPTIONS,
   canAbandonManagerContestDraft,
   canCancelContest,
-  canCompareContestOffers,
   isContestCompareReadOnly,
 } from '../../lib/tender-workflow-status';
 import { formatSubmissionDeadlineDisplay, formatCompareLockedTooltip } from '../../lib/contest-submission-deadline';
@@ -363,7 +362,7 @@ export function ManagerKonkursyContent({
         onClick={() => router.push(compareHref(row.id))}
       >
         <CheckCircle2 className="h-4 w-4 mr-1.5" />
-        Wybierz
+        Porównaj oferty
       </Button>
     );
   };
@@ -387,13 +386,6 @@ export function ManagerKonkursyContent({
   };
 
   const renderActionsMenu = (row: ManagerContest): ReactElement | null => {
-    const showViewResults =
-      row.status !== 'cancelled' &&
-      (row.offersCount > 0 ||
-        row.hasSelectedOffer ||
-        canCompareContestOffers(row.status) ||
-        isContestCompareReadOnly(row.status));
-
     const showQuestions = (row.questionsCount ?? 0) > 0;
     const unseen = unseenCounts[row.id] ?? 0;
     const pendingCount = unansweredCounts[row.id] ?? 0;
@@ -407,7 +399,6 @@ export function ManagerKonkursyContent({
     const hasMenuItems =
       abandonDraftAllowed ||
       canCancelContest(row.status) ||
-      showViewResults ||
       showQuestions ||
       showCooperationReviewEdit;
 
@@ -451,17 +442,6 @@ export function ManagerKonkursyContent({
               </DropdownMenuItem>
             </>
           ) : null}
-          {showViewResults ? (
-            <>
-              {showQuestions || abandonDraftAllowed ? <DropdownMenuSeparator /> : null}
-              <DropdownMenuItem
-                disabled={row.offersCount === 0 && !row.hasSelectedOffer}
-                onClick={() => setOffersDialogRow(row)}
-              >
-                Zobacz wyniki
-              </DropdownMenuItem>
-            </>
-          ) : null}
           {canCancelContest(row.status) ? (
             <>
               <DropdownMenuSeparator />
@@ -475,7 +455,7 @@ export function ManagerKonkursyContent({
           ) : null}
           {showCooperationReviewEdit ? (
             <>
-              {abandonDraftAllowed || showQuestions || showViewResults || canCancelContest(row.status) ? (
+              {abandonDraftAllowed || showQuestions || canCancelContest(row.status) ? (
                 <DropdownMenuSeparator />
               ) : null}
               <DropdownMenuItem onClick={() => setCooperationReviewTarget(row)}>
@@ -594,7 +574,7 @@ export function ManagerKonkursyContent({
                       >
                         <TableCell className={cn('max-w-0 truncate', isPickedRow && 'text-primary')}>
                           <Link
-                            href={`/zlecenia/${row.id}`}
+                            href={`/konkurs/${row.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title={row.title}

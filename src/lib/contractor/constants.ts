@@ -32,9 +32,9 @@ export interface ContractorServiceAreaSettings {
 
 export const DEFAULT_SERVICE_AREA: ContractorServiceAreaSettings = {
   voivodeship: 'mazowieckie',
-  scope: 'selected_cities',
-  cities: [DEFAULT_CITY],
-  districts: ['Wilanów', 'Mokotów'],
+  scope: 'whole_voivodeship',
+  cities: [],
+  districts: [],
 };
 
 /** Major cities per voivodeship for the service-area multi-select. */

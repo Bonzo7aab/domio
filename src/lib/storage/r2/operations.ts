@@ -88,6 +88,29 @@ export async function createPresignedGetUrl(
   );
 }
 
+function buildContentDisposition(filename: string): string {
+  const safeAscii = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_') || 'download';
+  return `attachment; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+export async function createPresignedDownloadUrl(
+  bucket: StorageBucket,
+  objectKey: string,
+  filename: string,
+  expiresIn = 3600,
+): Promise<string> {
+  const key = normalizeStorageObjectPath(objectKey, bucket);
+  return getSignedUrl(
+    getR2Client(),
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ResponseContentDisposition: buildContentDisposition(filename),
+    }),
+    { expiresIn },
+  );
+}
+
 export async function getObjectReadUrl(
   bucket: StorageBucket,
   objectKey: string,
@@ -115,6 +138,31 @@ export async function createSignedUrlSafe(
   } catch (error) {
     if (!isStorageObjectNotFound(error)) {
       console.warn('[storage] createSignedUrl failed', {
+        bucket,
+        objectPath,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return null;
+  }
+}
+
+export async function createDownloadUrlSafe(
+  path: string,
+  filename: string,
+  expiresIn = 3600,
+): Promise<string | null> {
+  const bucket = resolveBucketFromPath(path);
+  const objectPath = normalizeStorageObjectPath(path, bucket);
+
+  try {
+    if (isPublicStorageBucket(bucket)) {
+      return getStoragePublicUrl(bucket, objectPath);
+    }
+    return await createPresignedDownloadUrl(bucket, objectPath, filename, expiresIn);
+  } catch (error) {
+    if (!isStorageObjectNotFound(error)) {
+      console.warn('[storage] createDownloadUrl failed', {
         bucket,
         objectPath,
         message: error instanceof Error ? error.message : String(error),

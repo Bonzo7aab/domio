@@ -70,7 +70,7 @@ export async function notifyContestQuestionAskerAction(
   }
 
   const isFirstAnswer = (count ?? 0) === 1;
-  const actionUrl = `/zlecenia/${question.tender_id}?tab=contest-qa`;
+  const actionUrl = `/konkurs/${question.tender_id}?tab=contest-qa`;
 
   await createNotificationWithPush({
     supabase: admin,

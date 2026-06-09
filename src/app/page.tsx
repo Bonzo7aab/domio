@@ -322,7 +322,7 @@ function HomePageContent() {
 
   const handleJobSelect = (jobId: string) => {
     setSelectedJobId(jobId);
-    router.push(`/zlecenia/${jobId}`);
+    router.push(`/konkurs/${jobId}`);
   };
 
   const handleMessagingClose = () => {
@@ -704,7 +704,7 @@ function HomePageContent() {
           <CategoryIconBar jobs={loadedJobs} />
 
           <div className="max-w-7xl mx-auto sm:px-4 md:px-6 lg:px-8">
-            <div className="flex flex-col lg:flex-row min-h-0 lg:min-h-[calc(100vh-12rem)]">
+            <div className="flex flex-col lg:flex-row lg:items-start min-h-0 lg:min-h-[calc(100vh-12rem)] lg:gap-4">
               <div className="hidden lg:flex h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] min-h-0 flex-col lg:w-80 xl:w-96 flex-shrink-0 overflow-hidden lg:sticky lg:top-20 lg:self-start">
                 <JobFilters
                   onFilterChange={setFilters}
@@ -715,7 +715,7 @@ function HomePageContent() {
                 />
               </div>
 
-              <div className="flex-1 min-w-0 lg:ml-6">
+              <div className="flex-1 min-w-0">
                 <JobList
                   jobs={loadedJobs}
                   filters={filters}

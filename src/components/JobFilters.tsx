@@ -16,13 +16,15 @@ import type { Job } from '../types/job';
 import type { CategoryWithSubcategories } from '../lib/database/categories';
 import type { FilterState, DeadlineFilterKey } from '../lib/filters/filter-state';
 import { defaultFilters, WARSAW_CITY } from '../lib/filters/filter-state';
-import { extractCity, extractSublocality } from '../utils/locationMapping';
+import { extractCity } from '../utils/locationMapping';
 import {
   getDeadlineFilterCounts,
   getFormalCriteriaCounts,
-  getWarsawDistrictsForFilters,
+  getListEligibleJobs,
 } from '../lib/filters/filter-logic';
+import { getBookmarkedJobs } from '../utils/bookmarkStorage';
 import { DEADLINE_FILTER_OPTIONS } from '../lib/filters/deadline-labels';
+import { ActiveFilterChips } from './ActiveFilterChips';
 import { cn } from './ui/utils';
 
 export type { FilterState } from '../lib/filters/filter-state';
@@ -42,7 +44,7 @@ function filterCountClass(count: number, isSelected: boolean): string {
 }
 
 interface JobFiltersProps {
-  onFilterChange?: (filters: FilterState) => void;
+  onFilterChange?: (filters: FilterState | ((prev: FilterState) => FilterState)) => void;
   primaryLocation?: string;
   onLocationChange?: () => void;
   jobs?: Job[];
@@ -112,6 +114,39 @@ export default function JobFilters({
   const supabase = createClient();
   const [categoriesFromDb, setCategoriesFromDb] = useState<CategoryWithSubcategories[]>([]);
 
+  const bookmarkedIdSet = useMemo(() => {
+    try {
+      return new Set(getBookmarkedJobs().map((bookmark) => bookmark.id));
+    } catch {
+      return new Set<string>();
+    }
+  }, []);
+
+  const categoryPool = useMemo(
+    () => getListEligibleJobs(jobs, local, bookmarkedIdSet, 'categories'),
+    [jobs, local, bookmarkedIdSet],
+  );
+
+  const subcategoryPool = useMemo(
+    () => getListEligibleJobs(jobs, local, bookmarkedIdSet, 'subcategories'),
+    [jobs, local, bookmarkedIdSet],
+  );
+
+  const cityPool = useMemo(
+    () => getListEligibleJobs(jobs, local, bookmarkedIdSet, 'cities'),
+    [jobs, local, bookmarkedIdSet],
+  );
+
+  const deadlinePool = useMemo(
+    () => getListEligibleJobs(jobs, local, bookmarkedIdSet, 'deadline'),
+    [jobs, local, bookmarkedIdSet],
+  );
+
+  const formalPool = useMemo(
+    () => getListEligibleJobs(jobs, local, bookmarkedIdSet, 'formal'),
+    [jobs, local, bookmarkedIdSet],
+  );
+
   /* eslint-disable react-hooks/set-state-in-effect -- mirror URL/context filters into sidebar draft state */
   useEffect(() => {
     if (initialFilters && !isUpdatingFromSelfRef.current) {
@@ -131,48 +166,38 @@ export default function JobFilters({
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    jobs.forEach((job) => {
+    categoryPool.forEach((job) => {
       const name =
         typeof job.category === 'string' ? job.category : job.category?.name || '';
       if (name) counts[name] = (counts[name] || 0) + 1;
     });
     return counts;
-  }, [jobs]);
+  }, [categoryPool]);
 
   const subcategoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    jobs.forEach((job) => {
+    subcategoryPool.forEach((job) => {
       if (job.subcategory) {
         counts[job.subcategory] = (counts[job.subcategory] || 0) + 1;
       }
     });
     return counts;
-  }, [jobs]);
+  }, [subcategoryPool]);
 
-  const warsawDistricts = useMemo(() => getWarsawDistrictsForFilters(), []);
+  const cityCount = useMemo(
+    () => cityPool.filter((job) => extractCity(job.location) === WARSAW_CITY).length,
+    [cityPool],
+  );
 
-  const districtCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const district of warsawDistricts) {
-      counts[district] = 0;
-    }
-    jobs.forEach((job) => {
-      if (extractCity(job.location) !== WARSAW_CITY) return;
-      const sub = extractSublocality(job.location);
-      if (sub && sub in counts) {
-        counts[sub] += 1;
-      }
-    });
-    return counts;
-  }, [jobs, warsawDistricts]);
-
-  const deadlineCounts = useMemo(() => getDeadlineFilterCounts(jobs), [jobs]);
-  const formalCounts = useMemo(() => getFormalCriteriaCounts(jobs), [jobs]);
+  const deadlineCounts = useMemo(() => getDeadlineFilterCounts(deadlinePool), [deadlinePool]);
+  const formalCounts = useMemo(() => getFormalCriteriaCounts(formalPool), [formalPool]);
 
   useEffect(() => {
     const next: FilterState = {
       ...local,
       postTypes: defaultFilters.postTypes,
+      cities: [WARSAW_CITY],
+      sublocalities: [],
     };
 
     const serialized = JSON.stringify(next);
@@ -185,6 +210,12 @@ export default function JobFilters({
 
   const patch = (partial: Partial<FilterState>) => {
     setLocal((prev) => ({ ...prev, ...partial }));
+  };
+
+  const handleChipFilterChange = (
+    next: FilterState | ((prev: FilterState) => FilterState),
+  ) => {
+    setLocal((prev) => (typeof next === 'function' ? next(prev) : next));
   };
 
   const toggleSection = (name: string) => {
@@ -202,15 +233,6 @@ export default function JobFilters({
     });
   };
 
-  const handleDistrictChange = (district: string, checked: boolean) => {
-    const key = `${WARSAW_CITY}:${district}`;
-    patch({
-      sublocalities: checked
-        ? [...local.sublocalities, key]
-        : local.sublocalities.filter((s) => s !== key),
-    });
-  };
-
   const toggleDeadline = (value: DeadlineFilterKey, checked: boolean) => {
     patch({
       deadline: checked
@@ -224,12 +246,14 @@ export default function JobFilters({
       className="flex h-full min-h-0 w-full max-h-full flex-col overflow-hidden bg-white lg:w-80"
     >
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="flex-shrink-0 px-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <h3 className="text-lg font-bold text-gray-900">Filtry</h3>
-            </div>
+        <div className="flex-shrink-0 px-6 pt-3 lg:pt-3">
+          <div className="mb-2 flex h-8 items-center">
+            <h3 className="text-base font-bold text-gray-900 sm:text-lg">Filtry</h3>
           </div>
+
+          {onFilterChange && (
+            <ActiveFilterChips filters={local} onFilterChange={handleChipFilterChange} />
+          )}
 
           {primaryLocation && primaryLocation !== 'Polska' && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -374,43 +398,20 @@ export default function JobFilters({
           >
             <SectionTrigger title="Lokalizacja" open={expandedFilterSections.includes('location')} />
             <CollapsibleContent className="mt-3 pl-2">
-              <input
-                type="text"
-                value={WARSAW_CITY}
-                disabled
-                className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-600 text-sm mb-3"
-                aria-label="Miasto"
-              />
-              <Label className="text-xs font-semibold text-gray-700 mb-2 block">
-                Dzielnica
-              </Label>
-              <div className="space-y-2">
-                  {warsawDistricts.map((district) => {
-                    const key = `${WARSAW_CITY}:${district}`;
-                    const count = districtCounts[district] ?? 0;
-                    const districtSelected = local.sublocalities.includes(key);
-                    return (
-                      <div key={district} className="flex items-center space-x-2">
-                        <CustomCheckbox
-                          id={`district-${district}`}
-                          checked={districtSelected}
-                          onCheckedChange={(checked) =>
-                            handleDistrictChange(district, checked)
-                          }
-                        />
-                        <Label
-                          htmlFor={`district-${district}`}
-                          className={filterOptionLabelClass(count, districtSelected)}
-                        >
-                          {district}{' '}
-                          <span className={filterCountClass(count, districtSelected)}>
-                            ({count})
-                          </span>
-                        </Label>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="flex items-center space-x-2 pointer-events-none">
+                <CustomCheckbox
+                  id="city-warsaw"
+                  checked
+                  onCheckedChange={() => undefined}
+                />
+                <Label
+                  htmlFor="city-warsaw"
+                  className={filterOptionLabelClass(cityCount, true)}
+                >
+                  {WARSAW_CITY}{' '}
+                  <span className={filterCountClass(cityCount, true)}>({cityCount})</span>
+                </Label>
+              </div>
             </CollapsibleContent>
           </Collapsible>
 

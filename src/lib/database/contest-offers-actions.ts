@@ -61,7 +61,7 @@ export async function abandonTenderBidDraftAction(input: {
 
   const revalidateTargets = ['/panel-wykonawcy/aplikacje', '/panel-wykonawcy'];
   if (input.tenderId) {
-    revalidateTargets.push(`/zlecenia/${input.tenderId}`);
+    revalidateTargets.push(`/konkurs/${input.tenderId}`);
   }
   for (const path of revalidateTargets) {
     revalidatePath(path);

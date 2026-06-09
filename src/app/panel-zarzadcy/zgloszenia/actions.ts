@@ -59,7 +59,7 @@ export async function updateJobWorkflowStatusAction(
 
   revalidatePath('/panel-zarzadcy/zgloszenia');
   revalidatePath('/panel-zarzadcy/konkursy');
-  revalidatePath(`/zlecenia/${jobId.trim()}`);
+  revalidatePath(`/konkurs/${jobId.trim()}`);
 
   return { success: true };
 }
@@ -154,7 +154,7 @@ export async function acceptJobOfferAction(
   if (result.success) {
     revalidatePath('/panel-zarzadcy/zgloszenia');
     revalidatePath(`/panel-zarzadcy/zgloszenia/porownaj/${jobId.trim()}`);
-    revalidatePath(`/panel-zarzadcy/zlecenia/${jobId.trim()}/applications`);
+    revalidatePath(`/panel-zarzadcy/konkursy/${jobId.trim()}/aplikacje`);
   }
 
   return result;

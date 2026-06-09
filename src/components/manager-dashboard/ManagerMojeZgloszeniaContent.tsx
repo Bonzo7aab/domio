@@ -126,7 +126,7 @@ export function ManagerMojeZgloszeniaContent({
   const [abandonDraftTarget, setAbandonDraftTarget] = useState<ManagerSubmission | null>(null);
   const [isAbandoningDraft, setIsAbandoningDraft] = useState(false);
   const [podgladInitialTab, setPodgladInitialTab] = useState<
-    'details' | 'selected-offer' | 'rate-zlecenie'
+    'details' | 'selected-offer' | 'rate-konkurs'
   >('details');
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -150,10 +150,10 @@ export function ManagerMojeZgloszeniaContent({
     if (!row) return;
 
     const tabParam = searchParams.get('tab');
-    const tab: 'details' | 'selected-offer' | 'rate-zlecenie' =
-      tabParam === 'selected-offer' || tabParam === 'rate-zlecenie' || tabParam === 'rate-service'
-        ? tabParam === 'rate-service'
-          ? 'rate-zlecenie'
+    const tab: 'details' | 'selected-offer' | 'rate-konkurs' =
+      tabParam === 'selected-offer' || tabParam === 'rate-konkurs' || tabParam === 'rate-service' || tabParam === 'rate-zlecenie'
+        ? tabParam === 'rate-service' || tabParam === 'rate-zlecenie'
+          ? 'rate-konkurs'
           : tabParam
         : 'details';
 

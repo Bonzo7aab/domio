@@ -152,7 +152,7 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
       ? [
           {
             icon: ClipboardList,
-            title: 'Przeglądaj zlecenia i składaj oferty',
+            title: 'Przeglądaj konkursy i składaj oferty',
             description: 'Dopasuj ofertę do budżetu i terminu realizacji.',
           },
           {
@@ -169,8 +169,8 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
       : [
           {
             icon: Megaphone,
-            title: 'Publikuj zlecenia dla wykonawców',
-            description: 'Ogłoszenia widoczne na mapie i w liście zleceń.',
+            title: 'Publikuj konkursy dla wykonawców',
+            description: 'Ogłoszenia widoczne na mapie i w liście konkursów.',
           },
           {
             icon: MessagesSquare,
@@ -204,7 +204,7 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
         body:
           selectedUserType === 'contractor'
             ? 'Załóż konto firmy, a dokumenty weryfikacyjne prześlesz wtedy, kiedy będziesz gotowy.'
-            : 'Opublikuj zlecenia i znajdź sprawdzonych wykonawców w Warszawie.',
+            : 'Opublikuj konkursy i znajdź sprawdzonych wykonawców w Warszawie.',
         features: sideFeatures,
       }}
       footer={

@@ -11,7 +11,7 @@ export default function ContractorFavoritesPage(): React.ReactElement {
       <BookmarkedJobsPage
         embedded
         onBack={() => router.push('/')}
-        onJobSelect={(jobId) => router.push(`/zlecenia/${jobId}`)}
+        onJobSelect={(jobId) => router.push(`/konkurs/${jobId}`)}
       />
     </div>
   );

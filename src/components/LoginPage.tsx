@@ -54,14 +54,14 @@ export function LoginPage() {
     <AuthPageLayout
       testId="login-page"
       title="Zaloguj się"
-      subtitle="Wróć do zleceń i wiadomości na swoim koncie."
+      subtitle="Wróć do konkursów i wiadomości na swoim koncie."
       side={{
         heading: 'Platforma dla zarządców i wykonawców',
-        body: 'Przeglądaj zlecenia na mapie, składaj oferty i zarządzaj współpracą w jednym miejscu.',
+        body: 'Przeglądaj konkursy na mapie, składaj oferty i zarządzaj współpracą w jednym miejscu.',
         features: [
           {
             icon: MapPin,
-            title: 'Zlecenia i przetargi w Warszawie',
+            title: 'Konkursy w Warszawie',
             description: 'Filtruj po dzielnicy, kategorii i budżecie na mapie.',
           },
           {

@@ -89,7 +89,7 @@
       "name": "Znajdź zgłoszenia",
       "short_name": "Zgłoszenia",
       "description": "Przeglądaj dostępne zgłoszenia budowlane",
-      "url": "/zlecenia",
+      "url": "/",
       "icons": [
         {
           "src": "/icon-96x96.png",

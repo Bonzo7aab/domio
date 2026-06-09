@@ -77,7 +77,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to job page with error handling for interrupted navigation
         try {
-          await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -85,14 +85,14 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
-            await page.waitForURL((url) => !url.pathname.includes('/zlecenia/') || url.pathname.includes(`/zlecenia/${testJob.id}`), { timeout: 2000 }).catch(() => {});
+            await page.waitForURL((url) => !url.pathname.includes('/konkurs/') || url.pathname.includes(`/konkurs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testJob.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
               // Retry navigation
-              await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -160,7 +160,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to job page with error handling for interrupted navigation
         try {
-          await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -168,14 +168,14 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
-            await page.waitForURL((url) => !url.pathname.includes('/zlecenia/') || url.pathname.includes(`/zlecenia/${testJob.id}`), { timeout: 2000 }).catch(() => {});
+            await page.waitForURL((url) => !url.pathname.includes('/konkurs/') || url.pathname.includes(`/konkurs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testJob.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
               // Retry navigation
-              await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -237,7 +237,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to tender page (tenders use same route structure as jobs) with error handling
         try {
-          await page.goto(`/zlecenia/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -246,10 +246,10 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000); // Wait for redirect/cleanup to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testTender.id}`)) {
+            if (page.url().includes(`/konkurs/${testTender.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
-              await page.goto(`/zlecenia/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -311,7 +311,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to tender page with error handling
         try {
-          await page.goto(`/zlecenia/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -320,10 +320,10 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000); // Wait for redirect/cleanup to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testTender.id}`)) {
+            if (page.url().includes(`/konkurs/${testTender.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
-              await page.goto(`/zlecenia/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -401,7 +401,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to job page with error handling for interrupted navigation
         try {
-          await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -409,14 +409,14 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
-            await page.waitForURL((url) => !url.pathname.includes('/zlecenia/') || url.pathname.includes(`/zlecenia/${testJob.id}`), { timeout: 2000 }).catch(() => {});
+            await page.waitForURL((url) => !url.pathname.includes('/konkurs/') || url.pathname.includes(`/konkurs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testJob.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
               // Retry navigation
-              await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -459,7 +459,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to job page with error handling for interrupted navigation
         try {
-          await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -467,14 +467,14 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
-            await page.waitForURL((url) => !url.pathname.includes('/zlecenia/') || url.pathname.includes(`/zlecenia/${testJob.id}`), { timeout: 2000 }).catch(() => {});
+            await page.waitForURL((url) => !url.pathname.includes('/konkurs/') || url.pathname.includes(`/konkurs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testJob.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
               // Retry navigation
-              await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -517,7 +517,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to job page with error handling for interrupted navigation
         try {
-          await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -525,14 +525,14 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
-            await page.waitForURL((url) => !url.pathname.includes('/zlecenia/') || url.pathname.includes(`/zlecenia/${testJob.id}`), { timeout: 2000 }).catch(() => {});
+            await page.waitForURL((url) => !url.pathname.includes('/konkurs/') || url.pathname.includes(`/konkurs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testJob.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
               // Retry navigation
-              await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -587,7 +587,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to tender page with error handling
         try {
-          await page.goto(`/zlecenia/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -596,10 +596,10 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000); // Wait for redirect/cleanup to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testTender.id}`)) {
+            if (page.url().includes(`/konkurs/${testTender.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
-              await page.goto(`/zlecenia/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testTender.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -691,7 +691,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Submit offer on first job with error handling
         try {
-          await page.goto(`/zlecenia/${testJob1.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob1.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted
@@ -699,10 +699,10 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000);
-            if (page.url().includes(`/zlecenia/${testJob1.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob1.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
-              await page.goto(`/zlecenia/${testJob1.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob1.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -729,7 +729,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Submit offer on second job with error handling
         try {
-          await page.goto(`/zlecenia/${testJob2.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob2.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted
@@ -737,10 +737,10 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             await page.waitForTimeout(1000);
-            if (page.url().includes(`/zlecenia/${testJob2.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob2.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
-              await page.goto(`/zlecenia/${testJob2.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob2.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -789,7 +789,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to job page with error handling for interrupted navigation
         try {
-          await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -797,14 +797,14 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
-            await page.waitForURL((url) => !url.pathname.includes('/zlecenia/') || url.pathname.includes(`/zlecenia/${testJob.id}`), { timeout: 2000 }).catch(() => {});
+            await page.waitForURL((url) => !url.pathname.includes('/konkurs/') || url.pathname.includes(`/konkurs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testJob.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
               // Retry navigation
-              await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -851,7 +851,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to job page with error handling for interrupted navigation
         try {
-          await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -859,14 +859,14 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
-            await page.waitForURL((url) => !url.pathname.includes('/zlecenia/') || url.pathname.includes(`/zlecenia/${testJob.id}`), { timeout: 2000 }).catch(() => {});
+            await page.waitForURL((url) => !url.pathname.includes('/konkurs/') || url.pathname.includes(`/konkurs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testJob.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
               // Retry navigation
-              await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -925,7 +925,7 @@ test.describe('Contractor Making Offers', () => {
 
         // Navigate to job page with error handling for interrupted navigation
         try {
-          await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
           await page.waitForLoadState('networkidle');
         } catch (error: unknown) {
           // Retry navigation if interrupted (NS_BINDING_ABORTED or redirected)
@@ -933,14 +933,14 @@ test.describe('Contractor Making Offers', () => {
               error.message?.includes('interrupted') ||
               error.message?.includes('interrupted by another navigation'))) {
             // Wait for any redirect to complete
-            await page.waitForURL((url) => !url.pathname.includes('/zlecenia/') || url.pathname.includes(`/zlecenia/${testJob.id}`), { timeout: 2000 }).catch(() => {});
+            await page.waitForURL((url) => !url.pathname.includes('/konkurs/') || url.pathname.includes(`/konkurs/${testJob.id}`), { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(1000); // Additional wait for cleanup/redirect to complete
             // Check if we're already on the correct page
-            if (page.url().includes(`/zlecenia/${testJob.id}`)) {
+            if (page.url().includes(`/konkurs/${testJob.id}`)) {
               await page.waitForLoadState('networkidle');
             } else {
               // Retry navigation
-              await page.goto(`/zlecenia/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+              await page.goto(`/konkurs/${testJob.id}`, { waitUntil: 'domcontentloaded', timeout: 10000 });
               await page.waitForLoadState('networkidle');
             }
           } else {
@@ -974,7 +974,7 @@ test.describe('Contractor Making Offers', () => {
       page: import('@playwright/test').Page,
       jobId: string,
     ): Promise<void> {
-      await page.goto(`/zlecenia/${jobId}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.goto(`/konkurs/${jobId}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
       await page.waitForLoadState('networkidle');
     }
 
