@@ -79,7 +79,8 @@ async function resolveExistingPoolUser(
     throw new Error(`Failed to resolve existing pool user ${email}: ${error?.message ?? 'No user'}`);
   }
 
-  const { data: relation } = await adminClient
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: relation } = await (adminClient as any)
     .from('user_companies')
     .select('company_id')
     .eq('user_id', data.user.id)
@@ -327,7 +328,8 @@ export async function cleanupPool(): Promise<void> {
   for (const user of allUsers) {
     try {
       if (user.companyId) {
-        await adminClient.from('user_companies').delete().eq('company_id', user.companyId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (adminClient as any).from('user_companies').delete().eq('company_id', user.companyId);
       }
 
       await deleteTestUser(user.email);

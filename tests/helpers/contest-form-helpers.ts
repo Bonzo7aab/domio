@@ -114,7 +114,8 @@ function createAdminClient() {
 
 export async function findContestTenderIdByTitle(title: string): Promise<string | null> {
   const adminClient = createAdminClient();
-  const { data, error } = await adminClient
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (adminClient as any)
     .from('tenders')
     .select('id')
     .eq('title', title)
@@ -132,7 +133,8 @@ export async function findContestTenderIdByTitle(title: string): Promise<string 
 
 export async function deleteContestTender(tenderId: string): Promise<void> {
   const adminClient = createAdminClient();
-  const { error } = await adminClient.from('tenders').delete().eq('id', tenderId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (adminClient as any).from('tenders').delete().eq('id', tenderId);
 
   if (error) {
     console.warn(`Failed to delete contest tender ${tenderId}: ${error.message}`);

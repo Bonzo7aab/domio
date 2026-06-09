@@ -59,7 +59,8 @@ export async function getSeededUserProfile(
   const adminClient = createAdminClient();
   const userId = await getUserIdByEmail(email, password);
 
-  const { data: profile, error } = await adminClient
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profile, error } = await (adminClient as any)
     .from('user_profiles')
     .select(
       `
@@ -114,7 +115,8 @@ export async function resetContractorVerificationForE2E(
     throw new Error(`Failed to reset verification profile: ${profileError.message}`);
   }
 
-  const { error: settingsError } = await adminClient
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: settingsError } = await (adminClient as any)
     .from('contractor_account_settings')
     .update({ oc_policy_scan_path: null })
     .eq('user_id', userId);
