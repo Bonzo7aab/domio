@@ -13,7 +13,7 @@ export default function EdytujZgloszeniePage(): ReactElement {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push(`/login?redirectTo=${encodeURIComponent(`/manager-dashboard/zgloszenia/edytuj/${id}`)}`);
+      router.push(`/logowanie?redirectTo=${encodeURIComponent(`/panel-zarzadcy/zgloszenia/edytuj/${id}`)}`);
     }
   }, [user, isLoading, router, id]);
 
@@ -37,7 +37,7 @@ export default function EdytujZgloszeniePage(): ReactElement {
     <PostJobPage
       jobId={id}
       onBack={() => {
-        router.push('/manager-dashboard/konkursy');
+        router.push('/panel-zarzadcy/konkursy');
       }}
     />
   );

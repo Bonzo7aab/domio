@@ -97,7 +97,7 @@ export function ContractorDashboardHeader({ profile, stats }: ContractorDashboar
                 )}
                 <div 
                   className="flex items-center gap-1 cursor-pointer hover:text-yellow-600 transition-colors"
-                  onClick={() => router.push('/contractor-dashboard/ratings')}
+                  onClick={() => router.push('/panel-wykonawcy/oceny')}
                 >
                   <Star className="w-3 h-3 sm:w-4 sm:h-4 fill-yellow-400 text-yellow-400 flex-shrink-0" />
                   <span>

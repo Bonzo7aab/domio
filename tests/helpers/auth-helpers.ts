@@ -144,7 +144,7 @@ export async function loginViaUI(page: Page, email: string, password: string) {
   const browserName = page.context().browser()?.browserType().name() || 'chromium';
   const isWebKit = browserName === 'webkit';
   
-  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.goto('/logowanie', { waitUntil: 'domcontentloaded' });
   
   // Wait for auth initialization (critical for WebKit)
   await waitForAuthInitialized(page);
@@ -172,7 +172,7 @@ export async function loginViaUI(page: Page, email: string, password: string) {
   await page.click('button[type="submit"]');
   
   // Wait for navigation after login with longer timeout for WebKit
-  await page.waitForURL((url) => url.pathname !== '/login', { timeout: isWebKit ? 20000 : 10000 });
+  await page.waitForURL((url) => url.pathname !== '/logowanie', { timeout: isWebKit ? 20000 : 10000 });
 }
 
 /**
@@ -185,7 +185,7 @@ export async function logoutViaUI(page: Page) {
   
   if (await logoutButton.isVisible({ timeout: 2000 }).catch(() => false)) {
     await logoutButton.click();
-    await page.waitForURL((url) => url.pathname === '/login' || url.pathname === '/', { timeout: 10000 });
+    await page.waitForURL((url) => url.pathname === '/logowanie' || url.pathname === '/', { timeout: 10000 });
   }
 }
 
@@ -195,13 +195,13 @@ export async function logoutViaUI(page: Page) {
 export async function waitForAuthState(page: Page, isAuthenticated: boolean) {
   // Wait for navigation or URL change that indicates auth state
   if (isAuthenticated) {
-    // Wait for redirect away from login/register pages
-    await page.waitForURL((url) => !url.pathname.includes('/login') && !url.pathname.includes('/register'), {
+    // Wait for redirect away from login/rejestracja pages
+    await page.waitForURL((url) => !url.pathname.includes('/logowanie') && !url.pathname.includes('/rejestracja'), {
       timeout: 10000,
     });
   } else {
     // Wait for redirect to login page
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: 10000 });
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: 10000 });
   }
 }
 

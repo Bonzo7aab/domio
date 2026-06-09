@@ -279,7 +279,7 @@ export function ManagerContestWinnerDialog({
                     </p>
                     {bid.contractorCompanyId ? (
                       <Link
-                        href={`/contractors/${bid.contractorCompanyId}`}
+                        href={`/wykonawcy/${bid.contractorCompanyId}`}
                         className="inline-flex items-center gap-1 text-primary text-sm font-medium hover:underline pt-1"
                       >
                         Profil wykonawcy

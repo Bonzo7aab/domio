@@ -2,7 +2,7 @@
 
 import { useTransition, type ReactElement } from 'react';
 import { toast } from 'sonner';
-import { updateTenderWorkflowStatusAction } from '../../app/manager-dashboard/zgloszenia/actions';
+import { updateTenderWorkflowStatusAction } from '../../app/panel-zarzadcy/zgloszenia/actions';
 import {
   getManagerAllowedTenderStatuses,
   getTenderWorkflowStatusLabel,

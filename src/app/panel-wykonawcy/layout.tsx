@@ -21,7 +21,7 @@ export default async function ContractorDashboardLayout({
   if (authError || !user) {
     // Use the actual pathname from the request (middleware should have already redirected)
     // This is a fallback in case middleware doesn't catch it
-    redirect('/login?redirectTo=/contractor-dashboard');
+    redirect('/logowanie?redirectTo=/panel-wykonawcy');
   }
 
   // Fetch company data
@@ -29,7 +29,7 @@ export default async function ContractorDashboardLayout({
   
   if (companyError || !company) {
     // Redirect to account page to set up company
-    redirect('/account?tab=company');
+    redirect('/konto?tab=company');
   }
 
   // Fetch contractor profile

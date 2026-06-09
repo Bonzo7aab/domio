@@ -166,7 +166,7 @@ async function OverviewDataFetcher() {
       <Card>
         <CardContent className="pt-6 text-center space-y-4 gap-2 flex flex-col justify-center">
           <p className="text-muted-foreground">Nie znaleziono firmy. Proszę najpierw uzupełnić dane firmy w profilu.</p>
-          <Link href="/account">
+          <Link href="/konto">
             <Button>Dodaj dane firmy w profilu</Button>
           </Link>
         </CardContent>

@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
-import { addAdminNoteAction } from '../../app/admin/actions';
+import { addAdminNoteAction } from '../../app/administracja/actions';
 
 interface AdminNote {
   id: string;

@@ -8,7 +8,7 @@ export default function UserTypeSelection() {
 
   useEffect(() => {
     // Redirect directly to login page with tabs
-    router.push('/login');
+    router.push('/logowanie');
   }, [router]);
 
   return (

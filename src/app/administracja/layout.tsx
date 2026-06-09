@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const headerStore = await headers();
-  const redirectTo = headerStore.get('x-pathname') ?? '/admin';
+  const redirectTo = headerStore.get('x-pathname') ?? '/administracja';
   const session = await requirePlatformAdmin(redirectTo);
   const email = session.email ?? '';
 

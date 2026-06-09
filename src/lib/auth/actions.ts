@@ -78,23 +78,23 @@ async function loginActionImpl(
     const isContractor = profile?.user_type === 'contractor'
 
     const roleHome = isAdmin
-      ? '/admin'
+      ? '/administracja'
       : isContractor
-        ? '/contractor-dashboard'
-        : '/manager-dashboard'
+        ? '/panel-wykonawcy'
+        : '/panel-zarzadcy'
 
     if (isAdmin) {
-      // Admins always land on /admin regardless of `redirectTo`.
-      redirectTo = '/admin'
+      // Admins always land on /administracja regardless of `redirectTo`.
+      redirectTo = '/administracja'
     } else if (requestedRedirect) {
       const forbiddenForContractor =
         isContractor &&
-        (requestedRedirect.startsWith('/manager-dashboard') ||
-          requestedRedirect.startsWith('/admin'))
+        (requestedRedirect.startsWith('/panel-zarzadcy') ||
+          requestedRedirect.startsWith('/administracja'))
       const forbiddenForManager =
         !isContractor &&
-        (requestedRedirect.startsWith('/admin') ||
-          requestedRedirect.startsWith('/contractor-dashboard'))
+        (requestedRedirect.startsWith('/administracja') ||
+          requestedRedirect.startsWith('/panel-wykonawcy'))
 
       redirectTo =
         forbiddenForContractor || forbiddenForManager ? roleHome : requestedRedirect
@@ -135,41 +135,41 @@ async function registerActionImpl(
   const city = (formData.get('city') as string)?.trim() || undefined
   const district = (formData.get('district') as string)?.trim() || undefined
   if (!acceptTerms || acceptTerms === '0') {
-    redirect(`/register?error=${encodeURIComponent('Musisz zaakceptować regulamin i politykę prywatności')}`)
+    redirect(`/rejestracja?error=${encodeURIComponent('Musisz zaakceptować regulamin i politykę prywatności')}`)
   }
 
   if (!email || !password || !firstName || !lastName || !userType) {
-    redirect(`/register?error=${encodeURIComponent('Proszę wypełnić wszystkie wymagane pola')}`)
+    redirect(`/rejestracja?error=${encodeURIComponent('Proszę wypełnić wszystkie wymagane pola')}`)
   }
 
   if (!nip || !companyName) {
-    redirect(`/register?error=${encodeURIComponent('NIP i Nazwa są wymagane')}`)
+    redirect(`/rejestracja?error=${encodeURIComponent('NIP i Nazwa są wymagane')}`)
   }
 
   if (!phone) {
-    redirect(`/register?error=${encodeURIComponent('Telefon jest wymagany')}`)
+    redirect(`/rejestracja?error=${encodeURIComponent('Telefon jest wymagany')}`)
   }
 
   if (userType === 'manager') {
     if (!organizationType || !street || !district) {
-      redirect(`/register?error=${encodeURIComponent('Uzupełnij typ organizacji, adres (ulica, dzielnica)')}`)
+      redirect(`/rejestracja?error=${encodeURIComponent('Uzupełnij typ organizacji, adres (ulica, dzielnica)')}`)
     }
   }
 
   if (password.length < 6) {
-    redirect(`/register?error=${encodeURIComponent('Hasło musi mieć co najmniej 6 znaków')}`)
+    redirect(`/rejestracja?error=${encodeURIComponent('Hasło musi mieć co najmniej 6 znaków')}`)
   }
 
   if (password !== confirmPassword) {
-    redirect(`/register?error=${encodeURIComponent('Hasła nie są identyczne')}`)
+    redirect(`/rejestracja?error=${encodeURIComponent('Hasła nie są identyczne')}`)
   }
 
   const registrationSettings = await getRegistrationSettingsForRegister()
   if (userType === 'contractor' && !registrationSettings.contractorOpen) {
-    redirect(`/register?error=${encodeURIComponent(registrationClosedMessage('contractor'))}`)
+    redirect(`/rejestracja?error=${encodeURIComponent(registrationClosedMessage('contractor'))}`)
   }
   if (userType === 'manager' && !registrationSettings.managerOpen) {
-    redirect(`/register?error=${encodeURIComponent(registrationClosedMessage('manager'))}`)
+    redirect(`/rejestracja?error=${encodeURIComponent(registrationClosedMessage('manager'))}`)
   }
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -186,11 +186,11 @@ async function registerActionImpl(
   })
 
   if (authError) {
-    redirect(`/register?error=${encodeURIComponent(authError.message)}`)
+    redirect(`/rejestracja?error=${encodeURIComponent(authError.message)}`)
   }
 
   if (!authData.user) {
-    redirect(`/register?error=${encodeURIComponent('Nie udało się utworzyć konta')}`)
+    redirect(`/rejestracja?error=${encodeURIComponent('Nie udało się utworzyć konta')}`)
   }
 
   const userId = authData.user.id
@@ -212,7 +212,7 @@ async function registerActionImpl(
     })
 
   if (profileError) {
-    redirect(`/register?error=${encodeURIComponent(profileError.message)}`)
+    redirect(`/rejestracja?error=${encodeURIComponent(profileError.message)}`)
   }
 
   const companyType: 'spółdzielnia' | 'wspólnota' | 'contractor' =
@@ -246,11 +246,11 @@ async function registerActionImpl(
     .single()
 
   if (companyError) {
-    redirect(`/register?error=${encodeURIComponent(companyError.message)}`)
+    redirect(`/rejestracja?error=${encodeURIComponent(companyError.message)}`)
   }
 
   if (!companyRow?.id) {
-    redirect(`/register?error=${encodeURIComponent('Nie udało się utworzyć firmy')}`)
+    redirect(`/rejestracja?error=${encodeURIComponent('Nie udało się utworzyć firmy')}`)
   }
 
   // user_companies not in Database type; use type assertion
@@ -266,7 +266,7 @@ async function registerActionImpl(
     })
 
   if (ucError) {
-    redirect(`/register?error=${encodeURIComponent(ucError.message)}`)
+    redirect(`/rejestracja?error=${encodeURIComponent(ucError.message)}`)
   }
 
   revalidatePath('/', 'layout')
@@ -278,13 +278,13 @@ async function registerActionImpl(
   if (authData.session) {
     const redirectTo =
       userType === 'contractor'
-        ? `/register/verification-choice?message=${successMessage}`
-        : `/account?message=${successMessage}`
+        ? `/rejestracja/wybor-weryfikacji?message=${successMessage}`
+        : `/konto?message=${successMessage}`
     return { success: true, redirectTo }
   }
 
   redirect(
-    `/login?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')}`
+    `/logowanie?message=${encodeURIComponent('Konto zostało utworzone pomyślnie. Sprawdź email aby potwierdzić konto.')}`
   )
 }
 
@@ -301,7 +301,7 @@ async function logoutActionImpl() {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/login?refresh_browser_auth=1')
+  redirect('/logowanie?refresh_browser_auth=1')
 }
 
 /**
@@ -338,7 +338,7 @@ function getPublicAppOrigin(): string {
 }
 
 /**
- * Sends Supabase password recovery email (PKCE). Link lands on `/auth/callback` then `/auth/update-password`.
+ * Sends Supabase password recovery email (PKCE). Link lands on `/auth/callback` then `/auth/aktualizacja-hasla`.
  */
 async function requestPasswordResetEmailActionImpl(
   email: string
@@ -350,7 +350,7 @@ async function requestPasswordResetEmailActionImpl(
   }
 
   const origin = getPublicAppOrigin()
-  const next = encodeURIComponent('/auth/update-password')
+  const next = encodeURIComponent('/auth/aktualizacja-hasla')
   const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
     redirectTo: `${origin}/auth/callback?next=${next}`,
   })

@@ -22,7 +22,7 @@ import {
   resumeTenderListingAction,
   updateJobListingAdminAction,
   updateTenderListingAdminAction,
-} from '../../app/admin/actions';
+} from '../../app/administracja/actions';
 import type {
   AdminJobListingRow,
   AdminTenderListingRow,

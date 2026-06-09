@@ -194,13 +194,13 @@ export function ManagerOrderDetailDialog({
 
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" asChild>
-                  <Link href={`/manager-dashboard/konkursy?podglad=${order.tenderId}`}>
+                  <Link href={`/panel-zarzadcy/konkursy?podglad=${order.tenderId}`}>
                     Podgląd konkursu
                     <ExternalLink className="ml-1 h-3.5 w-3.5" />
                   </Link>
                 </Button>
                 <Button type="button" variant="outline" size="sm" asChild>
-                  <Link href={`/manager-dashboard/konkursy/porownaj/${order.tenderId}`}>
+                  <Link href={`/panel-zarzadcy/konkursy/porownaj/${order.tenderId}`}>
                     Porównanie ofert
                     <ExternalLink className="ml-1 h-3.5 w-3.5" />
                   </Link>

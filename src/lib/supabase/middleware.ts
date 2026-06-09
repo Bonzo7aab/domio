@@ -45,14 +45,14 @@ export async function updateSession(request: NextRequest) {
 
   // Protected routes that require authentication
   const protectedPaths = [
-    '/contractor-dashboard',
-    '/manager-dashboard',
-    '/account',
-    '/post-job',
-    '/post-contest',
-    '/post-tender',
-    '/tender-creation',
-    '/admin',
+    '/panel-wykonawcy',
+    '/panel-zarzadcy',
+    '/konto',
+    '/dodaj-zlecenie',
+    '/dodaj-konkurs',
+    '/dodaj-przetarg',
+    '/tworzenie-przetargu',
+    '/administracja',
   ]
 
   const isProtectedPath = protectedPaths.some(path =>
@@ -62,20 +62,20 @@ export async function updateSession(request: NextRequest) {
   // Redirect to login if accessing protected route without authentication
   if (isProtectedPath && !user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = '/logowanie'
     url.searchParams.set('redirectTo', request.nextUrl.pathname)
     return NextResponse.redirect(url)
   }
 
   const pathname = request.nextUrl.pathname
-  // `/account` is shared (managers + contractors); only manager dashboard is manager-only.
-  const isAccountPath = pathname === '/account' || pathname.startsWith('/account/')
+  // `/konto` is shared (managers + contractors); only manager dashboard is manager-only.
+  const isAccountPath = pathname === '/konto' || pathname.startsWith('/konto/')
   const isManagerDashboardPath =
-    pathname === '/manager-dashboard' || pathname.startsWith('/manager-dashboard/')
+    pathname === '/panel-zarzadcy' || pathname.startsWith('/panel-zarzadcy/')
   const isContractorOnlyPath =
-    pathname === '/contractor-dashboard' || pathname.startsWith('/contractor-dashboard/')
-  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
-  const isAuthEntryPath = pathname === '/login' || pathname === '/register'
+    pathname === '/panel-wykonawcy' || pathname.startsWith('/panel-wykonawcy/')
+  const isAdminPath = pathname === '/administracja' || pathname.startsWith('/administracja/')
+  const isAuthEntryPath = pathname === '/logowanie' || pathname === '/rejestracja'
 
   // Fetch role only when we may need to act on it
   if (
@@ -97,12 +97,12 @@ export async function updateSession(request: NextRequest) {
     const isManager = profile?.user_type === 'manager'
 
     const homePathFor = (() => {
-      if (isAdmin) return '/admin'
-      if (isContractor) return '/contractor-dashboard'
-      return '/manager-dashboard'
+      if (isAdmin) return '/administracja'
+      if (isContractor) return '/panel-wykonawcy'
+      return '/panel-zarzadcy'
     })()
 
-    // Already authenticated → bounce away from /login & /register to role-correct landing
+    // Already authenticated → bounce away from /logowanie & /rejestracja to role-correct landing
     if (isAuthEntryPath) {
       const url = request.nextUrl.clone()
       url.pathname = homePathFor
@@ -110,7 +110,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // /manager-dashboard is manager-only (contractors/admins are sent to their home)
+    // /panel-zarzadcy is manager-only (contractors/administracjas are sent to their home)
     if (isManagerDashboardPath && !isAdmin && !isManager) {
       const url = request.nextUrl.clone()
       url.pathname = homePathFor
@@ -118,11 +118,11 @@ export async function updateSession(request: NextRequest) {
     }
     if ((isManagerDashboardPath || isAccountPath) && isAdmin) {
       const url = request.nextUrl.clone()
-      url.pathname = '/admin'
+      url.pathname = '/administracja'
       return NextResponse.redirect(url)
     }
 
-    // /contractor-dashboard is contractor-only (admin lands on /admin instead)
+    // /panel-wykonawcy is contractor-only (admin lands on /administracja instead)
     if (isContractorOnlyPath && !isContractor && !isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = homePathFor
@@ -130,11 +130,11 @@ export async function updateSession(request: NextRequest) {
     }
     if (isContractorOnlyPath && isAdmin) {
       const url = request.nextUrl.clone()
-      url.pathname = '/admin'
+      url.pathname = '/administracja'
       return NextResponse.redirect(url)
     }
 
-    // /admin is admin-only
+    // /administracja is admin-only
     if (isAdminPath && !isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = homePathFor
@@ -152,7 +152,7 @@ export async function updateSession(request: NextRequest) {
 
   //   if (!profile?.profile_completed || !profile?.onboarding_completed) {
   //     const url = request.nextUrl.clone()
-  //     url.pathname = '/onboarding'
+  //     url.pathname = '/wdrozenie'
   //     return NextResponse.redirect(url)
   //   }
   // }

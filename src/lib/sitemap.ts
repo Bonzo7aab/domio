@@ -43,7 +43,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Główne",
     label: "Wykonawcy",
-    path: "/contractors",
+    path: "/wykonawcy",
     icon: Users,
     description: "Przeglądaj profile wykonawców",
     keywords: ["wykonawcy", "contractors", "firmy", "usługi"]
@@ -51,7 +51,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Główne",
     label: "Zarządcy Nieruchomości",
-    path: "/managers",
+    path: "/zarzadcy",
     icon: Building2,
     description: "Przeglądaj profile zarządców",
     keywords: ["zarządcy", "managers", "nieruchomości", "property"]
@@ -60,7 +60,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Dla Wykonawców",
     label: "Panel Wykonawcy",
-    path: "/contractor-dashboard",
+    path: "/panel-wykonawcy",
     icon: User,
     description: "Zarządzaj swoimi ofertami i aplikacjami",
     keywords: ["panel", "dashboard", "wykonawca", "oferty", "aplikacje"],
@@ -71,7 +71,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Dla Zarządców",
     label: "Panel Zarządcy",
-    path: "/manager-dashboard",
+    path: "/panel-zarzadcy",
     icon: Building2,
     description: "Zarządzaj swoimi ogłoszeniami i aplikacjami",
     keywords: ["panel", "dashboard", "zarządca", "ogłoszenia", "aplikacje"],
@@ -81,7 +81,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Dla Zarządców",
     label: "Utwórz konkurs",
-    path: "/post-contest",
+    path: "/dodaj-konkurs",
     icon: Plus,
     description: "Utwórz nowy konkurs ofert",
     keywords: ["konkurs", "tender", "utwórz", "nowy", "oferty", "zgłoszenie"],
@@ -93,7 +93,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Konto",
     label: "Profil",
-    path: "/account",
+    path: "/konto",
     icon: User,
     description: "Zarządzaj swoim profilem",
     keywords: ["profil", "account", "ustawienia", "dane", "settings"],
@@ -102,7 +102,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Konto",
     label: "Zapisane Zgłoszenia",
-    path: "/bookmarked-jobs",
+    path: "/zapisane-zgloszenia",
     icon: Bookmark,
     description: "Przeglądaj zapisane zgłoszenia",
     keywords: ["zapisane", "saved", "bookmark", "zgłoszenia"],
@@ -111,7 +111,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Konto",
     label: "Wiadomości",
-    path: "/messages",
+    path: "/wiadomosci",
     icon: MessagesSquare,
     description: "Sprawdź swoje wiadomości",
     keywords: ["wiadomości", "messages", "chat", "komunikacja"],
@@ -131,7 +131,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Pomoc",
     label: "Strona Powitalna",
-    path: "/welcome",
+    path: "/powitanie",
     icon: Play,
     description: "Dowiedz się więcej o platformie",
     keywords: ["welcome", "powitalna", "start", "onboarding", "intro"]
@@ -139,7 +139,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Pomoc",
     label: "Tutorial",
-    path: "/tutorial",
+    path: "/samouczek",
     icon: GraduationCap,
     description: "Przejdź przez samouczek platformy",
     keywords: ["tutorial", "samouczek", "nauka", "guide", "help"]
@@ -147,7 +147,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Pomoc",
     label: "Uzupełnij Profil",
-    path: "/profile-completion",
+    path: "/uzupelnianie-profilu",
     icon: Settings,
     description: "Dokończ konfigurację swojego profilu",
     keywords: ["profil", "completion", "uzupełnij", "konfiguracja"],
@@ -156,7 +156,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Pomoc",
     label: "Dokończ weryfikację",
-    path: "/account?tab=documents",
+    path: "/konto?tab=documents",
     icon: Shield,
     description: "Prześlij dokumenty w zakładce Dokumenty na koncie",
     keywords: ["weryfikacja", "verification", "verify", "potwierdź", "dokończ", "dokumenty"],
@@ -166,7 +166,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Pomoc",
     label: "Konsultacja Ekspercka",
-    path: "/expert-consultation",
+    path: "/konsultacja-eksperta",
     icon: HelpCircle,
     description: "Skorzystaj z konsultacji eksperckiej",
     keywords: ["konsultacja", "ekspert", "expert", "consultation", "pomoc"]
@@ -176,7 +176,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Autoryzacja",
     label: "Zaloguj się",
-    path: "/user-type-selection",
+    path: "/wybor-typu-konta",
     icon: LogIn,
     description: "Zaloguj się do swojego konta",
     keywords: ["login", "zaloguj", "logowanie", "sign in", "auth"],
@@ -185,7 +185,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Autoryzacja",
     label: "Rejestracja",
-    path: "/register",
+    path: "/rejestracja",
     icon: User,
     description: "Utwórz nowe konto",
     keywords: ["register", "rejestracja", "sign up", "nowe konto", "register"],
@@ -203,7 +203,7 @@ export const sitemapEntries: SitemapEntry[] = [
   {
     category: "Autoryzacja",
     label: "Przypomnij Hasło",
-    path: "/forgot-password",
+    path: "/zapomniane-haslo",
     icon: Lock,
     description: "Odzyskaj dostęp do konta",
     keywords: ["hasło", "password", "forgot", "reset", "odzyskaj"],

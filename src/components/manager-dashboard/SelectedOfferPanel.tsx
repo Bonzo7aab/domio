@@ -188,7 +188,7 @@ export function SelectedOfferPanel({
           </div>
           {companyId ? (
             <Link
-              href={`/contractors/${companyId}`}
+              href={`/wykonawcy/${companyId}`}
               className="inline-flex items-center gap-1 text-primary hover:underline mt-2"
             >
               Profil wykonawcy

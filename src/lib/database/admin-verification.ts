@@ -359,7 +359,7 @@ export async function fetchLatestDecisionAtForUser(
 }
 
 /**
- * All contractors/managers awaiting verification (OPD-45), including accounts that
+ * All contractors/zarzadcy awaiting verification (OPD-45), including accounts that
  * have not uploaded documents yet. Excludes users whose latest decision is rejected
  * until they resubmit.
  */

@@ -16,25 +16,25 @@ export function Footer() {
           {/* Links */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
             <Link 
-              href="/contractors" 
+              href="/wykonawcy" 
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               Wykonawcy
             </Link>
             <Link 
-              href="/managers" 
+              href="/zarzadcy" 
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               Zarządcy
             </Link>
             <Link 
-              href="/privacy" 
+              href="/polityka-prywatnosci" 
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               Polityka prywatności
             </Link>
             <Link 
-              href="/terms" 
+              href="/regulamin" 
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               Regulamin

@@ -29,7 +29,7 @@ test.describe('Route Protection', () => {
     // Should redirect to login (middleware redirect, may take a moment)
     // Firefox may need more time for redirects
     const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
     await page.waitForLoadState('networkidle');
     
     // Small delay for Firefox to handle redirects
@@ -37,10 +37,10 @@ test.describe('Route Protection', () => {
       await page.waitForTimeout(500);
     }
     
-    expect(page.url()).toContain('/login');
+    expect(page.url()).toContain('/logowanie');
     
     // Note: The redirectTo parameter may be lost due to client-side redirects or Suspense boundaries
-    // The important thing is that the redirect to /login happens, which it does
+    // The important thing is that the redirect to /logowanie happens, which it does
     // The redirectTo parameter is a nice-to-have but not critical for the redirect functionality
     const currentUrl = page.url();
     const url = new URL(currentUrl);
@@ -48,7 +48,7 @@ test.describe('Route Protection', () => {
     
     // If redirectTo is present, it should match the contractor dashboard route
     if (redirectTo) {
-      expect(redirectTo).toMatch(/^\/contractor-dashboard\/?$/);
+      expect(redirectTo).toMatch(/^\/panel-wykonawcy\/?$/);
     }
     // If redirectTo is missing, that's okay - the redirect still works
     // The middleware or layout redirect happened, which is what we're testing
@@ -61,8 +61,8 @@ test.describe('Route Protection', () => {
     await page.goto(ROUTES.managerOrders, { waitUntil: 'domcontentloaded' });
 
     const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
-    expect(page.url()).toContain('/login');
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
+    expect(page.url()).toContain('/logowanie');
   });
 
   test('should redirect to login when accessing contractor zamowienia without auth', async ({
@@ -72,8 +72,8 @@ test.describe('Route Protection', () => {
     await page.goto(ROUTES.contractorOrders, { waitUntil: 'domcontentloaded' });
 
     const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
-    expect(page.url()).toContain('/login');
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
+    expect(page.url()).toContain('/logowanie');
   });
 
   test('should redirect to login when accessing manager-dashboard without auth', async ({ page, browserName }) => {
@@ -82,7 +82,7 @@ test.describe('Route Protection', () => {
     // Should redirect to login (middleware redirect, may take a moment)
     // Firefox may need more time for redirects
     const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
     await page.waitForLoadState('networkidle');
     
     // Small delay for Firefox to handle redirects
@@ -90,10 +90,10 @@ test.describe('Route Protection', () => {
       await page.waitForTimeout(500);
     }
     
-    expect(page.url()).toContain('/login');
+    expect(page.url()).toContain('/logowanie');
     
     // Note: The redirectTo parameter may be lost due to client-side redirects or Suspense boundaries
-    // The important thing is that the redirect to /login happens, which it does
+    // The important thing is that the redirect to /logowanie happens, which it does
     // The redirectTo parameter is a nice-to-have but not critical for the redirect functionality
     const currentUrl = page.url();
     const url = new URL(currentUrl);
@@ -101,7 +101,7 @@ test.describe('Route Protection', () => {
     
     // If redirectTo is present, it should match the manager dashboard route
     if (redirectTo) {
-      expect(redirectTo).toMatch(/^\/manager-dashboard\/?$/);
+      expect(redirectTo).toMatch(/^\/panel-zarzadcy\/?$/);
     }
     // If redirectTo is missing, that's okay - the redirect still works
     // The middleware or layout redirect happened, which is what we're testing
@@ -113,7 +113,7 @@ test.describe('Route Protection', () => {
     // Should redirect to login (middleware redirect, may take a moment)
     // Firefox may need more time for redirects
     const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
     await page.waitForLoadState('networkidle');
     
     // Small delay for Firefox to handle redirects
@@ -121,7 +121,7 @@ test.describe('Route Protection', () => {
       await page.waitForTimeout(500);
     }
     
-    expect(page.url()).toContain('/login');
+    expect(page.url()).toContain('/logowanie');
     
     // Should preserve redirectTo parameter
     const url = new URL(page.url());
@@ -135,7 +135,7 @@ test.describe('Route Protection', () => {
     // Should redirect to login (middleware redirect, may take a moment)
     // Firefox may need more time for redirects
     const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
     await page.waitForLoadState('networkidle');
     
     // Small delay for Firefox to handle redirects
@@ -143,7 +143,7 @@ test.describe('Route Protection', () => {
       await page.waitForTimeout(500);
     }
     
-    expect(page.url()).toContain('/login');
+    expect(page.url()).toContain('/logowanie');
     
     // Should preserve redirectTo parameter
     const url = new URL(page.url());
@@ -157,7 +157,7 @@ test.describe('Route Protection', () => {
     // Should redirect to login (middleware redirect, may take a moment)
     // Firefox may need more time for redirects
     const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
     await page.waitForLoadState('networkidle');
     
     // Small delay for Firefox to handle redirects
@@ -165,7 +165,7 @@ test.describe('Route Protection', () => {
       await page.waitForTimeout(500);
     }
     
-    expect(page.url()).toContain('/login');
+    expect(page.url()).toContain('/logowanie');
     
     // Should preserve redirectTo parameter
     const url = new URL(page.url());
@@ -191,7 +191,7 @@ test.describe('Route Protection', () => {
       // Should not redirect to login - wait for page to load and check URL
       await page.waitForLoadState('networkidle');
       const currentUrl = page.url();
-      expect(currentUrl).not.toContain('/login');
+      expect(currentUrl).not.toContain('/logowanie');
     } finally {
       await deleteTestUser(email);
     }
@@ -211,7 +211,7 @@ test.describe('Route Protection', () => {
       // Should redirect to login with redirectTo parameter (middleware redirect, may take a moment)
       // Firefox may need more time for redirects
       const redirectTimeout = browserName === 'firefox' ? 15000 : 10000;
-      await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: redirectTimeout });
+      await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
       await page.waitForLoadState('networkidle');
       
       // Small delay for Firefox to handle redirects
@@ -231,7 +231,7 @@ test.describe('Route Protection', () => {
       // Should redirect to original destination or home
       // Firefox may need more time for post-login redirects
       const postLoginTimeout = browserName === 'firefox' ? 15000 : 10000;
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: postLoginTimeout });
+      await page.waitForURL((url) => !url.pathname.includes('/logowanie'), { timeout: postLoginTimeout });
       await page.waitForLoadState('networkidle');
       
       // Small delay for Firefox to handle redirects
@@ -240,7 +240,7 @@ test.describe('Route Protection', () => {
       }
       
       // Either redirected to account or home
-      expect(page.url()).toMatch(/\/account|\/$/);
+      expect(page.url()).toMatch(/\/konto|\/$/);
     } finally {
       await deleteTestUser(email);
     }
@@ -262,18 +262,18 @@ test.describe('Route Protection', () => {
       await page.goto(ROUTES.contractorDashboard);
       
       // Should not redirect to login - wait for page to load
-      // Note: contractor-dashboard redirects to /contractor-dashboard/dashboard or /account?tab=company if no company
+      // Note: contractor-dashboard redirects to /panel-wykonawcy/panel or /konto?tab=company if no company
       // Accept either as long as we're not on login (both mean user is authenticated)
       try {
         await page.waitForURL((url) => 
-          url.pathname.includes('/contractor-dashboard') || url.pathname.includes('/account'), 
+          url.pathname.includes('/panel-wykonawcy') || url.pathname.includes('/konto'), 
           { timeout: 10000 }
         );
       } catch {
         // If waitForURL times out, check current URL anyway
       }
       const currentUrl = page.url();
-      expect(currentUrl).not.toContain('/login');
+      expect(currentUrl).not.toContain('/logowanie');
     } finally {
       await deleteTestUser(email);
     }
@@ -298,14 +298,14 @@ test.describe('Route Protection', () => {
       // Note: manager-dashboard might redirect to different sub-routes, accept any manager-dashboard URL
       try {
         await page.waitForURL((url) => 
-          url.pathname.includes('/manager-dashboard'), 
+          url.pathname.includes('/panel-zarzadcy'), 
           { timeout: 10000 }
         );
       } catch {
         // If waitForURL times out, check current URL anyway
       }
       const currentUrl = page.url();
-      expect(currentUrl).not.toContain('/login');
+      expect(currentUrl).not.toContain('/logowanie');
     } finally {
       await deleteTestUser(email);
     }
@@ -314,13 +314,13 @@ test.describe('Route Protection', () => {
   test('should allow access to public routes without auth', async ({ page }) => {
     // Public routes should be accessible
     await page.goto(ROUTES.home);
-    expect(page.url()).not.toContain('/login');
+    expect(page.url()).not.toContain('/logowanie');
 
     await page.goto(ROUTES.login);
-    expect(page.url()).toContain('/login');
+    expect(page.url()).toContain('/logowanie');
 
     await page.goto(ROUTES.register);
-    expect(page.url()).toContain('/register');
+    expect(page.url()).toContain('/rejestracja');
   });
 });
 

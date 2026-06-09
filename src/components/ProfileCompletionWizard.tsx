@@ -701,7 +701,7 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
                         przetwarzamy w celu weryfikacji kwalifikacji i budowania zaufania na platformie. 
                         Przesłanie dokumentów jest dobrowolne - możesz korzystać z platformy bez weryfikacji, 
                         ale zweryfikowane konto otrzymuje więcej zgłoszeń.{' '}
-                        <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
+                        <Link href="/polityka-prywatnosci" className="text-blue-600 hover:underline font-medium">
                           Więcej informacji w Polityce prywatności
                         </Link>.
                       </AlertDescription>
@@ -750,7 +750,7 @@ export const ProfileCompletionWizard: React.FC<ProfileCompletionWizardProps> = (
                     <AlertDescription>
                       <strong>Ochrona danych:</strong> Wszystkie dokumenty są przetwarzane zgodnie z RODO. 
                       Weryfikacja jest dobrowolna, ale zweryfikowani zarządcy otrzymują więcej ofert od wykonawców.{' '}
-                      <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
+                      <Link href="/polityka-prywatnosci" className="text-blue-600 hover:underline font-medium">
                         Więcej informacji w Polityce prywatności
                       </Link>.
                     </AlertDescription>

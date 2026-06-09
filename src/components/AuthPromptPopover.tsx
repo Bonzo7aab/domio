@@ -67,7 +67,7 @@ export function AuthPromptPopover({
             size="sm"
             className="w-full sm:flex-1"
             onPointerDown={(event) =>
-              navigateWithoutClickThrough(event, '/user-type-selection')
+              navigateWithoutClickThrough(event, '/wybor-typu-konta')
             }
           >
             Zaloguj się
@@ -77,7 +77,7 @@ export function AuthPromptPopover({
             size="sm"
             variant="outline"
             className="w-full sm:flex-1"
-            onPointerDown={(event) => navigateWithoutClickThrough(event, '/register')}
+            onPointerDown={(event) => navigateWithoutClickThrough(event, '/rejestracja')}
           >
             Zarejestruj się
           </Button>

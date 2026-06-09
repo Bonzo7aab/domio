@@ -6,5 +6,5 @@ interface TenderBidEvaluationPageProps {
 
 export default async function TenderBidEvaluationPage({ params }: TenderBidEvaluationPageProps) {
   const { id } = await params;
-  redirect(`/manager-dashboard/konkursy/porownaj/${id}`);
+  redirect(`/panel-zarzadcy/konkursy/porownaj/${id}`);
 }

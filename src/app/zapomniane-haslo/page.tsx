@@ -9,7 +9,7 @@ export default function ForgotPassword() {
   return (
     <ForgotPasswordPage 
       onBack={() => router.push('/')}
-      onLoginClick={() => router.push('/user-type-selection')}
+      onLoginClick={() => router.push('/wybor-typu-konta')}
     />
   );
 }

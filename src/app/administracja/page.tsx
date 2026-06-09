@@ -4,7 +4,7 @@ import { fetchAdminDashboardMetrics } from '../../lib/database/admin-metrics';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 
 export default async function AdminHomePage() {
-  const { supabase } = await requirePlatformAdmin('/admin');
+  const { supabase } = await requirePlatformAdmin('/administracja');
   const metrics = await fetchAdminDashboardMetrics(supabase);
 
   const postsNoOffers = metrics.activeJobsWithoutApplications + metrics.activeTendersWithoutBids;
@@ -25,7 +25,7 @@ export default async function AdminHomePage() {
             <p className="mt-1 text-xs text-muted-foreground">
               Zgłoszenia: {metrics.activeJobsWithoutApplications}, przetargi: {metrics.activeTendersWithoutBids}
             </p>
-            <Link href="/admin/listings" className="mt-2 inline-block text-sm text-primary underline">
+            <Link href="/administracja/ogloszenia" className="mt-2 inline-block text-sm text-primary underline">
               Moderuj listingu →
             </Link>
           </CardContent>
@@ -39,7 +39,7 @@ export default async function AdminHomePage() {
             <p className="mt-1 text-xs text-muted-foreground">
               Aplikacje: {metrics.staleJobApplications}, przetargi: {metrics.staleTenderBids}
             </p>
-            <Link href="/admin/offers" className="mt-2 inline-block text-sm text-primary underline">
+            <Link href="/administracja/oferty" className="mt-2 inline-block text-sm text-primary underline">
               Moderuj oferty →
             </Link>
           </CardContent>
@@ -50,7 +50,7 @@ export default async function AdminHomePage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold">{metrics.contractorsOcExpiring7d}</div>
-            <Link href="/admin/verification" className="mt-2 inline-block text-sm text-primary underline">
+            <Link href="/administracja/weryfikacja" className="mt-2 inline-block text-sm text-primary underline">
               Kolejka weryfikacji →
             </Link>
           </CardContent>

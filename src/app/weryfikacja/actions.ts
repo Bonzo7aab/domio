@@ -21,8 +21,8 @@ const DEFAULT_CONTRACTOR_RADAR = {
 };
 
 /**
- * Mirror an `insurance` upload from /verification into the contractor's OC
- * settings, so the /account "Ubezpieczenie OC" card and the verification page
+ * Mirror an `insurance` upload from /weryfikacja into the contractor's OC
+ * settings, so the /konto "Ubezpieczenie OC" card and the verification page
  * see the same file. Best-effort: a sync failure must not abort the main
  * verification submission, but it is logged.
  */
@@ -168,7 +168,7 @@ export async function submitVerificationDocumentsAction(
       validateDocFile(entry);
       const ext = entry.name.includes('.') ? entry.name.split('.').pop()?.toLowerCase() ?? 'pdf' : 'pdf';
       const safeExt = ALLOWED_EXT.has(ext) ? ext : 'pdf';
-      const path = `${user.id}/verification/${key}/${Date.now()}-${safeFilename(entry.name) || `upload.${safeExt}`}`;
+      const path = `${user.id}/weryfikacja/${key}/${Date.now()}-${safeFilename(entry.name) || `upload.${safeExt}`}`;
       try {
         await uploadObject(STORAGE_BUCKETS.VERIFICATION_DOCUMENTS, path, entry);
       } catch (upErr) {
@@ -266,12 +266,12 @@ export async function submitVerificationDocumentsAction(
   }
 
   // Mirror any newly uploaded insurance file into the contractor's OC
-  // settings so /account?tab=contractor-data reflects the same state.
+  // settings so /konto?tab=contractor-data reflects the same state.
   if (userType === 'contractor' && newPaths.insurance) {
     await syncInsuranceToContractorSettings(supabase, user.id, newPaths.insurance);
   }
 
-  revalidatePath('/account');
+  revalidatePath('/konto');
   return { ok: true };
 }
 
@@ -299,8 +299,8 @@ export async function removeAccountVerificationDocumentAction(
   const result = await removeAccountDocumentForUser(supabase, user.id, payload);
 
   if (result.ok) {
-    revalidatePath('/account');
-    revalidatePath('/verification');
+    revalidatePath('/konto');
+    revalidatePath('/weryfikacja');
   }
 
   return result;

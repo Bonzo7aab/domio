@@ -29,7 +29,7 @@ import { formatSubmissionDeadlineDisplay, formatCompareLockedTooltip } from '../
 import {
   abandonContestDraftAction,
   cancelContestAction,
-} from '../../app/manager-dashboard/konkursy/actions';
+} from '../../app/panel-zarzadcy/konkursy/actions';
 import { ManagerContestOffersDialog } from './ManagerContestOffersDialog';
 import { ManagerContestQuestionsDialog } from './ManagerContestQuestionsDialog';
 import { ManagerContestWinnerDialog } from './ManagerContestWinnerDialog';
@@ -175,7 +175,7 @@ export function ManagerKonkursyContent({
       setOffersDialogRow(row);
     }
 
-    router.replace('/manager-dashboard/konkursy', { scroll: false });
+    router.replace('/panel-zarzadcy/konkursy', { scroll: false });
   }, [searchParams, contests, router]);
 
   const openQuestionsDialog = (row: ManagerContest): void => {
@@ -241,7 +241,7 @@ export function ManagerKonkursyContent({
   }, [contests, statusFilter, search, sortKey, sortDir]);
 
   const compareHref = (id: string): string =>
-    `/manager-dashboard/konkursy/porownaj/${id}`;
+    `/panel-zarzadcy/konkursy/porownaj/${id}`;
 
   const handleContestUpdated = (id: string, patch: Partial<ManagerContest>): void => {
     setContests((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
@@ -288,7 +288,7 @@ export function ManagerKonkursyContent({
 
     return (
       <Button variant="default" size="sm" className="h-8 shrink-0" asChild>
-        <Link href={`/post-contest/${row.id}`}>
+        <Link href={`/dodaj-konkurs/${row.id}`}>
           <Pencil className="h-4 w-4 mr-1.5" />
           Kontynuuj
         </Link>
@@ -594,7 +594,7 @@ export function ManagerKonkursyContent({
                       >
                         <TableCell className={cn('max-w-0 truncate', isPickedRow && 'text-primary')}>
                           <Link
-                            href={`/jobs/${row.id}`}
+                            href={`/zlecenia/${row.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title={row.title}
@@ -779,7 +779,7 @@ export function ManagerKonkursyContent({
             <AlertDialogAction
               onClick={() => {
                 if (!repeatContestTarget) return;
-                router.push(`/post-contest?duplicateFrom=${repeatContestTarget.id}`);
+                router.push(`/dodaj-konkurs?duplicateFrom=${repeatContestTarget.id}`);
                 setRepeatContestTarget(null);
               }}
             >

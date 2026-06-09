@@ -17,7 +17,7 @@ export default async function ManagerDashboardLayout({
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    redirect('/login?redirectTo=/manager-dashboard');
+    redirect('/logowanie?redirectTo=/panel-zarzadcy');
   }
 
   // Fetch company data

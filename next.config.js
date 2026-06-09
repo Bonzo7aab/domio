@@ -3,12 +3,83 @@ const { withSentryConfig } = require('@sentry/nextjs')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async redirects() {
+    const nestedRedirects = [
+      { source: '/admin/verification/:path*', destination: '/administracja/weryfikacja/:path*' },
+      { source: '/admin/verification', destination: '/administracja/weryfikacja' },
+      { source: '/admin/settings', destination: '/administracja/ustawienia' },
+      { source: '/admin/offers', destination: '/administracja/oferty' },
+      { source: '/admin/listings', destination: '/administracja/ogloszenia' },
+      { source: '/register/verification-choice', destination: '/rejestracja/wybor-weryfikacji' },
+      { source: '/manager-dashboard/overview', destination: '/panel-zarzadcy/przeglad' },
+      { source: '/manager-dashboard/jobs/:path*', destination: '/panel-zarzadcy/zlecenia/:path*' },
+      { source: '/manager-dashboard/contractors/:path*', destination: '/panel-zarzadcy/wykonawcy/:path*' },
+      { source: '/manager-dashboard/tenders/:path*', destination: '/panel-zarzadcy/przetargi/:path*' },
+      { source: '/contractor-dashboard/dashboard/:path*', destination: '/panel-wykonawcy/panel/:path*' },
+      { source: '/contractor-dashboard/dashboard', destination: '/panel-wykonawcy/panel' },
+      { source: '/contractor-dashboard/applications/:path*', destination: '/panel-wykonawcy/aplikacje/:path*' },
+      { source: '/contractor-dashboard/applications', destination: '/panel-wykonawcy/aplikacje' },
+      { source: '/contractor-dashboard/favorites/:path*', destination: '/panel-wykonawcy/ulubione/:path*' },
+      { source: '/contractor-dashboard/favorites', destination: '/panel-wykonawcy/ulubione' },
+      { source: '/contractor-dashboard/ratings/:path*', destination: '/panel-wykonawcy/oceny/:path*' },
+      { source: '/contractor-dashboard/ratings', destination: '/panel-wykonawcy/oceny' },
+      { source: '/contractor-dashboard/pricing/:path*', destination: '/panel-wykonawcy/cennik/:path*' },
+      { source: '/contractor-dashboard/pricing', destination: '/panel-wykonawcy/cennik' },
+      { source: '/contractor-dashboard/projects/:path*', destination: '/panel-wykonawcy/projekty/:path*' },
+      { source: '/contractor-dashboard/projects', destination: '/panel-wykonawcy/projekty' },
+      { source: '/auth/update-password', destination: '/auth/aktualizacja-hasla' },
+    ] as const;
+
+    const polishRouteRedirects = [
+      ['account', 'konto'],
+      ['admin', 'administracja'],
+      ['bookmarked-jobs', 'zapisane-zgloszenia'],
+      ['contractor-dashboard', 'panel-wykonawcy'],
+      ['contractors', 'wykonawcy'],
+      ['expert-consultation', 'konsultacja-eksperta'],
+      ['forgot-password', 'zapomniane-haslo'],
+      ['job-type-selection', 'wybor-typu-zlecenia'],
+      ['jobs', 'zlecenia'],
+      ['login', 'logowanie'],
+      ['manager-dashboard', 'panel-zarzadcy'],
+      ['managers', 'zarzadcy'],
+      ['messages', 'wiadomosci'],
+      ['onboarding', 'wdrozenie'],
+      ['post-contest', 'dodaj-konkurs'],
+      ['post-job', 'dodaj-zlecenie'],
+      ['post-tender', 'dodaj-przetarg'],
+      ['privacy', 'polityka-prywatnosci'],
+      ['profile-completion', 'uzupelnianie-profilu'],
+      ['register', 'rejestracja'],
+      ['tender-creation', 'tworzenie-przetargu'],
+      ['terms', 'regulamin'],
+      ['tutorial', 'samouczek'],
+      ['user-type-selection', 'wybor-typu-konta'],
+      ['verification', 'weryfikacja'],
+      ['welcome', 'powitanie'],
+      ['contest-questions', 'pytania-konkursu'],
+    ] as const;
+
     return [
       {
         source: '/pricing',
         destination: '/',
         permanent: true,
       },
+      ...nestedRedirects.map(({ source, destination }) => ({
+        source,
+        destination,
+        permanent: true,
+      })),
+      ...polishRouteRedirects.map(([from, to]) => ({
+        source: `/${from}/:path*`,
+        destination: `/${to}/:path*`,
+        permanent: true,
+      })),
+      ...polishRouteRedirects.map(([from, to]) => ({
+        source: `/${from}`,
+        destination: `/${to}`,
+        permanent: true,
+      })),
     ];
   },
   images: {

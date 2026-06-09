@@ -13,7 +13,7 @@ import {
 import {
   acceptOrderWorkAction,
   cancelOrderAction,
-} from '../../app/manager-dashboard/zamowienia/actions';
+} from '../../app/panel-zarzadcy/zamowienia/actions';
 import { ManagerOrderDetailDialog } from './ManagerOrderDetailDialog';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { Button } from '../ui/button';
@@ -117,10 +117,10 @@ export function ManagerZamowieniaContent({
       );
 
       if (result.data) {
-        router.push(`/messages?conversation=${result.data}`);
+        router.push(`/wiadomosci?conversation=${result.data}`);
       } else {
         router.push(
-          `/messages?recipient=${row.contractorId}&jobId=${row.tenderId}`,
+          `/wiadomosci?recipient=${row.contractorId}&jobId=${row.tenderId}`,
         );
       }
     } catch {

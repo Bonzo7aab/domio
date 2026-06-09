@@ -42,7 +42,7 @@ export default function JobTypeSelectionPage({ onBack, onSelectJob, onSelectTend
               <AlertCircle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-amber-700">
-                  Najpierw musisz <Link href="/account?tab=company" className="text-blue-700 underline">dodać dane firmy w profilu</Link>, aby móc tworzyć zgłoszenia i przetargi.
+                  Najpierw musisz <Link href="/konto?tab=company" className="text-blue-700 underline">dodać dane firmy w profilu</Link>, aby móc tworzyć zgłoszenia i przetargi.
                 </p>
               </div>
             </div>

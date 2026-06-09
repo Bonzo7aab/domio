@@ -89,7 +89,7 @@
       "name": "Znajdź zgłoszenia",
       "short_name": "Zgłoszenia",
       "description": "Przeglądaj dostępne zgłoszenia budowlane",
-      "url": "/jobs",
+      "url": "/zlecenia",
       "icons": [
         {
           "src": "/icon-96x96.png",
@@ -101,7 +101,7 @@
       "name": "Panel zarządcy",
       "short_name": "Zarządca",
       "description": "Szybki dostęp do panelu zarządcy",
-      "url": "/manager-dashboard",
+      "url": "/panel-zarzadcy",
       "icons": [
         {
           "src": "/icon-96x96.png",
@@ -113,7 +113,7 @@
       "name": "Panel wykonawcy",
       "short_name": "Wykonawca",
       "description": "Szybki dostęp do panelu wykonawcy",
-      "url": "/contractor-dashboard", 
+      "url": "/panel-wykonawcy", 
       "icons": [
         {
           "src": "/icon-96x96.png",

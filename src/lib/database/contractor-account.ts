@@ -248,7 +248,7 @@ export async function getContractorAccountSettings(userId: string): Promise<Cont
 
 /**
  * Mirror the OC scan path into the user's verification document set so the
- * `/verification` page (and admin review) sees the same file as the OC card.
+ * `/weryfikacja` page (and admin review) sees the same file as the OC card.
  * Best-effort: any failure is logged but does not roll back the main upsert.
  */
 async function syncOcScanToVerificationDocs(

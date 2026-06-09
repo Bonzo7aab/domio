@@ -83,7 +83,7 @@ test.describe('Password Reset', () => {
     expect(isRequired).toBe(true);
   });
 
-  test('should navigate back to home/login', async ({ page }) => {
+  test('should navigate back to home/logowanie', async ({ page }) => {
     await page.goto(ROUTES.forgotPassword);
 
     // Look for back button
@@ -92,7 +92,7 @@ test.describe('Password Reset', () => {
       await backButton.click();
       // Should navigate away from forgot password page
       await page.waitForTimeout(1000);
-      expect(page.url()).not.toContain('forgot-password');
+      expect(page.url()).not.toContain('zapomniane-haslo');
     }
   });
 
@@ -127,7 +127,7 @@ test.describe('Password Reset', () => {
     // Start navigation wait BEFORE clicking (Playwright best practice)
     const navigationPromise = page.waitForURL((url) => {
       const pathname = url.pathname;
-      return pathname.includes('/login') || pathname.includes('/user-type-selection');
+      return pathname.includes('/logowanie') || pathname.includes('/wybor-typu-konta');
     }, { timeout });
     
     // Use JavaScript click to directly trigger React's onClick handler
@@ -139,7 +139,7 @@ test.describe('Password Reset', () => {
     
     await navigationPromise;
     
-    // Wait for the final redirect to /login (user-type-selection redirects immediately)
+    // Wait for the final redirect to /logowanie (user-type-selection redirects immediately)
     // Add a small delay for Firefox to handle the redirect chain
     if (browserName === 'firefox') {
       await page.waitForTimeout(500);
@@ -148,14 +148,14 @@ test.describe('Password Reset', () => {
     // Wait for network to be idle after redirect
     await page.waitForLoadState('networkidle');
     
-    // Verify we're on the login page (user-type-selection redirects to /login)
+    // Verify we're on the login page (user-type-selection redirects to /logowanie)
     // Use longer timeout for the final redirect check
-    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: timeout });
+    await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: timeout });
     
     // Verify we navigated away from forgot-password
     const currentUrl = page.url();
-    expect(currentUrl).not.toContain('forgot-password');
-    expect(currentUrl).toContain('/login');
+    expect(currentUrl).not.toContain('zapomniane-haslo');
+    expect(currentUrl).toContain('/logowanie');
   });
 
   test('should show success state after form submission', async ({ page }) => {

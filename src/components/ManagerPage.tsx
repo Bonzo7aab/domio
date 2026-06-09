@@ -763,7 +763,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
   }, [activeTab, loadedTabs, companyId]);
 
   const handleTenderCreate = () => {
-    router.push('/post-contest');
+    router.push('/dodaj-konkurs');
   };
 
   const handleTenderEdit = async (tenderId: string) => {
@@ -1488,7 +1488,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => router.push(`/contractors/${contractor.id}`)}
+                              onClick={() => router.push(`/wykonawcy/${contractor.id}`)}
                               className="w-full sm:w-auto"
                             >
                               Zobacz profil

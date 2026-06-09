@@ -6,5 +6,5 @@ interface PostTenderEditPageProps {
 
 export default async function PostTenderEditPage({ params }: PostTenderEditPageProps) {
   const { id } = await params;
-  redirect(`/post-contest/${id}`);
+  redirect(`/dodaj-konkurs/${id}`);
 }

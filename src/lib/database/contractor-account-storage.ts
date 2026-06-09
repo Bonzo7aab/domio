@@ -68,7 +68,7 @@ async function uploadVerificationScan(
     ? extension
     : 'pdf';
 
-  const filePath = `${userId}/verification/${folder}/${Date.now()}-${Math.random()
+  const filePath = `${userId}/weryfikacja/${folder}/${Date.now()}-${Math.random()
     .toString(36)
     .slice(2)}.${safeExt}`;
 

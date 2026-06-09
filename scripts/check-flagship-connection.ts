@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     flagKey: FLAGSHIP_FLAG_KEYS.NEW_TENDER_SYSTEM,
     targetingKey: 'flagship-connection-test',
   });
-  const probeUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/flagship/apps/${appId}/evaluate?${probeParams}`;
+  const probeUrl = `https://api.cloudflare.com/client/v4/kontos/${accountId}/flagship/apps/${appId}/evaluate?${probeParams}`;
   console.log('\nRaw API probe (GET, SDK-style URL):');
   let probeOk = false;
   try {

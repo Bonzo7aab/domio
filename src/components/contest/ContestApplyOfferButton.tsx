@@ -9,7 +9,7 @@ import type { AuthUser } from '../../types/auth';
 import { cn } from '../ui/utils';
 import { useState } from 'react';
 
-export const CONTRACTOR_OFFERS_PAGE_HREF = '/contractor-dashboard/applications';
+export const CONTRACTOR_OFFERS_PAGE_HREF = '/panel-wykonawcy/aplikacje';
 
 interface ContestApplyOfferButtonProps {
   className?: string;

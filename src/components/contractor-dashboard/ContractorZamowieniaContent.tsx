@@ -15,7 +15,7 @@ import {
   canContractorReportForAcceptance,
   canMessageOnOrder,
 } from '../../lib/order-workflow-status';
-import { reportOrderForAcceptanceAction } from '../../app/contractor-dashboard/zamowienia/actions';
+import { reportOrderForAcceptanceAction } from '../../app/panel-wykonawcy/zamowienia/actions';
 import { OrderStatusBadge } from '../manager-dashboard/OrderStatusBadge';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -87,9 +87,9 @@ export function ContractorZamowieniaContent({
       );
 
       if (result.data) {
-        router.push(`/messages?conversation=${result.data}`);
+        router.push(`/wiadomosci?conversation=${result.data}`);
       } else {
-        router.push(`/messages?recipient=${row.managerId}&jobId=${row.tenderId}`);
+        router.push(`/wiadomosci?recipient=${row.managerId}&jobId=${row.tenderId}`);
       }
     } catch {
       toast.error('Nie udało się otworzyć wiadomości');

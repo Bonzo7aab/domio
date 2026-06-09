@@ -57,11 +57,11 @@ export function MobileMenuDock() {
   const getPathForLabel = (title: string): string => {
     const titleToPath: Record<string, string> = {
       'Strona główna': '/',
-      'Wykonawcy': '/contractors',
-      'Zarządcy': '/managers',
-      'Zapisane': '/bookmarked-jobs',
-      'Wiadomości': '/messages',
-      'Profil': '/account',
+      'Wykonawcy': '/wykonawcy',
+      'Zarządcy': '/zarzadcy',
+      'Zapisane': '/zapisane-zgloszenia',
+      'Wiadomości': '/wiadomosci',
+      'Profil': '/konto',
     };
     return titleToPath[title] || '';
   };
@@ -88,27 +88,27 @@ export function MobileMenuDock() {
     {
       title: 'Wykonawcy',
       icon: <Briefcase className="size-6" />,
-      href: '/contractors',
+      href: '/wykonawcy',
       onClick: () => {
-        router.push('/contractors');
+        router.push('/wykonawcy');
         setMenuDrawerOpen(false);
       },
     },
     {
       title: 'Zarządcy',
       icon: <Users className="size-6" />,
-      href: '/managers',
+      href: '/zarzadcy',
       onClick: () => {
-        router.push('/managers');
+        router.push('/zarzadcy');
         setMenuDrawerOpen(false);
       },
     },
     {
       title: 'Zapisane',
       icon: <Star className="size-6" />,
-      href: '/bookmarked-jobs',
+      href: '/zapisane-zgloszenia',
       onClick: () => {
-        router.push('/bookmarked-jobs');
+        router.push('/zapisane-zgloszenia');
         setMenuDrawerOpen(false);
       },
     },
@@ -117,18 +117,18 @@ export function MobileMenuDock() {
           {
             title: 'Wiadomości',
             icon: <MessagesSquare className="size-6" />,
-            href: '/messages',
+            href: '/wiadomosci',
             onClick: () => {
-              router.push('/messages');
+              router.push('/wiadomosci');
               setMenuDrawerOpen(false);
             },
           } as FloatingDockItem,
           {
             title: 'Profil',
             icon: <User className="size-6" />,
-            href: '/account',
+            href: '/konto',
             onClick: () => {
-              router.push('/account');
+              router.push('/konto');
               setMenuDrawerOpen(false);
             },
           } as FloatingDockItem,
@@ -137,9 +137,9 @@ export function MobileMenuDock() {
           {
             title: 'Zaloguj',
             icon: <User className="size-6" />,
-            href: '/login',
+            href: '/logowanie',
             onClick: () => {
-              router.push('/login');
+              router.push('/logowanie');
               setMenuDrawerOpen(false);
             },
           } as FloatingDockItem,
@@ -163,24 +163,24 @@ export function MobileMenuDock() {
     {
       title: 'Wykonawcy',
       icon: <Briefcase className="size-6" />,
-      href: '/contractors',
-      isActive: isActive('/contractors'),
+      href: '/wykonawcy',
+      isActive: isActive('/wykonawcy'),
       onClick: () => {
         setMenuDrawerOpen(false);
         setTimeout(() => {
-          router.push('/contractors');
+          router.push('/wykonawcy');
         }, 150);
       },
     },
     {
       title: 'Wiadomości',
       icon: <MessagesSquare className="size-6" />,
-      href: isAuthenticated ? '/messages' : '/user-type-selection',
-      isActive: isAuthenticated ? isActive('/messages') : isActive('/user-type-selection'),
+      href: isAuthenticated ? '/wiadomosci' : '/wybor-typu-konta',
+      isActive: isAuthenticated ? isActive('/wiadomosci') : isActive('/wybor-typu-konta'),
       onClick: () => {
         setMenuDrawerOpen(false);
         setTimeout(() => {
-          router.push(isAuthenticated ? '/messages' : '/user-type-selection');
+          router.push(isAuthenticated ? '/wiadomosci' : '/wybor-typu-konta');
         }, 150);
       },
     },

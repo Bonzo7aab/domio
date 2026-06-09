@@ -24,7 +24,7 @@ export default async function ManagerZamowieniaPage(): Promise<ReactElement> {
   }
 
   if (!(await isOrdersFeatureEnabledForAuthUser(supabase, user))) {
-    redirect('/manager-dashboard/overview');
+    redirect('/panel-zarzadcy/przeglad');
   }
 
   const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);
@@ -36,7 +36,7 @@ export default async function ManagerZamowieniaPage(): Promise<ReactElement> {
           <CardContent className="pt-6 text-center space-y-4 flex flex-col items-center">
             <p className="text-muted-foreground">Najpierw uzupełnij dane firmy w profilu.</p>
             <Button asChild>
-              <Link href="/account">Przejdź do konta</Link>
+              <Link href="/konto">Przejdź do konta</Link>
             </Button>
           </CardContent>
         </Card>

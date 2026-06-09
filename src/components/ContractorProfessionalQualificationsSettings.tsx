@@ -4,7 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, ExternalLink, FileUp, GraduationCap, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { removeAccountVerificationDocumentAction } from '../app/verification/actions';
+import { removeAccountVerificationDocumentAction } from '../app/weryfikacja/actions';
 import {
   getContractorAccountSettings,
   getOcPolicyAllowedFormatsLabel,

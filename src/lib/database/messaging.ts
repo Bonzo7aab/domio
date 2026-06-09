@@ -273,7 +273,7 @@ export async function buildMessageNotificationPayload(
         jobId: conv.job_id ?? null,
         tenderId: conv.tender_id ?? null,
       },
-      actionUrl: `/messages?conversation=${params.conversationId}`,
+      actionUrl: `/wiadomosci?conversation=${params.conversationId}`,
     };
   } catch (err) {
     console.warn('buildMessageNotificationPayload failed:', err);
@@ -606,7 +606,7 @@ export async function submitQuoteRequest(
         timeline: quoteData.timeline,
         location: quoteData.location,
       },
-      `/messages?conversation=${conversationResult.data}`
+      `/wiadomosci?conversation=${conversationResult.data}`
     );
 
     if (notificationResult.error) {

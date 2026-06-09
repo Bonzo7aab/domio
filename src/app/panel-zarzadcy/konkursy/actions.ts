@@ -7,7 +7,7 @@ import { acceptManagerTenderOffer } from '../../../lib/database/offer-selection'
 import { deleteManagerContestDraft } from '../../../lib/database/manager-contests';
 import { canCancelContest } from '../../../lib/tender-workflow-status';
 
-const KONKURSY_PATH = '/manager-dashboard/konkursy';
+const KONKURSY_PATH = '/panel-zarzadcy/konkursy';
 
 function revalidateKonkursy(tenderId?: string): void {
   revalidatePath(KONKURSY_PATH);
@@ -51,9 +51,9 @@ export async function acceptTenderOfferAction(
 
   if (result.success) {
     revalidateKonkursy(tenderId.trim());
-    revalidatePath('/manager-dashboard/zgloszenia');
-    revalidatePath('/manager-dashboard/zamowienia');
-    revalidatePath('/contractor-dashboard/zamowienia');
+    revalidatePath('/panel-zarzadcy/zgloszenia');
+    revalidatePath('/panel-zarzadcy/zamowienia');
+    revalidatePath('/panel-wykonawcy/zamowienia');
   }
 
   return result;
@@ -151,7 +151,7 @@ export async function abandonContestDraftAction(
 
   if (result.success) {
     revalidateKonkursy(tenderId.trim());
-    revalidatePath('/manager-dashboard/zgloszenia');
+    revalidatePath('/panel-zarzadcy/zgloszenia');
   }
 
   return result;

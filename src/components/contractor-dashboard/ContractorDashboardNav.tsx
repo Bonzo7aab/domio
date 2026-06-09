@@ -5,11 +5,11 @@ import { usePathname } from 'next/navigation';
 import { cn } from '../ui/utils';
 
 const tabs = [
-  { id: 'offers', label: 'Moje Oferty', href: '/contractor-dashboard/applications' },
-  { id: 'orders', label: 'Zamówienia', href: '/contractor-dashboard/zamowienia' },
-  { id: 'favorites', label: 'Zapisane konkursy', href: '/contractor-dashboard/favorites' },
-  { id: 'ratings', label: 'Ocena', href: '/contractor-dashboard/ratings' },
-  { id: 'services', label: 'Usługi', href: '/contractor-dashboard/pricing' },
+  { id: 'offers', label: 'Moje Oferty', href: '/panel-wykonawcy/aplikacje' },
+  { id: 'orders', label: 'Zamówienia', href: '/panel-wykonawcy/zamowienia' },
+  { id: 'favorites', label: 'Zapisane konkursy', href: '/panel-wykonawcy/ulubione' },
+  { id: 'ratings', label: 'Ocena', href: '/panel-wykonawcy/oceny' },
+  { id: 'services', label: 'Usługi', href: '/panel-wykonawcy/cennik' },
 ];
 
 interface ContractorDashboardNavProps {
@@ -28,13 +28,13 @@ export function ContractorDashboardNav({ showOrders = false }: ContractorDashboa
             const isActive =
               pathname === tab.href ||
               (tab.id === 'favorites' &&
-                pathname.startsWith('/contractor-dashboard/favorites')) ||
+                pathname.startsWith('/panel-wykonawcy/ulubione')) ||
               (tab.id === 'offers' &&
-                (pathname === '/contractor-dashboard' ||
-                  pathname === '/contractor-dashboard/' ||
-                  pathname === '/contractor-dashboard/dashboard')) ||
+                (pathname === '/panel-wykonawcy' ||
+                  pathname === '/panel-wykonawcy/' ||
+                  pathname === '/panel-wykonawcy/panel')) ||
               (tab.id === 'orders' &&
-                pathname.startsWith('/contractor-dashboard/zamowienia'));
+                pathname.startsWith('/panel-wykonawcy/zamowienia'));
             return (
               <Link
                 key={tab.id}

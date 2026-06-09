@@ -112,7 +112,7 @@ export function JobsContent({ jobs, companyId: _companyId }: JobsContentProps) {
                         </Button>
                         <Button 
                           size="sm"
-                          onClick={() => router.push(`/manager-dashboard/jobs/${job.id}/applications`)}
+                          onClick={() => router.push(`/panel-zarzadcy/zlecenia/${job.id}/applications`)}
                         >
                           Zobacz oferty
                         </Button>

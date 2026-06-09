@@ -34,7 +34,7 @@ export function DashboardContent({ data }: DashboardContentProps) {
   const { stats, recentActivities, allApplications } = data;
 
   const handleMessagesClick = () => {
-    router.push('/messages');
+    router.push('/wiadomosci');
   };
 
   // Filter out cancelled applications
@@ -232,11 +232,11 @@ export function DashboardContent({ data }: DashboardContentProps) {
             <CardTitle>Szybkie akcje</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button className="w-full justify-start" onClick={() => router.push('/contractor-dashboard/favorites')}>
+            <Button className="w-full justify-start" onClick={() => router.push('/panel-wykonawcy/ulubione')}>
               <Star className="w-4 h-4 mr-2" />
               Zapisane konkursy
             </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/account?tab=company')}>
+            <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/konto?tab=company')}>
               <Edit className="w-4 h-4 mr-2" />
               Edytuj profil firmy
             </Button>

@@ -36,8 +36,8 @@ import {
 import {
   acceptJobOfferAction,
   acceptTenderOfferAction,
-} from '../../app/manager-dashboard/zgloszenia/actions';
-import { acceptTenderOfferAction as acceptContestOfferAction } from '../../app/manager-dashboard/konkursy/actions';
+} from '../../app/panel-zarzadcy/zgloszenia/actions';
+import { acceptTenderOfferAction as acceptContestOfferAction } from '../../app/panel-zarzadcy/konkursy/actions';
 import type { ContestOfferDetails } from '../../types/contest-offer';
 import { computeGrossFromNet } from '../../types/contest-offer';
 import type { ContestOfferVatRate } from '../../types/contest-offer';
@@ -378,7 +378,7 @@ export function ManagerOfferCompareClient({
             setSubmissionDeadline(tender.submission_deadline ?? null);
             if (contestMode && tender.status === 'active') {
               toast.error('Porównanie ofert będzie dostępne po zakończeniu zbierania ofert');
-              router.replace('/manager-dashboard/konkursy');
+              router.replace('/panel-zarzadcy/konkursy');
               return;
             }
             const normalized = (bids || []) as unknown as TenderBidLike[];
@@ -400,7 +400,7 @@ export function ManagerOfferCompareClient({
     };
   }, [kind, submissionId, loadProfiles, contestMode, router]);
 
-  const backHref = contestMode ? '/manager-dashboard/konkursy' : '/manager-dashboard/zgloszenia';
+  const backHref = contestMode ? '/panel-zarzadcy/konkursy' : '/panel-zarzadcy/zgloszenia';
   const compareReadOnly =
     contestMode && tenderStatus != null && isContestCompareReadOnly(tenderStatus);
   const canSelectWinner =
@@ -440,10 +440,10 @@ export function ManagerOfferCompareClient({
 
   const submissionRedirectUrl = (): string => {
     if (contestMode) {
-      return `/manager-dashboard/konkursy?podglad=${submissionId}&tab=selected-offer`;
+      return `/panel-zarzadcy/konkursy?podglad=${submissionId}&tab=selected-offer`;
     }
     const typ = kind === 'tender' ? 'przetarg' : 'zgłoszenie';
-    return `/manager-dashboard/zgloszenia?podglad=${submissionId}&typ=${encodeURIComponent(typ)}&tab=selected-offer`;
+    return `/panel-zarzadcy/zgloszenia?podglad=${submissionId}&typ=${encodeURIComponent(typ)}&tab=selected-offer`;
   };
 
   const handleConfirmSelectOffer = async (): Promise<void> => {

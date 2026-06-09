@@ -43,7 +43,7 @@ import { toast } from 'sonner';
 import {
   removeAccountVerificationDocumentAction,
   submitVerificationDocumentsAction,
-} from '../app/verification/actions';
+} from '../app/weryfikacja/actions';
 import { DocumentRemovalAlertDialog } from './verification/DocumentRemovalAlertDialog';
 import {
   getContractorAccountSettings,
@@ -70,7 +70,7 @@ interface VerificationPageProps {
    * understands which files passed and which need re-submission.
    */
   documentReviews?: DocumentReviewMap;
-  /** When true, renders without standalone page chrome (for /account tab). */
+  /** When true, renders without standalone page chrome (for /konto tab). */
   embedded?: boolean;
   /** Contractor user id — renders uprawnienia zawodowe after Referencje in account tab. */
   userId?: string;
@@ -687,7 +687,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   const [replaceMode, setReplaceMode] = useState<Record<string, boolean>>({});
   const [pendingDocRemovalKey, setPendingDocRemovalKey] = useState<string | null>(null);
   const [isRemovingDoc, setIsRemovingDoc] = useState(false);
-  // OC validity date mirrored from /account?tab=contractor-data so the user
+  // OC validity date mirrored from /konto?tab=contractor-data so the user
   // can complete the OC information in one place. Stored separately because
   // it lives in `contractor_account_settings`, not in the verification doc
   // payload.
@@ -700,7 +700,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
   const isContractor = user?.userType === 'contractor';
   const useContractorDocumentSections = embedded && isContractor;
   const status = initialStatus.state;
-  /** Standalone /verification page: hide upload UI once approved. Account tab always shows sections. */
+  /** Standalone /weryfikacja page: hide upload UI once approved. Account tab always shows sections. */
   const showDocumentSections = embedded || status !== 'approved';
   const showVerificationSubmit = status !== 'approved';
 
@@ -1260,7 +1260,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
               status={initialStatus}
               onAction={
                 status === 'approved' && !embedded
-                  ? () => router.push('/account')
+                  ? () => router.push('/konto')
                   : undefined
               }
             />
@@ -1572,7 +1572,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                       <strong className="text-foreground">RODO:</strong> dokumenty przetwarzamy wyłącznie
                       w celu weryfikacji (art. 6 ust. 1 lit. f RODO), przechowujemy bezpiecznie i
                       usuwamy po zakończeniu procesu.{' '}
-                      <Link href="/privacy" className="font-medium text-primary hover:underline">
+                      <Link href="/polityka-prywatnosci" className="font-medium text-primary hover:underline">
                         Polityka prywatności
                       </Link>
                     </div>
@@ -1581,7 +1581,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 
                 <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end sm:gap-3">
                   {!embedded && showVerificationSubmit && (
-                    <Button variant="outline" onClick={() => router.push('/account')}>
+                    <Button variant="outline" onClick={() => router.push('/konto')}>
                       Anuluj
                     </Button>
                   )}
@@ -1637,7 +1637,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/account')}
+              onClick={() => router.push('/konto')}
               className="hidden md:flex text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />

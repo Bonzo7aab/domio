@@ -62,7 +62,7 @@ test.describe('Registration Page', () => {
     await expect(page.getByRole('radio', { name: 'Wykonawca' })).toBeAttached();
 
     // Check links
-    await expect(page.locator('a[href="/login"]')).toBeVisible({ timeout });
+    await expect(page.locator('a[href="/logowanie"]')).toBeVisible({ timeout });
   });
 
   test('should successfully register as contractor', async ({ page }) => {
@@ -91,17 +91,17 @@ test.describe('Registration Page', () => {
     // Wait for verification choice step (auto-login), legacy documents tab, or login (email confirm)
     await page.waitForURL(
       (url) =>
-        url.pathname.includes('/register/verification-choice') ||
-        (url.pathname.includes('/account') && url.search.includes('tab=documents')) ||
-        url.pathname.includes('/login'),
+        url.pathname.includes('/rejestracja/wybor-weryfikacji') ||
+        (url.pathname.includes('/konto') && url.search.includes('tab=documents')) ||
+        url.pathname.includes('/logowanie'),
       { timeout: 15000 }
     );
 
-    if (page.url().includes('/register/verification-choice')) {
+    if (page.url().includes('/rejestracja/wybor-weryfikacji')) {
       await expect(page.getByTestId('register-verification-choice')).toBeVisible();
       await expect(page.getByText('Prześlij dokumenty teraz')).toBeVisible();
       await expect(page.getByText('Zrobię to później')).toBeVisible();
-    } else if (page.url().includes('/account')) {
+    } else if (page.url().includes('/konto')) {
       expect(page.url()).toMatch(/tab=documents/);
     }
 
@@ -138,13 +138,13 @@ test.describe('Registration Page', () => {
     // Wait for redirect to account (auto-login) or login (email confirm)
     await page.waitForURL(
       (url) =>
-        url.pathname.includes('/account') ||
-        url.pathname.includes('/login'),
+        url.pathname.includes('/konto') ||
+        url.pathname.includes('/logowanie'),
       { timeout: 15000 }
     );
 
-    if (page.url().includes('/account')) {
-      expect(page.url()).toContain('/account');
+    if (page.url().includes('/konto')) {
+      expect(page.url()).toContain('/konto');
     }
 
     // Cleanup: delete the created user
@@ -199,7 +199,7 @@ test.describe('Registration Page', () => {
                      page.url().includes('error');
     
     // If still on register page, there should be an error
-    if (page.url().includes('/register')) {
+    if (page.url().includes('/rejestracja')) {
       expect(hasError).toBe(true);
     }
   });
@@ -233,7 +233,7 @@ test.describe('Registration Page', () => {
                      page.url().includes('error');
     
     // If still on register page, there should be an error
-    if (page.url().includes('/register')) {
+    if (page.url().includes('/rejestracja')) {
       expect(hasError).toBe(true);
     }
   });
@@ -317,14 +317,14 @@ test.describe('Registration Page', () => {
       await emailInput.fill(email);
       await page.fill('input[name="password"]', password);
       await page.click('button[type="submit"]');
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+      await page.waitForURL((url) => !url.pathname.includes('/logowanie'), { timeout: 10000 });
       
       // Try to access register page - should redirect away (client-side redirect via useEffect)
       await page.goto(ROUTES.register);
       // Wait for the redirect to complete - the page component redirects to home via useEffect
-      await page.waitForURL((url) => !url.pathname.includes('/register'), { timeout: 10000 });
+      await page.waitForURL((url) => !url.pathname.includes('/rejestracja'), { timeout: 10000 });
       await page.waitForLoadState('networkidle');
-      expect(page.url()).not.toContain('/register');
+      expect(page.url()).not.toContain('/rejestracja');
     } finally {
       await deleteTestUser(email);
     }

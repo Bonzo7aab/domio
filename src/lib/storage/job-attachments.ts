@@ -59,7 +59,7 @@ export async function uploadJobAttachment(
     const random = Math.random().toString(36).substring(7);
     const fileName = `${timestamp}-${random}.${fileExt}`;
     const jobFolder = jobId || 'draft';
-    const filePath = `${userId}/jobs/${jobFolder}/${fileName}`;
+    const filePath = `${userId}/zlecenia/${jobFolder}/${fileName}`;
 
     await uploadObject(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath, file);
 

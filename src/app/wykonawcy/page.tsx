@@ -9,7 +9,7 @@ export default function Contractors() {
   return (
     <ContractorBrowsePage 
       onBack={() => router.push('/')}
-      onContractorSelect={(contractorId: string) => router.push(`/contractors/${contractorId}`)}
+      onContractorSelect={(contractorId: string) => router.push(`/wykonawcy/${contractorId}`)}
     />
   );
 }

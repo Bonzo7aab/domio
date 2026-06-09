@@ -322,7 +322,7 @@ function HomePageContent() {
 
   const handleJobSelect = (jobId: string) => {
     setSelectedJobId(jobId);
-    router.push(`/jobs/${jobId}`);
+    router.push(`/zlecenia/${jobId}`);
   };
 
   const handleMessagingClose = () => {
@@ -443,7 +443,7 @@ function HomePageContent() {
     if (!company) {
       toast.error('Musisz najpierw dodać informacje o swojej firmie w profilu konta');
       setApplicationModalOpen(false);
-      router.push('/account?tab=company');
+      router.push('/konto?tab=company');
       return;
     }
 
@@ -475,7 +475,7 @@ function HomePageContent() {
           if (errorMessage.includes('company') || errorMessage.includes('firm') || errorMessage.includes('Contractor must have')) {
             toast.error('Musisz najpierw dodać informacje o swojej firmie');
             setApplicationModalOpen(false);
-            router.push('/account?tab=company');
+            router.push('/konto?tab=company');
             return;
           }
           
@@ -516,7 +516,7 @@ function HomePageContent() {
           if (errorMessage.includes('company') || errorMessage.includes('firm') || errorMessage.includes('Contractor must have')) {
             toast.error('Musisz najpierw dodać informacje o swojej firmie');
             setApplicationModalOpen(false);
-            router.push('/account?tab=company');
+            router.push('/konto?tab=company');
             return;
           }
           
@@ -591,7 +591,7 @@ function HomePageContent() {
   //   // Only redirect if we have confirmed user data and they're authenticated
   //   // Don't redirect while still loading user data
   //   if (!isLoading && isAuthenticated && user && !user.profileCompleted) {
-  //     router.push('/onboarding');
+  //     router.push('/wdrozenie');
   //   }
   // }, [isAuthenticated, user, isLoading, router]);
 

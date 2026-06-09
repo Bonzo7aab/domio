@@ -53,7 +53,7 @@ export async function uploadVerificationDocument(
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
     const fileName = `${timestamp}-${random}.${fileExt}`;
-    const filePath = `${userId}/verification/${documentType}/${fileName}`;
+    const filePath = `${userId}/weryfikacja/${documentType}/${fileName}`;
 
     await uploadObject(STORAGE_BUCKETS.VERIFICATION_DOCUMENTS, filePath, file);
 

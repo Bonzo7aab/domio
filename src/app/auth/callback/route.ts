@@ -42,5 +42,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL('/login?error=reset', url.origin).toString())
+  return NextResponse.redirect(new URL('/logowanie?error=reset', url.origin).toString())
 }

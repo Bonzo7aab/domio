@@ -98,7 +98,7 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
   const handleLogout = async () => {
     await logout()
     // Redirect to login - the new page load will have correct server state
-    router.push('/login')
+    router.push('/logowanie')
   }
 
   const userRoleLabel = isAdmin
@@ -108,73 +108,73 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
       : 'Wykonawca'
 
   const handleZgloszeniaClick = () => {
-    router.push('/manager-dashboard/konkursy')
+    router.push('/panel-zarzadcy/konkursy')
   }
 
   const handleZamowieniaClick = () => {
     router.push(
       currentUser?.userType === 'manager'
-        ? '/manager-dashboard/zamowienia'
-        : '/contractor-dashboard/zamowienia',
+        ? '/panel-zarzadcy/zamowienia'
+        : '/panel-wykonawcy/zamowienia',
     )
   }
 
   // Navigation handlers
   const handleCreateContestClick = () => {
-    router.push('/post-contest')
+    router.push('/dodaj-konkurs')
   }
 
   const handleAdminPanelClick = () => {
-    router.push('/admin')
+    router.push('/administracja')
   }
 
   const handleLoginClick = () => {
-    router.push('/login')
+    router.push('/logowanie')
   }
 
   const handleRegisterClick = () => {
-    router.push('/register')
+    router.push('/rejestracja')
   }
 
   const handleVerificationClick = () => {
     if (currentUser?.userType !== 'contractor') {
-      router.push('/account');
+      router.push('/konto');
       return;
     }
     router.push(CONTRACTOR_VERIFICATION_DOCUMENTS_PATH);
   };
 
   const handleAccountClick = () => {
-    router.push('/account')
+    router.push('/konto')
   }
 
   const handleOffersClick = () => {
-    router.push('/contractor-dashboard/applications')
+    router.push('/panel-wykonawcy/aplikacje')
   }
 
   const handleJobSelect = (jobId: string) => {
-    router.push(`/jobs/${jobId}`)
+    router.push(`/zlecenia/${jobId}`)
   }
 
 
   const handleBookmarkedJobsClick = () => {
-    router.push('/bookmarked-jobs')
+    router.push('/zapisane-zgloszenia')
   }
 
   const handleMessagingClick = () => {
-    router.push('/messages')
+    router.push('/wiadomosci')
   }
 
   const handleWelcomeClick = () => {
-    router.push('/welcome')
+    router.push('/powitanie')
   }
 
   const handleTutorialClick = () => {
-    router.push('/tutorial')
+    router.push('/samouczek')
   }
 
   const handleProfileCompletionClick = () => {
-    router.push('/profile-completion')
+    router.push('/uzupelnianie-profilu')
   }
 
   const renderAvatarTrigger = (className?: string) => (

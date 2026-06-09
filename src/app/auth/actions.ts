@@ -108,7 +108,7 @@ export async function resetPassword(formData: FormData) {
       /\/$/,
       ''
     )
-  const next = encodeURIComponent('/auth/update-password')
+  const next = encodeURIComponent('/auth/aktualizacja-hasla')
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/callback?next=${next}`,
@@ -148,7 +148,7 @@ export async function updateProfile(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/login')
+    redirect('/logowanie')
   }
 
   const profileData = {

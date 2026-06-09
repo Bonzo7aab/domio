@@ -23,13 +23,13 @@ export function ManagerProfileHeader({ profile }: ManagerProfileHeaderProps) {
   const [_showPhoneNumber, setShowPhoneNumber] = useState(false);
 
   const _handleBack = () => {
-    router.push('/managers');
+    router.push('/zarzadcy');
   };
 
   const _handleStartConversation = async () => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby rozpocząć konwersację');
-      router.push(`/login?redirectTo=${encodeURIComponent(window.location.pathname)}`);
+      router.push(`/logowanie?redirectTo=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 
@@ -89,7 +89,7 @@ export function ManagerProfileHeader({ profile }: ManagerProfileHeaderProps) {
       }
 
       // Navigate to messages page with the conversation
-      router.push(`/messages?conversation=${conversationId}`);
+      router.push(`/wiadomosci?conversation=${conversationId}`);
     } catch (error) {
       console.error('Error in handleStartConversation:', error);
       toast.error('Wystąpił błąd podczas rozpoczynania konwersacji');

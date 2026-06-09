@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   updateJobWorkflowStatusAction,
   updateTenderWorkflowStatusAction,
-} from '../../app/manager-dashboard/zgloszenia/actions';
+} from '../../app/panel-zarzadcy/zgloszenia/actions';
 import {
   formatWorkflowTransitionLabel,
   getJobWorkflowAdvanceAction,
@@ -102,7 +102,7 @@ export function ManagerWorkflowAdvanceButton({
             variant="default"
             onClick={() =>
               router.push(
-                `/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=zgłoszenie`,
+                `/panel-zarzadcy/zgloszenia/porownaj/${row.id}?typ=zgłoszenie`,
               )
             }
           />
@@ -115,7 +115,7 @@ export function ManagerWorkflowAdvanceButton({
           disabled={isPending}
           onClick={() =>
             router.push(
-              `/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=zgłoszenie`,
+              `/panel-zarzadcy/zgloszenia/porownaj/${row.id}?typ=zgłoszenie`,
             )
           }
         >
@@ -180,7 +180,7 @@ export function ManagerWorkflowAdvanceButton({
           disabled={isPending}
           variant="default"
           onClick={() =>
-            router.push(`/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=przetarg`)
+            router.push(`/panel-zarzadcy/zgloszenia/porownaj/${row.id}?typ=przetarg`)
           }
         />
       );
@@ -191,7 +191,7 @@ export function ManagerWorkflowAdvanceButton({
         variant="secondary"
         disabled={isPending}
         onClick={() =>
-          router.push(`/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=przetarg`)
+          router.push(`/panel-zarzadcy/zgloszenia/porownaj/${row.id}?typ=przetarg`)
         }
       >
         <TransitionLabel currentLabel={currentLabel} nextLabel="Porównaj oferty" />

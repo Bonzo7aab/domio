@@ -37,11 +37,11 @@ test.describe('Manager contest creation (zarzadca3)', () => {
     await loginViaUI(page, SEEDED_MANAGER.email, SEEDED_MANAGER.password);
     await page.goto(ROUTES.managerDashboard);
 
-    await page.waitForURL((url) => url.pathname.startsWith('/manager-dashboard'), {
+    await page.waitForURL((url) => url.pathname.startsWith('/panel-zarzadcy'), {
       timeout: 15000,
     });
 
-    expect(page.url()).not.toContain('/login');
+    expect(page.url()).not.toContain('/logowanie');
     await expect(page.getByText(/nieruchomości|aktywne zgłoszenia|panel/i).first()).toBeVisible({
       timeout: 15000,
     });

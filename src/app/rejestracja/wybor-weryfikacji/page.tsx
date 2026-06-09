@@ -19,7 +19,7 @@ export default async function RegisterVerificationChoicePage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login?redirectTo=/register/verification-choice');
+    redirect('/logowanie?redirectTo=/rejestracja/wybor-weryfikacji');
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,7 +30,7 @@ export default async function RegisterVerificationChoicePage() {
     .maybeSingle();
 
   if (profile?.user_type !== 'contractor') {
-    redirect('/account');
+    redirect('/konto');
   }
 
   return (

@@ -124,7 +124,7 @@ export default function JobApplicationsPage() {
 
         if (authError || !user) {
           toast.error("Zaloguj się, aby wysłać wiadomość.");
-          router.push(`/login?redirectTo=${encodeURIComponent(`/manager-dashboard/jobs/${jobId}/applications`)}`);
+          router.push(`/logowanie?redirectTo=${encodeURIComponent(`/panel-zarzadcy/zlecenia/${jobId}/applications`)}`);
           return;
         }
 
@@ -162,7 +162,7 @@ export default function JobApplicationsPage() {
           conversationId = newId;
         }
 
-        router.push(`/messages?conversation=${conversationId}`);
+        router.push(`/wiadomosci?conversation=${conversationId}`);
       } catch (e) {
         console.error("handleStartConversation:", e);
         toast.error("Wystąpił błąd podczas otwierania wiadomości.");
@@ -177,7 +177,7 @@ export default function JobApplicationsPage() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <Button
         variant="outline"
-        onClick={() => router.push("/manager-dashboard/zgloszenia")}
+        onClick={() => router.push("/panel-zarzadcy/zgloszenia")}
         className="mb-4"
       >
         ← Powrót do listy zgłoszeń

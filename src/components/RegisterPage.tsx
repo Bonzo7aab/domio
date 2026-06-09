@@ -210,7 +210,7 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
       footer={
         <>
           Masz już konto?{' '}
-          <Link href="/login" className="font-medium text-primary hover:underline">
+          <Link href="/logowanie" className="font-medium text-primary hover:underline">
             Zaloguj się
           </Link>
         </>
@@ -494,11 +494,11 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
             />
             <label htmlFor="acceptTerms" className="cursor-pointer text-sm leading-snug text-muted-foreground">
               Akceptuję{' '}
-              <Link href="/terms" className="font-medium text-primary hover:underline">
+              <Link href="/regulamin" className="font-medium text-primary hover:underline">
                 regulamin
               </Link>{' '}
               i{' '}
-              <Link href="/privacy" className="font-medium text-primary hover:underline">
+              <Link href="/polityka-prywatnosci" className="font-medium text-primary hover:underline">
                 politykę prywatności
               </Link>
               .

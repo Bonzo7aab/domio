@@ -15,7 +15,7 @@ export default async function Account() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login?redirectTo=/account');
+    redirect('/logowanie?redirectTo=/konto');
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

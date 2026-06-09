@@ -63,8 +63,8 @@ function MessagesPageContent() {
   const handleConversationChange = useCallback(
     (id: string | null) => {
       const path = id
-        ? `/messages?conversation=${encodeURIComponent(id)}`
-        : '/messages';
+        ? `/wiadomosci?conversation=${encodeURIComponent(id)}`
+        : '/wiadomosci';
       router.replace(path, { scroll: false });
     },
     [router],
@@ -168,8 +168,8 @@ function MessagesPageContent() {
     if (!isLoading && !user) {
       const currentPath = typeof window !== 'undefined' 
         ? `${window.location.pathname}${window.location.search}` 
-        : '/messages';
-      router.push(`/login?redirectTo=${encodeURIComponent(currentPath)}`);
+        : '/wiadomosci';
+      router.push(`/logowanie?redirectTo=${encodeURIComponent(currentPath)}`);
     }
   }, [user, isLoading, router]);
 

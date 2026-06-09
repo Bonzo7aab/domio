@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation';
 import { cn } from '../ui/utils';
 
 const tabs = [
-  { id: 'overview', label: 'Przegląd', href: '/manager-dashboard/overview' },
-  { id: 'konkursy', label: 'Konkursy', href: '/manager-dashboard/konkursy' },
-  { id: 'zamowienia', label: 'Zamówienia', href: '/manager-dashboard/zamowienia' },
-  { id: 'ocena', label: 'Ocena', href: '/manager-dashboard/ocena-zgloszen' },
+  { id: 'overview', label: 'Przegląd', href: '/panel-zarzadcy/przeglad' },
+  { id: 'konkursy', label: 'Konkursy', href: '/panel-zarzadcy/konkursy' },
+  { id: 'zamowienia', label: 'Zamówienia', href: '/panel-zarzadcy/zamowienia' },
+  { id: 'ocena', label: 'Ocena', href: '/panel-zarzadcy/ocena-zgloszen' },
 ];
 
 interface ManagerDashboardNavProps {
@@ -27,13 +27,13 @@ export function ManagerDashboardNav({ showOrders = false }: ManagerDashboardNavP
             const isActive =
               pathname === tab.href ||
               (tab.id === 'overview' &&
-                (pathname === '/manager-dashboard' || pathname === '/manager-dashboard/')) ||
+                (pathname === '/panel-zarzadcy' || pathname === '/panel-zarzadcy/')) ||
               (tab.id === 'konkursy' &&
-                (pathname.startsWith('/manager-dashboard/konkursy') ||
-                  pathname.startsWith('/manager-dashboard/zgloszenia'))) ||
+                (pathname.startsWith('/panel-zarzadcy/konkursy') ||
+                  pathname.startsWith('/panel-zarzadcy/zgloszenia'))) ||
               (tab.id === 'zamowienia' &&
-                pathname.startsWith('/manager-dashboard/zamowienia')) ||
-              (tab.id === 'ocena' && pathname.startsWith('/manager-dashboard/ocena-zgloszen'));
+                pathname.startsWith('/panel-zarzadcy/zamowienia')) ||
+              (tab.id === 'ocena' && pathname.startsWith('/panel-zarzadcy/ocena-zgloszen'));
             return (
               <Link
                 key={tab.id}

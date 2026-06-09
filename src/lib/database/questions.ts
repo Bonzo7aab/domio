@@ -1,6 +1,6 @@
 import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
-import { notifyContestQuestionAskerAction } from '../../app/contest-questions/actions';
+import { notifyContestQuestionAskerAction } from '../../app/pytania-konkursu/actions';
 import { createNotification } from './messaging';
 import { isContestTender } from '../tender-contest/map-tender-contest-display';
 import { isContestQuestionsDeadlinePassed } from '../contest-questions/format-contest-question-label';
@@ -699,8 +699,8 @@ export async function submitQuestion(
     if (meta.managerId && authenticatedUserId !== meta.managerId) {
       const isContestQa = !isJob && meta.isContest;
       const actionUrl = isContestQa
-        ? `/manager-dashboard/konkursy?contestId=${jobId}&tab=questions`
-        : `/jobs/${jobId}`;
+        ? `/panel-zarzadcy/konkursy?contestId=${jobId}&tab=questions`
+        : `/zlecenia/${jobId}`;
 
       const notificationType = isContestQa ? 'contest_question' : 'new_message';
       const notificationTitle = isContestQa

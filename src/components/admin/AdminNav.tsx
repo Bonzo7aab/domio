@@ -6,11 +6,11 @@ import { LayoutDashboard, ClipboardCheck, FileWarning, Building2, Settings } fro
 import { cn } from '../ui/utils';
 
 const links = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/admin/verification', label: 'Weryfikacja', icon: ClipboardCheck },
-  { href: '/admin/offers', label: 'Oferty wykonawców', icon: FileWarning },
-  { href: '/admin/listings', label: 'Zgłoszenia zarządców', icon: Building2 },
-  { href: '/admin/settings', label: 'Ustawienia', icon: Settings },
+  { href: '/administracja', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/administracja/weryfikacja', label: 'Weryfikacja', icon: ClipboardCheck },
+  { href: '/administracja/oferty', label: 'Oferty wykonawców', icon: FileWarning },
+  { href: '/administracja/ogloszenia', label: 'Zgłoszenia zarządców', icon: Building2 },
+  { href: '/administracja/ustawienia', label: 'Ustawienia', icon: Settings },
 ];
 
 export function AdminNav() {

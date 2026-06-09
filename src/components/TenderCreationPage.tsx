@@ -46,8 +46,8 @@ export default function TenderCreationPage({
 
   useEffect(() => {
     const loginPath = isEditMode
-      ? `/login?redirectTo=${encodeURIComponent(`/post-contest/${tenderId}`)}`
-      : `/login?redirectTo=${encodeURIComponent('/post-contest')}`;
+      ? `/logowanie?redirectTo=${encodeURIComponent(`/dodaj-konkurs/${tenderId}`)}`
+      : `/logowanie?redirectTo=${encodeURIComponent('/dodaj-konkurs')}`;
     if (!isLoading && !user && !session) {
       router.push(loginPath);
     }
@@ -239,7 +239,7 @@ export default function TenderCreationPage({
             : 'Konkurs zapisany jako szkic'
           : 'Konkurs został opublikowany',
       );
-      router.push('/manager-dashboard/konkursy');
+      router.push('/panel-zarzadcy/konkursy');
     } catch (error) {
       console.error('Error saving contest:', error);
       toast.error('Wystąpił błąd podczas zapisywania konkursu');

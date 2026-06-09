@@ -12,7 +12,7 @@ export interface PlatformAdminSession {
 /**
  * Ensures the current user is authenticated and has platform_role = platform_admin.
  */
-export async function requirePlatformAdmin(redirectTo = '/admin'): Promise<PlatformAdminSession> {
+export async function requirePlatformAdmin(redirectTo = '/administracja'): Promise<PlatformAdminSession> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -20,7 +20,7 @@ export async function requirePlatformAdmin(redirectTo = '/admin'): Promise<Platf
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    redirect(`/login?redirectTo=${encodeURIComponent(redirectTo)}`);
+    redirect(`/logowanie?redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
   const { data: profile, error: profileError } = await supabase

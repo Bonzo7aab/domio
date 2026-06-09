@@ -43,10 +43,10 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
         setOcValidUntil(settings.ocValidUntil ?? '');
 
         // Fall back to the verification `insurance` document so the card
-        // reflects OC uploaded via /verification too. If we resolve a path
+        // reflects OC uploaded via /weryfikacja too. If we resolve a path
         // via the fallback we proactively persist it to
         // `contractor_account_settings` so subsequent reads (and the OC
-        // notice on /account) stay consistent without another fallback.
+        // notice on /konto) stay consistent without another fallback.
         if (settings.ocPolicyScanPath) {
           setPolicyPath(settings.ocPolicyScanPath);
         } else {
@@ -117,7 +117,7 @@ export function ContractorInsuranceSettings({ userId }: ContractorInsuranceSetti
       setPolicyPath(saved.ocPolicyScanPath);
       toast.success(OC_SETTINGS_SAVED_TOAST);
       // Refresh server state so the OC notice in the page header and the
-      // /verification page reflect the newly synced scan immediately.
+      // /weryfikacja page reflect the newly synced scan immediately.
       router.refresh();
     } catch (error) {
       console.error('Error uploading OC policy:', error);

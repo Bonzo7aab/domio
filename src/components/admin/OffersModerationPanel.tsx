@@ -22,7 +22,7 @@ import {
   unsuspendTenderBidAction,
   updateJobApplicationAdminAction,
   updateTenderBidAdminAction,
-} from '../../app/admin/actions';
+} from '../../app/administracja/actions';
 import type { AdminJobApplicationRow, AdminTenderBidRow } from '../../lib/database/admin-offers';
 import { offerEffectiveStatus, statusBadgeClass } from '../../lib/admin/status-labels';
 import { SortableHeader, type SortState } from './SortableHeader';

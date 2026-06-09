@@ -32,11 +32,11 @@ export function RegisterVerificationChoice() {
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
-      router.replace('/login?redirectTo=/register/verification-choice');
+      router.replace('/logowanie?redirectTo=/rejestracja/wybor-weryfikacji');
       return;
     }
     if (user && user.userType !== 'contractor') {
-      router.replace('/account');
+      router.replace('/konto');
     }
   }, [isLoading, isAuthenticated, user, router]);
 

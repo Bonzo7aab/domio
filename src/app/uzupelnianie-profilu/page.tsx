@@ -12,7 +12,7 @@ export default function ProfileCompletion() {
   useEffect(() => {
     if (!isLoading) {
       if (!user) {
-        router.push('/login');
+        router.push('/logowanie');
       } else if (user.profileCompleted) {
         router.push('/');
       }

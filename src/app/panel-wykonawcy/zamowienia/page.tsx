@@ -20,7 +20,7 @@ export default async function ContractorZamowieniaPage(): Promise<ReactElement> 
   }
 
   if (!(await isOrdersFeatureEnabledForAuthUser(supabase, user))) {
-    redirect('/contractor-dashboard/applications');
+    redirect('/panel-wykonawcy/aplikacje');
   }
 
   const orders = await fetchContractorOrders(supabase, user.id);

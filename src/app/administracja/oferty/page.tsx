@@ -3,7 +3,7 @@ import { fetchAdminJobApplications, fetchAdminTenderBids } from '../../../lib/da
 import { OffersModerationPanel } from '../../../components/admin/OffersModerationPanel';
 
 export default async function AdminOffersPage() {
-  const { supabase } = await requirePlatformAdmin('/admin/offers');
+  const { supabase } = await requirePlatformAdmin('/administracja/oferty');
   const [applications, bids] = await Promise.all([
     fetchAdminJobApplications(supabase),
     fetchAdminTenderBids(supabase),

@@ -12,7 +12,7 @@ export default function Onboarding() {
   useEffect(() => {
     if (!isLoading && !user) {
       console.log('Onboarding - redirecting to login');
-      router.push('/login');
+      router.push('/logowanie');
     }
   }, [isLoading, user, router]);
 
@@ -28,7 +28,7 @@ export default function Onboarding() {
     <OnboardingFlow 
       onComplete={() => router.push('/')}
       onVerificationClick={() =>
-        router.push('/account?tab=documents')
+        router.push('/konto?tab=documents')
       }
     />
   );

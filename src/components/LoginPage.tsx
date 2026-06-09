@@ -79,7 +79,7 @@ export function LoginPage() {
       footer={
         <>
           Nie masz konta?{' '}
-          <Link href="/register" className="font-medium text-primary hover:underline">
+          <Link href="/rejestracja" className="font-medium text-primary hover:underline">
             Zarejestruj się
           </Link>
         </>
@@ -120,7 +120,7 @@ export function LoginPage() {
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="password">Hasło</Label>
               <Link
-                href="/forgot-password"
+                href="/zapomniane-haslo"
                 className="text-xs text-muted-foreground hover:text-primary hover:underline"
               >
                 Zapomniałeś hasła?

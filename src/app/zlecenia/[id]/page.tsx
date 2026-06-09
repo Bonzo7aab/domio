@@ -13,7 +13,7 @@ export default function JobDetailsPage() {
   };
 
   const handleJobSelect = (jobId: string) => {
-    router.push(`/jobs/${jobId}`);
+    router.push(`/zlecenia/${jobId}`);
   };
 
   return (

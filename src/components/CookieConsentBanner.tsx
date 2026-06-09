@@ -72,7 +72,7 @@ export function CookieConsentBanner() {
             zapamiętać Twoje preferencje oraz analizować ruch na stronie. 
             Niektóre pliki cookies są niezbędne do działania platformy, inne wymagają Twojej zgody. 
             Więcej informacji znajdziesz w naszej{' '}
-            <Link href="/privacy" className="text-blue-600 hover:underline font-medium">
+            <Link href="/polityka-prywatnosci" className="text-blue-600 hover:underline font-medium">
               Polityce prywatności
             </Link>.
           </p>

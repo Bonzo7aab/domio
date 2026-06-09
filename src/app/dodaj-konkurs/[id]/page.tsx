@@ -19,7 +19,7 @@ export default function PostContestEditPage() {
   return (
     <TenderCreationPage
       tenderId={id}
-      onBack={() => router.push('/manager-dashboard/konkursy')}
+      onBack={() => router.push('/panel-zarzadcy/konkursy')}
     />
   );
 }

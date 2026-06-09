@@ -10,7 +10,7 @@ export default function Welcome() {
     <WelcomePage 
       onBack={() => router.push('/')}
       onGetStarted={() => router.push('/')}
-      onTutorial={() => router.push('/tutorial')}
+      onTutorial={() => router.push('/samouczek')}
     />
   );
 }

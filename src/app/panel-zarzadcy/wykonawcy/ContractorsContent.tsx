@@ -59,7 +59,7 @@ export function ContractorsContent({ contractors }: ContractorsContentProps) {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => router.push(`/contractors/${contractor.id}`)}
+                      onClick={() => router.push(`/wykonawcy/${contractor.id}`)}
                     >
                       Zobacz profil
                     </Button>

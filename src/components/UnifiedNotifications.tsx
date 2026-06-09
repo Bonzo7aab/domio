@@ -361,17 +361,17 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         } else if (onTenderSelect && contestNotif.contestId) {
           onTenderSelect(contestNotif.contestId);
         } else if (contestNotif.contestId) {
-          router.push(`/jobs/${contestNotif.contestId}`);
+          router.push(`/zlecenia/${contestNotif.contestId}`);
         }
         break;
       }
       case 'system': {
         const systemNotif = notification as SystemNotification;
         const verificationPath =
-          user?.userType === 'manager' ? '/account' : '/account?tab=documents';
+          user?.userType === 'manager' ? '/konto' : '/konto?tab=documents';
         const target =
           systemNotif.actionUrl ||
-          (systemNotif.type === 'verification_rejected' ? verificationPath : '/account');
+          (systemNotif.type === 'verification_rejected' ? verificationPath : '/konto');
         router.push(target);
         break;
       }
@@ -380,8 +380,8 @@ export const UnifiedNotifications: React.FC<UnifiedNotificationsProps> = ({
         const target =
           messageNotif.actionUrl ||
           (messageNotif.conversationId
-            ? `/messages?conversation=${messageNotif.conversationId}`
-            : '/messages');
+            ? `/wiadomosci?conversation=${messageNotif.conversationId}`
+            : '/wiadomosci');
         router.push(target);
         break;
       }

@@ -65,7 +65,7 @@ export const mockNotifications: Notification[] = [
       senderName: 'Anna Kowalska'
     },
     priority: 'medium',
-    actionUrl: '/messages'
+    actionUrl: '/wiadomosci'
   },
   {
     id: 'notif-5',
@@ -81,7 +81,7 @@ export const mockNotifications: Notification[] = [
       jobTitle: 'Malowanie klatek schodowych'
     },
     priority: 'low',
-    actionUrl: '/manager/jobs'
+    actionUrl: '/manager/zlecenia'
   },
   {
     id: 'notif-6',

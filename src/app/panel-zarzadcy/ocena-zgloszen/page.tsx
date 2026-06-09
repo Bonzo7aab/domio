@@ -5,7 +5,7 @@ import {
   fetchContractorReviews,
 } from '../../../lib/database/contractors';
 import { fetchReviewsWrittenByUser } from '../../../lib/database/reviews';
-import { RatingsContent } from '../../contractor-dashboard/ratings/RatingsContent';
+import { RatingsContent } from '../../panel-wykonawcy/oceny/RatingsContent';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import Link from 'next/link';
@@ -34,7 +34,7 @@ export default async function OcenaZgloszenPage(): Promise<ReactElement> {
           <CardContent className="pt-6 text-center space-y-4 flex flex-col items-center">
             <p className="text-muted-foreground">Najpierw uzupełnij dane firmy w profilu.</p>
             <Button asChild>
-              <Link href="/account">Przejdź do konta</Link>
+              <Link href="/konto">Przejdź do konta</Link>
             </Button>
           </CardContent>
         </Card>

@@ -223,14 +223,14 @@ export function ContractorContestOffersContent({
       );
 
       if (result.error) {
-        router.push(`/messages?recipient=${managerId}&jobId=${row.tenderId}`);
+        router.push(`/wiadomosci?recipient=${managerId}&jobId=${row.tenderId}`);
         return;
       }
 
       if (result.data) {
-        router.push(`/messages?conversation=${result.data}`);
+        router.push(`/wiadomosci?conversation=${result.data}`);
       } else {
-        router.push(`/messages?recipient=${managerId}&jobId=${row.tenderId}`);
+        router.push(`/wiadomosci?recipient=${managerId}&jobId=${row.tenderId}`);
       }
     } catch (error) {
       console.error('Error starting conversation:', error);
@@ -420,7 +420,7 @@ export function ContractorContestOffersContent({
                       <TableCell className="max-w-[300px]">
                         <div className="min-w-0">
                           <Link
-                            href={`/jobs/${row.tenderId}`}
+                            href={`/zlecenia/${row.tenderId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="font-medium truncate leading-snug hover:underline block max-w-full text-foreground hover:text-primary"

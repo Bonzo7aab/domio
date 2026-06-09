@@ -55,7 +55,7 @@ function EmptyRow({ message, colSpan }: { message: string; colSpan: number }) {
 
 function DetailsLink({ userId }: { userId: string }) {
   return (
-    <Link href={`/admin/verification/${userId}`} className="text-primary underline">
+    <Link href={`/administracja/weryfikacja/${userId}`} className="text-primary underline">
       Szczegóły
     </Link>
   );

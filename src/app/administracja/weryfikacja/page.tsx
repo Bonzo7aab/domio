@@ -7,7 +7,7 @@ import {
 import { VerificationQueueTabs } from '../../../components/admin/VerificationQueueTabs';
 
 export default async function AdminVerificationQueuePage() {
-  const { supabase } = await requirePlatformAdmin('/admin/verification');
+  const { supabase } = await requirePlatformAdmin('/administracja/weryfikacja');
   const [pending, rejected, approved] = await Promise.all([
     fetchPendingVerificationQueue(supabase),
     fetchRejectedVerificationQueue(supabase),

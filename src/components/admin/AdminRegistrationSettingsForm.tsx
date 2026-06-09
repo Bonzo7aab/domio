@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { Button } from '../ui/button';
-import { updateRegistrationSettingsAction } from '../../app/admin/actions';
+import { updateRegistrationSettingsAction } from '../../app/administracja/actions';
 import type { RegistrationSettings } from '../../lib/registration-settings-shared';
 
 interface AdminRegistrationSettingsFormProps {

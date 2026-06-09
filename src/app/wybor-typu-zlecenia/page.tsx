@@ -17,7 +17,7 @@ export default function JobTypeSelection() {
   useEffect(() => {
     if (!isLoading && !user) {
       // Redirect to login with return path
-      router.push(`/login?redirectTo=${encodeURIComponent('/job-type-selection')}`);
+      router.push(`/logowanie?redirectTo=${encodeURIComponent('/wybor-typu-zlecenia')}`);
     }
   }, [user, isLoading, router]);
 
@@ -27,7 +27,7 @@ export default function JobTypeSelection() {
     if (user.userType !== 'manager') return;
     if (hasCompany === false) return;
     if (isCheckingCompany || hasCompany === null) return;
-    router.replace('/post-contest');
+    router.replace('/dodaj-konkurs');
   }, [user, isLoading, hasCompany, isCheckingCompany, router]);
 
   // Check if user has a company (only for managers)
@@ -65,7 +65,7 @@ export default function JobTypeSelection() {
     if (user?.userType === 'manager') {
       if (hasCompany === false) {
         toast.error('Najpierw musisz dodać dane firmy w profilu');
-        router.push('/account?tab=company');
+        router.push('/konto?tab=company');
         return;
       }
 
@@ -75,19 +75,19 @@ export default function JobTypeSelection() {
       }
     }
 
-    router.push('/post-job');
+    router.push('/dodaj-zlecenie');
   };
 
   const handleSelectTender = () => {
     if (user?.userType !== 'manager') {
-      router.push('/login');
+      router.push('/logowanie');
       return;
     }
 
     // Check if company exists before navigating
     if (hasCompany === false) {
       toast.error('Najpierw musisz dodać dane firmy w profilu');
-      router.push('/account?tab=company');
+      router.push('/konto?tab=company');
       return;
     }
 
@@ -96,7 +96,7 @@ export default function JobTypeSelection() {
       return;
     }
 
-    router.push('/post-contest');
+    router.push('/dodaj-konkurs');
   };
 
   return (

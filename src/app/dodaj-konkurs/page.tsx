@@ -11,7 +11,7 @@ function PostContestPageContent(): React.ReactElement {
 
   return (
     <TenderCreationPage
-      onBack={() => router.push('/manager-dashboard/konkursy')}
+      onBack={() => router.push('/panel-zarzadcy/konkursy')}
       duplicateFromId={duplicateFrom}
     />
   );

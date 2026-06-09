@@ -51,13 +51,13 @@ export function normalizeStorageObjectPath(path: string, bucket: StorageBucket):
 
 export function resolveStorageBucket(path: string): StorageBucket {
   const normalized = path.replace(/^\/+/, '');
-  if (normalized.includes('/tenders/') && !normalized.includes('/jobs/')) {
+  if (normalized.includes('/tenders/') && !normalized.includes('/zlecenia/')) {
     return STORAGE_BUCKETS.BID_ATTACHMENTS;
   }
-  if (normalized.includes('/verification/')) {
+  if (normalized.includes('/weryfikacja/')) {
     return STORAGE_BUCKETS.VERIFICATION_DOCUMENTS;
   }
-  if (normalized.includes('/reviews/') || normalized.includes('/jobs/') || normalized.includes('/portfolio/')) {
+  if (normalized.includes('/reviews/') || normalized.includes('/zlecenia/') || normalized.includes('/portfolio/')) {
     return STORAGE_BUCKETS.JOB_ATTACHMENTS;
   }
   return STORAGE_BUCKETS.VERIFICATION_DOCUMENTS;

@@ -70,17 +70,17 @@ test.describe('Logout', () => {
       await logoutOption.click();
 
       // Wait for redirect to login page
-      await page.waitForURL((url) => url.pathname.includes('/login') || url.pathname === '/', { timeout: 10000 });
+      await page.waitForURL((url) => url.pathname.includes('/logowanie') || url.pathname === '/', { timeout: 10000 });
 
       // Should be redirected to login or home
-      expect(page.url()).toMatch(/\/login|\/$/);
+      expect(page.url()).toMatch(/\/logowanie|\/$/);
 
       // Wait a bit for cookies to be cleared after logout
       await page.waitForTimeout(1000);
       
       // Verify auth state is cleared - clear auth state first to ensure clean check
       await clearAuthState(page);
-      await page.goto('/login'); // Navigate to a page to ensure cookies are cleared
+      await page.goto('/logowanie'); // Navigate to a page to ensure cookies are cleared
       const isAuthenticated = await getAuthState(page);
       expect(isAuthenticated).toBe(false);
     } finally {
@@ -113,7 +113,7 @@ test.describe('Logout', () => {
         await page.waitForTimeout(500);
         const logoutOption = page.locator('text=Wyloguj').or(page.locator('text=Wyloguj się')).first();
         await logoutOption.click();
-        await page.waitForURL((url) => url.pathname.includes('/login') || url.pathname === '/', { timeout: 10000 });
+        await page.waitForURL((url) => url.pathname.includes('/logowanie') || url.pathname === '/', { timeout: 10000 });
       }
 
       // Wait a bit for cookies to be cleared after logout
@@ -121,7 +121,7 @@ test.describe('Logout', () => {
       
       // Verify cookies are cleared - use same check as getAuthState
       await clearAuthState(page);
-      await page.goto('/login'); // Navigate to ensure cookies are cleared
+      await page.goto('/logowanie'); // Navigate to ensure cookies are cleared
       const cookiesAfter = await page.context().cookies();
       const hasAuthCookiesAfter = cookiesAfter.some(cookie => {
         const name = cookie.name.toLowerCase();
@@ -152,18 +152,18 @@ test.describe('Logout', () => {
       await loginViaUI(page, email, password);
       
       // Wait for login to complete and navigation to finish
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+      await page.waitForURL((url) => !url.pathname.includes('/logowanie'), { timeout: 10000 });
       await page.waitForLoadState('networkidle');
 
       // Access a protected route (only navigate if not already there)
       const currentUrl = page.url();
-      if (!currentUrl.includes('/account')) {
+      if (!currentUrl.includes('/konto')) {
         // Firefox may need longer timeout for navigation
         const navTimeout = browserName === 'firefox' ? 20000 : 10000;
         await page.goto(ROUTES.account, { waitUntil: 'domcontentloaded', timeout: navTimeout });
         await page.waitForLoadState('networkidle', { timeout: navTimeout });
       }
-      await expect(page).toHaveURL(/.*account/, { timeout: browserName === 'firefox' ? 20000 : 10000 });
+      await expect(page).toHaveURL(/.*konto/, { timeout: browserName === 'firefox' ? 20000 : 10000 });
 
       // Logout
       const avatarButton = page.locator('button').filter({ has: page.locator('img, svg') }).first();
@@ -175,7 +175,7 @@ test.describe('Logout', () => {
         const logoutVisible = await logoutOption.isVisible({ timeout: 2000 }).catch(() => false);
         if (logoutVisible) {
           await logoutOption.click();
-          await page.waitForURL((url) => url.pathname.includes('/login') || url.pathname === '/', { timeout: 10000 });
+          await page.waitForURL((url) => url.pathname.includes('/logowanie') || url.pathname === '/', { timeout: 10000 });
         }
       }
       
@@ -192,9 +192,9 @@ test.describe('Logout', () => {
       await page.goto(ROUTES.account);
       
       // Should redirect to login
-      await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: 5000 });
+      await page.waitForURL((url) => url.pathname.includes('/logowanie'), { timeout: 5000 });
       
-      expect(page.url()).toContain('/login');
+      expect(page.url()).toContain('/logowanie');
     } finally {
       await deleteTestUser(email);
     }
@@ -221,8 +221,8 @@ test.describe('Logout', () => {
       }
 
       // Should redirect to login page
-      await page.waitForURL((url) => url.pathname.includes('/login') || url.pathname === '/', { timeout: 10000 });
-      expect(page.url()).toMatch(/\/login|\/$/);
+      await page.waitForURL((url) => url.pathname.includes('/logowanie') || url.pathname === '/', { timeout: 10000 });
+      expect(page.url()).toMatch(/\/logowanie|\/$/);
     } finally {
       await deleteTestUser(email);
     }

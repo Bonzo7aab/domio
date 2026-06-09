@@ -1809,7 +1809,7 @@ export async function fetchContractorRecentActivities(
             timestamp: new Date(timestamp),
             color: 'bg-green-500',
             icon: 'CheckCircle',
-            linkUrl: jobId ? `/jobs/${jobId}` : undefined
+            linkUrl: jobId ? `/zlecenia/${jobId}` : undefined
           };
         } else if (app.status === 'rejected') {
           activity = {
@@ -1820,7 +1820,7 @@ export async function fetchContractorRecentActivities(
             timestamp: new Date(timestamp),
             color: 'bg-red-500',
             icon: 'XCircle',
-            linkUrl: jobId ? `/jobs/${jobId}` : undefined
+            linkUrl: jobId ? `/zlecenia/${jobId}` : undefined
           };
         } else if (app.status === 'under_review' || app.status === 'shortlisted') {
           activity = {
@@ -1831,7 +1831,7 @@ export async function fetchContractorRecentActivities(
             timestamp: new Date(timestamp),
             color: 'bg-blue-500',
             icon: 'Clock',
-            linkUrl: jobId ? `/jobs/${jobId}` : undefined
+            linkUrl: jobId ? `/zlecenia/${jobId}` : undefined
           };
         }
 
@@ -1888,7 +1888,7 @@ export async function fetchContractorRecentActivities(
             timestamp: new Date(timestamp),
             color: 'bg-green-500',
             icon: 'CheckCircle',
-            linkUrl: tenderId ? `/jobs/${tenderId}` : undefined
+            linkUrl: tenderId ? `/zlecenia/${tenderId}` : undefined
           };
         } else if (bid.status === 'rejected') {
           activity = {
@@ -1899,7 +1899,7 @@ export async function fetchContractorRecentActivities(
             timestamp: new Date(timestamp),
             color: 'bg-red-500',
             icon: 'XCircle',
-            linkUrl: tenderId ? `/jobs/${tenderId}` : undefined
+            linkUrl: tenderId ? `/zlecenia/${tenderId}` : undefined
           };
         } else if (bid.status === 'under_review' || bid.status === 'shortlisted') {
           activity = {
@@ -1910,7 +1910,7 @@ export async function fetchContractorRecentActivities(
             timestamp: new Date(timestamp),
             color: 'bg-blue-500',
             icon: 'Clock',
-            linkUrl: tenderId ? `/jobs/${tenderId}` : undefined
+            linkUrl: tenderId ? `/zlecenia/${tenderId}` : undefined
           };
         }
 
@@ -1991,7 +1991,7 @@ export async function fetchContractorRecentActivities(
             timestamp: new Date(lastMessage.created_at || conv.last_message_at),
             color: 'bg-blue-500',
             icon: 'MessagesSquare',
-            linkUrl: `/messages?conversation=${conv.id}`
+            linkUrl: `/wiadomosci?conversation=${conv.id}`
           });
         }
       }

@@ -45,8 +45,8 @@ test.describe('Login Page', () => {
     await expect(page.locator('button[type="submit"]')).toBeVisible({ timeout });
 
     // Check links
-    await expect(page.locator('a[href="/forgot-password"]')).toBeVisible({ timeout });
-    await expect(page.locator('a[href="/register"]')).toBeVisible({ timeout });
+    await expect(page.locator('a[href="/zapomniane-haslo"]')).toBeVisible({ timeout });
+    await expect(page.locator('a[href="/rejestracja"]')).toBeVisible({ timeout });
   });
 
   test('should successfully login with valid credentials', async ({ page }) => {
@@ -64,10 +64,10 @@ test.describe('Login Page', () => {
       await page.click('button[type="submit"]');
 
       // Wait for redirect away from login page
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+      await page.waitForURL((url) => !url.pathname.includes('/logowanie'), { timeout: 10000 });
 
       // Verify we're not on login page anymore
-      expect(page.url()).not.toContain('/login');
+      expect(page.url()).not.toContain('/logowanie');
     } finally {
       await deleteTestUser(email);
     }
@@ -165,7 +165,7 @@ test.describe('Login Page', () => {
     testData.userEmails.push(email);
 
     try {
-      const redirectTo = '/account';
+      const redirectTo = '/konto';
       await page.goto(`${ROUTES.login}?redirectTo=${encodeURIComponent(redirectTo)}`);
       
       // Wait for login page to finish loading - wait for the heading first (more reliable indicator)
@@ -183,10 +183,10 @@ test.describe('Login Page', () => {
       await page.click('button[type="submit"]');
 
       // Wait for redirect
-      await page.waitForURL((url) => url.pathname === redirectTo || url.pathname !== '/login', { timeout: 10000 });
+      await page.waitForURL((url) => url.pathname === redirectTo || url.pathname !== '/logowanie', { timeout: 10000 });
       
       // Should be redirected (either to redirectTo or home)
-      expect(page.url()).not.toContain('/login');
+      expect(page.url()).not.toContain('/logowanie');
     } finally {
       await deleteTestUser(email);
     }
@@ -206,11 +206,11 @@ test.describe('Login Page', () => {
       await page.fill('input[name="password"]', password);
       await page.click('button[type="submit"]');
 
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+      await page.waitForURL((url) => !url.pathname.includes('/logowanie'), { timeout: 10000 });
 
       const currentUrl = new URL(page.url());
       expect(currentUrl.hostname).not.toBe('evil.example');
-      expect(currentUrl.pathname).not.toContain('/login');
+      expect(currentUrl.pathname).not.toContain('/logowanie');
     } finally {
       await deleteTestUser(email);
     }
@@ -223,12 +223,12 @@ test.describe('Login Page', () => {
     await expect(page.locator('h1').filter({ hasText: 'Zaloguj się' })).toBeVisible({ timeout: 10000 });
     
     // Wait for forgot password link to be visible
-    const forgotPasswordLink = page.locator('a[href="/forgot-password"]');
+    const forgotPasswordLink = page.locator('a[href="/zapomniane-haslo"]');
     await expect(forgotPasswordLink).toBeVisible({ timeout: 10000 });
     
     // Use Playwright's native click which handles navigation better
     await Promise.all([
-      page.waitForURL(/.*forgot-password/, { timeout: 10000 }),
+      page.waitForURL(/.*zapomniane-haslo/, { timeout: 10000 }),
       forgotPasswordLink.click()
     ]);
   });
@@ -240,7 +240,7 @@ test.describe('Login Page', () => {
     await expect(page.locator('h1').filter({ hasText: 'Zaloguj się' })).toBeVisible({ timeout: 10000 });
     
     // Wait for register link to be visible
-    const registerLink = page.locator('a[href="/register"]');
+    const registerLink = page.locator('a[href="/rejestracja"]');
     await expect(registerLink).toBeVisible({ timeout: 10000 });
     
     // Use Playwright's native click which handles navigation better
@@ -276,9 +276,9 @@ test.describe('Login Page', () => {
       // Should redirect away from login page (middleware + client redirect)
       // Use longer timeout for redirect check
       const redirectTimeout = browserName === 'webkit' ? 20000 : 15000;
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: redirectTimeout });
+      await page.waitForURL((url) => !url.pathname.includes('/logowanie'), { timeout: redirectTimeout });
       await page.waitForLoadState('networkidle');
-      expect(page.url()).not.toContain('/login');
+      expect(page.url()).not.toContain('/logowanie');
     } finally {
       await deleteTestUser(email);
     }
@@ -303,7 +303,7 @@ test.describe('Login Page', () => {
       const submitButton = page.locator('button[type="submit"]');
       const isDisabled = await submitButton.isDisabled().catch(() => false);
       // Either button is disabled or we've navigated away
-      const hasNavigated = !page.url().includes('/login');
+      const hasNavigated = !page.url().includes('/logowanie');
       
       expect(isDisabled || hasNavigated).toBe(true);
     } finally {

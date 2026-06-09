@@ -66,7 +66,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // URL-based tab management (similar to /account page)
+  // URL-based tab management (similar to /konto page)
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMounted, setIsMounted] = useState(false);
   const hasInitializedTabFromUrl = useRef(false);
@@ -111,7 +111,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   } | null>(null);
 
   const handleMessagesClick = () => {
-    router.push('/messages');
+    router.push('/wiadomosci');
   };
 
   // State for Supabase data
@@ -464,7 +464,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
   };
 
   const handleJobView = (jobId: string) => {
-    router.push(`/jobs/${jobId}`);
+    router.push(`/zlecenia/${jobId}`);
   };
 
   const handleStartConversation = async (applicationId: string) => {
@@ -523,7 +523,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
 
       if (result.data) {
         // Conversation exists, navigate to messages page
-        router.push(`/messages?conversation=${result.data}`);
+        router.push(`/wiadomosci?conversation=${result.data}`);
       } else {
         // No conversation exists, show messaging modal with context
         setMessagingContext({
@@ -913,7 +913,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
               </div>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => router.push('/account')}>
+              <Button variant="outline" onClick={() => router.push('/konto')}>
                 Profil użytkownika
               </Button>
               <Button onClick={onBrowseJobs}>
@@ -1072,11 +1072,11 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
                   <CardTitle>Szybkie akcje</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button className="w-full justify-start" onClick={() => router.push('/contractor-dashboard/favorites')}>
+                  <Button className="w-full justify-start" onClick={() => router.push('/panel-wykonawcy/ulubione')}>
                     <Star className="w-4 h-4 mr-2" />
                     Zapisane zgłoszenia
                   </Button>
-                  <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/account?tab=company')}>
+                  <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/konto?tab=company')}>
                     <Edit className="w-4 h-4 mr-2" />
                     Edytuj profil firmy
                   </Button>
@@ -1227,7 +1227,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              onClick={() => router.push(`/jobs/${project.jobId}`)}
+                              onClick={() => router.push(`/zlecenia/${project.jobId}`)}
                             >
                               Zobacz szczegóły
                             </Button>

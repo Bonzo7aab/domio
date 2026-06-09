@@ -3,7 +3,7 @@ import { getRegistrationSettings } from '../../../lib/database/platform-settings
 import { AdminRegistrationSettingsForm } from '../../../components/admin/AdminRegistrationSettingsForm';
 
 export default async function AdminSettingsPage() {
-  const { supabase } = await requirePlatformAdmin('/admin/settings');
+  const { supabase } = await requirePlatformAdmin('/administracja/ustawienia');
   const settings = await getRegistrationSettings(supabase);
 
   return (

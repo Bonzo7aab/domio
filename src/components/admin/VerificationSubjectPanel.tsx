@@ -34,7 +34,7 @@ import type { VerificationState } from '../../lib/verification/types';
 import {
   approveVerificationSubjectAction,
   rejectVerificationSubjectAction,
-} from '../../app/admin/actions';
+} from '../../app/administracja/actions';
 import type {
   AdminVerificationSubjectProfile,
   DocumentReview,
@@ -259,7 +259,7 @@ export function VerificationSubjectPanel({
         return;
       }
       toast.success('Zweryfikowano');
-      window.location.href = '/admin/verification';
+      window.location.href = '/administracja/weryfikacja';
     } finally {
       setBusy(false);
     }
@@ -282,7 +282,7 @@ export function VerificationSubjectPanel({
         return;
       }
       toast.success('Odrzucono weryfikację');
-      window.location.href = '/admin/verification';
+      window.location.href = '/administracja/weryfikacja';
     } finally {
       setBusy(false);
     }

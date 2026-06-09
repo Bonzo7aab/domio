@@ -33,7 +33,7 @@ async function createAuthenticatedPage(
 
   // Verify we're authenticated by checking we're not on login page
   const currentUrl = page.url();
-  if (currentUrl.includes('/login')) {
+  if (currentUrl.includes('/logowanie')) {
     throw new Error('Failed to authenticate user');
   }
 

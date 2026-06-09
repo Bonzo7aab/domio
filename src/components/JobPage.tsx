@@ -775,7 +775,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     if (isCheckingBid) return;
 
     if (!hasDraftBid) {
-      router.replace(`/jobs/${jobId}`, { scroll: false });
+      router.replace(`/zlecenia/${jobId}`, { scroll: false });
       return;
     }
 
@@ -818,7 +818,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       }
 
       setShowContestOfferForm(true);
-      router.replace(`/jobs/${jobId}`, { scroll: false });
+      router.replace(`/zlecenia/${jobId}`, { scroll: false });
     };
 
     void openDraftOffer();
@@ -1714,17 +1714,17 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                   <div className="flex flex-col gap-2">
                     {canManagerEditThisJob && (
                       <Button asChild className="w-full">
-                        <Link href={`/manager-dashboard/zgloszenia/edytuj/${job.id}`}>
+                        <Link href={`/panel-zarzadcy/zgloszenia/edytuj/${job.id}`}>
                           Edytuj zgłoszenie
                         </Link>
                       </Button>
                     )}
                     <Button asChild variant="outline" className="w-full">
-                      <Link href="/manager-dashboard/konkursy">Konkursy</Link>
+                      <Link href="/panel-zarzadcy/konkursy">Konkursy</Link>
                     </Button>
                     {(job.applications ?? 0) > 0 && (
                       <Button asChild variant="secondary" className="w-full">
-                        <Link href={`/manager-dashboard/zgloszenia/porownaj/${job.id}?typ=zgłoszenie`}>
+                        <Link href={`/panel-zarzadcy/zgloszenia/porownaj/${job.id}?typ=zgłoszenie`}>
                           Porównaj oferty
                         </Link>
                       </Button>
@@ -1780,7 +1780,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     {existingConversationId ? (
                       <Button 
                         variant="outline"
-                        onClick={() => router.push(`/messages?conversation=${existingConversationId}`)}
+                        onClick={() => router.push(`/wiadomosci?conversation=${existingConversationId}`)}
                         className="flex items-center gap-2"
                       >
                         <MessagesSquare className="w-4 h-4" />
@@ -1941,7 +1941,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
             <Button
               onClick={() => {
                 setShowCompanyRequiredDialog(false);
-                router.push('/account?tab=company');
+                router.push('/konto?tab=company');
               }}
               className="bg-blue-600 hover:bg-blue-700"
             >

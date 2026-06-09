@@ -44,7 +44,7 @@ export function resolveStorageBucketFromPath(path: string): StorageBucket {
   if (normalized.includes('/tenders/')) {
     return STORAGE_BUCKETS.BID_ATTACHMENTS;
   }
-  if (normalized.includes('/reviews/') || normalized.includes('/jobs/') || normalized.includes('/portfolio/')) {
+  if (normalized.includes('/reviews/') || normalized.includes('/zlecenia/') || normalized.includes('/portfolio/')) {
     return STORAGE_BUCKETS.JOB_ATTACHMENTS;
   }
   if (normalized.match(/\/[0-9a-f-]{36}\//)) {

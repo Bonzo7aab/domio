@@ -79,7 +79,7 @@ npm run test:e2e:debug
 
 ### Run specific test file
 ```bash
-npx playwright test tests/auth/login.spec.ts
+npx playwright test tests/auth/logowanie.spec.ts
 ```
 
 ### Run tests in a specific browser
@@ -168,7 +168,7 @@ import { test, expect } from './fixtures/auth-fixtures';
 
 test('my test', async ({ authenticatedPage }) => {
   // authenticatedPage is already logged in
-  await authenticatedPage.goto('/account');
+  await authenticatedPage.goto('/konto');
   // ...
 });
 ```
@@ -355,7 +355,7 @@ Example GitHub Actions workflow:
 
 1. **Wait for Navigation**: Always wait for navigation after form submissions
    ```typescript
-   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+   await page.waitForURL((url) => !url.pathname.includes('/logowanie'), { timeout: 10000 });
    ```
 
 2. **Unique Identifiers**: Use `${Date.now()}-${Math.random().toString(36).substring(7)}` for unique test data

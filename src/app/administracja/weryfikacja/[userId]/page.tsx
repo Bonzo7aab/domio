@@ -25,7 +25,7 @@ interface PageProps {
 
 export default async function AdminVerificationSubjectPage({ params }: PageProps) {
   const { userId } = await params;
-  const { supabase } = await requirePlatformAdmin(`/admin/verification/${userId}`);
+  const { supabase } = await requirePlatformAdmin(`/administracja/weryfikacja/${userId}`);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -68,7 +68,7 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
 
   if (error || !profile) {
     if (error) {
-      console.error('[admin/verification] user_profiles read failed', {
+      console.error('[admin/weryfikacja] user_profiles read failed', {
         userId,
         code: error.code,
         message: error.message,
@@ -93,7 +93,7 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
     try {
       const { data: authUser, error: authError } = await elevatedClient.auth.admin.getUserById(userId);
       if (authError) {
-        console.error('[admin/verification] auth.admin.getUserById failed', {
+        console.error('[admin/weryfikacja] auth.admin.getUserById failed', {
           userId,
           message: authError.message,
         });
@@ -101,7 +101,7 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
         email = authUser.user?.email ?? email;
       }
     } catch (authErr) {
-      console.error('[admin/verification] auth.admin.getUserById threw', authErr);
+      console.error('[admin/weryfikacja] auth.admin.getUserById threw', authErr);
     }
   }
 
@@ -129,7 +129,7 @@ export default async function AdminVerificationSubjectPage({ params }: PageProps
       .eq('user_id', userId)
       .maybeSingle();
     if (casError) {
-      console.error('[admin/verification] contractor_account_settings read failed', {
+      console.error('[admin/weryfikacja] contractor_account_settings read failed', {
         userId,
         code: casError.code,
         message: casError.message,

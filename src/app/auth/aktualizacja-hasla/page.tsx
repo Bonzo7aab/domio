@@ -52,7 +52,7 @@ export default function UpdatePasswordPage() {
 
       setSuccess(true)
       await supabase.auth.signOut({ scope: 'local' })
-      setTimeout(() => router.push('/login'), 2000)
+      setTimeout(() => router.push('/logowanie'), 2000)
     } catch {
       setError('Wystąpił błąd podczas ustawiania hasła')
     } finally {
@@ -73,7 +73,7 @@ export default function UpdatePasswordPage() {
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
-              <Link href="/login">Przejdź do logowania</Link>
+              <Link href="/logowanie">Przejdź do logowania</Link>
             </Button>
           </CardContent>
         </Card>
@@ -126,7 +126,7 @@ export default function UpdatePasswordPage() {
               {loading ? 'Zapisywanie…' : 'Zapisz hasło'}
             </Button>
             <Button variant="link" asChild className="w-full">
-              <Link href="/login">Powrót do logowania</Link>
+              <Link href="/logowanie">Powrót do logowania</Link>
             </Button>
           </form>
         </CardContent>

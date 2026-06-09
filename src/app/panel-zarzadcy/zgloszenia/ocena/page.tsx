@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function OcenaZgloszenRedirectPage(): never {
-  redirect('/manager-dashboard/ocena-zgloszen');
+  redirect('/panel-zarzadcy/ocena-zgloszen');
 }

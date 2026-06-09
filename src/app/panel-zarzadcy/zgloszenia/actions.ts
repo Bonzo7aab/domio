@@ -57,9 +57,9 @@ export async function updateJobWorkflowStatusAction(
     return { success: false, error: message };
   }
 
-  revalidatePath('/manager-dashboard/zgloszenia');
-  revalidatePath('/manager-dashboard/konkursy');
-  revalidatePath(`/jobs/${jobId.trim()}`);
+  revalidatePath('/panel-zarzadcy/zgloszenia');
+  revalidatePath('/panel-zarzadcy/konkursy');
+  revalidatePath(`/zlecenia/${jobId.trim()}`);
 
   return { success: true };
 }
@@ -112,8 +112,8 @@ export async function updateTenderWorkflowStatusAction(
     return { success: false, error: message };
   }
 
-  revalidatePath('/manager-dashboard/zgloszenia');
-  revalidatePath('/manager-dashboard/konkursy');
+  revalidatePath('/panel-zarzadcy/zgloszenia');
+  revalidatePath('/panel-zarzadcy/konkursy');
 
   return { success: true };
 }
@@ -152,9 +152,9 @@ export async function acceptJobOfferAction(
   });
 
   if (result.success) {
-    revalidatePath('/manager-dashboard/zgloszenia');
-    revalidatePath(`/manager-dashboard/zgloszenia/porownaj/${jobId.trim()}`);
-    revalidatePath(`/manager-dashboard/jobs/${jobId.trim()}/applications`);
+    revalidatePath('/panel-zarzadcy/zgloszenia');
+    revalidatePath(`/panel-zarzadcy/zgloszenia/porownaj/${jobId.trim()}`);
+    revalidatePath(`/panel-zarzadcy/zlecenia/${jobId.trim()}/applications`);
   }
 
   return result;
@@ -194,12 +194,12 @@ export async function acceptTenderOfferAction(
   });
 
   if (result.success) {
-    revalidatePath('/manager-dashboard/zgloszenia');
-    revalidatePath('/manager-dashboard/konkursy');
-    revalidatePath('/manager-dashboard/zamowienia');
-    revalidatePath('/contractor-dashboard/zamowienia');
-    revalidatePath(`/manager-dashboard/zgloszenia/porownaj/${tenderId.trim()}`);
-    revalidatePath(`/manager-dashboard/konkursy/porownaj/${tenderId.trim()}`);
+    revalidatePath('/panel-zarzadcy/zgloszenia');
+    revalidatePath('/panel-zarzadcy/konkursy');
+    revalidatePath('/panel-zarzadcy/zamowienia');
+    revalidatePath('/panel-wykonawcy/zamowienia');
+    revalidatePath(`/panel-zarzadcy/zgloszenia/porownaj/${tenderId.trim()}`);
+    revalidatePath(`/panel-zarzadcy/konkursy/porownaj/${tenderId.trim()}`);
   }
 
   return result;

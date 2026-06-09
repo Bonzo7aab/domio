@@ -15,14 +15,14 @@ function PostJobInner(): ReactElement {
   useEffect(() => {
     if (!isLoading && !user) {
       const q = new URLSearchParams();
-      q.set('redirectTo', `/post-job${searchParams.toString() ? `?${searchParams.toString()}` : ''}`);
-      router.push(`/login?${q.toString()}`);
+      q.set('redirectTo', `/dodaj-zlecenie${searchParams.toString() ? `?${searchParams.toString()}` : ''}`);
+      router.push(`/logowanie?${q.toString()}`);
     }
   }, [user, isLoading, router, searchParams]);
 
   const handleBack = (): void => {
     if (from === 'zgloszenia') {
-      router.push('/manager-dashboard/zgloszenia');
+      router.push('/panel-zarzadcy/zgloszenia');
       return;
     }
     router.push('/');

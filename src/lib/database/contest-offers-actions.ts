@@ -59,9 +59,9 @@ export async function abandonTenderBidDraftAction(input: {
     };
   }
 
-  const revalidateTargets = ['/contractor-dashboard/applications', '/contractor-dashboard'];
+  const revalidateTargets = ['/panel-wykonawcy/aplikacje', '/panel-wykonawcy'];
   if (input.tenderId) {
-    revalidateTargets.push(`/jobs/${input.tenderId}`);
+    revalidateTargets.push(`/zlecenia/${input.tenderId}`);
   }
   for (const path of revalidateTargets) {
     revalidatePath(path);

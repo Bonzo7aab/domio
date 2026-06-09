@@ -22,7 +22,7 @@ import {
 } from '../../lib/database/manager-submissions';
 import { getJobWorkflowStatusSortIndex } from '../../lib/job-workflow-status';
 import { canAbandonManagerContestDraft } from '../../lib/tender-workflow-status';
-import { abandonContestDraftAction } from '../../app/manager-dashboard/konkursy/actions';
+import { abandonContestDraftAction } from '../../app/panel-zarzadcy/konkursy/actions';
 import { fetchAcceptedContractorCompanyForTender } from '../../lib/database/offer-selection';
 import { createClient } from '../../lib/supabase/client';
 import { CooperationReviewDialog } from '../reviews/CooperationReviewDialog';
@@ -160,7 +160,7 @@ export function ManagerMojeZgloszeniaContent({
     setPodgladRow(row);
     setPodgladInitialTab(tab);
 
-    router.replace('/manager-dashboard/zgloszenia', { scroll: false });
+    router.replace('/panel-zarzadcy/zgloszenia', { scroll: false });
   }, [searchParams, submissions, router]);
 
   const statusOptions = useMemo(() => {
@@ -227,7 +227,7 @@ export function ManagerMojeZgloszeniaContent({
 
   const compareHref = (row: ManagerSubmission): string => {
     const typ = row.kind === 'tender' ? 'przetarg' : 'zgłoszenie';
-    return `/manager-dashboard/zgloszenia/porownaj/${row.id}?typ=${typ}`;
+    return `/panel-zarzadcy/zgloszenia/porownaj/${row.id}?typ=${typ}`;
   };
 
   const handleStatusUpdated = (
@@ -338,7 +338,7 @@ export function ManagerMojeZgloszeniaContent({
               </SelectContent>
             </Select>
             <Button asChild className="lg:ml-auto">
-              <Link href="/post-contest">Utwórz konkurs</Link>
+              <Link href="/dodaj-konkurs">Utwórz konkurs</Link>
             </Button>
           </div>
 
@@ -452,8 +452,8 @@ export function ManagerMojeZgloszeniaContent({
                                 <Link
                                   href={
                                     row.kind === 'job'
-                                      ? `/manager-dashboard/zgloszenia/edytuj/${row.id}`
-                                      : `/post-contest/${row.id}`
+                                      ? `/panel-zarzadcy/zgloszenia/edytuj/${row.id}`
+                                      : `/dodaj-konkurs/${row.id}`
                                   }
                                 >
                                   <Pencil className="h-4 w-4 mr-1.5" />

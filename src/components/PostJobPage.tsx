@@ -510,7 +510,7 @@ export default function PostJobPage({ onBack, jobId: jobIdProp }: PostJobPagePro
           <Card>
             <CardContent className="pt-6 text-center space-y-4 gap-2 flex flex-col justify-center">
               <p className="text-muted-foreground">Nie znaleziono firmy. Uzupełnij dane firmy w profilu.</p>
-              <Link href="/account?tab=company">
+              <Link href="/konto?tab=company">
                 <Button>Dodaj dane firmy w profilu</Button>
               </Link>
               <Button variant="outline" onClick={onBack} className="mt-2">

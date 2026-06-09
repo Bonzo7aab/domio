@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   reviewVerificationDocumentAction,
   clearVerificationDocumentReviewAction,
-} from '../../app/admin/actions';
+} from '../../app/administracja/actions';
 import type { DocumentReview } from '../../lib/database/admin-verification';
 import type { DocumentRejectionReasonId } from '../../lib/verification/status';
 import { Button } from '../ui/button';

@@ -23,7 +23,7 @@ export function ContractorProfileHeader({ profile }: ContractorProfileHeaderProp
   const _handleRequestQuote = () => {
     if (!user?.id) {
       toast.error('Musisz być zalogowany, aby wysłać zapytanie o wycenę');
-      router.push(`/login?redirectTo=${encodeURIComponent(window.location.pathname)}`);
+      router.push(`/logowanie?redirectTo=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 

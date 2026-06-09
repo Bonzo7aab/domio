@@ -9,7 +9,7 @@ export default function Managers() {
   return (
     <ManagerBrowsePage 
       onBack={() => router.push('/')}
-      onManagerSelect={(managerId: string) => router.push(`/managers/${managerId}`)}
+      onManagerSelect={(managerId: string) => router.push(`/zarzadcy/${managerId}`)}
     />
   );
 }

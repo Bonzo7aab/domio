@@ -2,7 +2,7 @@
 
 import { useTransition, type ReactElement } from 'react';
 import { toast } from 'sonner';
-import { updateJobWorkflowStatusAction } from '../../app/manager-dashboard/zgloszenia/actions';
+import { updateJobWorkflowStatusAction } from '../../app/panel-zarzadcy/zgloszenia/actions';
 import {
   getJobWorkflowStatusLabel,
   getManagerAllowedJobStatuses,

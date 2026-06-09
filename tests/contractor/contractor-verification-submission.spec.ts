@@ -42,7 +42,7 @@ test.describe('Contractor verification submission (wykonawca3)', () => {
     await loginViaUI(page, SEEDED_CONTRACTOR.email, SEEDED_CONTRACTOR.password);
     await openContractorDocumentsTab(page);
 
-    expect(page.url()).not.toContain('/login');
+    expect(page.url()).not.toContain('/logowanie');
     await expect(page.getByText(/Dokumenty wymagane do weryfikacji/i).first()).toBeVisible({
       timeout: 15000,
     });

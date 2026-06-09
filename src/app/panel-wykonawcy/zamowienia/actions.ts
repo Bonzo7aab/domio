@@ -9,8 +9,8 @@ import {
   ORDERS_FEATURE_DISABLED_ERROR,
 } from '../../../lib/flagship/orders-feature';
 
-const MANAGER_ORDERS_PATH = '/manager-dashboard/zamowienia';
-const CONTRACTOR_ORDERS_PATH = '/contractor-dashboard/zamowienia';
+const MANAGER_ORDERS_PATH = '/panel-zarzadcy/zamowienia';
+const CONTRACTOR_ORDERS_PATH = '/panel-wykonawcy/zamowienia';
 
 export async function reportOrderForAcceptanceAction(
   orderId: string,

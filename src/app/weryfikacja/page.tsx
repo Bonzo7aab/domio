@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../../lib/supabase/server';
 
-/** Verification documents moved to /account?tab=documents for contractors. */
+/** Verification documents moved to /konto?tab=documents for contractors. */
 export default async function Verification() {
   const supabase = await createClient();
   const {
@@ -9,8 +9,8 @@ export default async function Verification() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login?redirectTo=/account?tab=documents');
+    redirect('/logowanie?redirectTo=/konto?tab=documents');
   }
 
-  redirect('/account?tab=documents');
+  redirect('/konto?tab=documents');
 }

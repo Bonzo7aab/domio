@@ -53,7 +53,7 @@ Execute these SQL files **in order** in your Supabase SQL Editor:
 
 ### Auth & Platform Security Updates
 
-For current auth/admin flows, also apply these later migrations:
+For current auth/administracja flows, also apply these later migrations:
 
 - **49_contractor_account_settings_and_offer_feedback.sql**
 - **50_admin_panel_kan8.sql**

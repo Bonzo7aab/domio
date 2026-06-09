@@ -620,7 +620,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
                               <Button 
                                 className="w-full" 
                                 size="sm"
-                                onClick={() => router.push(`/jobs/${job.id}`)}
+                                onClick={() => router.push(`/zlecenia/${job.id}`)}
                               >
                                 Przejdź do zgłoszenia
                               </Button>

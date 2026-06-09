@@ -29,7 +29,7 @@ async function logAdminAction(
 }
 
 async function approveVerificationSubjectActionImpl(subjectUserId: string): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -44,7 +44,7 @@ async function approveVerificationSubjectActionImpl(subjectUserId: string): Prom
 
   // Per-document reviews are intentionally preserved on overall decisions
   // so the user can see which files were approved or rejected (and why) on
-  // their /verification page. New uploads invalidate stale reviews via the
+  // their /weryfikacja page. New uploads invalidate stale reviews via the
   // uploadedAt > reviewedAt comparison.
   const { error: upErr } = await sb
     .from('user_profiles')
@@ -88,12 +88,12 @@ async function approveVerificationSubjectActionImpl(subjectUserId: string): Prom
     type: 'verification_approved',
     title: 'Konto zweryfikowane',
     message: 'Twoje konto zostało zweryfikowane przez administratora.',
-    actionUrl: '/account',
+    actionUrl: '/konto',
     sendPush: true,
   });
 
-  revalidatePath('/admin/verification');
-  revalidatePath(`/admin/verification/${subjectUserId}`);
+  revalidatePath('/administracja/weryfikacja');
+  revalidatePath(`/administracja/weryfikacja/${subjectUserId}`);
   return { ok: true };
 }
 
@@ -106,7 +106,7 @@ async function rejectVerificationSubjectActionImpl(
     return { ok: false, error: 'Podaj powód odrzucenia.' };
   }
 
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -120,7 +120,7 @@ async function rejectVerificationSubjectActionImpl(
   const companyId = companyRelation?.company_id as string | undefined;
 
   // Same as approve: keep per-document reviews around so the user can see the
-  // detailed feedback on /verification. They are auto-invalidated when the
+  // detailed feedback on /weryfikacja. They are auto-invalidated when the
   // user re-uploads (stale review mechanism).
   const { error: upErr } = await sb
     .from('user_profiles')
@@ -166,7 +166,7 @@ async function rejectVerificationSubjectActionImpl(
     type: 'verification_rejected',
     title: 'Weryfikacja odrzucona',
     message: trimmed,
-    actionUrl: '/account?tab=documents',
+    actionUrl: '/konto?tab=documents',
     sendPush: true,
   });
 
@@ -179,12 +179,12 @@ async function rejectVerificationSubjectActionImpl(
     }
   } else {
     console.warn(
-      '[admin/verification] Skipping rejection email: SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY not set',
+      '[admin/weryfikacja] Skipping rejection email: SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY not set',
     );
   }
 
-  revalidatePath('/admin/verification');
-  revalidatePath(`/admin/verification/${subjectUserId}`);
+  revalidatePath('/administracja/weryfikacja');
+  revalidatePath(`/administracja/weryfikacja/${subjectUserId}`);
   return { ok: true };
 }
 
@@ -197,7 +197,7 @@ async function addAdminNoteActionImpl(
     return { ok: false, error: 'Notatka nie może być pusta.' };
   }
 
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -215,12 +215,12 @@ async function addAdminNoteActionImpl(
     return { ok: false, error: error.message };
   }
 
-  revalidatePath(`/admin/verification/${subjectUserId}`);
+  revalidatePath(`/administracja/weryfikacja/${subjectUserId}`);
   return { ok: true, id: (data as { id: string } | null)?.id };
 }
 
 async function getOcPreviewSignedUrlActionImpl(subjectUserId: string): Promise<{ url: string | null; error?: string }> {
-  await requirePlatformAdmin('/admin');
+  await requirePlatformAdmin('/administracja');
   const client = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = client as any;
@@ -258,7 +258,7 @@ async function suspendJobApplicationActionImpl(
   if (!msg) {
     return { ok: false, error: 'Podaj treść powiadomienia dla wykonawcy.' };
   }
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -292,17 +292,17 @@ async function suspendJobApplicationActionImpl(
     type: 'offer_admin_moderation',
     title: 'Oferta wymaga poprawy',
     message: msg,
-    actionUrl: '/contractor-dashboard/applications',
+    actionUrl: '/panel-wykonawcy/aplikacje',
     sendPush: true,
   });
 
   await logAdminAction(sb, actorId, 'suspend_job_application', 'job_applications', applicationId, {});
-  revalidatePath('/admin/offers');
+  revalidatePath('/administracja/oferty');
   return { ok: true };
 }
 
 async function unsuspendJobApplicationActionImpl(applicationId: string): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -321,7 +321,7 @@ async function unsuspendJobApplicationActionImpl(applicationId: string): Promise
   }
 
   await logAdminAction(sb, actorId, 'unsuspend_job_application', 'job_applications', applicationId, {});
-  revalidatePath('/admin/offers');
+  revalidatePath('/administracja/oferty');
   return { ok: true };
 }
 
@@ -330,7 +330,7 @@ async function suspendTenderBidActionImpl(bidId: string, feedback: string): Prom
   if (!msg) {
     return { ok: false, error: 'Podaj treść powiadomienia dla wykonawcy.' };
   }
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -364,17 +364,17 @@ async function suspendTenderBidActionImpl(bidId: string, feedback: string): Prom
     type: 'offer_admin_moderation',
     title: 'Oferta przetargowa wymaga poprawy',
     message: msg,
-    actionUrl: '/contractor-dashboard/applications',
+    actionUrl: '/panel-wykonawcy/aplikacje',
     sendPush: true,
   });
 
   await logAdminAction(sb, actorId, 'suspend_tender_bid', 'tender_bids', bidId, {});
-  revalidatePath('/admin/offers');
+  revalidatePath('/administracja/oferty');
   return { ok: true };
 }
 
 async function unsuspendTenderBidActionImpl(bidId: string): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -393,7 +393,7 @@ async function unsuspendTenderBidActionImpl(bidId: string): Promise<{ ok: boolea
   }
 
   await logAdminAction(sb, actorId, 'unsuspend_tender_bid', 'tender_bids', bidId, {});
-  revalidatePath('/admin/offers');
+  revalidatePath('/administracja/oferty');
   return { ok: true };
 }
 
@@ -484,7 +484,7 @@ async function updateJobApplicationAdminActionImpl(
   applicationId: string,
   patch: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -499,7 +499,7 @@ async function updateJobApplicationAdminActionImpl(
   }
 
   await logAdminAction(sb, actorId, 'edit_job_application', 'job_applications', applicationId, sanitized);
-  revalidatePath('/admin/offers');
+  revalidatePath('/administracja/oferty');
   return { ok: true };
 }
 
@@ -507,7 +507,7 @@ async function updateTenderBidAdminActionImpl(
   bidId: string,
   patch: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -522,7 +522,7 @@ async function updateTenderBidAdminActionImpl(
   }
 
   await logAdminAction(sb, actorId, 'edit_tender_bid', 'tender_bids', bidId, sanitized);
-  revalidatePath('/admin/offers');
+  revalidatePath('/administracja/oferty');
   return { ok: true };
 }
 
@@ -530,7 +530,7 @@ async function updateJobListingAdminActionImpl(
   jobId: string,
   patch: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -545,7 +545,7 @@ async function updateJobListingAdminActionImpl(
   }
 
   await logAdminAction(sb, actorId, 'edit_job_listing', 'jobs', jobId, sanitized);
-  revalidatePath('/admin/listings');
+  revalidatePath('/administracja/ogloszenia');
   return { ok: true };
 }
 
@@ -553,7 +553,7 @@ async function updateTenderListingAdminActionImpl(
   tenderId: string,
   patch: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -568,7 +568,7 @@ async function updateTenderListingAdminActionImpl(
   }
 
   await logAdminAction(sb, actorId, 'edit_tender_listing', 'tenders', tenderId, sanitized);
-  revalidatePath('/admin/listings');
+  revalidatePath('/administracja/ogloszenia');
   return { ok: true };
 }
 
@@ -577,7 +577,7 @@ async function pauseJobListingActionImpl(jobId: string, feedback: string): Promi
   if (!msg) {
     return { ok: false, error: 'Podaj powód / instrukcję dla zarządcy.' };
   }
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
 
   const { data: job, error: jErr } = await supabase.from('jobs').select('manager_id, title').eq('id', jobId).single();
 
@@ -597,18 +597,18 @@ async function pauseJobListingActionImpl(jobId: string, feedback: string): Promi
     type: 'listing_admin_paused',
     title: 'Zgłoszenie zawieszone przez administratora',
     message: `${job.title}: ${msg}`,
-    actionUrl: `/manager-dashboard/zgloszenia`,
+    actionUrl: `/panel-zarzadcy/zgloszenia`,
     sendPush: true,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await logAdminAction(supabase as any, actorId, 'pause_job', 'jobs', jobId, {});
-  revalidatePath('/admin/listings');
+  revalidatePath('/administracja/ogloszenia');
   return { ok: true };
 }
 
 async function resumeJobListingActionImpl(jobId: string): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
 
   const { error } = await supabase.from('jobs').update({ status: 'active' }).eq('id', jobId);
 
@@ -618,7 +618,7 @@ async function resumeJobListingActionImpl(jobId: string): Promise<{ ok: boolean;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await logAdminAction(supabase as any, actorId, 'resume_job', 'jobs', jobId, {});
-  revalidatePath('/admin/listings');
+  revalidatePath('/administracja/ogloszenia');
   return { ok: true };
 }
 
@@ -630,7 +630,7 @@ async function pauseTenderListingActionImpl(
   if (!msg) {
     return { ok: false, error: 'Podaj powód / instrukcję dla zarządcy.' };
   }
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -656,18 +656,18 @@ async function pauseTenderListingActionImpl(
     type: 'listing_admin_paused',
     title: 'Przetarg zawieszony przez administratora',
     message: `${tender.title}: ${msg}`,
-    actionUrl: `/manager-dashboard/konkursy`,
+    actionUrl: `/panel-zarzadcy/konkursy`,
     sendPush: true,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await logAdminAction(supabase as any, actorId, 'pause_tender', 'tenders', tenderId, {});
-  revalidatePath('/admin/listings');
+  revalidatePath('/administracja/ogloszenia');
   return { ok: true };
 }
 
 async function resumeTenderListingActionImpl(tenderId: string): Promise<{ ok: boolean; error?: string }> {
-  const { supabase, userId: actorId } = await requirePlatformAdmin('/admin');
+  const { supabase, userId: actorId } = await requirePlatformAdmin('/administracja');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
@@ -679,7 +679,7 @@ async function resumeTenderListingActionImpl(tenderId: string): Promise<{ ok: bo
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await logAdminAction(supabase as any, actorId, 'resume_tender', 'tenders', tenderId, {});
-  revalidatePath('/admin/listings');
+  revalidatePath('/administracja/ogloszenia');
   return { ok: true };
 }
 
@@ -724,7 +724,7 @@ async function reviewVerificationDocumentActionImpl(
   }
 
   const { supabase, userId: actorId } = await requirePlatformAdmin(
-    `/admin/verification/${subjectUserId}`
+    `/administracja/weryfikacja/${subjectUserId}`
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -772,7 +772,7 @@ async function reviewVerificationDocumentActionImpl(
     { document_key: documentKey, reason: status === 'rejected' ? trimmedReason : null }
   );
 
-  revalidatePath(`/admin/verification/${subjectUserId}`);
+  revalidatePath(`/administracja/weryfikacja/${subjectUserId}`);
   return { ok: true };
 }
 
@@ -788,7 +788,7 @@ async function clearVerificationDocumentReviewActionImpl(
   }
 
   const { supabase, userId: actorId } = await requirePlatformAdmin(
-    `/admin/verification/${subjectUserId}`
+    `/administracja/weryfikacja/${subjectUserId}`
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -833,7 +833,7 @@ async function clearVerificationDocumentReviewActionImpl(
     { document_key: documentKey }
   );
 
-  revalidatePath(`/admin/verification/${subjectUserId}`);
+  revalidatePath(`/administracja/weryfikacja/${subjectUserId}`);
   return { ok: true };
 }
 
@@ -841,13 +841,13 @@ async function updateRegistrationSettingsActionImpl(
   contractorOpen: boolean,
   managerOpen: boolean
 ): Promise<{ ok: boolean; error?: string }> {
-  const { userId: actorId } = await requirePlatformAdmin('/admin/settings');
+  const { userId: actorId } = await requirePlatformAdmin('/administracja/ustawienia');
   const { updateRegistrationSettings } = await import('../../lib/database/platform-settings');
   const result = await updateRegistrationSettings(contractorOpen, managerOpen, actorId);
 
   if (result.ok) {
-    revalidatePath('/admin/settings');
-    revalidatePath('/register');
+    revalidatePath('/administracja/ustawienia');
+    revalidatePath('/rejestracja');
   }
 
   return result;
