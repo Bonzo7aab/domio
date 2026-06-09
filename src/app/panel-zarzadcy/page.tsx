@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function ManagerDashboardPage() {
-  redirect('/panel-zarzadcy/przeglad');
+  redirect('/panel-zarzadcy/konkursy');
 }

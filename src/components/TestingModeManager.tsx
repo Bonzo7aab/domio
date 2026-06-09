@@ -84,6 +84,7 @@ const FLAG_DESCRIPTIONS: Record<FlagshipFlagKey, string> = {
   [FLAGSHIP_FLAG_KEYS.ADVANCED_FILTERS]: 'Dodatkowe opcje filtrowania zgłoszeń',
   [FLAGSHIP_FLAG_KEYS.MOBILE_OPTIMIZATIONS]: 'Ulepszenia dla urządzeń mobilnych',
   [FLAGSHIP_FLAG_KEYS.ORDERS]: 'Moduł zamówień dla zarządców i wykonawców',
+  [FLAGSHIP_FLAG_KEYS.CONTRACTOR_SERVICES]: 'Zakładka Usługi (cennik) w panelu wykonawcy',
 };
 
 export const TestingModeManager: React.FC<TestingModeManagerProps> = ({ onBack }) => {

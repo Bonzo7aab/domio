@@ -41,7 +41,6 @@ export const routes = {
   panelWykonawcyProjekty: '/panel-wykonawcy/projekty',
   panelWykonawcyZamowienia: '/panel-wykonawcy/zamowienia',
   panelZarzadcy: '/panel-zarzadcy',
-  panelZarzadcyPrzeglad: '/panel-zarzadcy/przeglad',
   panelZarzadcyZlecenia: '/panel-zarzadcy/zlecenia',
   panelZarzadcyWykonawcy: '/panel-zarzadcy/wykonawcy',
   panelZarzadcyPrzetargi: '/panel-zarzadcy/przetargi',

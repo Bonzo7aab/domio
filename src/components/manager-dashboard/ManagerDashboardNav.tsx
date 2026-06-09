@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { cn } from '../ui/utils';
 
 const tabs = [
-  { id: 'overview', label: 'Przegląd', href: '/panel-zarzadcy/przeglad' },
   { id: 'konkursy', label: 'Konkursy', href: '/panel-zarzadcy/konkursy' },
   { id: 'zamowienia', label: 'Zamówienia', href: '/panel-zarzadcy/zamowienia' },
   { id: 'ocena', label: 'Ocena', href: '/panel-zarzadcy/ocena-zgloszen' },
@@ -26,10 +25,10 @@ export function ManagerDashboardNav({ showOrders = false }: ManagerDashboardNavP
           {visibleTabs.map((tab) => {
             const isActive =
               pathname === tab.href ||
-              (tab.id === 'overview' &&
-                (pathname === '/panel-zarzadcy' || pathname === '/panel-zarzadcy/')) ||
               (tab.id === 'konkursy' &&
-                (pathname.startsWith('/panel-zarzadcy/konkursy') ||
+                (pathname === '/panel-zarzadcy' ||
+                  pathname === '/panel-zarzadcy/' ||
+                  pathname.startsWith('/panel-zarzadcy/konkursy') ||
                   pathname.startsWith('/panel-zarzadcy/zgloszenia'))) ||
               (tab.id === 'zamowienia' &&
                 pathname.startsWith('/panel-zarzadcy/zamowienia')) ||

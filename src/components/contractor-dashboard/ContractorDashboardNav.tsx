@@ -14,11 +14,19 @@ const tabs = [
 
 interface ContractorDashboardNavProps {
   showOrders?: boolean;
+  showServices?: boolean;
 }
 
-export function ContractorDashboardNav({ showOrders = false }: ContractorDashboardNavProps) {
+export function ContractorDashboardNav({
+  showOrders = false,
+  showServices = false,
+}: ContractorDashboardNavProps) {
   const pathname = usePathname();
-  const visibleTabs = showOrders ? tabs : tabs.filter((tab) => tab.id !== 'orders');
+  const visibleTabs = tabs.filter((tab) => {
+    if (tab.id === 'orders' && !showOrders) return false;
+    if (tab.id === 'services' && !showServices) return false;
+    return true;
+  });
 
   return (
     <nav className="border-b bg-white">
@@ -34,7 +42,9 @@ export function ContractorDashboardNav({ showOrders = false }: ContractorDashboa
                   pathname === '/panel-wykonawcy/' ||
                   pathname === '/panel-wykonawcy/panel')) ||
               (tab.id === 'orders' &&
-                pathname.startsWith('/panel-wykonawcy/zamowienia'));
+                pathname.startsWith('/panel-wykonawcy/zamowienia')) ||
+              (tab.id === 'services' &&
+                pathname.startsWith('/panel-wykonawcy/cennik'));
             return (
               <Link
                 key={tab.id}

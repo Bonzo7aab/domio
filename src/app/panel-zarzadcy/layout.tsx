@@ -1,9 +1,8 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../../lib/supabase/server';
-import { fetchUserPrimaryCompany } from '../../lib/database/companies';
 import { buildEvaluationContext } from '../../lib/flagship/context';
 import { isOrdersFeatureEnabled } from '../../lib/flagship/orders-feature';
-import { ManagerDashboardHeader } from '../../components/manager-dashboard/ManagerDashboardHeader';
+import { UserAccountHeader } from '../../components/UserAccountHeader';
 import { ManagerDashboardNav } from '../../components/manager-dashboard/ManagerDashboardNav';
 
 export default async function ManagerDashboardLayout({
@@ -13,18 +12,11 @@ export default async function ManagerDashboardLayout({
 }) {
   const supabase = await createClient();
   
-  // Check authentication
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
     redirect('/logowanie?redirectTo=/panel-zarzadcy');
   }
-
-  // Fetch company data
-  const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);
-  
-  // Get user email from auth user
-  const userEmail = user.email;
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -43,11 +35,7 @@ export default async function ManagerDashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ManagerDashboardHeader 
-        company={company}
-        userEmail={userEmail}
-        userCompany={null}
-      />
+      <UserAccountHeader />
       <ManagerDashboardNav showOrders={showOrders} />
       {children}
     </div>

@@ -10,7 +10,6 @@ import GoogleMap, { MapMarker } from './GoogleMap';
 import { getCurrentLocation, calculateDistance } from '../lib/google-maps/geocoding';
 import { extractCity, extractSublocality } from '../utils/locationMapping';
 import type { Job } from '../types/job';
-import { MapLegend } from './MapLegend';
 import type { FilterState } from './JobFilters';
 import { jobMatchesFilters, matchesFavoritesFilter } from '../lib/filters/filter-logic';
 import { getBookmarkedJobs } from '../utils/bookmarkStorage';
@@ -82,7 +81,6 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   const [showJobClusters] = useState(true); // Always show all jobs
   const [mapCenter, setMapCenter] = useState({ lat: 52.1394, lng: 21.0458 }); // Ursynów, Warsaw
   const [mapZoom, setMapZoom] = useState(13); // District-level view
-  const [_showMapLegend] = useState(true);
   const [selectedCityName, setSelectedCityName] = useState<string | null>(null);
   const [bookmarkedJobIds, setBookmarkedJobIds] = useState<Set<string>>(() => new Set());
 
@@ -465,21 +463,6 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
             </Button>
           </div>
         )}
-
-        {/* Map Legend - Only visible when expanded */}
-        {isExpanded && _showMapLegend && (
-          <div className="absolute bottom-8 right-16 z-[1000] hidden md:block">
-            <MapLegend />
-          </div>
-        )}
-        
-        {/* Map Legend - Mobile version (below back button) */}
-        {isExpanded && _showMapLegend && (
-          <div className="absolute top-16 right-4 z-[1000] md:hidden">
-            <MapLegend initialExpanded={false} />
-          </div>
-        )}
-
 
         {/* Location Button */}
         <div className="absolute bottom-4 left-4 z-[1000]">

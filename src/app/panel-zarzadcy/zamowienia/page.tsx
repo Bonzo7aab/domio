@@ -24,7 +24,7 @@ export default async function ManagerZamowieniaPage(): Promise<ReactElement> {
   }
 
   if (!(await isOrdersFeatureEnabledForAuthUser(supabase, user))) {
-    redirect('/panel-zarzadcy/przeglad');
+    redirect('/panel-zarzadcy/konkursy');
   }
 
   const { data: company } = await fetchUserPrimaryCompany(supabase, user.id);

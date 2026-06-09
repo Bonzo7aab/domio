@@ -1,7 +1,9 @@
 import { Suspense } from 'react';
+import { redirect } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/server';
 import { fetchUserPrimaryCompany } from '../../../lib/database/companies';
 import { fetchContractorById } from '../../../lib/database/contractors';
+import { isContractorServicesFeatureEnabledForAuthUser } from '../../../lib/flagship/contractor-services-feature';
 import { Card, CardContent } from '../../../components/ui/card';
 import { PricingContent } from './PricingContent';
 
@@ -67,7 +69,16 @@ async function PricingDataFetcher() {
 }
 
 // Page component - renders immediately
-export default function PricingPage() {
+export default async function PricingPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user && !(await isContractorServicesFeatureEnabledForAuthUser(supabase, user))) {
+    redirect('/panel-wykonawcy/aplikacje');
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <Suspense fallback={<LoadingFallback message="Ładowanie cennika..." />}>
