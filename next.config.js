@@ -109,6 +109,10 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  // Contest/offer document uploads pass File blobs through Server Actions (10MB per file in storage helpers).
+  serverActions: {
+    bodySizeLimit: '50mb',
+  },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],

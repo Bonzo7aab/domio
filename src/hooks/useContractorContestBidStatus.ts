@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { createClient } from '../lib/supabase/client';
-import { fetchContractorBidTenderIds } from '../lib/database/contractor-bid-tender-ids';
+import { fetchContractorContestIds } from '../lib/database/contractor-contest-ids';
 import { useUserProfile } from '../contexts/AuthContext';
 import {
   CONTEST_BID_STATUS_CHANGED_EVENT,
@@ -46,12 +46,12 @@ export function useContractorContestBidStatus() {
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const { submittedTenderIds, draftTenderIds } = await fetchContractorBidTenderIds(
+      const { submittedContestIds, draftContestIds } = await fetchContractorContestIds(
         supabase,
         user.id,
       );
-      setSubmittedIds(new Set(submittedTenderIds));
-      setDraftIds(new Set(draftTenderIds));
+      setSubmittedIds(new Set(submittedContestIds));
+      setDraftIds(new Set(draftContestIds));
     } catch {
       setSubmittedIds(new Set());
       setDraftIds(new Set());
@@ -83,12 +83,12 @@ export function useContractorContestBidStatus() {
       void (async () => {
         try {
           const supabase = createClient();
-          const { submittedTenderIds, draftTenderIds } = await fetchContractorBidTenderIds(
+          const { submittedContestIds, draftContestIds } = await fetchContractorContestIds(
             supabase,
             user.id,
           );
-          setSubmittedIds(new Set(submittedTenderIds));
-          setDraftIds(new Set(draftTenderIds));
+          setSubmittedIds(new Set(submittedContestIds));
+          setDraftIds(new Set(draftContestIds));
         } catch {
           // Keep optimistic state on reconcile failure.
         }

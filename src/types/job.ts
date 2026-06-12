@@ -10,7 +10,7 @@ import type {
 export interface Job {
   // Core identifiers
   id: string;
-  postType: 'job' | 'tender';
+  postType: 'job' | 'contest';
 
   /** Workflow status from DB (contests/tenders: active, evaluation, awarded, …) */
   status?: string;
@@ -182,5 +182,5 @@ export interface TenderInfo {
   };
 }
 
-export type PostType = 'job' | 'tender';
+export type PostType = 'job' | 'contest';
 export type TenderPhaseStatus = 'completed' | 'active' | 'pending';

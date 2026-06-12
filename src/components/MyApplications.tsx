@@ -81,7 +81,7 @@ interface MyApplication {
     totalValue: number;
     paymentSchedule: string;
   };
-  postType?: 'job' | 'tender';
+  postType?: 'job' | 'contest';
 }
 
 interface MyApplicationsProps {
@@ -89,7 +89,7 @@ interface MyApplicationsProps {
   loading?: boolean;
   onJobView?: (jobId: string) => void;
   onStartConversation?: (applicationId: string) => void;
-  onWithdraw?: (applicationId: string, postType: 'job' | 'tender') => void;
+  onWithdraw?: (applicationId: string, postType: 'job' | 'contest') => void;
 }
 
 export const MyApplications: React.FC<MyApplicationsProps> = ({
@@ -296,7 +296,7 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                   </p>
                   {selectedOffer.postType && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      {selectedOffer.postType === 'tender' ? 'Przetarg' : 'Zgłoszenie'}
+                      {selectedOffer.postType === 'contest' ? 'Przetarg' : 'Zgłoszenie'}
                     </p>
                   )}
                 </div>
@@ -305,11 +305,11 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
                       <p className="text-muted-foreground">
-                        {selectedOffer.postType === 'tender' ? 'Kwota oferty' : 'Kwota netto'}
+                        {selectedOffer.postType === 'contest' ? 'Kwota oferty' : 'Kwota netto'}
                       </p>
                       <p className="font-medium">{formatMoneyPl(selectedOffer.proposedPrice, 2)}</p>
                     </div>
-                    {selectedOffer.postType !== 'tender' && (
+                    {selectedOffer.postType !== 'contest' && (
                       <>
                         <div>
                           <p className="text-muted-foreground">Stawka VAT</p>
@@ -385,7 +385,7 @@ export const MyApplications: React.FC<MyApplicationsProps> = ({
 
                 <div>
                   <p className="mb-1 font-medium">
-                    {selectedOffer.postType === 'tender' ? 'Propozycja techniczna' : 'Treść oferty'}
+                    {selectedOffer.postType === 'contest' ? 'Propozycja techniczna' : 'Treść oferty'}
                   </p>
                   <div className="rounded-md border bg-muted/40 p-3 whitespace-pre-wrap">
                     {selectedOffer.coverLetter?.trim() || '—'}

@@ -1,8 +1,8 @@
 export type TenderNotificationType =
-  | 'new_tender'
+  | 'new_contest'
   | 'deadline_reminder'
   | 'evaluation_started'
-  | 'tender_awarded'
+  | 'contest_awarded'
   | 'tender_cancelled';
 
 export interface TenderNotificationMock {
@@ -22,7 +22,7 @@ export interface TenderNotificationMock {
 export const mockTenderNotifications: TenderNotificationMock[] = [
   {
     id: 'tender-notif-1',
-    type: 'new_tender',
+    type: 'new_contest',
     title: 'Nowy przetarg dostępny',
     message: 'Opublikowano nowy przetarg w Twojej specjalizacji',
     tenderTitle: 'Kompleksowy remont elewacji budynku mieszkalnego',
@@ -60,7 +60,7 @@ export const mockTenderNotifications: TenderNotificationMock[] = [
   },
   {
     id: 'tender-notif-4',
-    type: 'tender_awarded',
+    type: 'contest_awarded',
     title: 'Wyniki przetargu zostały ogłoszone',
     message: 'Przetarg został rozstrzygnięty. Zobacz wyniki.',
     tenderTitle: 'Remont dachu budynku mieszkalnego',

@@ -3,26 +3,6 @@
 -- =============================================
 
 -- =============================================
--- SUBSCRIPTION PLANS
--- =============================================
-
--- Insert subscription plans
-INSERT INTO subscription_plans (name, slug, description, user_type, price_monthly, price_yearly, features, limitations, sort_order) VALUES
--- Manager plans (free)
-('Domio Free', 'domio-free', 'Darmowy plan dla zarządców nieruchomości', 'manager', 0, 0, 
- '["Nieograniczona liczba zgłoszeń", "Podstawowe filtry wyszukiwania", "Profil firmy", "Standardowe aplikacje", "Email support"]',
- '[]', 1),
-
--- Contractor plans
-('Domio Basic', 'domio-basic', 'Idealny dla wykonawców rozpoczynających działalność', 'contractor', 50, 500,
- '["Nieograniczony dostęp do zweryfikowanych przetargów", "Możliwość składania ofert bez limitu", "Profesjonalny profil w bazie Domio", "Podstawowa weryfikacja firmy", "Email support"]',
- '["Brak dostępu do przetargów premium", "Bez wyróżnień w wynikach", "Ograniczona widoczność profilu"]', 2),
-
-('Domio Pro', 'domio-pro', 'Dla rozwijających się firm', 'contractor', 100, 1000,
- '["Wszystko z planu Basic", "Odznaka eksperta", "Wyróżnienie w wynikach wyszukiwania", "Priorytetowe powiadomienia", "Zaawansowane statystyki", "Priorytetowy support", "Dostęp do przetargów premium"]',
- '[]', 3);
-
--- =============================================
 -- JOB CATEGORIES
 -- =============================================
 
@@ -91,44 +71,6 @@ BEGIN
 END $$;
 
 -- =============================================
--- CERTIFICATE CATEGORIES
--- =============================================
-
-INSERT INTO certificate_categories (name, description, is_required, for_user_type, sort_order) VALUES
--- Contractor certificates
-('Rejestracja firmy', 'Wypis z KRS/CEIDG potwierdzający rejestrację firmy', true, 'contractor', 1),
-('Ubezpieczenie OC', 'Polisa ubezpieczenia odpowiedzialności cywilnej', true, 'contractor', 2),
-('Certyfikaty zawodowe', 'Certyfikaty i uprawnienia zawodowe', false, 'contractor', 3),
-('Licencje budowlane', 'Licencje i uprawnienia budowlane', false, 'contractor', 4),
-('Referencje', 'Opinie i referencje z poprzednich projektów', false, 'contractor', 5),
-
--- Manager certificates
-('Licencja zarządcy', 'Certyfikat lub licencja zarządcy nieruchomości', false, 'manager', 6),
-('Ubezpieczenie OC zarządcy', 'Polisa ubezpieczenia odpowiedzialności cywilnej zarządcy', true, 'manager', 7),
-('Umowy zarządzania', 'Przykłady umów zarządzania nieruchomościami', false, 'manager', 8),
-
--- Common certificates
-('Certyfikaty ISO', 'Certyfikaty jakości ISO 9001, ISO 14001', false, 'both', 9),
-('Certyfikaty bezpieczeństwa', 'Certyfikaty BHP, bezpieczeństwa pracy', false, 'both', 10);
-
--- =============================================
--- DOCUMENT TEMPLATES
--- =============================================
-
-INSERT INTO document_templates (name, type, category, description, template_content, is_active) VALUES
-('Umowa o wykonanie prac budowlanych', 'contract', 'contractor', 'Standardowa umowa na wykonanie prac budowlanych',
- '{"sections": ["dane_wykonawcy", "dane_zleceniodawcy", "zakres_prac", "warunki_płatności", "termin_realizacji", "gwarancja"], "required_fields": ["nazwa_firmy", "nip", "adres", "zakres_prac", "cena", "termin"]}', true),
-
-('Faktura VAT', 'invoice', 'contractor', 'Faktura VAT dla wykonanych usług',
- '{"sections": ["dane_wystawcy", "dane_nabywcy", "pozycje_faktury", "podsumowanie"], "required_fields": ["nazwa_firmy", "nip", "nazwa_usługi", "kwota_netto", "vat", "kwota_brutto"]}', true),
-
-('Oferta cenowa', 'quote', 'contractor', 'Oferta cenowa na wykonanie prac',
- '{"sections": ["dane_firmy", "opis_zgloszenia", "szczegółowy_kosztorys", "warunki", "termin_ważności"], "required_fields": ["nazwa_firmy", "opis_prac", "cena", "termin_realizacji"]}', true),
-
-('Umowa zarządzania nieruchomością', 'contract', 'manager', 'Umowa na zarządzanie nieruchomością',
- '{"sections": ["dane_zarządcy", "dane_właściciela", "przedmiot_umowy", "zakres_obowiązków", "wynagrodzenie", "termin"], "required_fields": ["nazwa_zarządcy", "adres_nieruchomości", "zakres_zarządzania", "wynagrodzenie"]}', true);
-
--- =============================================
 -- HELPER FUNCTIONS FOR SAMPLE DATA
 -- =============================================
 
@@ -159,11 +101,7 @@ CREATE OR REPLACE FUNCTION create_sample_certificates()
 RETURNS VOID AS $$
 DECLARE
     company_record RECORD;
-    cert_category_id UUID;
 BEGIN
-    -- Get certificate category IDs
-    SELECT id INTO cert_category_id FROM certificate_categories WHERE name = 'Rejestracja firmy';
-    
     -- Add certificates for each company
     FOR company_record IN SELECT id, name FROM companies WHERE type = 'contractor' LOOP
         -- Company registration certificate
@@ -232,18 +170,5 @@ DROP FUNCTION IF EXISTS create_sample_portfolio_projects();
 
 -- Note: Sample questions require user profiles to exist first
 -- They can be added after user registration in the application
--- Example questions that would be added:
--- - 'Czy możliwe jest wykonanie prac w weekendy?'
--- - 'Jakie materiały są preferowane przez zarządcę?'
--- - 'Czy jest możliwość negocjacji ceny?'
 
--- Add sample user feedback (user_id can be NULL for anonymous feedback)
-INSERT INTO user_feedback (user_id, type, title, description, rating, category, status) VALUES
-(NULL, 'feature_request', 'Możliwość dodawania filmów w portfolio', 'Byłoby świetnie gdyby można było dodawać krótkie filmy pokazujące proces realizacji projektów.', 5, 'functionality', 'open'),
-(NULL, 'general_feedback', 'Świetna platforma!', 'Platforma Domio bardzo ułatwia znalezienie zgłoszeń. Interfejs jest intuicyjny, a wykonawcy są wiarygodni.', 5, 'ui', 'resolved');
-
--- Note: Sample support tickets require user profiles to exist first
--- They can be added after user registration in the application
--- Example tickets that would be added:
--- - 'Problem z płatnością' (billing issue)
--- - 'Jak dodać portfolio?' (technical question)
+-- Note: user_feedback and support_tickets tables removed 2026-06-11 (database/pending-prod/20260611140000_drop_unused_schema.sql)

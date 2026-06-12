@@ -99,8 +99,8 @@ export async function fetchContractorOrders(
 
     return {
       id: row.id,
-      tenderId: row.tender_id,
-      tenderBidId: row.tender_bid_id,
+      tenderId: row.contest_id,
+      tenderBidId: row.contest_offer_id,
       title: row.title,
       investorName: companyNames.get(row.manager_company_id) || '—',
       locationLabel: row.location_label?.trim() || '—',

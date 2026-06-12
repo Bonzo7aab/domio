@@ -66,7 +66,7 @@ interface JobApplicationModalProps {
   onApplicationSubmit: (applicationData: JobApplicationSubmitPayload) => void | Promise<void>;
   applicationForm: JobApplicationFormFields;
   setApplicationForm: (form: JobApplicationFormFields) => void;
-  postType?: 'job' | 'tender';
+  postType?: 'job' | 'contest';
 }
 
 const COVER_LETTER_MIN = 50;
@@ -89,7 +89,7 @@ export const JobApplicationModal: React.FC<JobApplicationModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
 
-  const isTender = postType === 'tender';
+  const isTender = postType === 'contest';
 
   const formatApplicationsCount = (count: number): string => {
     if (count === 0) return 'Brak ofert';

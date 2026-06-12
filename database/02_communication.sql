@@ -10,9 +10,9 @@
 CREATE TABLE conversations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
-    tender_id UUID REFERENCES tenders(id) ON DELETE CASCADE,
+    contest_id UUID REFERENCES contests(id) ON DELETE CASCADE,
     application_id UUID REFERENCES job_applications(id) ON DELETE CASCADE,
-    bid_id UUID REFERENCES tender_bids(id) ON DELETE CASCADE,
+    contest_offer_id UUID REFERENCES contest_offers(id) ON DELETE CASCADE,
     participant_1 UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     participant_2 UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     subject VARCHAR(255),
@@ -113,32 +113,18 @@ CREATE TABLE notification_preferences (
 );
 
 -- =============================================
--- ACTIVITY LOGGING
+-- ACTIVITY LOGGING — removed 2026-06-11 (see database/pending-prod/20260611140000_drop_unused_schema.sql)
 -- =============================================
-
--- User activity logs
-CREATE TABLE activity_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
-    action VARCHAR(100) NOT NULL,
-    entity_type VARCHAR(50), -- 'job', 'tender', 'application', 'bid', 'company', 'profile'
-    entity_id UUID,
-    description TEXT,
-    metadata JSONB,
-    ip_address INET,
-    user_agent TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
 
 -- =============================================
 -- Q&A SYSTEM
 -- =============================================
 
--- Questions about jobs/tenders
+-- Questions about jobs/contests
 CREATE TABLE questions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
-    tender_id UUID REFERENCES tenders(id) ON DELETE CASCADE,
+    contest_id UUID REFERENCES contests(id) ON DELETE CASCADE,
     asker_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     question TEXT NOT NULL,
     is_public BOOLEAN DEFAULT TRUE,
@@ -150,63 +136,8 @@ CREATE TABLE questions (
 );
 
 -- =============================================
--- FEEDBACK AND SUPPORT
+-- FEEDBACK AND SUPPORT — removed 2026-06-11 (see database/pending-prod/20260611140000_drop_unused_schema.sql)
 -- =============================================
-
--- User feedback
-CREATE TABLE user_feedback (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES user_profiles(id) ON DELETE SET NULL,
-    type VARCHAR(50) NOT NULL CHECK (type IN (
-        'bug_report', 'feature_request', 'general_feedback', 'rating'
-    )),
-    title VARCHAR(255) NOT NULL,
-    description TEXT NOT NULL,
-    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-    category VARCHAR(100), -- 'ui', 'performance', 'functionality', etc.
-    status VARCHAR(20) DEFAULT 'open' CHECK (status IN (
-        'open', 'in_progress', 'resolved', 'closed'
-    )),
-    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN (
-        'low', 'medium', 'high', 'urgent'
-    )),
-    assigned_to UUID REFERENCES user_profiles(id),
-    response TEXT,
-    responded_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Support tickets
-CREATE TABLE support_tickets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
-    subject VARCHAR(255) NOT NULL,
-    description TEXT NOT NULL,
-    category VARCHAR(50) NOT NULL CHECK (category IN (
-        'technical', 'billing', 'account', 'feature_request', 'other'
-    )),
-    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN (
-        'low', 'medium', 'high', 'urgent'
-    )),
-    status VARCHAR(20) DEFAULT 'open' CHECK (status IN (
-        'open', 'in_progress', 'waiting_response', 'resolved', 'closed'
-    )),
-    assigned_to UUID REFERENCES user_profiles(id),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Support ticket messages
-CREATE TABLE support_ticket_messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
-    sender_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
-    message TEXT NOT NULL,
-    is_internal BOOLEAN DEFAULT FALSE, -- Internal notes vs customer messages
-    attachments JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
 
 -- =============================================
 -- INDEXES FOR PERFORMANCE
@@ -216,7 +147,7 @@ CREATE TABLE support_ticket_messages (
 CREATE INDEX idx_conversations_participant_1 ON conversations(participant_1);
 CREATE INDEX idx_conversations_participant_2 ON conversations(participant_2);
 CREATE INDEX idx_conversations_job ON conversations(job_id);
-CREATE INDEX idx_conversations_tender ON conversations(tender_id);
+CREATE INDEX idx_conversations_contest ON conversations(contest_id);
 CREATE INDEX idx_conversations_last_message ON conversations(last_message_at);
 
 -- Messages indexes
@@ -230,26 +161,10 @@ CREATE INDEX idx_notifications_type ON notifications(type);
 CREATE INDEX idx_notifications_read ON notifications(is_read);
 CREATE INDEX idx_notifications_created ON notifications(created_at);
 
--- Activity logs indexes
-CREATE INDEX idx_activity_logs_user ON activity_logs(user_id);
-CREATE INDEX idx_activity_logs_action ON activity_logs(action);
-CREATE INDEX idx_activity_logs_entity ON activity_logs(entity_type, entity_id);
-CREATE INDEX idx_activity_logs_created ON activity_logs(created_at);
-
 -- Questions indexes
 CREATE INDEX idx_questions_job ON questions(job_id);
-CREATE INDEX idx_questions_tender ON questions(tender_id);
+CREATE INDEX idx_questions_contest ON questions(contest_id);
 CREATE INDEX idx_questions_asker ON questions(asker_id);
-
--- Feedback indexes
-CREATE INDEX idx_user_feedback_user ON user_feedback(user_id);
-CREATE INDEX idx_user_feedback_type ON user_feedback(type);
-CREATE INDEX idx_user_feedback_status ON user_feedback(status);
-
--- Support tickets indexes
-CREATE INDEX idx_support_tickets_user ON support_tickets(user_id);
-CREATE INDEX idx_support_tickets_status ON support_tickets(status);
-CREATE INDEX idx_support_tickets_category ON support_tickets(category);
 
 -- =============================================
 -- TRIGGERS FOR UPDATED_AT
@@ -258,5 +173,3 @@ CREATE INDEX idx_support_tickets_category ON support_tickets(category);
 CREATE TRIGGER update_conversations_updated_at BEFORE UPDATE ON conversations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_notification_preferences_updated_at BEFORE UPDATE ON notification_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_questions_updated_at BEFORE UPDATE ON questions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_user_feedback_updated_at BEFORE UPDATE ON user_feedback FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_support_tickets_updated_at BEFORE UPDATE ON support_tickets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

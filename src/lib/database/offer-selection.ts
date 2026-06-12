@@ -46,7 +46,7 @@ async function verifyTenderOwnership(
 ): Promise<{ ok: boolean; error?: string }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: tender, error } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .select('id, manager_id, company_id')
     .eq('id', tenderId)
     .maybeSingle();
@@ -201,10 +201,10 @@ export async function acceptManagerTenderOffer(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: bid, error: bidErr } = await (supabase as any)
-    .from('tender_bids')
-    .select('id, tender_id, status')
+    .from('contest_offers')
+    .select('id, contest_id, status')
     .eq('id', bidId)
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .maybeSingle();
 
   if (bidErr || !bid) {
@@ -221,9 +221,9 @@ export async function acceptManagerTenderOffer(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: existingAccepted } = await (supabase as any)
-    .from('tender_bids')
+    .from('contest_offers')
     .select('id')
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .eq('status', 'accepted')
     .maybeSingle();
 
@@ -235,13 +235,13 @@ export async function acceptManagerTenderOffer(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: acceptErr } = await (supabase as any)
-    .from('tender_bids')
+    .from('contest_offers')
     .update({
       status: 'accepted',
       evaluated_at: now,
     })
     .eq('id', bidId)
-    .eq('tender_id', tenderId);
+    .eq('contest_id', tenderId);
 
   if (acceptErr) {
     return {
@@ -252,12 +252,12 @@ export async function acceptManagerTenderOffer(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: rejectErr } = await (supabase as any)
-    .from('tender_bids')
+    .from('contest_offers')
     .update({
       status: 'rejected',
       evaluated_at: now,
     })
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .neq('id', bidId)
     .in('status', ['submitted', 'under_review', 'shortlisted']);
 
@@ -267,7 +267,7 @@ export async function acceptManagerTenderOffer(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: tenderErr } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .update({ status: 'awarded', updated_at: now })
     .eq('id', tenderId)
     .eq('manager_id', params.managerId);
@@ -328,7 +328,7 @@ export async function createOrderFromContestWinner(
   const { data: existingOrder } = await (supabase as any)
     .from('orders')
     .select('id')
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .maybeSingle();
 
   if (existingOrder?.id) {
@@ -337,7 +337,7 @@ export async function createOrderFromContestWinner(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: tender, error: tenderErr } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .select(
       `
       id,
@@ -366,11 +366,11 @@ export async function createOrderFromContestWinner(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: bid, error: bidErr } = await (supabase as any)
-    .from('tender_bids')
+    .from('contest_offers')
     .select(
       `
       id,
-      tender_id,
+      contest_id,
       contractor_id,
       company_id,
       bid_amount,
@@ -381,7 +381,7 @@ export async function createOrderFromContestWinner(
     `,
     )
     .eq('id', bidId)
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .maybeSingle();
 
   if (bidErr || !bid) {
@@ -400,8 +400,8 @@ export async function createOrderFromContestWinner(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: insertErr } = await (supabase as any).from('orders').insert({
-    tender_id: tenderId,
-    tender_bid_id: bidId,
+    contest_id: tenderId,
+    contest_offer_id: bidId,
     manager_id: params.managerId,
     manager_company_id: params.companyId,
     contractor_id: bid.contractor_id,
@@ -430,9 +430,9 @@ export async function createOrderFromContestWinner(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .update({
-      winning_bid_id: bidId,
+      winning_offer_id: bidId,
       winner_name: winnerName,
       updated_at: now,
     })

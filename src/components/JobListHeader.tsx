@@ -61,8 +61,8 @@ export const JobListHeader: React.FC<JobListHeaderProps> = ({
     // Add post type specification if specific types are selected
     if (selectedPostTypes && selectedPostTypes.length > 0) {
       if (selectedPostTypes.length === 1) {
-        if (selectedPostTypes[0] === 'tender') {
-          baseTitle = "Przetargi";
+        if (selectedPostTypes[0] === 'contest') {
+          baseTitle = "Konkursy";
         } else {
           baseTitle = "Zgłoszenia";
         }

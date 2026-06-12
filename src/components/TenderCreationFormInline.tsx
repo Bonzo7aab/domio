@@ -7,7 +7,7 @@ import type { TenderContestDocumentMeta, TenderContestFormData } from '../types/
 import {
   mapTenderRowToContestForm,
   parseExistingTenderDocuments,
-} from '../lib/tender-contest/build-tender-payload';
+} from '../lib/contest/build-tender-payload';
 
 interface TenderCreationFormInlineProps {
   onClose: () => void;

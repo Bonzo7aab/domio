@@ -51,11 +51,11 @@ function getNotificationCategoryAndType(
       return { category: 'application', type: 'contract_signed' };
 
     // Contest notifications (for contractors)
-    case 'new_tender':
+    case 'new_contest':
       return { category: 'contest', type: 'new_contest' };
     case 'bid_status_update':
       return { category: 'contest', type: 'evaluation_started' };
-    case 'tender_awarded':
+    case 'contest_awarded':
       return { category: 'contest', type: 'contest_awarded' };
 
     // System (admin) notifications surfaced to the user
@@ -146,7 +146,7 @@ function transformNotification(dbNotification: NotificationRow): UnifiedNotifica
         organizerName: (data?.organizerName || data?.organizer_name || 'Nieznany organizator') as string,
         estimatedValue: (data?.estimatedValue || data?.estimated_value) as string | undefined,
         deadline: data?.deadline ? new Date(data.deadline as string | number) : dbNotification.expires_at ? new Date(dbNotification.expires_at) : undefined,
-        contestId: (data?.contestId || data?.contest_id || data?.tenderId || data?.tender_id || dbNotification.id) as string,
+        contestId: (data?.contestId || data?.contest_id || data?.tenderId || data?.contest_id || dbNotification.id) as string,
         actionUrl: dbNotification.action_url ?? undefined,
       };
       return contestNotif;

@@ -1,239 +1,297 @@
 import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
+import type { BookmarkEntityType } from '../../types/bookmark';
 
-/**
- * Add a bookmark for a job
- */
-export async function addJobBookmark(
+interface BookmarkRow {
+  entity_type: BookmarkEntityType;
+  entity_id: string;
+}
+
+async function adjustJobBookmarksCount(
   supabase: SupabaseClient<Database>,
   jobId: string,
-  userId: string
+  delta: 1 | -1,
+): Promise<void> {
+  const { data: currentJob, error: fetchError } = await supabase
+    .from('jobs')
+    .select('bookmarks_count')
+    .eq('id', jobId)
+    .single();
+
+  if (fetchError) {
+    console.warn('Failed to fetch current bookmarks_count:', fetchError);
+    return;
+  }
+
+  const currentCount = currentJob?.bookmarks_count || 0;
+  const newCount =
+    delta === 1 ? currentCount + 1 : Math.max(0, currentCount - 1);
+
+  const { error: updateError } = await supabase
+    .from('jobs')
+    .update({ bookmarks_count: newCount })
+    .eq('id', jobId);
+
+  if (updateError) {
+    console.warn('Failed to update bookmarks_count:', updateError);
+  }
+}
+
+/**
+ * Add a bookmark for a listing entity (job or contest).
+ */
+export async function addBookmark(
+  supabase: SupabaseClient<Database>,
+  entityType: BookmarkEntityType,
+  entityId: string,
+  userId: string,
 ): Promise<{ error: PostgrestError | null }> {
   try {
-    // First, check if bookmark already exists to avoid duplicates
     const { data: existing, error: checkError } = await supabase
-      .from('job_bookmarks')
+      .from('bookmarks')
       .select('id')
-      .eq('job_id', jobId)
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId)
       .eq('user_id', userId)
       .maybeSingle();
 
-    // If bookmark already exists, no need to add again
     if (existing) {
       return { error: null };
     }
 
-    // If there was an error other than "not found", return it
     if (checkError && checkError.code !== 'PGRST116') {
       return { error: checkError };
     }
 
-    // Insert the bookmark
-    const { error } = await supabase
-      .from('job_bookmarks')
-      .insert({
-        job_id: jobId,
-        user_id: userId,
-      });
+    const { error } = await supabase.from('bookmarks').insert({
+      entity_type: entityType,
+      entity_id: entityId,
+      user_id: userId,
+    });
 
     if (error) {
       return { error };
     }
 
-    // Increment bookmarks_count atomically
-    const { data: currentJob, error: fetchError } = await supabase
-      .from('jobs')
-      .select('bookmarks_count')
-      .eq('id', jobId)
-      .single();
-
-    if (fetchError) {
-      console.warn('Failed to fetch current bookmarks_count:', fetchError);
-      // Don't fail the bookmark operation if count update fails
-      return { error: null };
-    }
-
-    const { error: updateError } = await supabase
-      .from('jobs')
-      .update({ bookmarks_count: (currentJob?.bookmarks_count || 0) + 1 })
-      .eq('id', jobId);
-
-    if (updateError) {
-      console.warn('Failed to increment bookmarks_count:', updateError);
-      // Don't fail the bookmark operation if count update fails
+    if (entityType === 'job') {
+      await adjustJobBookmarksCount(supabase, entityId, 1);
     }
 
     return { error: null };
   } catch (err) {
-    console.error('Error adding job bookmark:', err);
-    return { error: err };
+    console.error('Error adding bookmark:', err);
+    return { error: err as PostgrestError };
   }
 }
 
 /**
- * Remove a bookmark for a job
+ * Remove a bookmark for a listing entity.
  */
-export async function removeJobBookmark(
+export async function removeBookmark(
   supabase: SupabaseClient<Database>,
-  jobId: string,
-  userId: string
+  entityType: BookmarkEntityType,
+  entityId: string,
+  userId: string,
 ): Promise<{ error: PostgrestError | null }> {
   try {
-    // Delete the bookmark
     const { error } = await supabase
-      .from('job_bookmarks')
+      .from('bookmarks')
       .delete()
-      .eq('job_id', jobId)
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId)
       .eq('user_id', userId);
 
     if (error) {
       return { error };
     }
 
-    // Decrement bookmarks_count atomically (ensure it doesn't go below 0)
-    const { data: currentJob, error: fetchError } = await supabase
-      .from('jobs')
-      .select('bookmarks_count')
-      .eq('id', jobId)
-      .single();
-
-    if (fetchError) {
-      console.warn('Failed to fetch current bookmarks_count:', fetchError);
-      // Don't fail the bookmark operation if count update fails
-      return { error: null };
-    }
-
-    const currentCount = currentJob?.bookmarks_count || 0;
-    const newCount = Math.max(0, currentCount - 1);
-
-    const { error: updateError } = await supabase
-      .from('jobs')
-      .update({ bookmarks_count: newCount })
-      .eq('id', jobId);
-
-    if (updateError) {
-      console.warn('Failed to decrement bookmarks_count:', updateError);
-      // Don't fail the bookmark operation if count update fails
+    if (entityType === 'job') {
+      await adjustJobBookmarksCount(supabase, entityId, -1);
     }
 
     return { error: null };
   } catch (err) {
-    console.error('Error removing job bookmark:', err);
-    return { error: err };
+    console.error('Error removing bookmark:', err);
+    return { error: err as PostgrestError };
   }
 }
 
 /**
- * Check if a job is bookmarked by a user
+ * Check if an entity is bookmarked by a user.
  */
-export async function isJobBookmarked(
+export async function isBookmarkedInDb(
   supabase: SupabaseClient<Database>,
-  jobId: string,
-  userId: string
+  entityType: BookmarkEntityType,
+  entityId: string,
+  userId: string,
 ): Promise<{ bookmarked: boolean; error: PostgrestError | null }> {
   try {
     const { data, error } = await supabase
-      .from('job_bookmarks')
+      .from('bookmarks')
       .select('id')
-      .eq('job_id', jobId)
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId)
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
-      // PGRST116 is "not found" which is expected when not bookmarked
       return { bookmarked: false, error };
     }
 
     return { bookmarked: !!data, error: null };
   } catch (err) {
-    console.error('Error checking job bookmark:', err);
-    return { bookmarked: false, error: err };
+    console.error('Error checking bookmark:', err);
+    return { bookmarked: false, error: err as PostgrestError };
   }
 }
 
 /**
- * Get bookmarks count for a job
+ * Get bookmark count for a single entity.
  */
-export async function getJobBookmarksCount(
+export async function getBookmarkCount(
   supabase: SupabaseClient<Database>,
-  jobId: string
+  entityType: BookmarkEntityType,
+  entityId: string,
 ): Promise<{ count: number; error: PostgrestError | null }> {
   try {
     const { count, error } = await supabase
-      .from('job_bookmarks')
+      .from('bookmarks')
       .select('*', { count: 'exact', head: true })
-      .eq('job_id', jobId);
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId);
 
     return { count: count || 0, error };
   } catch (err) {
-    console.error('Error getting job bookmarks count:', err);
-    return { count: 0, error: err };
+    console.error('Error getting bookmark count:', err);
+    return { count: 0, error: err as PostgrestError };
   }
 }
 
 /**
- * Get all bookmarked job IDs for a user
+ * Get bookmarked entity IDs for a user, optionally filtered by type.
  */
-export async function getUserBookmarkedJobIds(
+export async function getUserBookmarkedEntityIds(
   supabase: SupabaseClient<Database>,
-  userId: string
-): Promise<{ jobIds: string[]; error: PostgrestError | null }> {
+  userId: string,
+  entityType?: BookmarkEntityType,
+): Promise<{ entityIds: string[]; error: PostgrestError | null }> {
   try {
-    const { data, error } = await supabase
-      .from('job_bookmarks')
-      .select('job_id')
+    let query = supabase
+      .from('bookmarks')
+      .select('entity_id')
       .eq('user_id', userId);
 
-    if (error) {
-      return { jobIds: [], error };
+    if (entityType) {
+      query = query.eq('entity_type', entityType);
     }
 
-    const jobIds = (data || []).map((bookmark) => bookmark.job_id);
-    return { jobIds, error: null };
+    const { data, error } = await query;
+
+    if (error) {
+      return { entityIds: [], error };
+    }
+
+    const entityIds = (data || []).map((bookmark) => bookmark.entity_id);
+    return { entityIds, error: null };
   } catch (err) {
-    console.error('Error getting user bookmarked jobs:', err);
-    return { jobIds: [], error: err };
+    console.error('Error getting user bookmarks:', err);
+    return { entityIds: [], error: err as PostgrestError };
   }
 }
 
 /**
- * Get bookmark counts for multiple jobs at once
- * This ensures accurate counts by querying the job_bookmarks table directly
+ * Get bookmark counts for multiple entities of the same type.
  */
-export async function getBookmarkCountsForJobs(
+export async function getBookmarkCounts(
   supabase: SupabaseClient<Database>,
-  jobIds: string[]
+  entityType: BookmarkEntityType,
+  entityIds: string[],
 ): Promise<{ counts: Record<string, number>; error: PostgrestError | null }> {
   try {
-    if (!jobIds || jobIds.length === 0) {
+    if (!entityIds || entityIds.length === 0) {
       return { counts: {}, error: null };
     }
 
     const { data, error } = await supabase
-      .from('job_bookmarks')
-      .select('job_id')
-      .in('job_id', jobIds);
+      .from('bookmarks')
+      .select('entity_id')
+      .eq('entity_type', entityType)
+      .in('entity_id', entityIds);
 
     if (error) {
       return { counts: {}, error };
     }
 
-    // Count bookmarks per job
     const counts: Record<string, number> = {};
-    jobIds.forEach(jobId => {
-      counts[jobId] = 0;
+    entityIds.forEach((entityId) => {
+      counts[entityId] = 0;
     });
 
-    (data || []).forEach((bookmark) => {
-      if (bookmark.job_id) {
-        counts[bookmark.job_id] = (counts[bookmark.job_id] || 0) + 1;
+    (data || []).forEach((bookmark: Pick<BookmarkRow, 'entity_id'>) => {
+      if (bookmark.entity_id) {
+        counts[bookmark.entity_id] = (counts[bookmark.entity_id] || 0) + 1;
       }
     });
 
     return { counts, error: null };
   } catch (err) {
-    console.error('Error getting bookmark counts for jobs:', err);
-    return { counts: {}, error: err };
+    console.error('Error getting bookmark counts:', err);
+    return { counts: {}, error: err as PostgrestError };
   }
 }
 
+/** @deprecated Use getBookmarkCounts with entityType 'job' */
+export async function getBookmarkCountsForJobs(
+  supabase: SupabaseClient<Database>,
+  jobIds: string[],
+): Promise<{ counts: Record<string, number>; error: PostgrestError | null }> {
+  return getBookmarkCounts(supabase, 'job', jobIds);
+}
+
+/** @deprecated Use getUserBookmarkedEntityIds with entityType 'job' */
+export async function getUserBookmarkedJobIds(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<{ jobIds: string[]; error: PostgrestError | null }> {
+  const { entityIds, error } = await getUserBookmarkedEntityIds(
+    supabase,
+    userId,
+    'job',
+  );
+  return { jobIds: entityIds, error };
+}
+
+/** @deprecated Use getBookmarkCount with entityType 'job' */
+export async function getJobBookmarksCount(
+  supabase: SupabaseClient<Database>,
+  jobId: string,
+): Promise<{ count: number; error: PostgrestError | null }> {
+  return getBookmarkCount(supabase, 'job', jobId);
+}
+
+/** @deprecated Use isBookmarkedInDb */
+export async function isJobBookmarked(
+  supabase: SupabaseClient<Database>,
+  jobId: string,
+  userId: string,
+): Promise<{ bookmarked: boolean; error: PostgrestError | null }> {
+  return isBookmarkedInDb(supabase, 'job', jobId, userId);
+}
+
+/** @deprecated Use addBookmark */
+export async function addJobBookmark(
+  supabase: SupabaseClient<Database>,
+  jobId: string,
+  userId: string,
+): Promise<{ error: PostgrestError | null }> {
+  return addBookmark(supabase, 'job', jobId, userId);
+}
+
+/** @deprecated Use removeBookmark */
+export async function removeJobBookmark(
+  supabase: SupabaseClient<Database>,
+  jobId: string,
+  userId: string,
+): Promise<{ error: PostgrestError | null }> {
+  return removeBookmark(supabase, 'job', jobId, userId);
+}

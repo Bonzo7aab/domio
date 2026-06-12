@@ -10,7 +10,7 @@ import type { ManagerOrderRow } from '../../lib/database/manager-orders';
 import {
   isContestTender,
   mapTenderRowToContestDisplay,
-} from '../../lib/tender-contest/map-tender-contest-display';
+} from '../../lib/contest/map-tender-contest-display';
 import { ManagerContestDetailSections } from './ManagerContestDetailSections';
 import { SelectedOfferPanel } from './SelectedOfferPanel';
 import { OrderStatusBadge } from './OrderStatusBadge';
@@ -225,7 +225,7 @@ export function ManagerOrderDetailDialog({
             </TabsContent>
 
             <TabsContent value="contractor" className="mt-0">
-              <SelectedOfferPanel submissionId={order.tenderId} kind="tender" />
+              <SelectedOfferPanel submissionId={order.tenderId} kind="contest" />
             </TabsContent>
           </Tabs>
 

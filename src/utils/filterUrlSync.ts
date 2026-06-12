@@ -83,7 +83,10 @@ export function searchParamsToFilters(searchParams: URLSearchParams): Partial<Fi
 
   const postTypes = searchParams.get('postTypes');
   if (postTypes) {
-    filters.postTypes = postTypes.split(',').filter(Boolean);
+    filters.postTypes = postTypes
+      .split(',')
+      .filter(Boolean)
+      .map((value) => (value === 'tender' ? 'contest' : value));
   }
 
   const favorites = searchParams.get('favorites');

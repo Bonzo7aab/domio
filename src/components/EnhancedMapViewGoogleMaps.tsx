@@ -215,7 +215,7 @@ export const EnhancedMapViewGoogleMaps: React.FC<EnhancedMapViewProps> = ({
   const filterByPostType = useCallback((job: Job, filterPostTypes?: string[]): boolean => {
     if (!filterPostTypes || filterPostTypes.length === 0) return true;
     const jobPostType = job.postType || 'job';
-    if (filterPostTypes.length === 2 && filterPostTypes.includes('job') && filterPostTypes.includes('tender')) {
+    if (filterPostTypes.length === 2 && filterPostTypes.includes('job') && filterPostTypes.includes('contest')) {
       return true;
     }
     return filterPostTypes.includes(jobPostType);

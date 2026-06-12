@@ -4,6 +4,10 @@
 
 This directory contains SQL migrations for setting up the Domio platform database on Supabase.
 
+**Table usage, unused schema, and legacy naming:** see [SCHEMA_INVENTORY.md](./SCHEMA_INVENTORY.md).
+
+**Not yet on production:** see [`pending-prod/`](./pending-prod/) — apply to prod when ready, or ask the agent to run them.
+
 ## Migration Order
 
 Execute these SQL files **in order** in your Supabase SQL Editor:
@@ -61,6 +65,9 @@ For current auth/administracja flows, also apply these later migrations:
 - **53_verification_document_reviews.sql**
 - **58_platform_registration_settings.sql**
 - **60_harden_system_write_policies.sql** 🔒
+- **61_rename_job_bookmarks_to_bookmarks.sql** — polymorphic `bookmarks` table
+- **62_fix_bookmarks_count_triggers.sql** — drop legacy bookmark count triggers
+- **Pending prod queue:** [`pending-prod/`](./pending-prod/) — SQL not yet in production migration history; apply when ready
 
 > Note: `51_grant_platform_admin_by_email.sql` is environment-specific (hard-coded email)
 > and should be run manually only when intentionally granting admin access.

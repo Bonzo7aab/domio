@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { addBookmark, getBookmarkedJobs, removeBookmark } from '../utils/bookmarkStorage';
+import { resolveBookmarkEntityType } from '../lib/bookmark/resolve-entity-type';
 import {
   BOOKMARK_COUNT_CHANGED_EVENT,
   readBookmarkCountOverrides,
@@ -316,18 +317,24 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
   const handleBookmark = useCallback((jobId: string, job: Job) => {
     const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
     const currentCount = job.bookmarks_count || 0;
+    const entityType = resolveBookmarkEntityType({
+      postType: job.postType,
+      contestInfo: job.contestInfo,
+    });
+    const isJobEntity = entityType === 'job';
+    const countBaseline = isJobEntity ? currentCount : undefined;
     
     if (isCurrentlyBookmarked) {
-      void removeBookmark(jobId, undefined, undefined, currentCount);
+      void removeBookmark(jobId, entityType, undefined, undefined, countBaseline);
       setBookmarkedJobs(prev => prev.filter(id => id !== jobId));
     } else {
-      // Add bookmark
       const bookmarkData = {
         id: job.id,
+        entityType,
         title: job.title,
         company: job.company,
         location: job.location,
-        postType: (job.postType || 'job') as 'job' | 'tender',
+        postType: (job.postType || 'job') as 'job' | 'contest',
         budget: typeof job.budget === 'object' ? job.budget : {
           min: null,
           max: null,
@@ -348,7 +355,7 @@ export const EnhancedJobList: React.FC<EnhancedJobListProps> = ({
         },
         undefined,
         undefined,
-        currentCount,
+        countBaseline,
       );
       setBookmarkedJobs(prev => [...prev, jobId]);
     }

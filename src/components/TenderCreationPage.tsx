@@ -8,14 +8,14 @@ import { createClient } from '../lib/supabase/client';
 import { createTender, fetchTenderById, updateTender } from '../lib/database/jobs';
 import type { TenderWithCompany } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
-import { uploadTenderDocuments } from '../lib/storage/tender-documents';
+import { uploadContestDocuments } from '../lib/storage/contest-documents';
 import {
   buildCreateTenderPayload,
   clearContestFormDates,
   contestPayloadToUpsertData,
   mapTenderRowToContestForm,
   parseExistingTenderDocuments,
-} from '../lib/tender-contest/build-tender-payload';
+} from '../lib/contest/build-tender-payload';
 import type { TenderContestDocumentMeta, TenderContestFormData } from '../types/tender-contest';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -180,7 +180,7 @@ export default function TenderCreationPage({
         return;
       }
 
-      const { data: uploaded, errors: uploadErrors } = await uploadTenderDocuments(
+      const { data: uploaded, errors: uploadErrors } = await uploadContestDocuments(
         newFiles,
         user.id,
         'draft',

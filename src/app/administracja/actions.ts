@@ -335,7 +335,7 @@ async function suspendTenderBidActionImpl(bidId: string, feedback: string): Prom
   const sb = supabase as any;
 
   const { data: bidRow, error: fetchErr } = await sb
-    .from('tender_bids')
+    .from('contest_offers')
     .select('contractor_id')
     .eq('id', bidId)
     .single();
@@ -345,7 +345,7 @@ async function suspendTenderBidActionImpl(bidId: string, feedback: string): Prom
   }
 
   const { error } = await sb
-    .from('tender_bids')
+    .from('contest_offers')
     .update({
       admin_moderation_status: 'suspended',
       admin_feedback_message: msg,
@@ -379,7 +379,7 @@ async function unsuspendTenderBidActionImpl(bidId: string): Promise<{ ok: boolea
   const sb = supabase as any;
 
   const { error } = await sb
-    .from('tender_bids')
+    .from('contest_offers')
     .update({
       admin_moderation_status: 'none',
       admin_feedback_message: null,
@@ -516,7 +516,7 @@ async function updateTenderBidAdminActionImpl(
     return { ok: false, error: 'Brak zmian.' };
   }
 
-  const { error } = await sb.from('tender_bids').update(sanitized).eq('id', bidId);
+  const { error } = await sb.from('contest_offers').update(sanitized).eq('id', bidId);
   if (error) {
     return { ok: false, error: error.message };
   }
@@ -562,7 +562,7 @@ async function updateTenderListingAdminActionImpl(
     return { ok: false, error: 'Brak zmian.' };
   }
 
-  const { error } = await sb.from('tenders').update(sanitized).eq('id', tenderId);
+  const { error } = await sb.from('contests').update(sanitized).eq('id', tenderId);
   if (error) {
     return { ok: false, error: error.message };
   }
@@ -635,7 +635,7 @@ async function pauseTenderListingActionImpl(
   const sb = supabase as any;
 
   const { data: tender, error: tErr } = await sb
-    .from('tenders')
+    .from('contests')
     .select('manager_id, title')
     .eq('id', tenderId)
     .single();
@@ -644,7 +644,7 @@ async function pauseTenderListingActionImpl(
     return { ok: false, error: tErr?.message ?? 'Nie znaleziono przetargu.' };
   }
 
-  const { error } = await sb.from('tenders').update({ status: 'paused' }).eq('id', tenderId);
+  const { error } = await sb.from('contests').update({ status: 'paused' }).eq('id', tenderId);
 
   if (error) {
     return { ok: false, error: error.message };
@@ -671,7 +671,7 @@ async function resumeTenderListingActionImpl(tenderId: string): Promise<{ ok: bo
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  const { error } = await sb.from('tenders').update({ status: 'active' }).eq('id', tenderId);
+  const { error } = await sb.from('contests').update({ status: 'active' }).eq('id', tenderId);
 
   if (error) {
     return { ok: false, error: error.message };

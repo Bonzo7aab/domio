@@ -145,7 +145,7 @@ export function ManagerMojeZgloszeniaContent({
 
     const typ = searchParams.get('typ');
     const kind: ManagerSubmission['kind'] =
-      typ === 'przetarg' || typ === 'tender' ? 'tender' : 'job';
+      typ === 'przetarg' || typ === 'tender' ? 'contest' : 'job';
     const row = submissions.find((s) => s.id === podgladId && s.kind === kind);
     if (!row) return;
 
@@ -226,7 +226,7 @@ export function ManagerMojeZgloszeniaContent({
   }, [submissions, statusFilter, search, sortKey, sortDir]);
 
   const compareHref = (row: ManagerSubmission): string => {
-    const typ = row.kind === 'tender' ? 'przetarg' : 'zgłoszenie';
+    const typ = row.kind === 'contest' ? 'przetarg' : 'zgłoszenie';
     return `/panel-zarzadcy/zgloszenia/porownaj/${row.id}?typ=${typ}`;
   };
 
@@ -245,7 +245,7 @@ export function ManagerMojeZgloszeniaContent({
   };
 
   const confirmAbandonDraft = async (): Promise<void> => {
-    if (!abandonDraftTarget || abandonDraftTarget.kind !== 'tender') return;
+    if (!abandonDraftTarget || abandonDraftTarget.kind !== 'contest') return;
     setIsAbandoningDraft(true);
     try {
       const result = await abandonContestDraftAction(abandonDraftTarget.id);
@@ -285,7 +285,7 @@ export function ManagerMojeZgloszeniaContent({
   };
 
   const handleOpenCooperationReview = async (row: ManagerSubmission): Promise<void> => {
-    if (row.kind !== 'tender' || !row.hasSelectedOffer) return;
+    if (row.kind !== 'contest' || !row.hasSelectedOffer) return;
 
     setLoadingCooperationReviewId(row.id);
     try {
@@ -482,7 +482,7 @@ export function ManagerMojeZgloszeniaContent({
                                 Porównaj
                               </Button>
                             ) : null}
-                            {row.kind === 'tender' &&
+                            {row.kind === 'contest' &&
                             row.hasSelectedOffer &&
                             !hasCooperationReview(row) ? (
                               <Button
@@ -513,10 +513,10 @@ export function ManagerMojeZgloszeniaContent({
                             </Button>
                             {(() => {
                               const abandonAllowed =
-                                row.kind === 'tender' &&
+                                row.kind === 'contest' &&
                                 canAbandonManagerContestDraft(row.status, row.offersCount);
                               const showCooperationReviewEdit =
-                                row.kind === 'tender' &&
+                                row.kind === 'contest' &&
                                 row.hasSelectedOffer &&
                                 hasCooperationReview(row);
                               if (!abandonAllowed && !showCooperationReviewEdit) {

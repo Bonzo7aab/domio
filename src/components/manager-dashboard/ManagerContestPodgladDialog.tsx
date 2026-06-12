@@ -9,7 +9,7 @@ import { fetchAcceptedTenderBid } from '../../lib/database/offer-selection';
 import {
   isContestTender,
   mapTenderRowToContestDisplay,
-} from '../../lib/tender-contest/map-tender-contest-display';
+} from '../../lib/contest/map-tender-contest-display';
 import { SelectedOfferPanel } from './SelectedOfferPanel';
 import { ContestStatusBadge } from './ContestStatusBadge';
 import { ManagerContestDetailSections } from './ManagerContestDetailSections';
@@ -211,7 +211,7 @@ export function ManagerContestPodgladDialog({
 
             {hasSelectedOffer && contestId ? (
               <TabsContent value="selected-offer" className="mt-0">
-                <SelectedOfferPanel submissionId={contestId} kind="tender" />
+                <SelectedOfferPanel submissionId={contestId} kind="contest" />
               </TabsContent>
             ) : null}
           </Tabs>

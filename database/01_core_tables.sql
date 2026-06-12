@@ -73,45 +73,8 @@ CREATE TABLE user_companies (
 );
 
 -- =============================================
--- SUBSCRIPTION MANAGEMENT
+-- SUBSCRIPTION MANAGEMENT — removed 2026-06-11 (see database/pending-prod/20260611140000_drop_unused_schema.sql)
 -- =============================================
-
--- Subscription plans
-CREATE TABLE subscription_plans (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL,
-    slug VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT,
-    user_type VARCHAR(20) NOT NULL CHECK (user_type IN ('manager', 'contractor')),
-    price_monthly DECIMAL(10,2) DEFAULT 0,
-    price_yearly DECIMAL(10,2) DEFAULT 0,
-    currency VARCHAR(3) DEFAULT 'PLN',
-    features JSONB, -- Array of features included
-    limitations JSONB, -- Array of limitations
-    is_active BOOLEAN DEFAULT TRUE,
-    sort_order INTEGER DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- User subscriptions
-CREATE TABLE user_subscriptions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
-    plan_id UUID NOT NULL REFERENCES subscription_plans(id),
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN (
-        'active', 'paused', 'cancelled', 'expired', 'trial'
-    )),
-    billing_period VARCHAR(20) NOT NULL CHECK (billing_period IN ('monthly', 'yearly')),
-    start_date TIMESTAMPTZ DEFAULT NOW(),
-    end_date TIMESTAMPTZ,
-    auto_renew BOOLEAN DEFAULT TRUE,
-    trial_end_date TIMESTAMPTZ,
-    payment_method VARCHAR(50),
-    last_payment_date TIMESTAMPTZ,
-    next_payment_date TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
 
 -- =============================================
 -- JOB CATEGORIES
@@ -130,7 +93,7 @@ CREATE TABLE job_categories (
 );
 
 -- =============================================
--- JOBS AND TENDERS
+-- JOBS AND CONTESTS
 -- =============================================
 
 -- Regular job postings
@@ -179,8 +142,8 @@ CREATE TABLE jobs (
     expires_at TIMESTAMPTZ
 );
 
--- Formal tenders
-CREATE TABLE tenders (
+-- Contests (Konkurs)
+CREATE TABLE contests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
@@ -203,12 +166,12 @@ CREATE TABLE tenders (
     requirements TEXT[],
     documents JSONB,
     evaluation_criteria JSONB,
-    phases JSONB, -- Tender phases if applicable
+    phases JSONB, -- Contest phases if applicable
     current_phase VARCHAR(100),
-    wadium DECIMAL(12,2), -- Tender deposit
-    winning_bid_id UUID,
+    wadium DECIMAL(12,2), -- Contest deposit (wadium)
+    winning_offer_id UUID,
     winner_name VARCHAR(255),
-    bids_count INTEGER DEFAULT 0,
+    offers_count INTEGER DEFAULT 0,
     views_count INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -245,10 +208,10 @@ CREATE TABLE job_applications (
     decision_at TIMESTAMPTZ
 );
 
--- Tender bids
-CREATE TABLE tender_bids (
+-- Contest offers
+CREATE TABLE contest_offers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tender_id UUID NOT NULL REFERENCES tenders(id) ON DELETE CASCADE,
+    contest_id UUID NOT NULL REFERENCES contests(id) ON DELETE CASCADE,
     contractor_id UUID NOT NULL REFERENCES user_profiles(id),
     company_id UUID NOT NULL REFERENCES companies(id),
     bid_amount DECIMAL(12,2) NOT NULL,
@@ -300,7 +263,7 @@ CREATE TABLE company_reviews (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     reviewer_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     job_id UUID REFERENCES jobs(id) ON DELETE SET NULL,
-    tender_id UUID REFERENCES tenders(id) ON DELETE SET NULL,
+    contest_id UUID REFERENCES contests(id) ON DELETE SET NULL,
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
     title VARCHAR(255),
     comment TEXT,
@@ -344,21 +307,21 @@ CREATE INDEX idx_jobs_budget ON jobs(budget_min, budget_max);
 CREATE INDEX idx_jobs_deadline ON jobs(deadline);
 CREATE INDEX idx_jobs_created ON jobs(created_at);
 
--- Tenders indexes
-CREATE INDEX idx_tenders_category ON tenders(category_id);
-CREATE INDEX idx_tenders_manager ON tenders(manager_id);
-CREATE INDEX idx_tenders_status ON tenders(status);
-CREATE INDEX idx_tenders_deadline ON tenders(submission_deadline);
+-- Contests indexes
+CREATE INDEX idx_contests_category ON contests(category_id);
+CREATE INDEX idx_contests_manager ON contests(manager_id);
+CREATE INDEX idx_contests_status ON contests(status);
+CREATE INDEX idx_contests_deadline ON contests(submission_deadline);
 
 -- Applications indexes
 CREATE INDEX idx_job_applications_job ON job_applications(job_id);
 CREATE INDEX idx_job_applications_contractor ON job_applications(contractor_id);
 CREATE INDEX idx_job_applications_status ON job_applications(status);
 
--- Bids indexes
-CREATE INDEX idx_tender_bids_tender ON tender_bids(tender_id);
-CREATE INDEX idx_tender_bids_contractor ON tender_bids(contractor_id);
-CREATE INDEX idx_tender_bids_status ON tender_bids(status);
+-- Contest offers indexes
+CREATE INDEX idx_contest_offers_contest ON contest_offers(contest_id);
+CREATE INDEX idx_contest_offers_contractor ON contest_offers(contractor_id);
+CREATE INDEX idx_contest_offers_status ON contest_offers(status);
 
 -- Reviews indexes
 CREATE INDEX idx_company_reviews_company ON company_reviews(company_id);
@@ -379,8 +342,7 @@ $$ language 'plpgsql';
 -- Apply to all tables with updated_at
 CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_user_subscriptions_updated_at BEFORE UPDATE ON user_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_jobs_updated_at BEFORE UPDATE ON jobs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_tenders_updated_at BEFORE UPDATE ON tenders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_contests_updated_at BEFORE UPDATE ON contests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_company_reviews_updated_at BEFORE UPDATE ON company_reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_company_ratings_updated_at BEFORE UPDATE ON company_ratings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

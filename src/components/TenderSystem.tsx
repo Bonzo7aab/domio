@@ -121,7 +121,7 @@ export const TenderSystem: React.FC<TenderSystemProps> = ({
               status: t.status as TenderStatus,
               submissionDeadline: new Date(t.submission_deadline),
               evaluationDeadline: t.evaluation_deadline ? new Date(t.evaluation_deadline) : undefined,
-              bidCount: t.bids_count || 0,
+              bidCount: t.offers_count || 0,
               createdBy: t.company?.name || 'Unknown',
               category: t.category?.name || 'Inne',
               winnerName: ((t as { winner_name?: string }).winner_name) || undefined,

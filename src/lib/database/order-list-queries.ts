@@ -4,8 +4,8 @@ import type { Database } from '../../types/database';
 /** Scalar order row from `orders` (no embeds — avoids PostgREST relationship cache issues). */
 export interface RawOrderRow {
   id: string;
-  tender_id: string;
-  tender_bid_id: string;
+  contest_id: string;
+  contest_offer_id: string;
   title: string;
   location_label: string | null;
   net_amount: string | number;
@@ -38,8 +38,8 @@ export function formatPostgrestError(error: unknown): string {
 
 const ORDER_COLUMNS = `
   id,
-  tender_id,
-  tender_bid_id,
+  contest_id,
+  contest_offer_id,
   title,
   location_label,
   net_amount,

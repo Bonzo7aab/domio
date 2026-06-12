@@ -202,7 +202,7 @@ export async function shouldSendPushNotification(
 
   const { data: preferences, error } = await supabase
     .from('notification_preferences')
-    .select('push_notifications, new_job_notifications, new_tender_notifications, message_notifications, status_update_notifications, reminder_notifications, marketing_notifications, system_notifications')
+    .select('push_notifications, new_job_notifications, new_contest_notifications, message_notifications, status_update_notifications, reminder_notifications, marketing_notifications, system_notifications')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -226,8 +226,8 @@ export async function shouldSendPushNotification(
   switch (notificationType) {
     case 'new_job':
       return preferences.new_job_notifications ?? true;
-    case 'new_tender':
-      return preferences.new_tender_notifications ?? true;
+    case 'new_contest':
+      return preferences.new_contest_notifications ?? true;
     case 'new_message':
     case 'contest_question':
       return preferences.message_notifications ?? true;

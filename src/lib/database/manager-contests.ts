@@ -8,7 +8,7 @@ import {
   fetchUnansweredContestQuestionCounts,
   fetchUnseenContestQuestionCounts,
 } from './questions';
-import { countsTowardTenderBidsCount } from './tender-bid-count';
+import { countsTowardContestOfferCount } from './contest-offer-count';
 import { fetchReviewedTenderIdsForReviewer } from './reviews';
 
 export interface ManagerContest {
@@ -80,7 +80,7 @@ export async function advanceContestsPastSubmissionDeadline(
   const now = new Date().toISOString();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .update({ status: 'evaluation', updated_at: now })
     .eq('company_id', companyId)
     .eq('status', 'active')
@@ -100,7 +100,7 @@ export async function fetchManagerContests(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: tenderRows, error } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .select(
       `
       id,
@@ -139,18 +139,18 @@ export async function fetchManagerContests(
   if (tenderIds.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bids } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .select(
-        'tender_id, status, admin_moderation_status, company:companies!tender_bids_company_id_fkey (id, name)',
+        'contest_id, status, admin_moderation_status, company:companies!tender_bids_company_id_fkey (id, name)',
       )
-      .in('tender_id', tenderIds);
+      .in('contest_id', tenderIds);
 
     for (const row of bids || []) {
-      const tid = row.tender_id as string;
+      const tid = row.contest_id as string;
       const status = row.status as string;
       const moderationStatus = row.admin_moderation_status as string | null | undefined;
       if (
-        countsTowardTenderBidsCount(status) &&
+        countsTowardContestOfferCount(status) &&
         moderationStatus !== 'suspended'
       ) {
         offerCounts[tid] = (offerCounts[tid] ?? 0) + 1;
@@ -222,7 +222,7 @@ export async function deleteManagerContestDraft(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: tender, error: fetchErr } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .select('id, status, manager_id, company_id')
     .eq('id', tenderId)
     .maybeSingle();
@@ -241,9 +241,9 @@ export async function deleteManagerContestDraft(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { count: bidCount, error: countErr } = await (supabase as any)
-    .from('tender_bids')
+    .from('contest_offers')
     .select('*', { count: 'exact', head: true })
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .neq('status', 'draft')
     .neq('status', 'cancelled');
 
@@ -257,7 +257,7 @@ export async function deleteManagerContestDraft(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: deleteErr } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .delete()
     .eq('id', tenderId);
 

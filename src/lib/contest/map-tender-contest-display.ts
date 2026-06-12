@@ -1,3 +1,8 @@
+/**
+ * Contest (Konkurs) domain helpers for rows stored in DB table `tenders`
+ * and offers in `tender_bids`. Legacy table names are intentional — see
+ * database/SCHEMA_INVENTORY.md § Legacy naming.
+ */
 import type { TenderWithCompany } from '../database/jobs';
 import type {
   FormalRequirements,

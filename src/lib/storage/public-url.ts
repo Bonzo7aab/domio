@@ -41,7 +41,7 @@ export function isPublicStorageBucket(bucket: StorageBucket): boolean {
 
 export function resolveStorageBucketFromPath(path: string): StorageBucket {
   const normalized = path.replace(/^\/+/, '');
-  if (normalized.includes('/tenders/')) {
+  if (normalized.includes('/contests/') || normalized.includes('/tenders/')) {
     return STORAGE_BUCKETS.BID_ATTACHMENTS;
   }
   if (normalized.includes('/reviews/') || normalized.includes('/zlecenia/') || normalized.includes('/portfolio/')) {

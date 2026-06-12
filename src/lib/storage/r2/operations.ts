@@ -174,7 +174,10 @@ export async function createDownloadUrlSafe(
 
 function resolveBucketFromPath(path: string): StorageBucket {
   const normalized = path.replace(/^\/+/, '');
-  if (normalized.includes('/tenders/') && !normalized.includes('/zlecenia/')) {
+  if (
+    (normalized.includes('/contests/') || normalized.includes('/tenders/')) &&
+    !normalized.includes('/zlecenia/')
+  ) {
     return STORAGE_BUCKETS.BID_ATTACHMENTS;
   }
   if (normalized.includes('/weryfikacja/')) {

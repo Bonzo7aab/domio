@@ -127,7 +127,7 @@ export function getContestMarkerIconSvg(strokeColor: string, size = 14): string 
 // Returns SVG element for use in Google Maps PinElement glyph
 // Icons are white filled with colored outline, placed directly on marker background
 // Uses caching to avoid recreating SVG elements for the same postType + backgroundColor combination
-export const createMarkerGlyph = (postType: 'job' | 'tender', backgroundColor: string): SVGSVGElement => {
+export const createMarkerGlyph = (postType: 'job' | 'contest', backgroundColor: string): SVGSVGElement => {
   // Create cache key
   const cacheKey = `${postType}-${backgroundColor}`;
   

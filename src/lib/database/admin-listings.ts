@@ -148,12 +148,12 @@ export async function fetchAdminTenderListings(
 ): Promise<AdminTenderListingRow[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .select(
       `
       id, title, description, status, manager_id, company_id, category_id,
       location, address, estimated_value, currency, submission_deadline,
-      evaluation_deadline, project_duration, requirements, wadium, bids_count,
+      evaluation_deadline, project_duration, requirements, wadium, offers_count,
       created_at, updated_at,
       manager:user_profiles!tenders_manager_id_fkey ( first_name, last_name ),
       company:companies!tenders_company_id_fkey ( name )
@@ -192,7 +192,7 @@ export async function fetchAdminTenderListings(
       projectDuration: (r.project_duration as string) ?? null,
       requirements: (r.requirements as string[]) ?? null,
       wadium: (r.wadium as number) ?? null,
-      bidsCount: (r.bids_count as number) ?? 0,
+      bidsCount: (r.offers_count as number) ?? 0,
       createdAt: (r.created_at as string) ?? null,
       updatedAt: (r.updated_at as string) ?? null,
     };

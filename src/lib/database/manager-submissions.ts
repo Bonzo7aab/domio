@@ -4,7 +4,7 @@ import { getJobWorkflowStatusLabel } from '../job-workflow-status';
 import { getTenderWorkflowStatusLabel } from '../tender-workflow-status';
 import { fetchReviewedTenderIdsForReviewer } from './reviews';
 
-export type ManagerSubmissionKind = 'job' | 'tender';
+export type ManagerSubmissionKind = 'job' | 'contest';
 
 export interface ManagerSubmission {
   id: string;
@@ -52,7 +52,7 @@ export async function fetchManagerSubmissions(
       .order('created_at', { ascending: false }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tenders not in generated Database types
     (supabase as any)
-      .from('tenders')
+      .from('contests')
       .select('id, title, status, created_at')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false }),
@@ -101,12 +101,12 @@ export async function fetchManagerSubmissions(
   if (tenderIds.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bids } = await (supabase as any)
-      .from('tender_bids')
-      .select('tender_id, status, submitted_at')
-      .in('tender_id', tenderIds);
+      .from('contest_offers')
+      .select('contest_id, status, submitted_at')
+      .in('contest_id', tenderIds);
 
     for (const row of bids || []) {
-      const tid = row.tender_id as string;
+      const tid = row.contest_id as string;
       if (!tenderOfferCounts[tid]) tenderOfferCounts[tid] = { total: 0, newCount: 0 };
       tenderOfferCounts[tid].total += 1;
       if (row.status === 'accepted') {
@@ -154,7 +154,7 @@ export async function fetchManagerSubmissions(
 
   const tenders: ManagerSubmission[] = tenderRows.map((t) => ({
     id: t.id,
-    kind: 'tender' as const,
+    kind: 'contest' as const,
     title: t.title,
     status: t.status,
     offersCount: tenderOfferCounts[t.id]?.total ?? 0,

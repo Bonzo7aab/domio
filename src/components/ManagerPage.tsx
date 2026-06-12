@@ -76,7 +76,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
   const [_isLoadingApplications, setIsLoadingApplications] = useState(false);
   const [_selectedJobData, setSelectedJobData] = useState<{ title: string; budget: string } | null>(null);
   // Tender bids state
-  const [tenderBids, setTenderBids] = useState<Array<{ id: string; contractor_id: string; tender_id: string; proposed_price: number; proposed_timeline: string; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
+  const [tenderBids, setTenderBids] = useState<Array<{ id: string; contractor_id: string; contest_id: string; proposed_price: number; proposed_timeline: string; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>>([]);
   const [isLoadingTenderBids, setIsLoadingTenderBids] = useState(false);
   const [selectedTenderData, setSelectedTenderData] = useState<{ title: string } | null>(null);
   // Job details dialog state
@@ -438,7 +438,7 @@ export default function ManagerPage({ onBack: _onBack, onPostJob, shouldOpenTend
           toast.error('Nie udało się załadować ofert');
           setTenderBids([]);
         } else {
-          setTenderBids((bidsData || []) as Array<{ id: string; contractor_id: string; tender_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>);
+          setTenderBids((bidsData || []) as Array<{ id: string; contractor_id: string; contest_id: string; proposed_price: number | null; proposed_timeline: string | null; status: string; created_at: string; contractor?: { id: string; first_name: string; last_name: string; avatar_url: string | null } }>);
         }
       } catch (err) {
         console.error('Error loading tender bids:', err);

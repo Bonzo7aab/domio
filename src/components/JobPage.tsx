@@ -22,7 +22,12 @@ import { AskQuestionModal } from './AskQuestionModal';
 import SimilarJobs from './SimilarJobs';
 import { useUserProfile } from '../contexts/AuthContext';
 import { getStoredJobs, Job as StoredJob } from '../utils/jobStorage';
-import { addBookmark, removeBookmark, isJobBookmarked } from '../utils/bookmarkStorage';
+import {
+  addBookmark,
+  removeBookmark,
+  isBookmarked as isStoredBookmark,
+} from '../utils/bookmarkStorage';
+import { resolveBookmarkEntityType } from '../lib/bookmark/resolve-entity-type';
 import {
   BOOKMARK_COUNT_CHANGED_EVENT,
   readBookmarkCountOverrides,
@@ -37,7 +42,7 @@ import { type Job, type TenderInfo } from '../types/job';
 import {
   isContestTender,
   mapTenderRowToContestDisplay,
-} from '../lib/tender-contest/map-tender-contest-display';
+} from '../lib/contest/map-tender-contest-display';
 import { parseSelectionCriteria } from '../types/tender-contest';
 import {
   CONTEST_TAB_ITEMS,
@@ -129,7 +134,7 @@ function getStatusLabel(status?: string, isContest = false): string {
  */
 function normalizeJobData(
   data: JobWithCompany | TenderWithCompany | StoredJob | null,
-  source: 'job' | 'tender' | 'stored'
+  source: 'job' | 'contest' | 'stored'
 ): JobDisplayData | null {
   if (!data) return null;
 
@@ -237,7 +242,7 @@ function normalizeJobData(
       images: [],
       lat: storedJob.lat,
       lng: storedJob.lng,
-      tenderInfo: storedJob.postType === 'tender' && storedJob.tenderInfo ? {
+      tenderInfo: storedJob.postType === 'contest' && storedJob.tenderInfo ? {
         tenderType: 'Zamówienie publiczne',
         phases: storedJob.tenderInfo.phases?.map((phase: string | { name: string; status: string; deadline: string }) => {
           if (typeof phase === 'string') {
@@ -350,7 +355,7 @@ function normalizeJobData(
   }
 
   // Handle database tender
-  if (source === 'tender') {
+  if (source === 'contest') {
     const dbTender = data as TenderWithCompany;
     const locationData: { city: string; sublocality_level_1?: string } = typeof dbTender.location === 'string' 
       ? { city: dbTender.location }
@@ -412,7 +417,7 @@ function normalizeJobData(
 
     return {
       id: dbTender.id,
-      postType: 'tender',
+      postType: 'contest',
       title: dbTender.title,
       company: dbTender.company?.name || 'Unknown',
       location: locationData,
@@ -425,11 +430,11 @@ function normalizeJobData(
       responsibilities: [],
       skills: [],
       metrics: {
-        applications: dbTender.bids_count || 0,
+        applications: dbTender.offers_count || 0,
         visits: dbTender.views_count || 0,
         bookmarks: 0,
       },
-      applications: dbTender.bids_count || 0,
+      applications: dbTender.offers_count || 0,
       visits_count: dbTender.views_count || 0,
       bookmarks_count: 0,
       verified: dbTender.company?.is_verified || false,
@@ -592,7 +597,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       
       if (dbTender && !tenderError) {
         console.log('✅ JobPage - Found tender in database:', dbTender);
-        const normalizedTender = normalizeJobData(dbTender, 'tender');
+        const normalizedTender = normalizeJobData(dbTender, 'contest');
         if (normalizedTender) {
           setJobData(normalizedTender);
           // Extract manager_id from dbTender if available
@@ -667,7 +672,11 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     if (!jobIdForBookmark) return;
 
     const syncBookmarkState = () => {
-      setIsBookmarked(isJobBookmarked(jobIdForBookmark));
+      const entityType = resolveBookmarkEntityType({
+        postType: jobData?.postType,
+        contestInfo: jobData?.contestInfo,
+      });
+      setIsBookmarked(isStoredBookmark(jobIdForBookmark, entityType));
       const overrideCount = readBookmarkCountOverrides()[jobIdForBookmark];
       if (overrideCount === undefined) return;
       setJobData((prev) => {
@@ -684,12 +693,12 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
       window.removeEventListener(BOOKMARK_COUNT_CHANGED_EVENT, syncBookmarkState);
       window.removeEventListener('focus', syncBookmarkState);
     };
-  }, [jobData?.id]);
+  }, [jobData?.id, jobData?.postType, jobData?.contestInfo]);
 
   // Check tender bid state (submitted vs draft) for this tender
   useEffect(() => {
     const checkBidState = async () => {
-      if (!jobData || !user?.id || !supabase || jobData.postType !== 'tender') {
+      if (!jobData || !user?.id || !supabase || jobData.postType !== 'contest') {
         setHasExistingBid(false);
         setHasDraftBid(false);
         return;
@@ -728,7 +737,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           jobData.id,
           user.id,
           managerId,
-          jobData.postType === 'tender'
+          jobData.postType === 'contest'
         );
 
         if (result.error) {
@@ -771,7 +780,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   useEffect(() => {
     if (searchParams.get('continueOffer') !== 'draft') return;
     if (continueOfferHandledRef.current) return;
-    if (isLoadingJob || !jobData?.contestInfo || jobData.postType !== 'tender') return;
+    if (isLoadingJob || !jobData?.contestInfo || jobData.postType !== 'contest') return;
     if (isCheckingBid) return;
 
     if (!hasDraftBid) {
@@ -921,7 +930,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   };
 
   const refreshBidState = async () => {
-    if (!jobData || !user?.id || !supabase || jobData.postType !== 'tender') return;
+    if (!jobData || !user?.id || !supabase || jobData.postType !== 'contest') return;
     const { state } = await fetchTenderBidOfferState(supabase, jobData.id, user.id);
     setHasExistingBid(state === 'submitted');
     setHasDraftBid(state === 'draft');
@@ -934,7 +943,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
     }
 
     try {
-      if (job.postType === 'tender') {
+      if (job.postType === 'contest') {
         // Handle tender bid submission
         const { data, error } = await createTenderBid(
           supabase,
@@ -1055,20 +1064,34 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
   const handleBookmark = () => {
     if (!job) return;
 
+    const entityType = resolveBookmarkEntityType({
+      postType: job.postType,
+      contestInfo: job.contestInfo,
+    });
     const currentCount = job.bookmarks_count ?? 0;
+    const isJobEntity = entityType === 'job';
 
     if (isBookmarked) {
-      void removeBookmark(job.id, supabase ?? undefined, user?.id, currentCount);
-      setIsBookmarked(false);
-      setJobData((prev) =>
-        prev
-          ? { ...prev, bookmarks_count: Math.max(0, currentCount - 1) }
-          : prev,
+      void removeBookmark(
+        job.id,
+        entityType,
+        supabase ?? undefined,
+        user?.id,
+        isJobEntity ? currentCount : undefined,
       );
+      setIsBookmarked(false);
+      if (isJobEntity) {
+        setJobData((prev) =>
+          prev
+            ? { ...prev, bookmarks_count: Math.max(0, currentCount - 1) }
+            : prev,
+        );
+      }
       toast.success('Usunięto z zapisanych');
     } else {
       const bookmarkData = {
         id: job.id,
+        entityType,
         title: job.title,
         company: job.company,
         location: typeof job.location === 'string' ? job.location : job.location?.city || 'Unknown',
@@ -1080,12 +1103,14 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
         bookmarkData,
         supabase ?? undefined,
         user?.id,
-        currentCount,
+        isJobEntity ? currentCount : undefined,
       );
       setIsBookmarked(true);
-      setJobData((prev) =>
-        prev ? { ...prev, bookmarks_count: currentCount + 1 } : prev,
-      );
+      if (isJobEntity) {
+        setJobData((prev) =>
+          prev ? { ...prev, bookmarks_count: currentCount + 1 } : prev,
+        );
+      }
       toast.success('Dodano do zapisanych');
     }
   };
@@ -1261,7 +1286,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 >
                   Wymagania
                 </button>
-                {job.postType === 'tender' && (
+                {job.postType === 'contest' && (
                   <>
                     <button
                       onClick={() => setActiveTab('procedure')}
@@ -1311,7 +1336,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
           <div className="lg:col-span-2 min-w-0 space-y-6">
 
             {/* Key tender summary — contests show details in tabs, not this pinned widget */}
-            {job.postType === 'tender' && job.tenderInfo && !job.contestInfo && (
+            {job.postType === 'contest' && job.tenderInfo && !job.contestInfo && (
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
@@ -1382,7 +1407,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 <Card>
                   <CardContent className="min-w-0 space-y-6 p-6">
                     <div className="min-w-0">
-                      <h3 className="text-lg font-semibold mb-3">Opis {job.postType === 'tender' ? 'przetargu' : 'zgłoszenia'}</h3>
+                      <h3 className="text-lg font-semibold mb-3">Opis {job.postType === 'contest' ? 'przetargu' : 'zgłoszenia'}</h3>
                       <p className="max-w-full break-words text-muted-foreground leading-relaxed whitespace-pre-wrap">
                         {job.description}
                       </p>
@@ -1402,7 +1427,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     </div>
                   )}
 
-                    {job.postType === 'tender' && job.tenderInfo && job.tenderInfo.evaluationCriteria && job.tenderInfo.evaluationCriteria.length > 0 && (
+                    {job.postType === 'contest' && job.tenderInfo && job.tenderInfo.evaluationCriteria && job.tenderInfo.evaluationCriteria.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold mb-3">Kryteria oceny ofert</h3>
                       <div className="bg-muted/50 border border-border rounded-lg p-4">
@@ -1538,7 +1563,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     </div>
                   )}
 
-                  {job.postType === 'tender' && (
+                  {job.postType === 'contest' && (
                     <div className="bg-muted/50 border border-border rounded-lg p-4">
                       <div className="flex items-start gap-3">
                         <AlertCircle className="w-5 h-5 text-foreground mt-0.5 flex-shrink-0" />
@@ -1565,7 +1590,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
               </TabsContent>
 
               {/* Procedure Tab - Only for legacy tenders */}
-              {job.postType === 'tender' && !job.contestInfo && (
+              {job.postType === 'contest' && !job.contestInfo && (
                 <TabsContent value="procedure">
                   <Card>
                     <CardContent className="p-6 space-y-6">
@@ -1599,7 +1624,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
               )}
 
               {/* Documents Tab - Only for legacy tenders */}
-              {job.postType === 'tender' && !job.contestInfo && (
+              {job.postType === 'contest' && !job.contestInfo && (
                 <TabsContent value="documents">
                   <Card>
                     <CardContent className="p-6 space-y-6">
@@ -1741,7 +1766,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                 <div className="space-y-3">
                   <ContestApplyOfferButton
                     className={
-                      hasExistingBid && job.postType === 'tender'
+                      hasExistingBid && job.postType === 'contest'
                         ? 'w-full'
                         : 'w-full bg-blue-800 hover:bg-blue-900 text-white'
                     }
@@ -1749,7 +1774,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     isLoggedIn={Boolean(user)}
                     user={user}
                     hasSubmittedOffer={Boolean(
-                      hasExistingBid && job.postType === 'tender',
+                      hasExistingBid && job.postType === 'contest',
                     )}
                     hasDraftOffer={Boolean(
                       hasDraftBid && isContestView && !hasExistingBid,

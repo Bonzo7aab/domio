@@ -1,8 +1,8 @@
 -- =============================================
 -- UPDATE APPLICATION COUNTS TRIGGERS
 -- =============================================
--- Automatically update applications_count and bids_count when
--- applications/bids are created, updated, or deleted
+-- Automatically update applications_count and offers_count when
+-- applications/offers are created, updated, or deleted
 
 -- =============================================
 -- JOB APPLICATIONS COUNT
@@ -49,48 +49,48 @@ CREATE TRIGGER update_job_app_count_on_delete
   EXECUTE FUNCTION update_job_applications_count();
 
 -- =============================================
--- TENDER BIDS COUNT
+-- CONTEST OFFERS COUNT
 -- =============================================
 
--- Function to update tender bids_count
-CREATE OR REPLACE FUNCTION update_tender_bids_count()
+-- Function to update contest offers_count
+CREATE OR REPLACE FUNCTION update_contest_offers_count()
 RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE tenders 
-  SET bids_count = (
-    SELECT COUNT(*) 
-    FROM tender_bids 
-    WHERE tender_id = COALESCE(NEW.tender_id, OLD.tender_id)
-    AND status != 'cancelled'  -- Exclude cancelled bids from count
+  UPDATE contests
+  SET offers_count = (
+    SELECT COUNT(*)
+    FROM contest_offers
+    WHERE contest_id = COALESCE(NEW.contest_id, OLD.contest_id)
+    AND status NOT IN ('cancelled', 'draft')
   )
-  WHERE id = COALESCE(NEW.tender_id, OLD.tender_id);
+  WHERE id = COALESCE(NEW.contest_id, OLD.contest_id);
   RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
 
 -- Drop existing triggers if they exist
-DROP TRIGGER IF EXISTS update_tender_bids_count_on_insert ON tender_bids;
-DROP TRIGGER IF EXISTS update_tender_bids_count_on_update ON tender_bids;
-DROP TRIGGER IF EXISTS update_tender_bids_count_on_delete ON tender_bids;
+DROP TRIGGER IF EXISTS update_contest_offers_count_on_insert ON contest_offers;
+DROP TRIGGER IF EXISTS update_contest_offers_count_on_update ON contest_offers;
+DROP TRIGGER IF EXISTS update_contest_offers_count_on_delete ON contest_offers;
 
 -- Trigger on insert
-CREATE TRIGGER update_tender_bids_count_on_insert
-  AFTER INSERT ON tender_bids
-  FOR EACH ROW 
-  EXECUTE FUNCTION update_tender_bids_count();
+CREATE TRIGGER update_contest_offers_count_on_insert
+  AFTER INSERT ON contest_offers
+  FOR EACH ROW
+  EXECUTE FUNCTION update_contest_offers_count();
 
--- Trigger on update (to handle status changes, e.g., cancelling)
-CREATE TRIGGER update_tender_bids_count_on_update
-  AFTER UPDATE ON tender_bids
-  FOR EACH ROW 
-  WHEN (OLD.status IS DISTINCT FROM NEW.status)
-  EXECUTE FUNCTION update_tender_bids_count();
+-- Trigger on update (to handle status changes, e.g., cancelling or submitting draft)
+CREATE TRIGGER update_contest_offers_count_on_update
+  AFTER UPDATE ON contest_offers
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status OR OLD.contest_id IS DISTINCT FROM NEW.contest_id)
+  EXECUTE FUNCTION update_contest_offers_count();
 
 -- Trigger on delete
-CREATE TRIGGER update_tender_bids_count_on_delete
-  AFTER DELETE ON tender_bids
-  FOR EACH ROW 
-  EXECUTE FUNCTION update_tender_bids_count();
+CREATE TRIGGER update_contest_offers_count_on_delete
+  AFTER DELETE ON contest_offers
+  FOR EACH ROW
+  EXECUTE FUNCTION update_contest_offers_count();
 
 -- =============================================
 -- INITIAL COUNT UPDATE
@@ -105,11 +105,11 @@ SET applications_count = (
   AND status != 'cancelled'
 );
 
-UPDATE tenders 
-SET bids_count = (
-  SELECT COUNT(*) 
-  FROM tender_bids 
-  WHERE tender_bids.tender_id = tenders.id
-  AND status != 'cancelled'
+UPDATE contests
+SET offers_count = (
+  SELECT COUNT(*)
+  FROM contest_offers
+  WHERE contest_offers.contest_id = contests.id
+  AND status NOT IN ('cancelled', 'draft')
 );
 

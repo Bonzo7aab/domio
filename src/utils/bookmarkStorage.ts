@@ -1,9 +1,13 @@
-// Utility functions for managing bookmarked jobs in localStorage
+// Utility functions for managing bookmarked listings in localStorage
 // Optionally syncs with database when user is authenticated
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
-import { addJobBookmark as addJobBookmarkDb, removeJobBookmark as removeJobBookmarkDb } from '../lib/database/bookmarks';
+import {
+  addBookmark as addBookmarkDb,
+  removeBookmark as removeBookmarkDb,
+} from '../lib/database/bookmarks';
+import type { BookmarkEntityType } from '../types/bookmark';
 import type { Budget } from '../types/budget';
 import {
   decrementBookmarkCountOverride,
@@ -12,10 +16,12 @@ import {
 
 export interface BookmarkedJob {
   id: string;
+  entityType: BookmarkEntityType;
   title: string;
   company: string;
   location: string | { city?: string; sublocality_level_1?: string };
-  postType: 'job' | 'tender';
+  /** @deprecated Use entityType instead */
+  postType: 'job' | 'contest';
   bookmarkedAt: string;
   budget?: string | Budget;
   deadline?: string;
@@ -27,13 +33,42 @@ function canUseLocalStorage(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 }
 
+function normalizeBookmark(raw: BookmarkedJob & { postType?: 'job' | 'contest' | 'tender' }): BookmarkedJob {
+  const legacyPostType = raw.postType as 'job' | 'contest' | 'tender' | undefined;
+  const entityType =
+    raw.entityType ??
+    (legacyPostType === 'contest' || legacyPostType === 'tender' ? 'contest' : 'job');
+
+  const normalizedPostType: 'job' | 'contest' =
+    legacyPostType === 'tender' || legacyPostType === 'contest'
+      ? 'contest'
+      : legacyPostType === 'job'
+        ? 'job'
+        : entityType === 'job'
+          ? 'job'
+          : 'contest';
+
+  return {
+    ...raw,
+    entityType,
+    postType: normalizedPostType,
+  };
+}
+
+function bookmarkKey(entityType: BookmarkEntityType, id: string): string {
+  return `${entityType}:${id}`;
+}
+
 export const getBookmarkedJobs = (): BookmarkedJob[] => {
   if (!canUseLocalStorage()) {
     return [];
   }
   try {
     const bookmarks = localStorage.getItem(BOOKMARKS_KEY);
-    return bookmarks ? (JSON.parse(bookmarks) as BookmarkedJob[]) : [];
+    const parsed = bookmarks
+      ? (JSON.parse(bookmarks) as BookmarkedJob[])
+      : [];
+    return parsed.map(normalizeBookmark);
   } catch (error) {
     console.error('Error loading bookmarked jobs:', error);
     return [];
@@ -41,87 +76,112 @@ export const getBookmarkedJobs = (): BookmarkedJob[] => {
 };
 
 export const addBookmark = async (
-  job: Omit<BookmarkedJob, 'bookmarkedAt'>,
+  bookmark: Omit<BookmarkedJob, 'bookmarkedAt'>,
   supabase?: SupabaseClient<Database>,
   userId?: string,
   bookmarksCountBaseline?: number,
 ): Promise<void> => {
   try {
-    // Sync with database if authenticated
+    const entityType = bookmark.entityType;
+
     if (supabase && userId) {
-      const { error } = await addJobBookmarkDb(supabase, job.id, userId);
+      const { error } = await addBookmarkDb(
+        supabase,
+        entityType,
+        bookmark.id,
+        userId,
+      );
       if (error) {
         console.warn('Failed to sync bookmark with database:', error);
-        // Continue with localStorage as fallback
       }
     }
 
-    // Always update localStorage for offline/unauthenticated users
     const bookmarks = getBookmarkedJobs();
     const newBookmark: BookmarkedJob = {
-      ...job,
-      bookmarkedAt: new Date().toISOString()
+      ...normalizeBookmark(bookmark as BookmarkedJob),
+      bookmarkedAt: new Date().toISOString(),
     };
-    
-    // Remove existing bookmark if it exists
-    const filteredBookmarks = bookmarks.filter(bookmark => bookmark.id !== job.id);
-    
-    // Add new bookmark at the beginning
+
+    const key = bookmarkKey(entityType, bookmark.id);
+    const filteredBookmarks = bookmarks.filter(
+      (item) => bookmarkKey(item.entityType, item.id) !== key,
+    );
+
     const updatedBookmarks = [newBookmark, ...filteredBookmarks];
-    
+
     if (canUseLocalStorage()) {
       localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));
     }
 
-    if (bookmarksCountBaseline !== undefined) {
-      incrementBookmarkCountOverride(job.id, bookmarksCountBaseline);
+    if (bookmarksCountBaseline !== undefined && entityType === 'job') {
+      incrementBookmarkCountOverride(bookmark.id, bookmarksCountBaseline);
     }
 
-    console.log('✅ Job bookmarked:', job.id);
+    console.log('✅ Bookmark saved:', entityType, bookmark.id);
   } catch (error) {
     console.error('Error adding bookmark:', error);
   }
 };
 
 export const removeBookmark = async (
-  jobId: string,
+  entityId: string,
+  entityType: BookmarkEntityType,
   supabase?: SupabaseClient<Database>,
   userId?: string,
   bookmarksCountBaseline?: number,
 ): Promise<void> => {
   try {
-    // Sync with database if authenticated
     if (supabase && userId) {
-      const { error } = await removeJobBookmarkDb(supabase, jobId, userId);
+      const { error } = await removeBookmarkDb(
+        supabase,
+        entityType,
+        entityId,
+        userId,
+      );
       if (error) {
         console.warn('Failed to sync bookmark removal with database:', error);
-        // Continue with localStorage as fallback
       }
     }
 
-    // Always update localStorage for offline/unauthenticated users
     const bookmarks = getBookmarkedJobs();
-    const updatedBookmarks = bookmarks.filter(bookmark => bookmark.id !== jobId);
+    const key = bookmarkKey(entityType, entityId);
+    const updatedBookmarks = bookmarks.filter(
+      (item) => bookmarkKey(item.entityType, item.id) !== key,
+    );
+
     if (canUseLocalStorage()) {
       localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updatedBookmarks));
     }
 
-    decrementBookmarkCountOverride(jobId, bookmarksCountBaseline);
+    if (bookmarksCountBaseline !== undefined && entityType === 'job') {
+      decrementBookmarkCountOverride(entityId, bookmarksCountBaseline);
+    }
 
-    console.log('✅ Bookmark removed:', jobId);
+    console.log('✅ Bookmark removed:', entityType, entityId);
   } catch (error) {
     console.error('Error removing bookmark:', error);
   }
 };
 
-export const isJobBookmarked = (jobId: string): boolean => {
+export const isBookmarked = (
+  entityId: string,
+  entityType: BookmarkEntityType,
+): boolean => {
   try {
     const bookmarks = getBookmarkedJobs();
-    return bookmarks.some(bookmark => bookmark.id === jobId);
+    const key = bookmarkKey(entityType, entityId);
+    return bookmarks.some(
+      (item) => bookmarkKey(item.entityType, item.id) === key,
+    );
   } catch (error) {
     console.error('Error checking bookmark status:', error);
     return false;
   }
+};
+
+/** @deprecated Use isBookmarked(entityId, entityType) */
+export const isJobBookmarked = (jobId: string): boolean => {
+  return isBookmarked(jobId, 'job');
 };
 
 export const clearAllBookmarks = (): void => {

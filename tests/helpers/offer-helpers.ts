@@ -360,7 +360,7 @@ export async function createTestContestTender(
   const adminClient = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (adminClient as any)
-    .from('tenders')
+    .from('contests')
     .update({
       formal_requirements: {
         insuranceOc: false,
@@ -428,16 +428,16 @@ export async function cleanupTestData(
     }
   }
 
-  // Delete tenders BEFORE companies (to avoid foreign key violations)
+  // Delete contests BEFORE companies (to avoid foreign key violations)
   if (tenderIds.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: tendersError } = await (adminClient as any)
-      .from('tenders')
+    const { error: contestsError } = await (adminClient as any)
+      .from('contests')
       .delete()
       .in('id', tenderIds);
     
-    if (tendersError) {
-      console.error('Error cleaning up tenders:', tendersError);
+    if (contestsError) {
+      console.error('Error cleaning up contests:', contestsError);
     }
   }
 

@@ -506,7 +506,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
         application.jobId,
         user.id,
         managerId,
-        application.postType === 'tender'
+        application.postType === 'contest'
       );
 
       if (result.error) {
@@ -541,7 +541,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
     }
   };
 
-  const handleWithdrawApplication = async (applicationId: string, postType: 'job' | 'tender') => {
+  const handleWithdrawApplication = async (applicationId: string, postType: 'job' | 'contest') => {
     if (!user?.id || !companyId) {
       toast.error('Musisz być zalogowany aby anulować ofertę');
       return;
@@ -692,7 +692,7 @@ export default function ContractorPage({ onBack: _onBack, onBrowseJobs }: Contra
       attachments: [],
       certificates: [],
       reviewNotes: bid.managerFeedbackMessage || undefined,
-      postType: 'tender' as const,
+      postType: 'contest' as const,
     };
   });
 

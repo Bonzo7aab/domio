@@ -7,6 +7,7 @@
 
 import { shouldUseMockData } from '../config/data-source';
 import { createClient } from '../supabase/client';
+import { getContestsSchemaReady } from '../database/schema-compat';
 import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import type { Job } from '../../types/job';
@@ -68,6 +69,7 @@ async function fetchData<T, TArgs extends unknown[] = unknown[]>(
   
   // Use database
   const supabase = createClient();
+  await getContestsSchemaReady(supabase);
   return await dbFetch(supabase, ...args);
 }
 
@@ -86,6 +88,7 @@ async function fetchDataFromDB<T>(
   ...args: any[]
 ): Promise<T> {
   const supabase = createClient();
+  await getContestsSchemaReady(supabase);
   return await dbFetch(supabase, ...args);
 }
 
@@ -102,7 +105,7 @@ function mockFetchJobsAndTenders(filters: DBJobFilters = {}): { data: Job[]; err
   
   // Public browse: contests only (no legacy jobs)
   let filtered = mockItems.filter(
-    (item: Job) => item.postType === 'tender' && Boolean(item.contestInfo),
+    (item: Job) => item.postType === 'contest' && Boolean(item.contestInfo),
   );
 
   if (filters.searchQuery) {
@@ -137,7 +140,7 @@ function mockFetchJobsAndTenders(filters: DBJobFilters = {}): { data: Job[]; err
 }
 
 /**
- * Fetch jobs and tenders (unified adapter)
+ * Fetch jobs and contests (unified adapter)
  * @param filters - Optional filters for jobs/tenders
  * @returns Combined jobs and tenders data
  */
@@ -179,7 +182,7 @@ export async function getJobById(jobId: string) {
 function mockFetchTenderById(tenderId: string): { data: TenderWithCompany | null; error: PostgrestError | null } {
   // Check mockJobDetailsMap first (has detailed format)
   const mockTenderFromMap = mockJobDetailsMap[tenderId];
-  if (mockTenderFromMap && mockTenderFromMap.postType === 'tender') {
+  if (mockTenderFromMap && mockTenderFromMap.postType === 'contest') {
     return { data: mockTenderFromMap as unknown as TenderWithCompany, error: null };
   }
   

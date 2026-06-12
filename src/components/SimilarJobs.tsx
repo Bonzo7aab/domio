@@ -11,7 +11,7 @@ import type { Budget, BudgetType } from '../types/budget';
 interface SimilarJobsProps {
   currentJobId: string;
   currentJobCategory: string;
-  currentJobType: 'job' | 'tender';
+  currentJobType: 'job' | 'contest';
   onJobSelect: (jobId: string) => void;
 }
 
@@ -22,7 +22,7 @@ interface SimilarJob {
   location: string;
   budget: Budget | string; // Budget object or string for backward compatibility
   postedTime: string;
-  postType: 'job' | 'tender';
+  postType: 'job' | 'contest';
   category: string;
   type?: string;
 }
@@ -51,7 +51,7 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
         currency: 'PLN',
       },
       postedTime: job.postedTime,
-      postType: job.postType || 'job' as 'job' | 'tender',
+      postType: job.postType || 'job' as 'job' | 'contest',
       category: job.category,
       type: 'type' in job && typeof job.type === 'string' ? job.type : undefined,
     }));
@@ -77,7 +77,7 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Building className="w-5 h-5" />
-          Podobne {currentJobType === 'tender' ? 'przetargi' : 'zgłoszenia'}
+          Podobne {currentJobType === 'contest' ? 'konkursy' : 'zgłoszenia'}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -92,7 +92,7 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
                 <h4 className="font-medium text-sm line-clamp-2 flex-1 mr-2">
                   {job.title}
                 </h4>
-                {job.postType === 'tender' && (
+                {job.postType === 'contest' && (
                   <Badge variant="secondary" className="text-xs">
                     {job.type === 'Konkurs' ? 'Konkurs' : 'Przetarg'}
                   </Badge>
@@ -127,7 +127,7 @@ const SimilarJobs: React.FC<SimilarJobsProps> = ({
         ))}
         
         <Button variant="outline" className="w-full text-xs" size="sm">
-          Zobacz więcej podobnych {currentJobType === 'tender' ? 'przetargów' : 'zgłoszeń'}
+          Zobacz więcej podobnych {currentJobType === 'contest' ? 'konkursów' : 'zgłoszeń'}
         </Button>
       </CardContent>
     </Card>

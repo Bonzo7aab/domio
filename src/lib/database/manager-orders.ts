@@ -78,8 +78,8 @@ export async function fetchManagerOrders(
 
     return {
       id: row.id,
-      tenderId: row.tender_id,
-      tenderBidId: row.tender_bid_id,
+      tenderId: row.contest_id,
+      tenderBidId: row.contest_offer_id,
       title: row.title,
       locationLabel: row.location_label?.trim() || '—',
       contractorCompanyId: row.contractor_company_id,

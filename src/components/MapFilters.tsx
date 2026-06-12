@@ -99,7 +99,7 @@ export const MapFilters: React.FC<MapFiltersProps> = ({
 
   const handleClearFilters = () => {
     onFilterChange({
-      postTypes: ['tender'],
+      postTypes: ['contest'],
       categories: [],
       locations: [],
       salaryRange: [0, 200],

@@ -392,9 +392,9 @@ export async function fetchTenderBidOfferState(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: rows } = await (supabase as any)
-    .from('tender_bids')
+    .from('contest_offers')
     .select('id, status, offer_details, bid_amount, experience_summary, attachments, proposed_start_date, proposed_timeline')
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .eq('company_id', access.companyId)
     .neq('status', 'cancelled');
 
@@ -458,7 +458,7 @@ export async function upsertTenderBidDraft(
       const { bid } = await fetchTenderBidOfferState(supabase, tenderId, contractorId);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
-        .from('tender_bids')
+        .from('contest_offers')
         .update(row)
         .eq('id', bid?.id)
         .select()
@@ -471,9 +471,9 @@ export async function upsertTenderBidDraft(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .insert({
-        tender_id: tenderId,
+        contest_id: tenderId,
         contractor_id: contractorId,
         company_id: access.companyId,
         ...row,
@@ -513,8 +513,8 @@ export async function deleteTenderBidDraft(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query = (supabase as any)
-      .from('tender_bids')
-      .select('id, status, tender_id')
+      .from('contest_offers')
+      .select('id, status, contest_id')
       .eq('contractor_id', contractorId)
       .eq('company_id', access.companyId)
       .eq('status', 'draft');
@@ -522,7 +522,7 @@ export async function deleteTenderBidDraft(
     if (options.bidId) {
       query = query.eq('id', options.bidId);
     } else if (options.tenderId) {
-      query = query.eq('tender_id', options.tenderId);
+      query = query.eq('contest_id', options.tenderId);
     }
 
     const { data: draft, error: fetchError } = await query.maybeSingle();
@@ -540,7 +540,7 @@ export async function deleteTenderBidDraft(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: deleteError } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .delete()
       .eq('id', draft.id)
       .eq('contractor_id', contractorId)
@@ -614,7 +614,7 @@ export async function submitTenderBid(
     if (state === 'draft' && bid?.id) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
-        .from('tender_bids')
+        .from('contest_offers')
         .update(row)
         .eq('id', bid.id)
         .select()
@@ -625,9 +625,9 @@ export async function submitTenderBid(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .insert({
-        tender_id: tenderId,
+        contest_id: tenderId,
         contractor_id: contractorId,
         company_id: access.companyId,
         ...row,

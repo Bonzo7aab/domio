@@ -34,7 +34,7 @@ export function bookmarkToListingJob(bookmark: BookmarkedJob): Job {
 
   return {
     id: bookmark.id,
-    postType: 'tender',
+    postType: 'contest',
     title: bookmark.title,
     company: bookmark.company,
     location,
@@ -65,7 +65,7 @@ export function bookmarkToListingJob(bookmark: BookmarkedJob): Job {
 }
 
 export function isContestBookmark(bookmark: BookmarkedJob): boolean {
-  return bookmark.postType === 'tender';
+  return bookmark.entityType === 'contest';
 }
 
 export function formatKonkursCountLabel(count: number): string {

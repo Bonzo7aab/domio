@@ -37,7 +37,7 @@ import { getTenderById } from '../../lib/data';
 import {
   isContestTender,
   mapTenderRowToContestDisplay,
-} from '../../lib/tender-contest/map-tender-contest-display';
+} from '../../lib/contest/map-tender-contest-display';
 import { ContestOfferSubmissionDialog } from '../contest-offer/ContestOfferSubmissionDialog';
 import { useUserProfile } from '../../contexts/AuthContext';
 import type { ContestInfo } from '../../types/job';

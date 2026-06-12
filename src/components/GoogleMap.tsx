@@ -36,7 +36,7 @@ interface MarkerConfig {
   onClick?: () => void;
   isSelected?: boolean;
   isHovered?: boolean;
-  postType?: 'job' | 'tender';
+  postType?: 'job' | 'contest';
   urgency?: 'low' | 'medium' | 'high';
   jobData?: Job;
 }
@@ -843,7 +843,7 @@ export interface MapMarker {
   isSelected?: boolean;
   isHovered?: boolean;
   isUrgent?: boolean; // Legacy support
-  postType?: 'job' | 'tender';
+  postType?: 'job' | 'contest';
   urgency?: 'low' | 'medium' | 'high';
   jobData?: Job;
 }

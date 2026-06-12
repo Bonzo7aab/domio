@@ -19,12 +19,12 @@ async function fetchOrderForMutation(
   status: string;
   manager_company_id: string;
   contractor_company_id: string;
-  tender_id: string;
+  contest_id: string;
 } | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('orders')
-    .select('id, status, manager_company_id, contractor_company_id, tender_id')
+    .select('id, status, manager_company_id, contractor_company_id, contest_id')
     .eq('id', orderId)
     .maybeSingle();
 
@@ -151,7 +151,7 @@ export async function isOrderMessagingBlocked(
   const { data } = await (supabase as any)
     .from('orders')
     .select('status')
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .maybeSingle();
 
   if (!data) return false;

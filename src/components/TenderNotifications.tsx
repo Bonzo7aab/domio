@@ -24,7 +24,7 @@ import { mockTenderNotifications } from '../mocks';
 
 interface TenderNotification {
   id: string;
-  type: 'new_tender' | 'deadline_reminder' | 'evaluation_started' | 'tender_awarded' | 'tender_cancelled';
+  type: 'new_contest' | 'deadline_reminder' | 'evaluation_started' | 'contest_awarded' | 'tender_cancelled';
   title: string;
   message: string;
   tenderTitle: string;
@@ -103,13 +103,13 @@ export const TenderNotifications: React.FC<TenderNotificationsProps> = ({
 
   const getNotificationIcon = (type: TenderNotification['type']) => {
     switch (type) {
-      case 'new_tender':
+      case 'new_contest':
         return <Gavel className="h-5 w-5 text-blue-600" />;
       case 'deadline_reminder':
         return <Clock className="h-5 w-5 text-orange-600" />;
       case 'evaluation_started':
         return <Eye className="h-5 w-5 text-purple-600" />;
-      case 'tender_awarded':
+      case 'contest_awarded':
         return <Trophy className="h-5 w-5 text-green-600" />;
       case 'tender_cancelled':
         return <X className="h-5 w-5 text-red-600" />;
@@ -124,7 +124,7 @@ export const TenderNotifications: React.FC<TenderNotificationsProps> = ({
       if (daysLeft <= 1) return 'high';
       if (daysLeft <= 3) return 'medium';
     }
-    if (notification.type === 'new_tender') return 'medium';
+    if (notification.type === 'new_contest') return 'medium';
     return 'low';
   };
 
@@ -259,7 +259,7 @@ export const TenderNotifications: React.FC<TenderNotificationsProps> = ({
                           </div>
                         )}
 
-                        {notification.type === 'new_tender' && (
+                        {notification.type === 'new_contest' && (
                           <div className="mt-2 p-2 bg-blue-100 border border-blue-200 rounded text-xs">
                             <div className="flex items-center gap-1 text-blue-700">
                               <Play className="h-3 w-3" />
@@ -271,7 +271,7 @@ export const TenderNotifications: React.FC<TenderNotificationsProps> = ({
                           </div>
                         )}
 
-                        {notification.type === 'tender_awarded' && (
+                        {notification.type === 'contest_awarded' && (
                           <div className="mt-2 p-2 bg-green-100 border border-green-200 rounded text-xs">
                             <div className="flex items-center gap-1 text-green-700">
                               <CheckCircle className="h-3 w-3" />

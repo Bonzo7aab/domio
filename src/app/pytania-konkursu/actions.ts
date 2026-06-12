@@ -29,17 +29,17 @@ export async function notifyContestQuestionAskerAction(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: question, error: questionError } = await (admin as any)
     .from('questions')
-    .select('asker_id, tender_id')
+    .select('asker_id, contest_id')
     .eq('id', questionId.trim())
     .maybeSingle();
 
-  if (questionError || !question?.tender_id || !question.asker_id) {
+  if (questionError || !question?.contest_id || !question.asker_id) {
     return { success: false };
   }
 
   const { data: canManage, error: accessError } = await supabase.rpc(
-    'user_can_manage_contest_tender',
-    { p_tender_id: question.tender_id },
+    'user_can_manage_contest',
+    { p_contest_id: question.contest_id },
   );
 
   if (accessError || !canManage) {
@@ -52,9 +52,9 @@ export async function notifyContestQuestionAskerAction(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: tender } = await (admin as any)
-    .from('tenders')
+    .from('contests')
     .select('title')
-    .eq('id', question.tender_id)
+    .eq('id', question.contest_id)
     .maybeSingle();
 
   const tenderTitle = (tender?.title as string | undefined) ?? 'konkurs';
@@ -70,7 +70,7 @@ export async function notifyContestQuestionAskerAction(
   }
 
   const isFirstAnswer = (count ?? 0) === 1;
-  const actionUrl = `/konkurs/${question.tender_id}?tab=contest-qa`;
+  const actionUrl = `/konkurs/${question.contest_id}?tab=contest-qa`;
 
   await createNotificationWithPush({
     supabase: admin,
@@ -83,7 +83,7 @@ export async function notifyContestQuestionAskerAction(
       ? `Zarządca odpowiedział na Twoje pytanie w konkursie: ${tenderTitle}`
       : `Zarządca dodał komentarz do Twojego pytania w konkursie: ${tenderTitle}`,
     data: {
-      tenderId: question.tender_id,
+      tenderId: question.contest_id,
       questionId: questionId.trim(),
       tab: 'contest-qa',
       title: tenderTitle,

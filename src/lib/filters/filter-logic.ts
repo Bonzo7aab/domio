@@ -68,7 +68,7 @@ export function getJobDeadline(job: Job): Date | null {
   }
   if (
     'postType' in job &&
-    job.postType === 'tender' &&
+    job.postType === 'contest' &&
     'tenderInfo' in job &&
     job.tenderInfo?.submissionDeadline
   ) {

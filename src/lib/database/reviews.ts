@@ -107,9 +107,9 @@ export async function fetchReviewByReviewerAndTender(
 ): Promise<CompanyReviewRecord | null> {
   const { data, error } = await supabase
     .from('company_reviews')
-    .select('id, rating, title, comment, image_urls, created_at, company_id, job_id, tender_id')
+    .select('id, rating, title, comment, image_urls, created_at, company_id, job_id, contest_id')
     .eq('reviewer_id', reviewerId)
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .maybeSingle();
 
   if (error || !data) {
@@ -125,7 +125,7 @@ export async function fetchReviewByReviewerAndTender(
     createdAt: data.created_at,
     companyId: data.company_id,
     jobId: data.job_id,
-    tenderId: data.tender_id,
+    tenderId: data.contest_id,
   };
 }
 
@@ -152,11 +152,11 @@ export async function createCompanyReview(
     .eq('reviewer_id', reviewerId);
 
   if (reviewData.tenderId) {
-    existingQuery = existingQuery.eq('tender_id', reviewData.tenderId);
+    existingQuery = existingQuery.eq('contest_id', reviewData.tenderId);
   } else if (reviewData.jobId) {
     existingQuery = existingQuery.eq('job_id', reviewData.jobId);
   } else {
-    existingQuery = existingQuery.is('job_id', null).is('tender_id', null);
+    existingQuery = existingQuery.is('job_id', null).is('contest_id', null);
   }
 
   const { data: existingReview } = await existingQuery.maybeSingle();
@@ -181,7 +181,7 @@ export async function createCompanyReview(
     comment: reviewData.comment.trim(),
     categories: reviewData.categories ?? null,
     job_id: reviewData.jobId ?? null,
-    tender_id: reviewData.tenderId ?? null,
+    contest_id: reviewData.tenderId ?? null,
     is_public: true,
     is_verified: false,
   };
@@ -256,16 +256,16 @@ export async function fetchReviewedTenderIdsForReviewer(
 
   const { data, error } = await supabase
     .from('company_reviews')
-    .select('tender_id')
+    .select('contest_id')
     .eq('reviewer_id', reviewerId)
-    .in('tender_id', tenderIds);
+    .in('contest_id', tenderIds);
 
   if (error || !data) {
     return new Set();
   }
 
   return new Set(
-    data.map((row) => row.tender_id).filter((id): id is string => typeof id === 'string'),
+    data.map((row) => row.contest_id).filter((id): id is string => typeof id === 'string'),
   );
 }
 
@@ -313,7 +313,7 @@ export async function fetchReviewsWrittenByUser(
       image_urls,
       created_at,
       job_id,
-      tender_id,
+      contest_id,
       company_id,
       companies!company_reviews_company_id_fkey ( name )
     `,
@@ -337,7 +337,7 @@ export async function fetchReviewsWrittenByUser(
       counterpartyName: company?.name || 'Firma',
       counterpartyCompanyId: row.company_id,
       jobId: row.job_id,
-      tenderId: row.tender_id,
+      tenderId: row.contest_id,
     };
   });
 }

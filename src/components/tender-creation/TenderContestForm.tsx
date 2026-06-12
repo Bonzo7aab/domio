@@ -40,7 +40,7 @@ import {
   hasTenderContestFormFieldErrors,
   scrollToFirstTenderContestError,
   type TenderContestFormFieldErrors,
-} from '../../lib/tender-contest/contest-form-validation';
+} from '../../lib/contest/contest-form-validation';
 import {
   ContestOfferFieldError,
   fieldErrorInputClass,

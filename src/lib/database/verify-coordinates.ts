@@ -44,7 +44,7 @@ export async function verifyDatabaseCoordinates(
     // Check tenders
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: allTenders, error: allTendersError } = await (supabase as any)
-      .from('tenders')
+      .from('contests')
       .select('id, title, location, latitude, longitude');
 
     if (allTendersError) {

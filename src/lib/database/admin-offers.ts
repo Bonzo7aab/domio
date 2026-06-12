@@ -164,11 +164,11 @@ export async function fetchAdminTenderBids(supabase: SupabaseClient<Database>): 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
   const { data, error } = await sb
-    .from('tender_bids')
+    .from('contest_offers')
     .select(
       `
       id,
-      tender_id,
+      contest_id,
       contractor_id,
       company_id,
       status,
@@ -191,7 +191,7 @@ export async function fetchAdminTenderBids(supabase: SupabaseClient<Database>): 
       admin_moderated_at,
       submitted_at,
       evaluated_at,
-      tenders ( title ),
+      contests ( title ),
       companies ( id, name )
     `
     )
@@ -207,8 +207,8 @@ export async function fetchAdminTenderBids(supabase: SupabaseClient<Database>): 
     const company = r.companies as { id?: string; name?: string } | null;
     return {
       id: r.id as string,
-      tenderId: r.tender_id as string,
-      tenderTitle: (r.tenders as { title?: string } | null)?.title ?? null,
+      tenderId: r.contest_id as string,
+      tenderTitle: (r.contests as { title?: string } | null)?.title ?? null,
       contractorId: r.contractor_id as string,
       companyId: company?.id ?? ((r.company_id as string) ?? null),
       companyName: company?.name ?? null,

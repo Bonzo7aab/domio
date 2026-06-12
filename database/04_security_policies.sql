@@ -6,13 +6,11 @@
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_companies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tenders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tender_bids ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contest_offers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_ratings ENABLE ROW LEVEL SECURITY;
@@ -21,22 +19,10 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_read_status ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
-ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_feedback ENABLE ROW LEVEL SECURITY;
-ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE support_ticket_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_uploads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE image_galleries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE document_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE shared_files ENABLE ROW LEVEL SECURITY;
-ALTER TABLE storage_quotas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE company_storage_quotas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portfolio_projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portfolio_project_images ENABLE ROW LEVEL SECURITY;
-ALTER TABLE certificate_categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE certificate_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE file_processing_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE buildings ENABLE ROW LEVEL SECURITY;
 
 -- =============================================
@@ -109,26 +95,6 @@ CREATE POLICY "Users can update their own company relationships" ON user_compani
     FOR UPDATE USING (user_id = auth.uid());
 
 -- =============================================
--- SUBSCRIPTION POLICIES
--- =============================================
-
--- Subscription plans are publicly readable
-CREATE POLICY "Subscription plans are publicly readable" ON subscription_plans
-    FOR SELECT USING (true);
-
--- Users can view their own subscriptions
-CREATE POLICY "Users can view their own subscriptions" ON user_subscriptions
-    FOR SELECT USING (user_id = auth.uid());
-
--- Users can insert their own subscriptions
-CREATE POLICY "Users can insert their own subscriptions" ON user_subscriptions
-    FOR INSERT WITH CHECK (user_id = auth.uid());
-
--- Users can update their own subscriptions
-CREATE POLICY "Users can update their own subscriptions" ON user_subscriptions
-    FOR UPDATE USING (user_id = auth.uid());
-
--- =============================================
 -- JOB CATEGORIES POLICIES
 -- =============================================
 
@@ -161,27 +127,27 @@ CREATE POLICY "Users can delete their own jobs" ON jobs
     FOR DELETE USING (manager_id = auth.uid());
 
 -- =============================================
--- TENDERS POLICIES
+-- CONTESTS POLICIES
 -- =============================================
 
--- Public tenders can be viewed by authenticated users
-CREATE POLICY "Authenticated users can view public tenders" ON tenders
+-- Public contests can be viewed by authenticated users
+CREATE POLICY "Authenticated users can view public contests" ON contests
     FOR SELECT USING (auth.role() = 'authenticated' AND is_public = true);
 
--- Users can view tenders they created
-CREATE POLICY "Users can view their own tenders" ON tenders
+-- Users can view contests they created
+CREATE POLICY "Users can view their own contests" ON contests
     FOR SELECT USING (manager_id = auth.uid());
 
--- Users can insert tenders
-CREATE POLICY "Users can insert tenders" ON tenders
+-- Users can insert contests
+CREATE POLICY "Users can insert contests" ON contests
     FOR INSERT WITH CHECK (manager_id = auth.uid());
 
--- Users can update their own tenders
-CREATE POLICY "Users can update their own tenders" ON tenders
+-- Users can update their own contests
+CREATE POLICY "Users can update their own contests" ON contests
     FOR UPDATE USING (manager_id = auth.uid());
 
--- Users can delete their own tenders
-CREATE POLICY "Users can delete their own tenders" ON tenders
+-- Users can delete their own contests
+CREATE POLICY "Users can delete their own contests" ON contests
     FOR DELETE USING (manager_id = auth.uid());
 
 -- =============================================
@@ -217,34 +183,34 @@ CREATE POLICY "Job owners can update application status" ON job_applications
     );
 
 -- =============================================
--- TENDER BIDS POLICIES
+-- CONTEST OFFERS POLICIES
 -- =============================================
 
--- Users can view bids they submitted
-CREATE POLICY "Users can view their own bids" ON tender_bids
+-- Users can view offers they submitted
+CREATE POLICY "Users can view their own bids" ON contest_offers
     FOR SELECT USING (contractor_id = auth.uid());
 
--- Users can view bids for their tenders
-CREATE POLICY "Tender owners can view bids" ON tender_bids
+-- Contest owners can view offers on their contests
+CREATE POLICY "Contest owners can view offers" ON contest_offers
     FOR SELECT USING (
         EXISTS (
-            SELECT 1 FROM tenders 
-            WHERE tenders.id = tender_bids.tender_id 
-            AND tenders.manager_id = auth.uid()
+            SELECT 1 FROM contests
+            WHERE contests.id = contest_offers.contest_id
+            AND contests.manager_id = auth.uid()
         )
     );
 
--- Users can insert bids
-CREATE POLICY "Users can submit bids" ON tender_bids
+-- Users can submit contest offers
+CREATE POLICY "Users can submit contest offers" ON contest_offers
     FOR INSERT WITH CHECK (contractor_id = auth.uid());
 
--- Tender owners can update bid status
-CREATE POLICY "Tender owners can update bid status" ON tender_bids
+-- Contest owners can update offer status
+CREATE POLICY "Contest owners can update offer status" ON contest_offers
     FOR UPDATE USING (
         EXISTS (
-            SELECT 1 FROM tenders 
-            WHERE tenders.id = tender_bids.tender_id 
-            AND tenders.manager_id = auth.uid()
+            SELECT 1 FROM contests
+            WHERE contests.id = contest_offers.contest_id
+            AND contests.manager_id = auth.uid()
         )
     );
 
@@ -431,22 +397,6 @@ CREATE POLICY "Users can insert their notification preferences" ON notification_
     FOR INSERT WITH CHECK (user_id = auth.uid());
 
 -- =============================================
--- ACTIVITY LOGS POLICIES
--- =============================================
-
--- Users can view their own activity logs
-CREATE POLICY "Users can view their own activity logs" ON activity_logs
-    FOR SELECT USING (user_id = auth.uid());
-
--- System can insert activity logs for any user
-CREATE POLICY "System can insert activity logs" ON activity_logs
-    FOR INSERT WITH CHECK (
-        auth.role() = 'service_role' OR
-        is_admin() OR
-        user_id = auth.uid()
-    );
-
--- =============================================
 -- QUESTIONS POLICIES
 -- =============================================
 
@@ -456,11 +406,11 @@ CREATE POLICY "System can insert activity logs" ON activity_logs
 CREATE POLICY "Users can view their own questions" ON questions
     FOR SELECT USING (asker_id = auth.uid());
 
-CREATE POLICY "Managers can view questions on their tenders" ON questions
+CREATE POLICY "Managers can view questions on their contests" ON questions
     FOR SELECT USING (
-        tender_id IS NOT NULL AND EXISTS (
-            SELECT 1 FROM tenders t
-            WHERE t.id = questions.tender_id AND t.manager_id = auth.uid()
+        contest_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM contests c
+            WHERE c.id = questions.contest_id AND c.manager_id = auth.uid()
         )
     );
 
@@ -480,73 +430,16 @@ CREATE POLICY "Users can insert questions" ON questions
 CREATE POLICY "Users can update their own questions" ON questions
     FOR UPDATE USING (asker_id = auth.uid());
 
--- Job/tender owners can answer questions
-CREATE POLICY "Job/tender owners can answer questions" ON questions
+-- Job/contest owners can answer questions
+CREATE POLICY "Job/contest owners can answer questions" ON questions
     FOR UPDATE USING (
         answered_by = auth.uid() OR
         (job_id IS NOT NULL AND EXISTS (
             SELECT 1 FROM jobs WHERE jobs.id = questions.job_id AND jobs.manager_id = auth.uid()
         )) OR
-        (tender_id IS NOT NULL AND EXISTS (
-            SELECT 1 FROM tenders WHERE tenders.id = questions.tender_id AND tenders.manager_id = auth.uid()
+        (contest_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM contests WHERE contests.id = questions.contest_id AND contests.manager_id = auth.uid()
         ))
-    );
-
--- =============================================
--- USER FEEDBACK POLICIES
--- =============================================
-
--- Users can view their own feedback
-CREATE POLICY "Users can view their own feedback" ON user_feedback
-    FOR SELECT USING (user_id = auth.uid());
-
--- Users can insert feedback
-CREATE POLICY "Users can insert feedback" ON user_feedback
-    FOR INSERT WITH CHECK (user_id = auth.uid());
-
--- Users can update their own feedback
-CREATE POLICY "Users can update their own feedback" ON user_feedback
-    FOR UPDATE USING (user_id = auth.uid());
-
--- =============================================
--- SUPPORT TICKETS POLICIES
--- =============================================
-
--- Users can view their own support tickets
-CREATE POLICY "Users can view their own support tickets" ON support_tickets
-    FOR SELECT USING (user_id = auth.uid());
-
--- Users can insert support tickets
-CREATE POLICY "Users can insert support tickets" ON support_tickets
-    FOR INSERT WITH CHECK (user_id = auth.uid());
-
--- Users can update their own support tickets
-CREATE POLICY "Users can update their own support tickets" ON support_tickets
-    FOR UPDATE USING (user_id = auth.uid());
-
--- =============================================
--- SUPPORT TICKET MESSAGES POLICIES
--- =============================================
-
--- Users can view messages in their support tickets
-CREATE POLICY "Users can view support ticket messages" ON support_ticket_messages
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM support_tickets 
-            WHERE id = support_ticket_messages.ticket_id 
-            AND user_id = auth.uid()
-        )
-    );
-
--- Users can insert messages in their support tickets
-CREATE POLICY "Users can insert support ticket messages" ON support_ticket_messages
-    FOR INSERT WITH CHECK (
-        sender_id = auth.uid() AND
-        EXISTS (
-            SELECT 1 FROM support_tickets 
-            WHERE id = support_ticket_messages.ticket_id 
-            AND user_id = auth.uid()
-        )
     );
 
 -- =============================================
@@ -572,116 +465,6 @@ CREATE POLICY "Users can update their own files" ON file_uploads
 -- Users can delete their own files
 CREATE POLICY "Users can delete their own files" ON file_uploads
     FOR DELETE USING (user_id = auth.uid());
-
--- =============================================
--- IMAGE GALLERIES POLICIES
--- =============================================
-
--- Users can view image galleries for entities they have access to
-CREATE POLICY "Users can view image galleries" ON image_galleries
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM file_uploads 
-            WHERE id = image_galleries.file_id 
-            AND (user_id = auth.uid() OR is_public = true)
-        )
-    );
-
--- Users can insert image galleries for their files
-CREATE POLICY "Users can insert image galleries" ON image_galleries
-    FOR INSERT WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM file_uploads 
-            WHERE id = image_galleries.file_id 
-            AND user_id = auth.uid()
-        )
-    );
-
--- Users can update image galleries for their files
-CREATE POLICY "Users can update image galleries" ON image_galleries
-    FOR UPDATE USING (
-        EXISTS (
-            SELECT 1 FROM file_uploads 
-            WHERE id = image_galleries.file_id 
-            AND user_id = auth.uid()
-        )
-    );
-
--- Users can delete image galleries for their files
-CREATE POLICY "Users can delete image galleries" ON image_galleries
-    FOR DELETE USING (
-        EXISTS (
-            SELECT 1 FROM file_uploads 
-            WHERE id = image_galleries.file_id 
-            AND user_id = auth.uid()
-        )
-    );
-
--- =============================================
--- DOCUMENT TEMPLATES POLICIES
--- =============================================
-
--- Document templates are publicly readable
-CREATE POLICY "Document templates are publicly readable" ON document_templates
-    FOR SELECT USING (true);
-
--- =============================================
--- SHARED FILES POLICIES
--- =============================================
-
--- Users can view files shared with them
-CREATE POLICY "Users can view shared files" ON shared_files
-    FOR SELECT USING (
-        shared_with = auth.uid() OR 
-        shared_by = auth.uid() OR
-        shared_with IS NULL
-    );
-
--- Users can share files
-CREATE POLICY "Users can share files" ON shared_files
-    FOR INSERT WITH CHECK (shared_by = auth.uid());
-
--- Users can update files they shared
-CREATE POLICY "Users can update shared files" ON shared_files
-    FOR UPDATE USING (shared_by = auth.uid());
-
--- Users can delete files they shared
-CREATE POLICY "Users can delete shared files" ON shared_files
-    FOR DELETE USING (shared_by = auth.uid());
-
--- =============================================
--- STORAGE QUOTAS POLICIES
--- =============================================
-
--- Users can view their own storage quotas
-CREATE POLICY "Users can view their storage quotas" ON storage_quotas
-    FOR SELECT USING (user_id = auth.uid());
-
--- System can insert/update storage quotas
-CREATE POLICY "System can manage storage quotas" ON storage_quotas
-    FOR ALL
-    USING (auth.role() = 'service_role' OR is_admin())
-    WITH CHECK (auth.role() = 'service_role' OR is_admin());
-
--- =============================================
--- COMPANY STORAGE QUOTAS POLICIES
--- =============================================
-
--- Users can view storage quotas for their companies
-CREATE POLICY "Users can view company storage quotas" ON company_storage_quotas
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM user_companies 
-            WHERE company_id = company_storage_quotas.company_id 
-            AND user_id = auth.uid()
-        )
-    );
-
--- System can insert/update company storage quotas
-CREATE POLICY "System can manage company storage quotas" ON company_storage_quotas
-    FOR ALL
-    USING (auth.role() = 'service_role' OR is_admin())
-    WITH CHECK (auth.role() = 'service_role' OR is_admin());
 
 -- =============================================
 -- PORTFOLIO PROJECTS POLICIES
@@ -790,32 +573,6 @@ CREATE POLICY "Users can delete portfolio project images" ON portfolio_project_i
             AND user_companies.role IN ('owner', 'manager')
         )
     );
-
--- =============================================
--- CERTIFICATE CATEGORIES POLICIES
--- =============================================
-
--- Certificate categories are publicly readable
-CREATE POLICY "Certificate categories are publicly readable" ON certificate_categories
-    FOR SELECT USING (true);
-
--- =============================================
--- CERTIFICATE TEMPLATES POLICIES
--- =============================================
-
--- Certificate templates are publicly readable
-CREATE POLICY "Certificate templates are publicly readable" ON certificate_templates
-    FOR SELECT USING (true);
-
--- =============================================
--- FILE PROCESSING QUEUE POLICIES
--- =============================================
-
--- System can manage file processing queue
-CREATE POLICY "System can manage file processing queue" ON file_processing_queue
-    FOR ALL
-    USING (auth.role() = 'service_role' OR is_admin())
-    WITH CHECK (auth.role() = 'service_role' OR is_admin());
 
 -- =============================================
 -- HELPER FUNCTIONS FOR POLICIES

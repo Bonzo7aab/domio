@@ -321,7 +321,7 @@ export function ManagerSubmissionPodgladDialog({
               <h2 className="text-2xl font-bold pr-8">{tender.title}</h2>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <Badge variant="outline">
-                  {getSubmissionStatusLabel('tender', tender.status)}
+                  {getSubmissionStatusLabel('contest', tender.status)}
                 </Badge>
                 <span className="text-muted-foreground">{tender.category?.name || 'Inne'}</span>
               </div>
@@ -399,7 +399,7 @@ export function ManagerSubmissionPodgladDialog({
 
             {hasSelectedOffer && target ? (
               <TabsContent value="selected-offer" className="mt-0">
-                <SelectedOfferPanel submissionId={target.id} kind="tender" />
+                <SelectedOfferPanel submissionId={target.id} kind="contest" />
               </TabsContent>
             ) : null}
           </Tabs>

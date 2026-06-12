@@ -10,7 +10,7 @@ import {
   Star,
 } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
-import type { ContestDisplayInfo } from '../../lib/tender-contest/map-tender-contest-display';
+import type { ContestDisplayInfo } from '../../lib/contest/map-tender-contest-display';
 import type { TenderWithCompany } from '../../lib/database/jobs';
 import { selectionCriteriaTotalWeight } from '../../types/tender-contest';
 import { formatSubmissionDeadlineDisplay } from '../../lib/contest-submission-deadline';

@@ -76,8 +76,8 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
   );
 
   const handleRemoveBookmark = useCallback(
-    (jobId: string, jobTitle: string) => {
-      void removeBookmark(jobId);
+    (jobId: string, jobTitle: string, entityType: BookmarkedJob['entityType']) => {
+      void removeBookmark(jobId, entityType);
       loadBookmarks();
       toast.success(`Usunięto z zapisanych: ${jobTitle}`);
     },
@@ -88,7 +88,7 @@ export const BookmarkedJobsPage: React.FC<BookmarkedJobsPageProps> = ({
     (jobId: string) => {
       const bookmark = bookmarks.find((b) => b.id === jobId);
       if (bookmark) {
-        handleRemoveBookmark(jobId, bookmark.title);
+        handleRemoveBookmark(jobId, bookmark.title, bookmark.entityType);
       }
     },
     [bookmarks, handleRemoveBookmark],

@@ -4,7 +4,8 @@ import type { TenderContestDocumentMeta } from '../../types/tender-contest';
 import { STORAGE_BUCKETS } from './buckets';
 import { requireAuthenticatedUser } from './auth';
 import { getStoragePublicUrl } from './public-url';
-import { uploadObject } from './r2/operations';
+import { objectExists, uploadObject } from './r2/operations';
+import { isStorageObjectNotFound } from './path-utils';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -29,10 +30,44 @@ function inferDocumentType(fileName: string): TenderContestDocumentMeta['type'] 
   return 'other';
 }
 
-export async function uploadTenderDocument(
+/** Legacy uploads used `{userId}/tenders/` — new uploads use `{userId}/contests/`. */
+function contestDocumentPathCandidates(path: string): string[] {
+  const normalized = path.replace(/^\/+/, '');
+  if (normalized.includes('/contests/')) {
+    const legacy = normalized.replace('/contests/', '/tenders/');
+    return [normalized, legacy];
+  }
+  if (normalized.includes('/tenders/')) {
+    const modern = normalized.replace('/tenders/', '/contests/');
+    return [modern, normalized];
+  }
+  return [normalized];
+}
+
+/** Resolve a stored document path, trying modern `contests/` then legacy `tenders/` keys. */
+export async function resolveContestDocumentPath(
+  path: string,
+): Promise<string | null> {
+  for (const candidate of contestDocumentPathCandidates(path)) {
+    try {
+      const exists = await objectExists(STORAGE_BUCKETS.JOB_ATTACHMENTS, candidate);
+      if (exists) return candidate;
+    } catch (error) {
+      if (!isStorageObjectNotFound(error)) {
+        console.warn('[contest-documents] resolveContestDocumentPath failed', {
+          path: candidate,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+  return null;
+}
+
+export async function uploadContestDocument(
   file: File,
   userId: string,
-  tenderId?: string,
+  contestId?: string,
 ): Promise<{ data: TenderContestDocumentMeta | null; error: Error | null }> {
   try {
     await requireAuthenticatedUser(userId);
@@ -54,8 +89,8 @@ export async function uploadTenderDocument(
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const folder = tenderId || 'draft';
-    const filePath = `${userId}/tenders/${folder}/${fileName}`;
+    const folder = contestId || 'draft';
+    const filePath = `${userId}/contests/${folder}/${fileName}`;
 
     await uploadObject(STORAGE_BUCKETS.JOB_ATTACHMENTS, filePath, file);
 
@@ -77,16 +112,16 @@ export async function uploadTenderDocument(
   }
 }
 
-export async function uploadTenderDocuments(
+export async function uploadContestDocuments(
   files: File[],
   userId: string,
-  tenderId?: string,
+  contestId?: string,
 ): Promise<{ data: TenderContestDocumentMeta[]; errors: unknown[] }> {
   const results: TenderContestDocumentMeta[] = [];
   const errors: unknown[] = [];
 
   for (const file of files) {
-    const { data, error } = await uploadTenderDocument(file, userId, tenderId);
+    const { data, error } = await uploadContestDocument(file, userId, contestId);
     if (error || !data) {
       errors.push({ file: file.name, error });
     } else {
@@ -96,3 +131,9 @@ export async function uploadTenderDocuments(
 
   return { data: results, errors };
 }
+
+/** @deprecated Use uploadContestDocument */
+export const uploadTenderDocument = uploadContestDocument;
+
+/** @deprecated Use uploadContestDocuments */
+export const uploadTenderDocuments = uploadContestDocuments;

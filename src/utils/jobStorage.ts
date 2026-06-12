@@ -6,7 +6,7 @@ export interface Job {
   company: string;
   location: string;
   type: string;
-  postType: 'job' | 'tender';
+  postType: 'job' | 'contest';
   salary: string;
   description: string;
   searchKeywords: string[];

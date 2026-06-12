@@ -2,6 +2,8 @@
 -- VERIFY MANAGER MIGRATION
 -- =============================================
 -- Verification queries to ensure data integrity and completeness
+-- Note: queries using get_managers_for_browse() / manager_browse_view were removed with
+-- database/pending-prod/20260611140000_drop_unused_schema.sql — use direct companies queries instead.
 
 -- 1. Count managers by organization type
 SELECT 

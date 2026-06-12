@@ -7,6 +7,7 @@ import { Label } from './ui/label';
 import JobCard from './JobCard';
 import type { FilterState } from '../lib/filters/filter-state';
 import { getBookmarkedJobs, addBookmark, removeBookmark } from '../utils/bookmarkStorage';
+import { resolveBookmarkEntityType } from '../lib/bookmark/resolve-entity-type';
 import {
   BOOKMARK_COUNT_CHANGED_EVENT,
   readBookmarkCountOverrides,
@@ -143,23 +144,31 @@ export default function JobList({
     const isCurrentlyBookmarked = bookmarkedJobs.includes(jobId);
     const currentCount = ('bookmarks_count' in job ? job.bookmarks_count : 0) as number;
 
+    const entityType = resolveBookmarkEntityType({
+      postType: job.postType,
+      contestInfo: job.contestInfo,
+    });
+    const isJobEntity = entityType === 'job';
+    const countBaseline = isJobEntity ? currentCount : undefined;
+
     if (isCurrentlyBookmarked) {
-      void removeBookmark(jobId, undefined, undefined, currentCount);
+      void removeBookmark(jobId, entityType, undefined, undefined, countBaseline);
       setBookmarkedJobs((prev) => prev.filter((id) => id !== jobId));
     } else {
       void addBookmark(
         {
           id: job.id,
+          entityType,
           title: job.title,
           company: job.company,
           location: job.location,
-          postType: (job.postType || 'job') as 'job' | 'tender',
+          postType: (job.postType || 'job') as 'job' | 'contest',
           budget: job.budget || job.salary,
           deadline: job.deadline,
         },
         undefined,
         undefined,
-        currentCount,
+        countBaseline,
       );
       setBookmarkedJobs((prev) => [...prev, jobId]);
     }

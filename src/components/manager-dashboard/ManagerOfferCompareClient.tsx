@@ -71,7 +71,7 @@ function jobDurationLabel(app: Application): string {
 /** Tender bids do not store per-bid VAT in this flow; assume 23% for comparison. */
 const DEFAULT_VAT = 23;
 
-type CompareKind = 'job' | 'tender';
+type CompareKind = 'job' | 'contest';
 
 interface TenderBidLike {
   id: string;
@@ -443,7 +443,7 @@ export function ManagerOfferCompareClient({
     if (contestMode) {
       return `/panel-zarzadcy/konkursy?podglad=${submissionId}&tab=selected-offer`;
     }
-    const typ = kind === 'tender' ? 'przetarg' : 'zgłoszenie';
+    const typ = kind === 'contest' ? 'przetarg' : 'zgłoszenie';
     return `/panel-zarzadcy/zgloszenia?podglad=${submissionId}&typ=${encodeURIComponent(typ)}&tab=selected-offer`;
   };
 
@@ -458,7 +458,7 @@ export function ManagerOfferCompareClient({
           toast.error(result.error || 'Nie udało się wybrać oferty');
           return;
         }
-      } else if (kind === 'tender') {
+      } else if (kind === 'contest') {
         const bidToSelect = pendingSelectBid ?? detailBid;
         if (!bidToSelect) {
           toast.error('Brak wybranej oferty');
@@ -916,7 +916,7 @@ export function ManagerOfferCompareClient({
 
               <div className="flex flex-col gap-2 sm:flex-row pt-2">
                 {(kind === 'job' || !compareReadOnly) &&
-                (kind !== 'tender' || canSelectWinner || !contestMode) &&
+                (kind !== 'contest' || canSelectWinner || !contestMode) &&
                 !(contestMode && detailBid) ? (
                 <Button className="flex-1" onClick={openConfirmSelect}>
                   Wybierz tę ofertę

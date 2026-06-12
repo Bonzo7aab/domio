@@ -389,7 +389,7 @@ export async function fetchContractorsByWorkHistory(
     // Step 2: Get all tender IDs for this company
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: companyTenders, error: tendersError } = await (supabase as any)
-      .from('tenders')
+      .from('contests')
       .select('id, title')
       .eq('company_id', managerCompanyId);
 
@@ -436,24 +436,24 @@ export async function fetchContractorsByWorkHistory(
     // Step 4: Get accepted bids for these tenders
     type BidWithTender = {
       company_id: string;
-      tender_id: string;
+      contest_id: string;
       submitted_at: string;
-      tenders: { title: string } | null;
+      contests: { title: string } | null;
     };
     let acceptedBids: BidWithTender[] = [];
     if (tenderIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: bids, error: bidsError } = await (supabase as any)
-        .from('tender_bids')
+        .from('contest_offers')
         .select(`
           company_id,
-          tender_id,
+          contest_id,
           submitted_at,
-          tenders (
+          contests (
             title
           )
         `)
-        .in('tender_id', tenderIds)
+        .in('contest_id', tenderIds)
         .eq('status', 'accepted');
 
       if (bidsError) {
@@ -494,7 +494,7 @@ export async function fetchContractorsByWorkHistory(
       const companyId = bid.company_id;
       if (!companyId) continue;
 
-      const tenderTitle = bid.tenders?.title || '';
+      const tenderTitle = bid.contests?.title || '';
       const submittedAt = bid.submitted_at || '';
 
       if (!contractorMap.has(companyId)) {
@@ -939,10 +939,10 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
     // Fetch bids with more details for applications view
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bids } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .select(`
         id,
-        tender_id,
+        contest_id,
         bid_amount,
         proposed_timeline,
         technical_proposal,
@@ -950,7 +950,7 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
         submitted_at,
         evaluated_at,
         valid_until,
-        tenders (
+        contests (
           title,
           location,
           job_categories (
@@ -966,17 +966,17 @@ export async function fetchContractorDashboardData(supabase: SupabaseClient<Data
 
     const formattedBids: ContractorBid[] = ((bids as Array<Record<string, unknown>>) || []).map((bid: Record<string, unknown>) => ({
       id: String(bid.id ?? ''),
-      tenderId: String(bid.tender_id ?? ''),
-      tenderTitle: String((bid.tenders as Record<string, unknown>)?.title ?? ''),
-      companyName: String(((bid.tenders as Record<string, unknown>)?.companies as Record<string, unknown>)?.name ?? ''),
+      tenderId: String(bid.contest_id ?? ''),
+      tenderTitle: String((bid.contests as Record<string, unknown>)?.title ?? ''),
+      companyName: String(((bid.contests as Record<string, unknown>)?.companies as Record<string, unknown>)?.name ?? ''),
       status: String(bid.status ?? 'pending') as 'submitted' | 'under_review' | 'shortlisted' | 'accepted' | 'rejected' | 'cancelled' | 'pending',
       bidAmount: String(bid.bid_amount ?? ''),
       submittedAt: String(bid.submitted_at ?? ''),
       validUntil: String(bid.valid_until ?? ''),
-      location: typeof (bid.tenders as Record<string, unknown>)?.location === 'string' 
-        ? (bid.tenders as Record<string, unknown>).location as string
-        : String(((bid.tenders as Record<string, unknown>)?.location as Record<string, unknown>)?.city ?? 'Nieznana lokalizacja'),
-      category: String(((bid.tenders as Record<string, unknown>)?.job_categories as Record<string, unknown>)?.name ?? 'Przetarg'),
+      location: typeof (bid.contests as Record<string, unknown>)?.location === 'string' 
+        ? (bid.contests as Record<string, unknown>).location as string
+        : String(((bid.contests as Record<string, unknown>)?.location as Record<string, unknown>)?.city ?? 'Nieznana lokalizacja'),
+      category: String(((bid.contests as Record<string, unknown>)?.job_categories as Record<string, unknown>)?.name ?? 'Przetarg'),
       proposedTimeline: bid.proposed_timeline as number | undefined,
       technicalProposal: bid.technical_proposal as string | undefined,
       reviewedAt: bid.evaluated_at as string | undefined // Use evaluated_at for tender_bids
@@ -1057,13 +1057,13 @@ export async function fetchContractorDashboardStats(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: bidsCount } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .select('*', { count: 'exact', head: true })
       .eq('contractor_id', contractorUserId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: acceptedBidsCount } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .select('*', { count: 'exact', head: true })
       .eq('contractor_id', contractorUserId)
       .eq('status', 'accepted');
@@ -1211,10 +1211,10 @@ export async function fetchContractorApplications(
     // Fetch bids with more details for applications view
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bids } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .select(`
         id,
-        tender_id,
+        contest_id,
         bid_amount,
         proposed_timeline,
         technical_proposal,
@@ -1223,7 +1223,7 @@ export async function fetchContractorApplications(
         submitted_at,
         evaluated_at,
         valid_until,
-        tenders (
+        contests (
           title,
           location,
           published_at,
@@ -1242,7 +1242,7 @@ export async function fetchContractorApplications(
 
     type BidWithTenderDetails = {
       id: string;
-      tender_id: string;
+      contest_id: string;
       status: string;
       bid_amount?: string;
       submitted_at: string;
@@ -1251,7 +1251,7 @@ export async function fetchContractorApplications(
       technical_proposal?: string;
       manager_feedback_message?: string;
       evaluated_at?: string;
-      tenders?: {
+      contests?: {
         title?: string;
         location?: string | { city?: string };
         published_at?: string;
@@ -1262,22 +1262,22 @@ export async function fetchContractorApplications(
     };
     const formattedBids: ContractorBid[] = ((bids || []) as BidWithTenderDetails[]).map(bid => ({
       id: bid.id,
-      tenderId: bid.tender_id,
-      tenderTitle: bid.tenders?.title || '',
-      companyName: bid.tenders?.companies?.name || '',
+      tenderId: bid.contest_id,
+      tenderTitle: bid.contests?.title || '',
+      companyName: bid.contests?.companies?.name || '',
       status: (bid.status || 'pending') as ContractorBid['status'],
       bidAmount: bid.bid_amount || '',
       submittedAt: bid.submitted_at,
       validUntil: bid.valid_until || '',
-      location: typeof bid.tenders?.location === 'string' 
-        ? bid.tenders.location 
-        : bid.tenders?.location?.city || 'Nieznana lokalizacja',
-      category: bid.tenders?.job_categories?.name || 'Przetarg',
+      location: typeof bid.contests?.location === 'string' 
+        ? bid.contests.location 
+        : bid.contests?.location?.city || 'Nieznana lokalizacja',
+      category: bid.contests?.job_categories?.name || 'Przetarg',
       proposedTimeline: bid.proposed_timeline || undefined,
       technicalProposal: bid.technical_proposal || undefined,
       managerFeedbackMessage: bid.manager_feedback_message || undefined,
       reviewedAt: bid.evaluated_at || undefined,
-      postedTime: getTimeAgo(bid.tenders?.published_at || bid.tenders?.created_at)
+      postedTime: getTimeAgo(bid.contests?.published_at || bid.contests?.created_at)
     }));
 
     return {
@@ -1321,13 +1321,13 @@ export async function fetchContractorAnalytics(
     // Fetch bids count for stats
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: bidsCount } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .select('*', { count: 'exact', head: true })
       .eq('company_id', contractorId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count: acceptedBidsCount } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .select('*', { count: 'exact', head: true })
       .eq('company_id', contractorId)
       .eq('status', 'accepted');
@@ -1844,14 +1844,14 @@ export async function fetchContractorRecentActivities(
     // 2. Fetch recent tender bids with status changes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bids } = await (supabase as any)
-      .from('tender_bids')
+      .from('contest_offers')
       .select(`
         id,
-        tender_id,
+        contest_id,
         status,
         submitted_at,
         evaluated_at,
-        tenders (
+        contests (
           id,
           title
         )
@@ -1864,19 +1864,19 @@ export async function fetchContractorRecentActivities(
 
     type BidWithTender = {
       id: string;
-      tender_id: string;
+      contest_id: string;
       status: string;
       submitted_at: string;
       evaluated_at?: string;
-      tenders: { id: string; title: string } | null;
+      contests: { id: string; title: string } | null;
     };
     if (bids) {
       (bids as BidWithTender[]).forEach((bid) => {
         const timestamp = bid.evaluated_at || bid.submitted_at;
         if (!timestamp) return;
 
-        const tenderTitle = bid.tenders?.title || 'przetarg';
-        const tenderId = bid.tenders?.id || bid.tender_id;
+        const tenderTitle = bid.contests?.title || 'przetarg';
+        const tenderId = bid.contests?.id || bid.contest_id;
         let activity: ContractorActivity | null = null;
 
         if (bid.status === 'accepted') {

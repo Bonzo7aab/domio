@@ -28,7 +28,7 @@ import { getTenderById } from '../lib/data';
 import {
   isContestTender,
   mapTenderRowToContestDisplay,
-} from '../lib/tender-contest/map-tender-contest-display';
+} from '../lib/contest/map-tender-contest-display';
 import type { ContestInfo } from '../types/job';
 
 // Dynamically import heavy components to reduce initial bundle size
@@ -357,7 +357,7 @@ function HomePageContent() {
         return;
       }
 
-      if (job?.postType === 'tender') {
+      if (job?.postType === 'contest') {
         const { data: dbTender } = await getTenderById(jobId);
         if (dbTender && isContestTender(dbTender)) {
           const contestInfo = mapTenderRowToContestDisplay(dbTender);
@@ -449,7 +449,7 @@ function HomePageContent() {
 
     try {
       const job = selectedApplicationJob || getJobForApplication(selectedApplicationJobId);
-      const isTender = job?.postType === 'tender';
+      const isTender = job?.postType === 'contest';
 
       if (isTender) {
         // Handle tender bid submission
@@ -651,7 +651,7 @@ function HomePageContent() {
           onApplicationSubmit={handleApplicationSubmit}
           applicationForm={applicationForm}
           setApplicationForm={(form) => setApplicationForm(form)}
-          postType={(selectedApplicationJob?.postType || getJobForApplication(selectedApplicationJobId).postType) as 'job' | 'tender'}
+          postType={(selectedApplicationJob?.postType || getJobForApplication(selectedApplicationJobId).postType) as 'job' | 'contest'}
         />
       )}
 

@@ -83,7 +83,6 @@ function generateInfoWindowContentInternal(jobData: Job, isSmallMap: boolean): s
   // Rating is not part of Job type, so we'll skip it
   const rating = undefined;
 
-  const isTender = postType === 'tender';
   const displaySkills = skills.slice(0, 3);
   const hasMoreSkills = skills.length > 3;
 
@@ -359,7 +358,6 @@ export function generateMobileDrawerContent(jobData: Job): string {
   
   const companyLogo = companyInfo?.logo_url || undefined;
   
-  const isTender = postType === 'tender';
   const displaySkills = skills.slice(0, 3);
   const hasMoreSkills = skills.length > 3;
 
@@ -615,7 +613,6 @@ function generateCompactInfoWindow(jobData: Job, escapeHtml: (text: string) => s
       ? location.city + (location.sublocality_level_1 ? `, ${location.sublocality_level_1}` : '')
       : '';
 
-  const isTender = postType === 'tender';
   const safeTitle = escapeHtml(title);
   const safeCompany = escapeHtml(company);
   const safeLocation = escapeHtml(locationString);

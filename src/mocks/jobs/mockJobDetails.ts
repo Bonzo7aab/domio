@@ -188,7 +188,7 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
   // PRZETARGI - KOMPLETNE SZCZEGÓŁY
   'tender-1': {
     id: 'tender-1',
-    postType: 'tender',
+    postType: 'contest',
     title: 'PRZETARG: Termomodernizacja osiedla mieszkaniowego',
     company: 'Spółdzielnia Mieszkaniowa "Centrum" - Przetarg',
     location: 'Warszawa',
@@ -277,7 +277,7 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
   },
   'tender-2': {
     id: 'tender-2',
-    postType: 'tender',
+    postType: 'contest',
     title: 'PRZETARG: Modernizacja instalacji elektrycznej',
     company: 'Wspólnota Mieszkaniowa "Parkowa" - Przetarg',
     location: 'Kraków',
@@ -366,7 +366,7 @@ export const mockJobDetailsMap: { [key: string]: Record<string, unknown> } = {
   },
   'tender-3': {
     id: 'tender-3',
-    postType: 'tender',
+    postType: 'contest',
     title: 'PRZETARG: Zagospodarowanie terenów zielonych',
     company: 'Zarząd Dzielnicy Mokotów - Przetarg',
     location: 'Warszawa',

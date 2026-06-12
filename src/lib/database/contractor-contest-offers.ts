@@ -6,7 +6,7 @@ import {
 } from '../contest-offer/contractor-contest-offer-status';
 import { fetchUserPrimaryCompany } from './companies';
 import { fetchReviewedTenderIdsForReviewer } from './reviews';
-import { isContestTender } from '../tender-contest/map-tender-contest-display';
+import { isContestTender } from '../contest/map-tender-contest-display';
 import {
   computeGrossFromNet,
   type ContestOfferDetails,
@@ -70,12 +70,12 @@ export function resolveContestBidPricing(
 
 interface BidWithContestTender {
   id: string;
-  tender_id: string;
+  contest_id: string;
   bid_amount?: string | number | null;
   offer_details?: unknown;
   status: string;
   submitted_at: string;
-  tenders?: {
+  contests?: {
     title?: string;
     status?: string;
     submission_deadline?: string;
@@ -103,16 +103,16 @@ export async function fetchContractorContestOffers(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: bids, error } = await (supabase as any)
-    .from('tender_bids')
+    .from('contest_offers')
     .select(
       `
       id,
-      tender_id,
+      contest_id,
       bid_amount,
       offer_details,
       status,
       submitted_at,
-      tenders (
+      contests (
         title,
         status,
         submission_deadline,
@@ -138,7 +138,7 @@ export async function fetchContractorContestOffers(
   const rows: ContractorContestOfferRow[] = [];
 
   for (const bid of (bids || []) as BidWithContestTender[]) {
-    const tender = bid.tenders;
+    const tender = bid.contests;
     if (!tender) continue;
 
     const isContest = isContestTender({
@@ -164,7 +164,7 @@ export async function fetchContractorContestOffers(
 
     rows.push({
       id: bid.id,
-      tenderId: bid.tender_id,
+      tenderId: bid.contest_id,
       contestTitle: tender.title || 'Bez tytułu',
       organizerName: tender.companies?.name || 'Nieznany organizator',
       organizerCompanyId: tender.companies?.id || '',

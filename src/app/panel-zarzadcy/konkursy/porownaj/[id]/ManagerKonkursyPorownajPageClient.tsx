@@ -7,5 +7,5 @@ export function ManagerKonkursyPorownajPageClient(): React.ReactElement {
   const params = useParams();
   const id = params.id as string;
 
-  return <ManagerOfferCompareClient submissionId={id} kind="tender" contestMode />;
+  return <ManagerOfferCompareClient submissionId={id} kind="contest" contestMode />;
 }

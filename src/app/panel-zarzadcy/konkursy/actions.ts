@@ -86,7 +86,7 @@ export async function cancelContestAction(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: tender, error: fetchErr } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .select('id, status, manager_id, company_id')
     .eq('id', tenderId.trim())
     .maybeSingle();
@@ -106,7 +106,7 @@ export async function cancelContestAction(
   const now = new Date().toISOString();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: updateErr } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .update({ status: 'cancelled', updated_at: now })
     .eq('id', tenderId.trim());
 

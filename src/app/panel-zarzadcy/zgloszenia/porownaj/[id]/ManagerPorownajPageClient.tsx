@@ -8,7 +8,7 @@ export function ManagerPorownajPageClient(): React.ReactElement {
   const searchParams = useSearchParams();
   const id = params.id as string;
   const typ = searchParams.get('typ');
-  const kind = typ === 'przetarg' ? 'tender' : 'job';
+  const kind = typ === 'przetarg' ? 'contest' : 'job';
 
   return <ManagerOfferCompareClient submissionId={id} kind={kind} />;
 }

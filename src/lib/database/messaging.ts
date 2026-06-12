@@ -9,7 +9,7 @@ interface ConversationRow {
   participant_2: string;
   subject: string;
   job_id: string | null;
-  tender_id: string | null;
+  contest_id: string | null;
   last_message_at: string;
   [key: string]: unknown;
 }
@@ -94,7 +94,7 @@ export async function createConversation(
         participant_2: data.participant2,
         subject: data.subject,
         job_id: data.jobId || null,
-        tender_id: data.tenderId || null,
+        contest_id: data.tenderId || null,
         last_message_at: new Date().toISOString(),
       })
       .select('id')
@@ -123,17 +123,17 @@ export async function sendMessage(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: conversation, error: convFetchErr } = await (supabase as any)
       .from('conversations')
-      .select('tender_id')
+      .select('contest_id')
       .eq('id', data.conversationId)
       .maybeSingle();
 
     if (convFetchErr) {
       console.error('sendMessage: conversation lookup', convFetchErr);
-    } else if (conversation?.tender_id) {
+    } else if (conversation?.contest_id) {
       const { isOrderMessagingBlocked } = await import('./order-mutations');
       const blocked = await isOrderMessagingBlocked(
         supabase,
-        conversation.tender_id as string,
+        conversation.contest_id as string,
       );
       if (blocked) {
         return {
@@ -220,9 +220,9 @@ export async function buildMessageNotificationPayload(
         participant_1,
         participant_2,
         job_id,
-        tender_id,
+        contest_id,
         job:jobs(title),
-        tender:tenders(title)
+        tender:contests(title)
       `)
       .eq('id', params.conversationId)
       .single();
@@ -271,7 +271,7 @@ export async function buildMessageNotificationPayload(
         messageId: params.messageId,
         senderId: params.senderId,
         jobId: conv.job_id ?? null,
-        tenderId: conv.tender_id ?? null,
+        tenderId: conv.contest_id ?? null,
       },
       actionUrl: `/wiadomosci?conversation=${params.conversationId}`,
     };
@@ -352,7 +352,7 @@ export async function sendQuoteRequestMessage(
 export async function createNotification(
   supabase: SupabaseClient<Database>,
   userId: string,
-  type: 'new_job' | 'new_tender' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'tender_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused' | 'contest_question',
+  type: 'new_job' | 'new_contest' | 'application_received' | 'bid_received' | 'application_status_update' | 'bid_status_update' | 'job_assigned' | 'contest_awarded' | 'new_message' | 'review_received' | 'certificate_expiring' | 'deadline_reminder' | 'system_announcement' | 'subscription_expiring' | 'payment_failed' | 'verification_approved' | 'verification_rejected' | 'profile_completion_reminder' | 'offer_admin_moderation' | 'listing_admin_paused' | 'contest_question',
   title: string,
   message: string,
   data?: Record<string, unknown>,
@@ -674,7 +674,7 @@ export async function findConversationByJob(
   isTender: boolean = false
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
   try {
-    const jobField = isTender ? 'tender_id' : 'job_id';
+    const jobField = isTender ? 'contest_id' : 'job_id';
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: conversation, error } = await (supabase as any)
       .from('conversations')
@@ -727,7 +727,7 @@ export async function fetchUserConversations(
         created_at,
         updated_at,
         job_id,
-        tender_id,
+        contest_id,
         participant_1_profile:user_profiles!conversations_participant_1_fkey(
           id,
           first_name,
@@ -748,7 +748,7 @@ export async function fetchUserConversations(
           id,
           title
         ),
-        tender:tenders(
+        tender:contests(
           id,
           title
         )
@@ -793,7 +793,7 @@ export async function fetchUserConversations(
         ],
         lastMessage: undefined, // Will be populated separately
         unreadCount: 0, // Will be calculated separately
-        jobId: String(conv.job_id ?? conv.tender_id ?? ''),
+        jobId: String(conv.job_id ?? conv.contest_id ?? ''),
         jobTitle: String((conv.job as Record<string, unknown>)?.title ?? (conv.tender as Record<string, unknown>)?.title ?? ''),
         subject: conv.subject ? String(conv.subject) : undefined,
         createdAt: new Date(String(conv.created_at ?? '')),

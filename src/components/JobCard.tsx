@@ -82,7 +82,7 @@ const JobCard = React.memo(function JobCard({
     }
   }, [job, onApplyClick]);
 
-  const isTender = useMemo(() => job.postType === 'tender', [job.postType]);
+  const isTender = useMemo(() => job.postType === 'contest', [job.postType]);
   const contestStatus = useMemo(() => resolveContestStatus(job), [job]);
   const submissionDeadline = useMemo(() => getContestSubmissionDeadline(job), [job]);
   const categoryLabel = useMemo(

@@ -611,7 +611,7 @@ function TenderListingDetails({ row }: { row: AdminTenderListingRow }) {
         <EditableForm sections={sections} initialValues={initialValues} onSave={onSave} busy={busy} />
       </div>
       <PauseListingSection
-        kind="tender"
+        kind="contest"
         paused={row.status === 'paused'}
         msg={msg}
         setMsg={setMsg}
@@ -682,7 +682,7 @@ function ManagerMetaBlock({
 }
 
 interface PauseListingSectionProps {
-  kind: 'job' | 'tender';
+  kind: 'job' | 'contest';
   paused: boolean;
   msg: string;
   setMsg: (value: string) => void;

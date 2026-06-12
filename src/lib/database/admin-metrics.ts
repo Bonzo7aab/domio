@@ -51,7 +51,7 @@ export async function fetchAdminDashboardMetrics(
   }
 
   const { data: activeTenders, error: tendersError } = await sb
-    .from('tenders')
+    .from('contests')
     .select('id')
     .eq('status', 'active');
 
@@ -63,8 +63,8 @@ export async function fetchAdminDashboardMetrics(
   let activeTendersWithoutBids = 0;
 
   if (tenderIds.length > 0) {
-    const { data: bidRows } = await sb.from('tender_bids').select('tender_id').in('tender_id', tenderIds);
-    const withBids = new Set((bidRows ?? []).map((r: { tender_id: string }) => r.tender_id));
+    const { data: bidRows } = await sb.from('contest_offers').select('contest_id').in('contest_id', tenderIds);
+    const withBids = new Set((bidRows ?? []).map((r: { contest_id: string }) => r.contest_id));
     activeTendersWithoutBids = tenderIds.filter((id: string) => !withBids.has(id)).length;
   }
 
@@ -78,7 +78,7 @@ export async function fetchAdminDashboardMetrics(
     .lt('submitted_at', fortyEightHoursAgo);
 
   const { count: staleTenderBids } = await sb
-    .from('tender_bids')
+    .from('contest_offers')
     .select('*', { count: 'exact', head: true })
     .in('status', staleStatuses)
     .neq('admin_moderation_status', 'suspended')

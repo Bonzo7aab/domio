@@ -1,6 +1,6 @@
 /** Shared filter state for homepage job listings (KAN-6). */
 
-export const DEFAULT_POST_TYPES = ['tender'] as const;
+export const DEFAULT_POST_TYPES = ['contest'] as const;
 
 export const WARSAW_CITY = 'Warszawa';
 
@@ -21,7 +21,7 @@ export interface FilterState {
   searchQuery?: string;
   /** Zakończenie przyjmowania ofert — deadline window filters */
   deadline: DeadlineFilterKey[];
-  /** Public browse shows contests only (`tender` rows). Kept for URL backward compatibility. */
+  /** Public browse shows contests only. Kept for URL backward compatibility. */
   postTypes: string[];
   /** Show only locally bookmarked listings. */
   favoritesOnly: boolean;
@@ -45,7 +45,7 @@ export const defaultFilters: FilterState = {
 };
 
 export function isDefaultPostTypes(postTypes: string[]): boolean {
-  return postTypes.length === 1 && postTypes.includes('tender');
+  return postTypes.length === 1 && postTypes.includes('contest');
 }
 
 export function isDefaultCities(cities: string[]): boolean {

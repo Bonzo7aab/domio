@@ -9,7 +9,16 @@ import {
   TENDER_WORKFLOW_STATUSES,
   isTenderWorkflowStatusRegression,
 } from '../tender-workflow-status';
-import { mapTenderRowToContestDisplay } from '../tender-contest/map-tender-contest-display';
+import { mapTenderRowToContestDisplay } from '../contest/map-tender-contest-display';
+import {
+  contestIdColumn,
+  contestOffersTable,
+  contestsTable,
+  ensureContestsSchemaResolved,
+  normalizeContestRow,
+  normalizeContestRows,
+  shouldApplyContestTendersFilter,
+} from './schema-compat';
 
 /** Matches contest rows in DB (see opd70_remove_legacy_tenders migration). */
 export const CONTEST_TENDERS_OR_FILTER =
@@ -33,7 +42,7 @@ export interface JobFilters {
   locations?: string[];
   budgetMin?: number;
   budgetMax?: number;
-  postType?: 'job' | 'tender' | 'all';
+  postType?: 'job' | 'contest' | 'all';
   status?: string;
   sortBy?: 'newest' | 'oldest' | 'budget_low' | 'budget_high' | 'deadline';
   searchQuery?: string;
@@ -694,10 +703,11 @@ export async function updateManagerTenderWorkflowStatus(
   }
 
   try {
+    await ensureContestsSchemaResolved(supabase);
     const tenderId = params.tenderId.trim();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existing, error: fetchErr } = await (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .select('id, manager_id, company_id, status')
       .eq('id', tenderId)
       .maybeSingle();
@@ -716,9 +726,9 @@ export async function updateManagerTenderWorkflowStatus(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: acceptedBid } = await (supabase as any)
-      .from('tender_bids')
+      .from(contestOffersTable())
       .select('id')
-      .eq('tender_id', tenderId)
+      .eq(contestIdColumn(), tenderId)
       .eq('status', 'accepted')
       .maybeSingle();
 
@@ -738,7 +748,7 @@ export async function updateManagerTenderWorkflowStatus(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: updateError } = await (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .update({
         status: params.status,
         updated_at: new Date().toISOString(),
@@ -777,13 +787,13 @@ interface TenderRow {
   submission_deadline: string;
   evaluation_deadline: string | null;
   views_count: number;
-  bids_count: number;
+  offers_count: number;
   [key: string]: unknown;
 }
 
 interface TenderBidRow {
   id: string;
-  tender_id: string;
+  contest_id: string;
   contractor_id: string;
   company_id: string | null;
   status: string;
@@ -822,7 +832,7 @@ export interface TenderWithCompany {
   deposit_instructions?: string | null;
   payment_terms?: Record<string, unknown> | null;
   allow_questions?: boolean | null;
-  bids_count: number;
+  offers_count: number;
   views_count: number;
   created_at: string;
   published_at: string | null;
@@ -1050,7 +1060,7 @@ export async function fetchJobs(
 
     // Calculate applications_count dynamically if not already accurate
     if (data && data.length > 0) {
-      const jobIds = data.map((job: JobWithCompany) => job.id);
+      const jobIds = data.map((job) => job.id);
       
       // Fetch counts for all jobs at once
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1067,13 +1077,13 @@ export async function fetchJobs(
         });
 
         // Update applications_count for each job
-        data.forEach((job: JobWithCompany) => {
+        data.forEach((job) => {
           job.applications_count = countsMap[job.id] || 0;
         });
       }
     }
 
-    return { data: data as JobWithCompany[], error };
+    return { data: data as unknown as JobWithCompany[], error };
   } catch (err) {
     console.error('Error fetching jobs:', err);
     return { data: null, error: err };
@@ -1089,10 +1099,12 @@ export async function fetchTenders(
   managerId?: string // If provided, include manager's drafts even if not public
 ): Promise<{ data: TenderWithCompany[] | null; error: PostgrestError | null }> {
   try {
+    await ensureContestsSchemaResolved(supabase);
+
     // Type assertion needed as tenders table may not be in generated types yet
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query = (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .select(`
         *,
         company:companies!tenders_company_id_fkey (
@@ -1111,7 +1123,7 @@ export async function fetchTenders(
         )
       `);
 
-    if (filters.tenderScope === 'contest') {
+    if (shouldApplyContestTendersFilter(filters.tenderScope)) {
       query = applyContestTendersFilter(query);
     }
 
@@ -1133,7 +1145,7 @@ export async function fetchTenders(
     // For managers viewing their own tenders, show all (including drafts)
     if (managerId) {
       // Manager can see their own tenders regardless of public status
-      // Filter by manager_id to get manager's tenders (RLS will handle permissions)
+      // Filter by manager_id to get manager's contests (RLS will handle permissions)
       query = query.eq('manager_id', managerId);
     } else {
       // Public view - only show public tenders
@@ -1258,16 +1270,17 @@ export async function fetchTenders(
       return { data: null, error };
     }
 
-    // Calculate bids_count dynamically if not already accurate
+    // Calculate offers_count dynamically if not already accurate
     if (data && data.length > 0) {
       const tenderIds = (data || []).map((tender: TenderWithCompany) => tender.id);
       
       // Fetch counts for all tenders at once
+      const contestIdField = contestIdColumn();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: countsData, error: countsError } = await (supabase as any)
-        .from('tender_bids')
-        .select('tender_id')
-        .in('tender_id', tenderIds)
+        .from(contestOffersTable())
+        .select(contestIdField)
+        .in(contestIdField, tenderIds)
         .neq('status', 'draft')
         .neq('status', 'cancelled') as { data: TenderBidRow[] | null; error: PostgrestError | null };
 
@@ -1275,17 +1288,18 @@ export async function fetchTenders(
         // Count bids per tender
         const countsMap: { [key: string]: number } = {};
         countsData?.forEach((bid: TenderBidRow) => {
-          countsMap[bid.tender_id] = (countsMap[bid.tender_id] || 0) + 1;
+          const parentId = bid[contestIdField as keyof TenderBidRow] as string;
+          countsMap[parentId] = (countsMap[parentId] || 0) + 1;
         });
 
-        // Update bids_count for each tender
+        // Update offers_count for each tender
         data.forEach((tender: TenderWithCompany) => {
-          (tender as TenderWithCompany & { bids_count: number }).bids_count = countsMap[tender.id] || 0;
+          (tender as TenderWithCompany & { offers_count: number }).offers_count = countsMap[tender.id] || 0;
         });
       }
     }
 
-    return { data: data as unknown as TenderWithCompany[], error };
+    return { data: normalizeContestRows(data as Record<string, unknown>[]) as unknown as TenderWithCompany[], error };
   } catch (err) {
     console.error('Exception fetching tenders:', err);
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -1334,7 +1348,7 @@ export async function fetchJobsAndTenders(
         : undefined,
       location: locationData,
       type: 'Konkurs',
-      postType: 'tender' as const,
+      postType: 'contest' as const,
       status: tender.status,
       salary: `${tender.estimated_value} ${tender.currency}`,
       budget: `${tender.estimated_value} ${tender.currency}`,
@@ -1343,11 +1357,11 @@ export async function fetchJobsAndTenders(
       deadline: tender.submission_deadline,
       urgency: 'medium' as const,
       metrics: {
-        applications: tender.bids_count,
+        applications: tender.offers_count,
         visits: tender.views_count || 0,
         bookmarks: 0,
       },
-      applications: tender.bids_count,
+      applications: tender.offers_count,
       visits_count: tender.views_count || 0,
       bookmarks_count: 0,
       verified: tender.company?.is_verified || false,
@@ -1473,7 +1487,7 @@ export async function fetchJobById(
       data.applications_count = count;
     }
 
-    return { data: data as JobWithCompany, error: null };
+    return { data: data as unknown as JobWithCompany, error: null };
   } catch (err) {
     const error = err as PostgrestError | Error;
     // Handle "not found" error (PGRST116) as a normal case
@@ -1504,10 +1518,12 @@ export async function fetchTenderById(
     return { data: null, error: null };
   }
   try {
+    await ensureContestsSchemaResolved(supabase);
+
     // Type assertion needed as tenders table may not be in generated types yet
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .select(`
         *,
         company:companies!tenders_company_id_fkey (
@@ -1557,20 +1573,23 @@ export async function fetchTenderById(
       return { data: null, error: null };
     }
 
-    // Calculate bids_count dynamically if tender exists
+    // Calculate offers_count dynamically if tender exists
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { count, error: countsError } = await (supabase as any)
-      .from('tender_bids')
+      .from(contestOffersTable())
       .select('*', { count: 'exact', head: true })
-      .eq('tender_id', id)
+      .eq(contestIdColumn(), id)
       .neq('status', 'draft')
       .neq('status', 'cancelled');
 
     if (!countsError && count !== null && result.data) {
-      (result.data as unknown as { bids_count?: number }).bids_count = count;
+      (result.data as unknown as { offers_count?: number }).offers_count = count;
     }
 
-    return { data: result.data as unknown as TenderWithCompany, error: null };
+    return {
+      data: normalizeContestRow(result.data as Record<string, unknown>) as unknown as TenderWithCompany,
+      error: null,
+    };
   } catch (err) {
     const error = err as PostgrestError | Error;
     // Handle "not found" error (PGRST116) as a normal case
@@ -1647,7 +1666,7 @@ export async function incrementTenderViews(
     // Fetch current views_count
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: currentTender, error: fetchError } = await (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .select('views_count')
       .eq('id', tenderId)
       .single();
@@ -1670,7 +1689,7 @@ export async function incrementTenderViews(
     // Increment and update
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: updateError } = await (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .update({ views_count: newViewsCount })
       .eq('id', tenderId);
 
@@ -1839,7 +1858,7 @@ export async function createTender(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: insertedTender, error: insertError } = await (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .insert(insertRow)
       .select(`
         *,
@@ -1889,7 +1908,7 @@ export async function updateTender(
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingTender, error: fetchError } = await (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .select('id, status')
       .eq('id', tenderId)
       .single();
@@ -1925,7 +1944,7 @@ export async function updateTender(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: updatedTender, error: updateError } = await (supabase as any)
-      .from('tenders')
+      .from(contestsTable())
       .update(updateRow)
       .eq('id', tenderId)
       .select(`
@@ -2600,6 +2619,7 @@ export async function createTenderBid(
   }
 ): Promise<{ data: Record<string, unknown> | null; error: PostgrestError | null }> {
   try {
+    await ensureContestsSchemaResolved(supabase);
     const { canUserUsePlatformFeatures } = await import('../verification/can-use-platform');
     const access = await canUserUsePlatformFeatures(supabase, contractorId);
     if (!access.allowed) {
@@ -2633,9 +2653,9 @@ export async function createTenderBid(
     // Block only submitted (non-draft, non-cancelled) bids — drafts allowed for contest flow
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingBids, error: checkError } = await (supabase as any)
-      .from('tender_bids')
+      .from(contestOffersTable())
       .select('id, status')
-      .eq('tender_id', tenderId)
+      .eq(contestIdColumn(), tenderId)
       .eq('company_id', company.id)
       .in('status', ['submitted', 'under_review', 'shortlisted', 'accepted', 'rejected'])
       .limit(1);
@@ -2660,7 +2680,7 @@ export async function createTenderBid(
     
     // Prepare insert data
     const insertData: Record<string, unknown> = {
-      tender_id: tenderId,
+      [contestIdColumn()]: tenderId,
       contractor_id: contractorId,
       company_id: company.id,
       bid_amount: bidData.proposedPrice,
@@ -2678,7 +2698,7 @@ export async function createTenderBid(
     // Insert bid (using type assertion since tender_bids may not be in generated types)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: insertedBid, error: insertError } = await (supabase as any)
-      .from('tender_bids')
+      .from(contestOffersTable())
       .insert(insertData)
       .select()
       .single();
@@ -2731,13 +2751,15 @@ export async function fetchTenderBidsByTenderId(
   options?: FetchTenderBidsOptions,
 ): Promise<{ data: Record<string, unknown>[] | null; error: PostgrestError | null }> {
   try {
+    await ensureContestsSchemaResolved(supabase);
+    const contestIdField = contestIdColumn();
     // Use type assertion since tender_bids may not be in generated types
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query = (supabase as any)
-      .from('tender_bids')
+      .from(contestOffersTable())
       .select(`
         id,
-        tender_id,
+        ${contestIdField},
         contractor_id,
         bid_amount,
         proposed_timeline,
@@ -2767,7 +2789,7 @@ export async function fetchTenderBidsByTenderId(
           logo_url
         )
       `)
-      .eq('tender_id', tenderId)
+      .eq(contestIdField, tenderId)
       .neq('admin_moderation_status', 'suspended');
 
     if (options?.submittedOnly) {
@@ -2994,17 +3016,19 @@ export async function cancelTenderBid(
       };
     }
 
+    const contestIdField = contestIdColumn();
+    const parentTable = contestsTable();
     // First, fetch the bid to check ownership and current status
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: bid, error: fetchError } = await (supabase as any)
-      .from('tender_bids')
+      .from(contestOffersTable())
       .select(
         `
         id,
         company_id,
         status,
-        tender_id,
-        tenders (
+        ${contestIdField},
+        ${parentTable} (
           status,
           submission_deadline,
           building_id,
@@ -3049,17 +3073,17 @@ export async function cancelTenderBid(
     }
 
     const tender = (bid as unknown as {
-      tenders?: {
+      contests?: {
         status?: string;
         submission_deadline?: string;
         building_id?: string | null;
         selection_criteria?: unknown;
         formal_requirements?: unknown;
       };
-    })?.tenders;
+    })?.contests;
 
     if (tender) {
-      const { isContestTender } = await import('../tender-contest/map-tender-contest-display');
+      const { isContestTender } = await import('../contest/map-tender-contest-display');
       const isContest = isContestTender({
         building_id: tender.building_id ?? null,
         selection_criteria: tender.selection_criteria as Record<string, unknown> | null,
@@ -3093,7 +3117,7 @@ export async function cancelTenderBid(
     // Filter by both contractor_id (for RLS policy) and company_id (for validation)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: updateData, error: updateError } = await (supabase as any)
-      .from('tender_bids')
+      .from(contestOffersTable())
       .update({ 
         status: 'cancelled',
         evaluated_at: new Date().toISOString()

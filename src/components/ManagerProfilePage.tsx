@@ -304,7 +304,7 @@ export default function ManagerProfilePage({ managerId, onBack }: ManagerProfile
         // Fetch active tenders
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: tendersData, error: tendersError } = await (supabase as any)
-          .from('tenders')
+          .from('contests')
           .select(`
             id,
             title,

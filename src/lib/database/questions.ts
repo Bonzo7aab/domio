@@ -2,7 +2,7 @@ import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 import { notifyContestQuestionAskerAction } from '../../app/pytania-konkursu/actions';
 import { createNotification } from './messaging';
-import { isContestTender } from '../tender-contest/map-tender-contest-display';
+import { isContestTender } from '../contest/map-tender-contest-display';
 import { isContestQuestionsDeadlinePassed } from '../contest-questions/format-contest-question-label';
 import { formatPostgrestError } from './postgrest-error';
 
@@ -84,7 +84,7 @@ export async function fetchContestQuestionsForContractor(
   tenderId: string,
 ): Promise<{ data: ContestQuestionPublished[]; error: PostgrestError | null }> {
   const { data, error } = await supabase.rpc('list_contest_questions_contractor', {
-    p_tender_id: tenderId,
+    p_contest_id: tenderId,
   });
 
   if (error) {
@@ -113,7 +113,7 @@ export async function fetchOwnPendingContestQuestions(
   const { data, error } = await supabase
     .from('questions')
     .select('id, question, created_at')
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .eq('asker_id', askerId)
     .is('answered_at', null)
     .order('created_at', { ascending: false });
@@ -141,7 +141,7 @@ async function fetchContestQuestionsForManagerDirect(
   const { data: questionRows, error } = await supabase
     .from('questions')
     .select('id, question, answer, created_at, answered_at, asker_id')
-    .eq('tender_id', tenderId)
+    .eq('contest_id', tenderId)
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -259,7 +259,7 @@ export async function fetchContestQuestionsForManager(
   }
 
   const { data, error } = await supabase.rpc('list_contest_questions_manager', {
-    p_tender_id: tenderId,
+    p_contest_id: tenderId,
   });
 
   if (!error) {
@@ -391,8 +391,8 @@ export async function fetchContestCommentCounts(
 
   const { data, error } = await supabase
     .from('question_comments')
-    .select('id, questions!question_comments_question_id_fkey ( tender_id )')
-    .in('questions.tender_id', tenderIds);
+    .select('id, questions!question_comments_question_id_fkey ( contest_id )')
+    .in('questions.contest_id', tenderIds);
 
   if (error) {
     console.error('fetchContestCommentCounts:', formatPostgrestError(error));
@@ -401,8 +401,8 @@ export async function fetchContestCommentCounts(
 
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
-    const questions = row.questions as { tender_id?: string } | null;
-    const tenderId = questions?.tender_id;
+    const questions = row.questions as { contest_id?: string } | null;
+    const tenderId = questions?.contest_id;
     if (tenderId) {
       counts[tenderId] = (counts[tenderId] ?? 0) + 1;
     }
@@ -421,8 +421,8 @@ export async function fetchContestQuestionCounts(
 
   const { data, error } = await supabase
     .from('questions')
-    .select('tender_id')
-    .in('tender_id', tenderIds);
+    .select('contest_id')
+    .in('contest_id', tenderIds);
 
   if (error) {
     console.error('fetchContestQuestionCounts:', formatPostgrestError(error));
@@ -431,8 +431,8 @@ export async function fetchContestQuestionCounts(
 
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
-    if (row.tender_id) {
-      counts[row.tender_id] = (counts[row.tender_id] ?? 0) + 1;
+    if (row.contest_id) {
+      counts[row.contest_id] = (counts[row.contest_id] ?? 0) + 1;
     }
   }
   return counts;
@@ -452,8 +452,8 @@ export async function fetchUnansweredContestQuestionCounts(
 
   const { data, error } = await supabase
     .from('questions')
-    .select('tender_id')
-    .in('tender_id', tenderIds)
+    .select('contest_id')
+    .in('contest_id', tenderIds)
     .is('answered_at', null);
 
   if (error) {
@@ -463,8 +463,8 @@ export async function fetchUnansweredContestQuestionCounts(
 
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
-    if (row.tender_id) {
-      counts[row.tender_id] = (counts[row.tender_id] ?? 0) + 1;
+    if (row.contest_id) {
+      counts[row.contest_id] = (counts[row.contest_id] ?? 0) + 1;
     }
   }
   return counts;
@@ -477,7 +477,7 @@ export async function fetchUnseenContestQuestionCounts(
   if (tenderIds.length === 0) return {};
 
   const { data, error } = await supabase.rpc('count_unseen_contest_questions', {
-    p_tender_ids: tenderIds,
+    p_contest_ids: tenderIds,
   });
 
   if (error) {
@@ -487,7 +487,7 @@ export async function fetchUnseenContestQuestionCounts(
 
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
-    counts[row.tender_id] = Number(row.unseen_count);
+    counts[row.contest_id] = Number(row.unseen_count);
   }
   return counts;
 }
@@ -497,7 +497,7 @@ export async function markContestQuestionsSeen(
   tenderId: string,
 ): Promise<void> {
   const { error } = await supabase.rpc('mark_contest_questions_seen', {
-    p_tender_id: tenderId,
+    p_contest_id: tenderId,
   });
   if (error) {
     console.warn('markContestQuestionsSeen:', error);
@@ -590,7 +590,7 @@ async function resolveListingMeta(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: tenderData, error: tenderError } = await (supabase as any)
-    .from('tenders')
+    .from('contests')
     .select(
       'id, title, manager_id, allow_questions, submission_deadline, building_id, selection_criteria, formal_requirements',
     )
@@ -668,7 +668,7 @@ export async function submitQuestion(
       asker_id: authenticatedUserId,
       question: trimmedQuestion,
       is_public: true,
-      ...(isJob ? { job_id: jobId } : { tender_id: jobId }),
+      ...(isJob ? { job_id: jobId } : { contest_id: jobId }),
     };
 
     const { data: questionRow, error: questionError } = await supabase
