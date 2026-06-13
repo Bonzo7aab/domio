@@ -92,10 +92,14 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-      },
+      ...(process.env.NODE_ENV === 'development'
+        ? [
+            {
+              protocol: 'http',
+              hostname: 'localhost',
+            },
+          ]
+        : []),
       {
         protocol: 'https',
         hostname: '**.supabase.co',

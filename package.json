@@ -71,7 +71,7 @@
     "framer-motion": "^12.23.24",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.544.0",
-    "next": "16.0.7",
+    "next": "^16.2.9",
     "react": "19.2.1",
     "react-day-picker": "^9.11.0",
     "react-dom": "19.2.1",
@@ -95,14 +95,38 @@
     "autoprefixer": "^10.0.1",
     "baseline-browser-mapping": "^2.10.32",
     "eslint": "^9",
-    "eslint-config-next": "16.0.7",
+    "eslint-config-next": "^16.2.9",
     "husky": "^9.1.7",
-    "postcss": "^8",
+    "postcss": "^8.5.15",
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
   },
   "overrides": {
     "@types/react": "19.2.7",
-    "@types/react-dom": "19.2.3"
+    "@types/react-dom": "19.2.3",
+    "jws": "4.0.1",
+    "asn1.js": {
+      "bn.js": "4.12.3"
+    },
+    "next": {
+      "postcss": "8.5.15"
+    },
+    "sucrase": {
+      "glob": "10.5.0",
+      "minimatch": "9.0.7",
+      "brace-expansion": "2.0.3"
+    },
+    "micromatch": {
+      "picomatch": "2.3.2"
+    },
+    "anymatch": {
+      "picomatch": "2.3.2"
+    },
+    "readdirp": {
+      "picomatch": "2.3.2"
+    },
+    "postcss-load-config": {
+      "yaml": "2.8.3"
+    }
   }
 }

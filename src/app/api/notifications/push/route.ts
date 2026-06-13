@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '../../../../lib/supabase/admin';
 import { sendPushNotificationToUser, initializeVAPID, type PushNotificationPayload } from '../../../../lib/push-notifications/server';
+import { createClient } from '../../../../lib/supabase/server';
+import { sanitizeRedirectPath } from '../../../../lib/auth/redirectPath';
 import webpush from 'web-push';
 
 /**
@@ -19,22 +21,44 @@ import webpush from 'web-push';
  */
 export async function POST(request: NextRequest) {
   try {
+    const authz = await authorizePlatformAdmin();
+    if (authz) {
+      return authz;
+    }
+
     // Initialize VAPID keys
     try {
       initializeVAPID();
     } catch {
       return NextResponse.json(
-        { error: 'VAPID keys not configured. Please set VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY environment variables.' },
+        { error: 'Push notifications are not configured.' },
         { status: 500 }
       );
     }
 
-    const body = await request.json();
-    const { userId, title, body: message, icon, url, data } = body;
+    const requestBody = (await request.json()) as Record<string, unknown>;
+    const userId = typeof requestBody.userId === 'string' ? requestBody.userId.trim() : '';
+    const title = typeof requestBody.title === 'string' ? requestBody.title.trim() : '';
+    const message = typeof requestBody.body === 'string' ? requestBody.body.trim() : '';
+    const icon = typeof requestBody.icon === 'string' ? requestBody.icon.trim() : '';
+    const redirectUrl = sanitizeRedirectPath(
+      typeof requestBody.url === 'string' ? requestBody.url : null,
+      '/'
+    );
+    const data =
+      requestBody.data && typeof requestBody.data === 'object' && !Array.isArray(requestBody.data)
+        ? (requestBody.data as Record<string, unknown>)
+        : {};
 
     if (!userId || !title || !message) {
       return NextResponse.json(
         { error: 'Missing required fields: userId, title, body' },
+        { status: 400 }
+      );
+    }
+    if (title.length > 120 || message.length > 2000) {
+      return NextResponse.json(
+        { error: 'Notification title or body is too long.' },
         { status: 400 }
       );
     }
@@ -58,10 +82,10 @@ export async function POST(request: NextRequest) {
     const payload: PushNotificationPayload = {
       title,
       body: message,
-      icon: icon || '/logo.svg',
+      icon: icon.startsWith('/') ? icon : '/logo.svg',
       badge: '/logo.svg',
-      url: url || '/',
-      data: data || {},
+      url: redirectUrl,
+      data,
       timestamp: Date.now()
     };
 
@@ -79,10 +103,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error in push notification API:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -94,22 +115,49 @@ export async function POST(request: NextRequest) {
  */
 export async function GET() {
   try {
+    const authz = await authorizePlatformAdmin();
+    if (authz) {
+      return authz;
+    }
+
     initializeVAPID();
-    const vapidDetails = webpush.getVapidDetails();
     
     return NextResponse.json({
-      configured: !!vapidDetails.publicKey,
-      hasPublicKey: !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-      hasPrivateKey: !!process.env.VAPID_PRIVATE_KEY
+      configured: !!webpush.getVapidDetails().publicKey,
     });
   } catch (error) {
+    console.error('Error in push notification config API:', error);
     return NextResponse.json(
       {
         configured: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Push notifications are not configured.'
       },
       { status: 500 }
     );
   }
+}
+
+async function authorizePlatformAdmin(): Promise<NextResponse | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('platform_role')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError || profile?.platform_role !== 'platform_admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  return null;
 }
 
