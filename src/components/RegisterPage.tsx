@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -27,6 +27,8 @@ import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
 import { Checkbox } from './ui/checkbox';
 import { registerAction } from '../lib/auth/actions';
+import { lookupCompanyByNipAction } from '../lib/gus/actions';
+import { isValidNip, normalizeNip } from '../lib/gus/nip';
 import { WARSAW_DISTRICTS, DEFAULT_CITY } from '../lib/config/warsawDistricts';
 import { useUserProfile } from '../contexts/AuthContext';
 import {
@@ -111,6 +113,128 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [nip, setNip] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [street, setStreet] = useState('');
+  const [regon, setRegon] = useState('');
+  const [gusAddress, setGusAddress] = useState('');
+  const [gusCity, setGusCity] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [bankAccountIban, setBankAccountIban] = useState('');
+  const [vatStatus, setVatStatus] = useState('');
+  const [gusLookupStatus, setGusLookupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [gusLookupMessage, setGusLookupMessage] = useState<string | null>(null);
+  const lastLookedUpNipRef = useRef<string | null>(null);
+  const gusLookupAbortRef = useRef(0);
+
+  const clearGusDerivedFields = useCallback(() => {
+    setRegon('');
+    setGusAddress('');
+    setGusCity('');
+    setPostalCode('');
+    setBankAccountIban('');
+    setVatStatus('');
+    setStreet('');
+    setDistrict('');
+    lastLookedUpNipRef.current = null;
+  }, []);
+
+  const runGusLookup = useCallback(async (nipValue: string) => {
+    const normalized = normalizeNip(nipValue);
+
+    if (!isValidNip(normalized)) {
+      setGusLookupStatus('error');
+      setGusLookupMessage('Nieprawidłowy numer NIP');
+      return;
+    }
+
+    if (lastLookedUpNipRef.current === normalized) {
+      return;
+    }
+
+    const requestId = ++gusLookupAbortRef.current;
+    setGusLookupStatus('loading');
+    setGusLookupMessage(null);
+
+    const result = await lookupCompanyByNipAction(normalized);
+
+    if (requestId !== gusLookupAbortRef.current) {
+      return;
+    }
+
+    if ('error' in result) {
+      setGusLookupStatus('error');
+      setGusLookupMessage(result.error);
+      clearGusDerivedFields();
+      return;
+    }
+
+    lastLookedUpNipRef.current = normalized;
+    setCompanyName(result.data.name);
+    setRegon(result.data.regon);
+    setGusAddress(result.data.address ?? '');
+    setGusCity(result.data.city ?? '');
+    setPostalCode(result.data.postalCode ?? '');
+    if (result.data.address) {
+      setStreet(result.data.address);
+    }
+    if (result.data.district) {
+      setDistrict(result.data.district);
+    }
+    setBankAccountIban(result.data.bankAccountIban ?? '');
+    setVatStatus(result.data.vatStatus ?? '');
+    setGusLookupStatus('success');
+    const mfExtras: string[] = [];
+    if (result.data.bankAccountIban) {
+      mfExtras.push('numer konta');
+    }
+    if (result.data.vatStatus) {
+      mfExtras.push('status VAT');
+    }
+    setGusLookupMessage(
+      mfExtras.length > 0
+        ? `Dane firmy pobrane z GUS (w tym ${mfExtras.join(' i ')} z białej listy VAT)`
+        : 'Dane firmy pobrane z GUS',
+    );
+  }, [clearGusDerivedFields]);
+
+  const handleSelectUserType = (type: 'contractor' | 'manager') => {
+    setSelectedUserType(type);
+  };
+
+  const normalizedNip = normalizeNip(nip);
+  const gusNipValidationError =
+    normalizedNip.length >= 10 && !isValidNip(normalizedNip) ? 'Nieprawidłowy numer NIP' : null;
+
+  useEffect(() => {
+    if (!isValidNip(normalizedNip) || lastLookedUpNipRef.current === normalizedNip) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void runGusLookup(normalizedNip);
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [normalizedNip, runGusLookup]);
+
+  const handleNipBlur = () => {
+    const normalized = normalizeNip(nip);
+    if (isValidNip(normalized) && lastLookedUpNipRef.current !== normalized) {
+      void runGusLookup(normalized);
+    }
+  };
+
+  const handleNipChange = (value: string) => {
+    setNip(value);
+    const normalized = normalizeNip(value);
+    if (lastLookedUpNipRef.current && lastLookedUpNipRef.current !== normalized) {
+      clearGusDerivedFields();
+      setGusLookupStatus('idle');
+      setGusLookupMessage(null);
+    }
+  };
 
   const roleRegistrationClosed =
     (selectedUserType === 'contractor' && !registrationSettings.contractorOpen) ||
@@ -248,7 +372,7 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
                 id="register-manager"
                 checked={selectedUserType === 'manager'}
                 disabled={!registrationSettings.managerOpen}
-                onSelect={() => setSelectedUserType('manager')}
+                onSelect={() => handleSelectUserType('manager')}
                 icon={Building}
                 label="Zarządca"
               />
@@ -256,7 +380,7 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
                 id="register-contractor"
                 checked={selectedUserType === 'contractor'}
                 disabled={!registrationSettings.contractorOpen}
-                onSelect={() => setSelectedUserType('contractor')}
+                onSelect={() => handleSelectUserType('contractor')}
                 icon={User}
                 label="Wykonawca"
               />
@@ -293,14 +417,35 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="nip">NIP</Label>
-                <Input
-                  id="nip"
-                  name="nip"
-                  placeholder="0000000000"
-                  className={authFieldClassName}
-                  required
-                  disabled={isPending}
-                />
+                <div className="relative">
+                  <Input
+                    id="nip"
+                    name="nip"
+                    value={nip}
+                    onChange={e => handleNipChange(e.target.value)}
+                    onBlur={handleNipBlur}
+                    placeholder="0000000000"
+                    className={authFieldClassName}
+                    required
+                    disabled={isPending}
+                    inputMode="numeric"
+                    autoComplete="off"
+                  />
+                  {gusLookupStatus === 'loading' && (
+                    <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                {(gusNipValidationError || gusLookupMessage) && (
+                  <p
+                    className={cn(
+                      'text-xs',
+                      !gusNipValidationError && gusLookupStatus === 'success' && 'text-emerald-600',
+                      (gusNipValidationError || gusLookupStatus === 'error') && 'text-destructive',
+                    )}
+                  >
+                    {gusNipValidationError ?? gusLookupMessage}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="companyName">Nazwa</Label>
@@ -309,6 +454,8 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
                   <Input
                     id="companyName"
                     name="companyName"
+                    value={companyName}
+                    onChange={e => setCompanyName(e.target.value)}
                     placeholder={
                       selectedUserType === 'manager'
                         ? 'np. Wspólnota Mieszkaniowa Osiedle Zielone'
@@ -322,6 +469,18 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
               </div>
             </div>
 
+            <input type="hidden" name="regon" value={regon} />
+            <input type="hidden" name="postalCode" value={postalCode} />
+
+            {selectedUserType === 'contractor' && (
+              <>
+                <input type="hidden" name="address" value={gusAddress} />
+                <input type="hidden" name="city" value={gusCity} />
+                <input type="hidden" name="bankAccountIban" value={bankAccountIban} />
+                <input type="hidden" name="vatStatus" value={vatStatus} />
+              </>
+            )}
+
             {selectedUserType === 'manager' && (
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2 sm:col-span-2">
@@ -331,6 +490,8 @@ export function RegisterPage({ registrationSettings }: RegisterPageProps) {
                     <Input
                       id="street"
                       name="street"
+                      value={street}
+                      onChange={e => setStreet(e.target.value)}
                       placeholder="ul. Przykładowa 1"
                       className={`pl-10 ${authFieldClassName}`}
                       required

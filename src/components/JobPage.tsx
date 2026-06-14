@@ -33,6 +33,7 @@ import {
   readBookmarkCountOverrides,
 } from '../utils/bookmarkCountOverrides';
 import { toast } from 'sonner';
+import { kontoCompanyDataHref } from '../lib/konto-tabs';
 import { getJobById, getTenderById } from '../lib/data';
 import { incrementJobViews, incrementTenderViews, createJobApplication, createTenderBid, type JobWithCompany, type TenderWithCompany } from '../lib/database/jobs';
 import { fetchUserPrimaryCompany } from '../lib/database/companies';
@@ -1966,7 +1967,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
             <Button
               onClick={() => {
                 setShowCompanyRequiredDialog(false);
-                router.push('/konto?tab=company');
+                router.push(kontoCompanyDataHref('contractor'));
               }}
               className="bg-blue-600 hover:bg-blue-700"
             >

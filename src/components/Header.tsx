@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search,
   User,
@@ -19,6 +19,7 @@ import { HeaderJobSearch } from './HeaderJobSearch';
 import { Button } from './ui/button';
 import { UnifiedNotifications } from './UnifiedNotifications';
 import { useUserProfile } from '../contexts/AuthContext';
+import { createClient } from '../lib/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,7 +42,9 @@ import { useNavigationWithLoading } from '../hooks/useNavigationWithLoading';
 import { usePathname } from 'next/navigation';
 import { useLayoutContext } from './ConditionalFooter';
 import {
+  mergeAuthUsersForDisplay,
   needsVerificationAttention,
+  verificationAttentionAriaLabel,
   verificationMenuLabel,
 } from '../lib/verification/needs-verification-attention';
 import { CONTRACTOR_VERIFICATION_DOCUMENTS_PATH } from '../lib/verification/documents-route';
@@ -60,6 +63,9 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
   const { setIsMapExpanded } = useLayoutContext();
   const { user: contextUser, session, isAuthenticated: contextIsAuthenticated, logout, isLoading } = useUserProfile();
   const [isMounted, setIsMounted] = useState(false);
+  const [liveVerificationSubmittedAt, setLiveVerificationSubmittedAt] = useState<
+    string | null | undefined
+  >(undefined);
 
   // Ensure consistent hydration
   useEffect(() => {
@@ -74,19 +80,79 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
     ? contextIsAuthenticated
     : !!(initialUser || contextIsAuthenticated)
 
-  // Determine current user for display:
-  // Priority: contextUser > initialUser > temporary user from session
-  // This ensures we show user info immediately after login, even if profile is still loading
-  const currentUser = contextUser || initialUser || 
-    (session?.user ? {
-      id: session.user.id,
-      email: session.user.email || '',
-      firstName: session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'User',
-      lastName: session.user.user_metadata?.last_name || '',
-      userType: session.user.user_metadata?.user_type || 'contractor',
-    } as AuthUser : null)
+  // Merge client + server profile so verification_submitted_at from SSR is kept in the menu label.
+  const currentUser = useMemo(() => {
+    const sessionFallback = session?.user
+      ? ({
+          id: session.user.id,
+          email: session.user.email || '',
+          firstName:
+            session.user.user_metadata?.first_name ||
+            session.user.email?.split('@')[0] ||
+            'User',
+          lastName: session.user.user_metadata?.last_name || '',
+          userType: session.user.user_metadata?.user_type || 'contractor',
+          isVerified: false,
+          verificationSubmittedAt: null,
+          profileCompleted: false,
+          onboardingCompleted: false,
+        } as AuthUser)
+      : null;
 
-  const showVerificationAttention = needsVerificationAttention(currentUser)
+    return mergeAuthUsersForDisplay(contextUser, initialUser ?? null, sessionFallback);
+  }, [contextUser, initialUser, session]);
+
+  const shouldFetchVerificationSubmittedAt =
+    isMounted &&
+    Boolean(currentUser?.id) &&
+    currentUser?.userType === 'contractor' &&
+    !currentUser.isVerified;
+
+  useEffect(() => {
+    if (!shouldFetchVerificationSubmittedAt || !currentUser?.id) {
+      return;
+    }
+
+    let cancelled = false;
+    const supabase = createClient();
+
+    void supabase
+      .from('user_profiles')
+      .select('verification_submitted_at')
+      .eq('id', currentUser.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled || error) {
+          return;
+        }
+        setLiveVerificationSubmittedAt(data?.verification_submitted_at ?? null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    shouldFetchVerificationSubmittedAt,
+    currentUser?.id,
+    pathname,
+  ]);
+
+  const userForVerificationUi = useMemo(() => {
+    if (!currentUser) {
+      return null;
+    }
+    if (!shouldFetchVerificationSubmittedAt || liveVerificationSubmittedAt === undefined) {
+      return currentUser;
+    }
+    return {
+      ...currentUser,
+      verificationSubmittedAt:
+        liveVerificationSubmittedAt ?? currentUser.verificationSubmittedAt ?? null,
+    };
+  }, [currentUser, liveVerificationSubmittedAt, shouldFetchVerificationSubmittedAt]);
+
+  const showVerificationAttention = needsVerificationAttention(currentUser);
+  const verificationAttentionLabel = verificationAttentionAriaLabel(userForVerificationUi);
   const isAdmin = currentUser?.platformRole === 'platform_admin'
   const showFavoritesNav =
     !currentUser ||
@@ -189,7 +255,7 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
         </AvatarFallback>
       </Avatar>
       {showVerificationAttention && (
-        <span className="absolute -top-1 -right-1" aria-label="Wymagana weryfikacja">
+        <span className="absolute -top-1 -right-1" aria-label={verificationAttentionLabel}>
           <VerificationAttentionIcon className="h-4 w-4 fill-amber-50" />
         </span>
       )}
@@ -390,7 +456,7 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
                                 onClick={handleVerificationClick}
                               >
                                 <VerificationAttentionIcon className="mr-2 h-4 w-4" />
-                                <span>{verificationMenuLabel(currentUser)}</span>
+                                <span>{verificationMenuLabel(userForVerificationUi)}</span>
                               </Button>
                             )}
                             {showOrders ? (
@@ -577,7 +643,7 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
                         {showVerificationAttention && (
                           <DropdownMenuItem onClick={handleVerificationClick}>
                             <VerificationAttentionIcon className="mr-2 h-4 w-4" />
-                            <span>{verificationMenuLabel(currentUser)}</span>
+                            <span>{verificationMenuLabel(userForVerificationUi)}</span>
                           </DropdownMenuItem>
                         )}
                         {showOrders ? (

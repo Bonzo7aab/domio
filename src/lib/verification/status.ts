@@ -4,7 +4,7 @@ export const VERIFICATION_STATUS_LABELS: Record<VerificationState, string> = {
   approved: 'Zweryfikowany',
   pending: 'Weryfikacja w toku',
   rejected: 'Odrzucony',
-  unsubmitted: 'Weryfikacja w toku',
+  unsubmitted: 'Wymaga weryfikacji',
 };
 
 export const VERIFICATION_REJECTION_REASONS = [

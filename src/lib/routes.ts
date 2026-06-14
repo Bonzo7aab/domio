@@ -1,6 +1,8 @@
 /**
  * Canonical Polish URL paths for the application.
  */
+import { KONTO_DOKUMENTY_PATH } from './konto-tabs';
+
 export const routes = {
   home: '/',
   logowanie: '/logowanie',
@@ -55,7 +57,7 @@ export const routes = {
   administracjaOferty: '/administracja/oferty',
   administracjaOgloszenia: '/administracja/ogloszenia',
   authAktualizacjaHasla: '/auth/aktualizacja-hasla',
-  kontoDokumenty: '/konto?tab=documents',
+  kontoDokumenty: KONTO_DOKUMENTY_PATH,
 } as const
 
 export type AppRoute = (typeof routes)[keyof typeof routes]

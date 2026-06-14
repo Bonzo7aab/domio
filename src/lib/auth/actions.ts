@@ -130,6 +130,14 @@ async function registerActionImpl(
   const acceptTerms = formData.get('acceptTerms') as string
   const nip = (formData.get('nip') as string)?.trim()
   const companyName = (formData.get('companyName') as string)?.trim()
+  const regon = (formData.get('regon') as string)?.trim() || null
+  const gusAddress = (formData.get('address') as string)?.trim() || null
+  const gusCity = (formData.get('city') as string)?.trim() || null
+  const postalCode = (formData.get('postalCode') as string)?.trim() || null
+  const bankAccountIban = (formData.get('bankAccountIban') as string)?.trim() || null
+  const vatStatusRaw = (formData.get('vatStatus') as string)?.trim() || null
+  const vatStatus =
+    vatStatusRaw === 'active_vat' || vatStatusRaw === 'vat_exempt' ? vatStatusRaw : null
   const organizationType = formData.get('organizationType') as 'spółdzielnia' | 'wspólnota' | null
   const street = (formData.get('street') as string)?.trim()
   const city = (formData.get('city') as string)?.trim() || undefined
@@ -220,17 +228,16 @@ async function registerActionImpl(
       ? (organizationType as 'spółdzielnia' | 'wspólnota')
       : 'contractor'
 
-  const address =
-    userType === 'manager' && street && city && district
-      ? `${street}, ${city}, ${district}`
-      : undefined
-
   const companyPayload = {
     name: companyName,
     type: companyType,
     nip: nip || null,
-    address: address ?? null,
-    city: userType === 'manager' ? (city || 'Warszawa') : null,
+    regon,
+    address: userType === 'manager' && street && city && district
+      ? `${street}, ${city}, ${district}`
+      : gusAddress,
+    city: userType === 'manager' ? (city || 'Warszawa') : gusCity,
+    postal_code: postalCode,
     country: 'PL',
     email: email,
     phone: phone || null,
@@ -267,6 +274,55 @@ async function registerActionImpl(
 
   if (ucError) {
     redirect(`/rejestracja?error=${encodeURIComponent(ucError.message)}`)
+  }
+
+  if (userType === 'contractor') {
+    const { normalizeIbanInput, isValidPolishIban } = await import('../contractor/iban')
+    const normalizedBankAccount = bankAccountIban ? normalizeIbanInput(bankAccountIban) : null
+    const validBankAccount =
+      normalizedBankAccount !== null && isValidPolishIban(normalizedBankAccount)
+
+    if (validBankAccount || vatStatus) {
+      const settingsRow: Record<string, unknown> = {
+        user_id: userId,
+        notification_channels: { email: true, app: true, phoneCall: false, sms: false },
+        radar_settings: { enabled: true, minAmountNet: 1000, areas: ['Warszawa'] },
+      }
+
+      if (validBankAccount && normalizedBankAccount) {
+        settingsRow.bank_account_iban = normalizedBankAccount
+      }
+
+      if (vatStatus) {
+        settingsRow.vat_status = vatStatus
+      }
+
+      if (validBankAccount && normalizedBankAccount) {
+        try {
+          const { checkBankAccountOnVatWhitelist } = await import('../mf-vat-whitelist/check-bank-account')
+          const vatResult = await checkBankAccountOnVatWhitelist(nip, normalizedBankAccount)
+          const verifiedAt = new Date().toISOString()
+          Object.assign(settingsRow, {
+            vat_whitelist_verified_at: verifiedAt,
+            vat_whitelist_account_assigned: vatResult.assigned,
+            vat_whitelist_request_id: vatResult.requestId,
+            vat_whitelist_checked_for_date: vatResult.checkedForDate,
+            updated_at: verifiedAt,
+          })
+        } catch (vatError) {
+          console.error('VAT whitelist check during registration failed:', vatError)
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: contractorSettingsError } = await (admin as any)
+        .from('contractor_account_settings')
+        .insert(settingsRow)
+
+      if (contractorSettingsError) {
+        console.error('contractor_account_settings insert at registration failed:', contractorSettingsError)
+      }
+    }
   }
 
   revalidatePath('/', 'layout')

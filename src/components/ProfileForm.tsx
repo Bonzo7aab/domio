@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, Edit2, X, Check, Building2 } from 'lucide-react';
+import { Mail, Phone, Edit2, X, Check, Building2, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -13,6 +13,9 @@ import { fetchUserPrimaryCompany, upsertUserCompany, type CompanyData } from '..
 import type { AuthUser } from '../types/auth';
 import { ContractorFinanceSettings } from './ContractorFinanceSettings';
 import { ContractorServiceAreaSettings } from './ContractorServiceAreaSettings';
+import { GusNipStatusHint } from './gus/GusNipStatusHint';
+import { useGusNipLookup } from '../lib/gus/use-gus-nip-lookup';
+import type { CompanyLookupResult } from '../lib/gus/types';
 
 interface ProfileFormProps {
   user: AuthUser;
@@ -38,6 +41,37 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
   const [businessNip, setBusinessNip] = useState('');
   const [businessRegon, setBusinessRegon] = useState('');
   const [businessKrs, setBusinessKrs] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessCity, setBusinessCity] = useState('');
+  const [businessPostalCode, setBusinessPostalCode] = useState('');
+
+  const applyGusCompanyData = useCallback((data: CompanyLookupResult) => {
+    setBusinessCompanyName(data.name);
+    setBusinessRegon(data.regon);
+    if (data.address) {
+      setBusinessAddress(data.address);
+    }
+    if (data.city) {
+      setBusinessCity(data.city);
+    }
+    if (data.postalCode) {
+      setBusinessPostalCode(data.postalCode);
+    }
+  }, []);
+
+  const clearGusDerivedBusinessFields = useCallback(() => {
+    setBusinessRegon('');
+    setBusinessAddress('');
+    setBusinessCity('');
+    setBusinessPostalCode('');
+  }, []);
+
+  const gusLookup = useGusNipLookup({
+    enabled: isContractorBusinessBlock && isEditingBusiness,
+    nip: businessNip,
+    onApply: applyGusCompanyData,
+    onClearDerived: clearGusDerivedBusinessFields,
+  });
 
   const [profileData, setProfileData] = useState({
     firstName: user.firstName || '',
@@ -65,6 +99,9 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
         setBusinessNip('');
         setBusinessRegon('');
         setBusinessKrs('');
+        setBusinessAddress('');
+        setBusinessCity('');
+        setBusinessPostalCode('');
         return;
       }
       setCompanySnapshot(data);
@@ -72,6 +109,9 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
       setBusinessNip((data.nip || '').trim());
       setBusinessRegon((data.regon || '').trim());
       setBusinessKrs((data.krs || '').trim());
+      setBusinessAddress(data.address || '');
+      setBusinessCity(data.city || '');
+      setBusinessPostalCode(data.postal_code || '');
     } finally {
       setIsLoadingBusiness(false);
     }
@@ -84,6 +124,9 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
       setBusinessNip('');
       setBusinessRegon('');
       setBusinessKrs('');
+      setBusinessAddress('');
+      setBusinessCity('');
+      setBusinessPostalCode('');
       setIsEditingBusiness(false);
       return;
     }
@@ -178,9 +221,9 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
             nip: trimmedNip,
             phone: snap.phone || user.phone || '',
             email: snap.email || user.email || '',
-            address: snap.address || '',
-            city: snap.city || '',
-            postal_code: snap.postal_code || '',
+            address: businessAddress.trim() || snap.address || '',
+            city: businessCity.trim() || snap.city || '',
+            postal_code: businessPostalCode.trim() || snap.postal_code || '',
             regon: trimmedRegon,
             krs: trimmedKrs,
             website: snap.website || '',
@@ -193,10 +236,13 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
             name: trimmedName,
             type: 'contractor',
             nip: trimmedNip,
-            regon: trimmedRegon || undefined,
-            krs: trimmedKrs || undefined,
+            regon: trimmedRegon,
+            krs: trimmedKrs,
             phone: user.phone?.trim() || undefined,
             email: user.email?.trim() || undefined,
+            address: businessAddress.trim() || undefined,
+            city: businessCity.trim() || undefined,
+            postal_code: businessPostalCode.trim() || undefined,
           };
 
       const { data: saved, error: upError } = await upsertUserCompany(supabase, user.id, payload);
@@ -213,8 +259,12 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
       setBusinessNip((saved.nip || '').trim());
       setBusinessRegon((saved.regon || '').trim());
       setBusinessKrs((saved.krs || '').trim());
+      setBusinessAddress(saved.address || '');
+      setBusinessCity(saved.city || '');
+      setBusinessPostalCode(saved.postal_code || '');
       setSuccess('Dane biznesowe zostały zaktualizowane');
       setIsEditingBusiness(false);
+      gusLookup.resetLookupState();
       setTimeout(() => setSuccess(''), 3000);
       router.refresh();
     } catch {
@@ -230,12 +280,19 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
       setBusinessNip((companySnapshot.nip || '').trim());
       setBusinessRegon((companySnapshot.regon || '').trim());
       setBusinessKrs((companySnapshot.krs || '').trim());
+      setBusinessAddress(companySnapshot.address || '');
+      setBusinessCity(companySnapshot.city || '');
+      setBusinessPostalCode(companySnapshot.postal_code || '');
     } else {
       setBusinessCompanyName('');
       setBusinessNip('');
       setBusinessRegon('');
       setBusinessKrs('');
+      setBusinessAddress('');
+      setBusinessCity('');
+      setBusinessPostalCode('');
     }
+    gusLookup.resetLookupState();
     setIsEditingBusiness(false);
     setError('');
   };
@@ -383,14 +440,29 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
             <div className="space-y-2">
               <Label htmlFor="businessNip">NIP *</Label>
               {isEditingBusiness ? (
-                <Input
-                  id="businessNip"
-                  value={businessNip}
-                  onChange={(e) => setBusinessNip(e.target.value)}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="np. 1234567890"
-                />
+                <>
+                  <div className="relative">
+                    <Input
+                      id="businessNip"
+                      value={businessNip}
+                      onChange={e =>
+                        gusLookup.handleNipChange(e.target.value, setBusinessNip)
+                      }
+                      onBlur={gusLookup.handleNipBlur}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="np. 1234567890"
+                    />
+                    {gusLookup.isLoading ? (
+                      <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                    ) : null}
+                  </div>
+                  <GusNipStatusHint
+                    status={gusLookup.status}
+                    validationError={gusLookup.validationError}
+                    message={gusLookup.message}
+                  />
+                </>
               ) : (
                 <p className="text-sm py-2 px-3 bg-muted rounded-md">{businessNip || '—'}</p>
               )}

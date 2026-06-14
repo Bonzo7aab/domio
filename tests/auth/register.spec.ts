@@ -92,7 +92,7 @@ test.describe('Registration Page', () => {
     await page.waitForURL(
       (url) =>
         url.pathname.includes('/rejestracja/wybor-weryfikacji') ||
-        (url.pathname.includes('/konto') && url.search.includes('tab=documents')) ||
+        (url.pathname.includes('/konto') && url.search.includes('tab=dokumenty')) ||
         url.pathname.includes('/logowanie'),
       { timeout: 15000 }
     );
@@ -102,7 +102,7 @@ test.describe('Registration Page', () => {
       await expect(page.getByText('Prześlij dokumenty teraz')).toBeVisible();
       await expect(page.getByText('Zrobię to później')).toBeVisible();
     } else if (page.url().includes('/konto')) {
-      expect(page.url()).toMatch(/tab=documents/);
+      expect(page.url()).toMatch(/tab=dokumenty/);
     }
 
     // Cleanup: delete the created user

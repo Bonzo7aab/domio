@@ -9,6 +9,7 @@ import { createNotificationWithPush } from '../../lib/database/notifications-ser
 import { sendVerificationRejectionEmail } from '../../lib/email/verification-rejection';
 import { createPresignedGetUrl } from '../../lib/storage/r2/operations';
 import { STORAGE_BUCKETS } from '../../lib/storage/buckets';
+import { KONTO_DOKUMENTY_PATH } from '../../lib/konto-tabs';
 
 async function logAdminAction(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -166,7 +167,7 @@ async function rejectVerificationSubjectActionImpl(
     type: 'verification_rejected',
     title: 'Weryfikacja odrzucona',
     message: trimmed,
-    actionUrl: '/konto?tab=documents',
+    actionUrl: KONTO_DOKUMENTY_PATH,
     sendPush: true,
   });
 
