@@ -12,6 +12,10 @@ interface UseGusNipLookupOptions {
   nip: string;
   onApply: (data: CompanyLookupResult) => void;
   onClearDerived?: () => void;
+  /** When `blur`, lookup runs only on NIP field blur. Default `debounce` for live typing. */
+  trigger?: 'blur' | 'debounce';
+  /** Prevents lookup on edit open when NIP is unchanged (e.g. loaded company snapshot). */
+  initialLookedUpNip?: string | null;
   debounceMs?: number;
 }
 
@@ -20,12 +24,15 @@ export function useGusNipLookup({
   nip,
   onApply,
   onClearDerived,
+  trigger = 'debounce',
+  initialLookedUpNip = null,
   debounceMs = 500,
 }: UseGusNipLookupOptions) {
   const [status, setStatus] = useState<GusLookupStatus>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const lastLookedUpNipRef = useRef<string | null>(null);
   const abortRef = useRef(0);
+  const wasEnabledRef = useRef(false);
 
   const normalizedNip = normalizeNip(nip);
   const validationError =
@@ -80,6 +87,19 @@ export function useGusNipLookup({
   );
 
   useEffect(() => {
+    if (enabled && !wasEnabledRef.current && initialLookedUpNip) {
+      const seeded = normalizeNip(initialLookedUpNip);
+      if (isValidNip(seeded)) {
+        lastLookedUpNipRef.current = seeded;
+      }
+    }
+    wasEnabledRef.current = enabled;
+  }, [enabled, initialLookedUpNip]);
+
+  useEffect(() => {
+    if (trigger !== 'debounce') {
+      return;
+    }
     if (!enabled || !isValidNip(normalizedNip) || lastLookedUpNipRef.current === normalizedNip) {
       return;
     }
@@ -89,7 +109,7 @@ export function useGusNipLookup({
     }, debounceMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [enabled, normalizedNip, runLookup, debounceMs]);
+  }, [trigger, enabled, normalizedNip, runLookup, debounceMs]);
 
   const handleNipBlur = useCallback(() => {
     if (!enabled) {

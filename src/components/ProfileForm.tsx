@@ -69,6 +69,8 @@ export function ProfileForm({ user, includeBusinessData }: ProfileFormProps) {
   const gusLookup = useGusNipLookup({
     enabled: isContractorBusinessBlock && isEditingBusiness,
     nip: businessNip,
+    trigger: 'blur',
+    initialLookedUpNip: companySnapshot?.nip ?? null,
     onApply: applyGusCompanyData,
     onClearDerived: clearGusDerivedBusinessFields,
   });
