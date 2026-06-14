@@ -68,7 +68,7 @@ const CustomCheckbox: React.FC<{
       htmlFor={id}
       className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center ${
         checked
-          ? 'bg-blue-800 border-blue-800'
+          ? 'bg-primary border-primary'
           : 'bg-white border-gray-300 hover:border-gray-400'
       }`}
     >
@@ -263,7 +263,7 @@ export default function JobFilters({
                   <span className="font-normal text-blue-900">Aktualna lokalizacja</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-blue-800 font-semibold">{primaryLocation}</span>
+                  <span className="text-primary font-semibold">{primaryLocation}</span>
                   {onLocationChange && (
                     <Button
                       variant="ghost"

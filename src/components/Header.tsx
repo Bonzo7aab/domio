@@ -296,7 +296,7 @@ export function Header({
                   variant="default"
                   size="sm"
                   onClick={handleAdminPanelClick}
-                  className="shrink-0 bg-blue-800 hover:bg-blue-900"
+                  className="shrink-0"
                 >
                   ADMIN
                 </Button>
@@ -306,7 +306,7 @@ export function Header({
                     variant="default"
                     size="sm"
                     onClick={handleCreateContestClick}
-                    className="shrink-0 bg-blue-800 hover:bg-blue-900"
+                    className="shrink-0"
                   >
                     Utwórz konkurs
                   </Button>
@@ -737,12 +737,12 @@ export function Header({
             ) : (
               <>
                 <div className="md:hidden flex items-center space-x-2">
-                  <Button variant="default" size="sm" onClick={handleCreateContestClick} className="shrink-0 bg-blue-800 hover:bg-blue-900">
+                  <Button variant="default" size="sm" onClick={handleCreateContestClick} className="shrink-0">
                     Utwórz konkurs
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="default" size="sm" className="text-sm bg-blue-800 hover:bg-blue-900 text-white">
+                      <Button variant="default" size="sm" className="text-sm">
                         Zaloguj się
                         <ChevronDown className="h-4 w-4 ml-1" />
                       </Button>
@@ -762,7 +762,7 @@ export function Header({
                 <div className="hidden md:block">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="default" size="sm" className="text-sm bg-blue-800 hover:bg-blue-900 text-white">
+                      <Button variant="default" size="sm" className="text-sm">
                         Zaloguj się
                         <ChevronDown className="h-4 w-4 ml-1" />
                       </Button>

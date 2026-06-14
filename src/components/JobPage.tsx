@@ -1769,7 +1769,7 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     className={
                       hasExistingBid && job.postType === 'contest'
                         ? 'w-full'
-                        : 'w-full bg-blue-800 hover:bg-blue-900 text-white'
+                        : 'w-full'
                     }
                     size="lg"
                     isLoggedIn={Boolean(user)}
