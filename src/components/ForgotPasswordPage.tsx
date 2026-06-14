@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Alert, AlertDescription } from './ui/alert';
 import { useUserProfile } from '../contexts/AuthContext';
 import { requestPasswordResetEmailAction } from '../lib/auth/actions';
+import { BrandLogo } from './BrandLogo';
 
 interface ForgotPasswordPageProps {
   onBack: () => void;
@@ -73,12 +74,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
           {/* Logo and title */}
           <div className="text-center space-y-2">
             <div className="flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src="/logo.svg" 
-                alt="Urbi.eu Logo" 
-                className="h-16 w-auto"
-              />
+              <BrandLogo variant="full" className="h-16 w-auto" />
             </div>
           </div>
 
@@ -144,12 +140,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
         {/* Logo and title */}
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
-              src="/logo.svg" 
-              alt="Urbi.eu Logo" 
-              className="h-16 w-auto"
-            />
+            <BrandLogo variant="full" className="h-16 w-auto" />
           </div>
           <p className="text-muted-foreground">
             Resetowanie hasła

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { useFilterContext } from '../contexts/FilterContext';
 import { createClient } from '../lib/supabase/client';
 import { fetchAllCategories } from '../lib/database/categories';
@@ -187,9 +187,8 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
         >
             {categories.map(category => {
               const config = getCategoryConfig(category.slug);
-              if (!config) return null;
-
-              const Icon = config.icon;
+              const Icon = config?.icon ?? FileText;
+              const accentColor = config?.color ?? '#2563EB';
               const isSelected = isCategorySelected(category.name);
               const count = categoryCounts[category.name] || 0;
 
@@ -210,7 +209,7 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
                   style={
                     isSelected
                       ? {
-                          backgroundColor: `${config.color}08`,
+                          backgroundColor: `${accentColor}08`,
                         } as React.CSSProperties
                       : undefined
                   }
@@ -225,7 +224,7 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
                     style={
                       isSelected
                         ? {
-                            backgroundColor: `${config.color}20`,
+                            backgroundColor: `${accentColor}20`,
                           }
                         : undefined
                     }
@@ -235,7 +234,7 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
                         "w-5 h-5 sm:w-6 sm:h-6 transition-colors",
                         isSelected ? "" : "text-muted-foreground"
                       )}
-                      style={isSelected ? { color: config.color } : undefined}
+                      style={isSelected ? { color: accentColor } : undefined}
                     />
                   </div>
                   {count > 0 && (
@@ -247,7 +246,7 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
                       style={
                         isSelected
                           ? {
-                              backgroundColor: config.color,
+                              backgroundColor: accentColor,
                             }
                           : undefined
                       }
@@ -262,7 +261,7 @@ export default function CategoryIconBar({ jobs = [] }: CategoryIconBarProps) {
                       "text-[10px] sm:text-[11px] font-medium text-center leading-tight line-clamp-3",
                       isSelected ? "text-foreground" : "text-muted-foreground"
                     )}
-                    style={isSelected ? { color: config.color } : undefined}
+                    style={isSelected ? { color: accentColor } : undefined}
                   >
                     {category.name}
                   </span>

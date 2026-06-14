@@ -48,16 +48,18 @@ import {
   verificationMenuLabel,
 } from '../lib/verification/needs-verification-attention';
 import { CONTRACTOR_VERIFICATION_DOCUMENTS_PATH } from '../lib/verification/documents-route';
+import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   initialUser?: AuthUser | null;
-  /** Set server-side from Flagship `new-tender-system` flag. Defaults to Domio. */
-  brandTitle?: string;
   /** Set server-side from Flagship `orders` flag. Defaults to hidden. */
   showOrders?: boolean;
 }
 
-export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }: HeaderProps) {
+export function Header({
+  initialUser,
+  showOrders = false,
+}: HeaderProps) {
   const router = useNavigationWithLoading();
   const pathname = usePathname();
   const { setIsMapExpanded } = useLayoutContext();
@@ -275,9 +277,10 @@ export function Header({ initialUser, brandTitle = 'Domio', showOrders = false }
         <div className="flex items-center justify-between h-16">
           {/* 1. Logo Section - Left */}
           <div className="flex-shrink-0">
-            <h1 className="text-2xl font-bold cursor-pointer" style={{ color: '#1e40af' }} onClick={handleHomeClick}>
-              {brandTitle}
-            </h1>
+            <BrandLogo
+              variant="full"
+              onClick={handleHomeClick}
+            />
           </div>
 
           {/* 2. Center - Search (hidden on mobile) */}

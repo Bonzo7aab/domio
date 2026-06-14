@@ -61,25 +61,38 @@ export const categoryConfigs: Record<string, CategoryConfig> = {
   }
 };
 
+/** Legacy DB slugs (sample data / older migrations) → current config slugs */
+const categorySlugAliases: Record<string, string> = {
+  'remonty-budownictwo': 'roboty-budowlane-remonty',
+  'instalacje-techniczne': 'instalacje-systemy-techniczne',
+  'wykończenia-dekoracje': 'roboty-budowlane-remonty',
+  'usługi-sprzątające': 'sprzatanie-utrzymanie-czystosci',
+  'zarządzanie-nieruchomościami': 'przeglady-obsługa-techniczna',
+};
+
+function resolveCategorySlug(slug: string): string {
+  return categorySlugAliases[slug] ?? slug;
+}
+
 /**
  * Get category configuration by slug
  */
 export function getCategoryConfig(slug: string): CategoryConfig | undefined {
-  return categoryConfigs[slug];
+  return categoryConfigs[resolveCategorySlug(slug)];
 }
 
 /**
  * Get category color by slug
  */
 export function getCategoryColor(slug: string): string {
-  return categoryConfigs[slug]?.color || '#6b7280';
+  return getCategoryConfig(slug)?.color ?? '#6b7280';
 }
 
 /**
  * Get category icon by slug
  */
 export function getCategoryIcon(slug: string): LucideIcon {
-  return categoryConfigs[slug]?.icon || FileText;
+  return getCategoryConfig(slug)?.icon ?? FileText;
 }
 
 /**
