@@ -77,7 +77,7 @@ export default function RootLayout({
                 <JobsProvider>
                   <LayoutProvider>
                     <HeaderWithSession />
-                    <main className="min-h-[calc(100vh-10rem)] pb-20 lg:pb-0">
+                    <main className="min-h-[calc(100vh-12rem)] pb-20 lg:pb-0">
                       {children}
                     </main>
                     <MobileMenuDock />

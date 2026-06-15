@@ -6,22 +6,27 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { X, Cookie } from 'lucide-react'
 import Link from 'next/link'
 
-const COOKIE_CONSENT_KEY = 'cookie-consent'
+import { COOKIE_CONSENT_KEY, COOKIE_SETTINGS_EVENT } from '../lib/cookie-consent'
 
 export function CookieConsentBanner() {
   const [showBanner, setShowBanner] = useState(false)
 
   useEffect(() => {
-    // Check if user has already given consent
-    // Only check in browser environment
-    if (typeof window !== 'undefined') {
+    const syncBannerVisibility = () => {
+      if (typeof window === 'undefined') return
       const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
-      if (!consent) {
-        // Use setTimeout to avoid synchronous setState in effect
-        setTimeout(() => {
-          setShowBanner(true)
-        }, 0)
-      }
+      setShowBanner(!consent)
+    }
+
+    syncBannerVisibility()
+
+    const handleOpenSettings = () => {
+      setShowBanner(true)
+    }
+
+    window.addEventListener(COOKIE_SETTINGS_EVENT, handleOpenSettings)
+    return () => {
+      window.removeEventListener(COOKIE_SETTINGS_EVENT, handleOpenSettings)
     }
   }, [])
 
