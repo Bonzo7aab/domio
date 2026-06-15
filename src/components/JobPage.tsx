@@ -53,6 +53,10 @@ import { ManagerJobStatusSelect } from './manager-dashboard/ManagerJobStatusSele
 import { canManagerEditJobFields, getJobWorkflowStatusLabel } from '../lib/job-workflow-status';
 import { getContestWorkflowStatusLabel } from '../lib/tender-workflow-status';
 import { formatContestLocation } from '../lib/contest-display';
+import {
+  getCategoryDisplayName,
+  getSubcategoryDisplayName,
+} from '../lib/config/categoryConfig';
 import { ContestStatusBadge } from './manager-dashboard/ContestStatusBadge';
 import { VerificationRequiredApplyDialog } from './VerificationRequiredApplyDialog';
 import { needsVerificationAttention } from '../lib/verification/needs-verification-attention';
@@ -1199,11 +1203,17 @@ const JobPage: React.FC<JobPageProps> = ({ jobId, onBack, onJobSelect }) => {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
-                        {typeof job.category === 'string' ? job.category : job.category?.name || 'Inne'}
+                        {getCategoryDisplayName({
+                          slug: typeof job.category === 'object' ? job.category?.slug : undefined,
+                          name: typeof job.category === 'string' ? job.category : job.category?.name,
+                        })}
                       </Badge>
                       {job.subcategory ? (
                         <Badge variant="secondary" className="shrink-0 text-[10px] sm:text-xs md:text-sm">
-                          {job.subcategory}
+                          {getSubcategoryDisplayName({
+                            name: job.subcategory,
+                            categorySlug: typeof job.category === 'object' ? job.category?.slug : undefined,
+                          }) ?? job.subcategory}
                         </Badge>
                       ) : null}
                     </div>
